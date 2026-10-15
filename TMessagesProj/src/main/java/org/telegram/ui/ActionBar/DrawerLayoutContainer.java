@@ -292,6 +292,9 @@ public class DrawerLayoutContainer extends FrameLayout {
         animatorSet.start();
     }
 
+    /** Drawer ochilganda/yopilganda xabar berish uchun (YuzGram pastki bar). */
+    public Runnable onDrawerAnimationChanged;
+
     private void onDrawerAnimationEnd(boolean opened) {
         startedTracking = false;
         currentAnimation = null;
@@ -305,6 +308,9 @@ public class DrawerLayoutContainer extends FrameLayout {
             }
         }
         sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED);
+        if (onDrawerAnimationChanged != null) {
+            onDrawerAnimationChanged.run();
+        }
     }
 
     private void setScrimOpacity(float value) {

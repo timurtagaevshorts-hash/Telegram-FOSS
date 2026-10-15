@@ -13,11 +13,10 @@ import org.telegram.ui.Components.LayoutHelper;
 
 /**
  * "Elonlar" (classifieds) bo'limi — YuzGram pastki navigatsiyasining 2-tab'i.
+ * Pastki bar LaunchActivity darajasida (doimiy) chiziladi — bu ekran o'z bari'ni qo'shmaydi.
  * Faza B: placeholder. Faza C'da bu yerga eski KinoTOP4 elonlar feed'i ko'chiriladi.
  */
 public class ElonlarActivity extends BaseFragment {
-
-    private YuzGramBottomBar bottomBar;
 
     @Override
     public View createView(Context context) {
@@ -41,18 +40,10 @@ public class ElonlarActivity extends BaseFragment {
         placeholder.setGravity(Gravity.CENTER);
         placeholder.setTextSize(16);
         placeholder.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+        // Pastdagi doimiy bar ostiga tushmasligi uchun joy bo'shatamiz.
+        placeholder.setPadding(0, 0, 0, YuzGramBottomBar.height());
         root.addView(placeholder, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.CENTER));
 
-        bottomBar = new YuzGramBottomBar(context);
-        bottomBar.setActiveTab(YuzGramBottomBar.TAB_ELONLAR);
-        bottomBar.setOnTabSelectedListener(tab -> YuzGramNav.select(ElonlarActivity.this, tab));
-        root.addView(bottomBar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, YuzGramBottomBar.height(), Gravity.BOTTOM));
-
         return root;
-    }
-
-    @Override
-    public boolean onFragmentCreate() {
-        return super.onFragmentCreate();
     }
 }

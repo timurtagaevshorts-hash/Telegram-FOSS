@@ -3285,6 +3285,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             callItem.setContentDescription(LocaleController.getString("Call", R.string.Call));
         }
         if (myProfile) {
+            // YuzGram "Profil" tab'i: o'z profilida qo'ng'iroq/video kerak emas.
+            videoCallItem.setVisibility(View.GONE);
+            callItem.setVisibility(View.GONE);
+        }
+        if (myProfile) {
             editItem = menu.addItem(edit_profile, R.drawable.group_edit_profile);
             editItem.setContentDescription(LocaleController.getString("Edit", R.string.Edit));
         } else {

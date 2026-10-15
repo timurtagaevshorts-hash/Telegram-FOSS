@@ -589,8 +589,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     private int folderId;
 
-    // YuzGram pastki navigatsiya bari (faqat asosiy chats root'ida ko'rinadi)
-    private uz.kodlikino.top4.ui.YuzGramBottomBar yuzGramBottomBar;
+    // YuzGram pastki navigatsiya uchun ro'yxat pastida joy bo'shatish bayrog'i
+    // (bar o'zi LaunchActivity darajasida chiziladi)
     private boolean hasYuzGramBottomBar;
 
     private final static int pin = 100;
@@ -2673,8 +2673,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     /**
      * Pastki navigatsiya faqat haqiqiy asosiy chats root'ida ko'rsatiladi:
      * papka emas, tanlash rejimi emas, izlash emas, standart dialoglar turi.
+     * LaunchActivity bar ko'rinishini shu orqali hal qiladi.
      */
-    private boolean shouldShowYuzGramBottomBar() {
+    public boolean isYuzGramMainRoot() {
         return !onlySelect && folderId == 0 && searchString == null
                 && initialDialogsType == DIALOGS_TYPE_DEFAULT;
     }
@@ -4458,7 +4459,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (initialDialogsType != DIALOGS_TYPE_WIDGET) {
             floatingButton2Container = new FrameLayout(context);
             floatingButton2Container.setVisibility(onlySelect && initialDialogsType != 10 || folderId != 0 || !storiesEnabled ? View.GONE : View.VISIBLE);
-            contentView.addView(floatingButton2Container, LayoutHelper.createFrame((Build.VERSION.SDK_INT >= 21 ? 36 : 40), (Build.VERSION.SDK_INT >= 21 ? 36 : 40), (LocaleController.isRTL ? Gravity.LEFT : Gravity.RIGHT) | Gravity.BOTTOM, LocaleController.isRTL ? 24 : 0, 0, LocaleController.isRTL ? 0 : 24, 14 + 60 + 8));
+            contentView.addView(floatingButton2Container, LayoutHelper.createFrame((Build.VERSION.SDK_INT >= 21 ? 36 : 40), (Build.VERSION.SDK_INT >= 21 ? 36 : 40), (LocaleController.isRTL ? Gravity.LEFT : Gravity.RIGHT) | Gravity.BOTTOM, LocaleController.isRTL ? 24 : 0, 0, LocaleController.isRTL ? 0 : 24, 14 + 60 + 8 + (isYuzGramMainRoot() ? uz.kodlikino.top4.ui.YuzGramBottomBar.HEIGHT_DP : 0)));
             floatingButton2Container.setOnClickListener(v -> {
                 if (parentLayout != null && parentLayout.isInPreviewMode()) {
                     finishPreviewFragment();
@@ -4502,7 +4503,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
         floatingButtonContainer = new FrameLayout(context);
         floatingButtonContainer.setVisibility(onlySelect && initialDialogsType != 10 || folderId != 0 ? View.GONE : View.VISIBLE);
-        contentView.addView(floatingButtonContainer, LayoutHelper.createFrame((Build.VERSION.SDK_INT >= 21 ? 56 : 60), (Build.VERSION.SDK_INT >= 21 ? 56 : 60), (LocaleController.isRTL ? Gravity.LEFT : Gravity.RIGHT) | Gravity.BOTTOM, LocaleController.isRTL ? 14 : 0, 0, LocaleController.isRTL ? 0 : 14, 14));
+        contentView.addView(floatingButtonContainer, LayoutHelper.createFrame((Build.VERSION.SDK_INT >= 21 ? 56 : 60), (Build.VERSION.SDK_INT >= 21 ? 56 : 60), (LocaleController.isRTL ? Gravity.LEFT : Gravity.RIGHT) | Gravity.BOTTOM, LocaleController.isRTL ? 14 : 0, 0, LocaleController.isRTL ? 0 : 14, 14 + (isYuzGramMainRoot() ? uz.kodlikino.top4.ui.YuzGramBottomBar.HEIGHT_DP : 0)));
         floatingButtonContainer.setOnClickListener(v -> {
             if (parentLayout != null && parentLayout.isInPreviewMode()) {
                 finishPreviewFragment();
@@ -5089,14 +5090,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             contentView.addView(animatedStatusView, LayoutHelper.createFrame(20, 20, Gravity.LEFT | Gravity.TOP));
         }
 
-        if (shouldShowYuzGramBottomBar()) {
+        if (isYuzGramMainRoot()) {
+            // Bar LaunchActivity darajasida (doimiy) chiziladi; bu yerda faqat
+            // ro'yxat ostida bar uchun joy bo'shatamiz.
             hasYuzGramBottomBar = true;
-            yuzGramBottomBar = new uz.kodlikino.top4.ui.YuzGramBottomBar(context);
-            yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ASOSIY);
-            yuzGramBottomBar.setOnTabSelectedListener(tab ->
-                    uz.kodlikino.top4.ui.YuzGramNav.select(DialogsActivity.this, tab));
-            contentView.addView(yuzGramBottomBar, LayoutHelper.createFrame(
-                    LayoutHelper.MATCH_PARENT, uz.kodlikino.top4.ui.YuzGramBottomBar.height(), Gravity.BOTTOM));
         }
 
         if (searchString == null && initialDialogsType == DIALOGS_TYPE_DEFAULT) {

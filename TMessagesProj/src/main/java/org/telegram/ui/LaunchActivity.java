@@ -260,6 +260,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     private View themeSwitchSunView;
     private RLottieDrawable themeSwitchSunDrawable;
     private ActionBarLayout actionBarLayout;
+    private uz.kodlikino.top4.ui.YuzGramBottomBar yuzGramBottomBar;
     private ActionBarLayout layersActionBarLayout;
     private ActionBarLayout rightActionBarLayout;
     private RelativeLayout launchLayout;
@@ -464,6 +465,19 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         drawerLayoutContainer.setBehindKeyboardColor(Theme.getColor(Theme.key_windowBackgroundWhite));
 
         frameLayout.addView(drawerLayoutContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+
+        // YuzGram doimiy pastki navigatsiya bari (LaunchActivity darajasida — fragmentlar
+        // ustida qoladi, ichki ekranlarda (chat) animatsiya bilan yashiriladi).
+        yuzGramBottomBar = new uz.kodlikino.top4.ui.YuzGramBottomBar(this);
+        yuzGramBottomBar.setOnTabSelectedListener(tab -> {
+            BaseFragment top = getLastFragment();
+            uz.kodlikino.top4.ui.YuzGramNav.select(top, tab);
+        });
+        yuzGramBottomBar.setVisibility(View.GONE);
+        yuzGramBottomBar.setTranslationY(uz.kodlikino.top4.ui.YuzGramBottomBar.height());
+        frameLayout.addView(yuzGramBottomBar, LayoutHelper.createFrame(
+                LayoutHelper.MATCH_PARENT, uz.kodlikino.top4.ui.YuzGramBottomBar.height(), Gravity.BOTTOM));
+        drawerLayoutContainer.onDrawerAnimationChanged = this::updateYuzGramBottomBar;
 
         if (Build.VERSION.SDK_INT >= 21) {
             themeSwitchSunView = new View(this) {
@@ -809,6 +823,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             if (getLastFragment() != null && getLastFragment().getLastStoryViewer() != null) {
                 getLastFragment().getLastStoryViewer().updatePlayingMode();
             }
+            updateYuzGramBottomBar();
         });
         actionBarLayout.setDelegate(this);
         Theme.loadWallpaper(true);
@@ -7925,6 +7940,37 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             }
         }
         drawerLayoutAdapter.notifyDataSetChanged();
+    }
+
+    /**
+     * YuzGram pastki navigatsiya barining ko'rinishini joriy top fragment'dan
+     * kelib chiqib yangilaydi. Faqat 3 ta root ekranda ko'rsatiladi; chat kabi
+     * ichki ekranlar, varaqalar (sheet) va qatlamlar (layer) ustida yashiriladi.
+     */
+    private void updateYuzGramBottomBar() {
+        if (yuzGramBottomBar == null) {
+            return;
+        }
+        BaseFragment top = getLastFragment();
+        if (top == null) {
+            return; // o'tish payti — joriy holatni saqlaymiz (flicker oldini oladi)
+        }
+        int tab = -1;
+        if (drawerLayoutContainer != null && drawerLayoutContainer.isDrawerOpened()) {
+            tab = -1; // yon menyu ochiq — bar ko'rinmasin
+        } else if (top instanceof uz.kodlikino.top4.ui.ElonlarActivity) {
+            tab = uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ELONLAR;
+        } else if (top instanceof ProfileActivity && ((ProfileActivity) top).myProfile) {
+            tab = uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_PROFIL;
+        } else if (top instanceof DialogsActivity && ((DialogsActivity) top).isYuzGramMainRoot()) {
+            tab = uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ASOSIY;
+        }
+        if (tab >= 0) {
+            yuzGramBottomBar.setActiveTab(tab, yuzGramBottomBar.isShownBar());
+            yuzGramBottomBar.setVisible(true);
+        } else {
+            yuzGramBottomBar.setVisible(false);
+        }
     }
 
     public static BaseFragment getLastFragment() {
