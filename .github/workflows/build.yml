@@ -101,6 +101,29 @@ jobs:
           echo "=== produced static libs ==="
           find ffmpeg/build libvpx/build boringssl/build -name '*.a' 2>/dev/null | sort
 
+      - name: Prepare YuzGram release keystore (from secrets)
+        env:
+          KS_B64: ${{ secrets.YUZGRAM_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.YUZGRAM_STORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.YUZGRAM_KEY_ALIAS }}
+          KS_KPASS: ${{ secrets.YUZGRAM_KEY_PASSWORD }}
+        run: |
+          # Expose the keystore to gradle as *project* properties via ORG_GRADLE_PROJECT_* env vars.
+          # TMessagesProj_App/build.gradle only wires signingConfig when YUZGRAM_STORE_FILE is present,
+          # so a missing secret cleanly produces an unsigned build instead of failing.
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/yuzgram-release.keystore"
+            {
+              echo "ORG_GRADLE_PROJECT_YUZGRAM_STORE_FILE=$RUNNER_TEMP/yuzgram-release.keystore"
+              echo "ORG_GRADLE_PROJECT_YUZGRAM_STORE_PASSWORD=$KS_PASS"
+              echo "ORG_GRADLE_PROJECT_YUZGRAM_KEY_ALIAS=$KS_ALIAS"
+              echo "ORG_GRADLE_PROJECT_YUZGRAM_KEY_PASSWORD=$KS_KPASS"
+            } >> "$GITHUB_ENV"
+            echo "YuzGram signing ENABLED"
+          else
+            echo "YuzGram signing DISABLED (unsigned APK)"
+          fi
+
       - name: Build APK (:TMessagesProj_App:assembleAfatRelease)
         run: ./gradlew --no-daemon :TMessagesProj_App:assembleAfatRelease
 

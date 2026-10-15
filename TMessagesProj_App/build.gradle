@@ -44,6 +44,21 @@ android {
         coreLibraryDesugaringEnabled true
     }
 
+    signingConfigs {
+        release {
+            // YuzGram release signing. Only wired when the keystore properties are
+            // provided (locally via gradle.properties, or in CI via secrets/env).
+            // Without them the release build stays unsigned, exactly as before.
+            if (project.hasProperty('YUZGRAM_STORE_FILE')) {
+                storeFile file(project.property('YUZGRAM_STORE_FILE'))
+                storePassword project.property('YUZGRAM_STORE_PASSWORD')
+                keyAlias project.property('YUZGRAM_KEY_ALIAS')
+                keyPassword project.property('YUZGRAM_KEY_PASSWORD')
+                v2SigningEnabled true
+            }
+        }
+    }
+
     buildTypes {
         debug {
             debuggable true
@@ -74,6 +89,9 @@ android {
             multiDexEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), '../TMessagesProj/proguard-rules.pro'
             ndk.debugSymbolLevel = 'FULL'
+            if (project.hasProperty('YUZGRAM_STORE_FILE')) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 

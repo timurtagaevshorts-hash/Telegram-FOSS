@@ -20,3 +20,7 @@ TMessagesProj/.externalNativeBuild/
 TMessagesProj/jni/ffmpeg/android/
 TMessagesProj/jni/ffmpeg/build/
 TMessagesProj/jni/boringssl/build/
+
+# YuzGram local signing (CI uses GitHub secrets)
+release.keystore
+*.jks
