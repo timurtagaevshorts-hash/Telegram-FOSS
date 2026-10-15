@@ -1,0 +1,161 @@
+{
+  "project_info": {
+    "project_number": "418391546865",
+    "project_id": "kinotop-f0c3e",
+    "storage_bucket": "kinotop-f0c3e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:418391546865:android:183b72be25bb4b455f4250",
+        "android_client_info": {
+          "package_name": "com.example.kinotop"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "418391546865-mnitneus114ogd29568nl9a3283ho9h5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.kinotop",
+            "certificate_hash": "49d6ed77798da7e3f4169b2ea30b4f15ecde7eb0"
+          }
+        },
+        {
+          "client_id": "418391546865-ohs1unmhojt4pak86v8tr1cq68a0jarm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.kinotop",
+            "certificate_hash": "39a3d0459a9add0e448a564d8aa063340c283093"
+          }
+        },
+        {
+          "client_id": "418391546865-8frnvkpj08uvh2943pjobh0oi57586uk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMEKUf0dVHe3U570n3VQLm33L0w-BhrEM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "418391546865-8frnvkpj08uvh2943pjobh0oi57586uk.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:418391546865:android:904a947f090e7bd45f4250",
+        "android_client_info": {
+          "package_name": "uz.kodlikino.top4"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "418391546865-859hgdh3mdj6vg77gagcnf3kmjtor73m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "uz.kodlikino.top4",
+            "certificate_hash": "f4de68a4ad3edb21f8ba24c1f7e4f0d277409861"
+          }
+        },
+        {
+          "client_id": "418391546865-914318sg5sm28slc117vjhucctfadvr1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "uz.kodlikino.top4",
+            "certificate_hash": "39a3d0459a9add0e448a564d8aa063340c283093"
+          }
+        },
+        {
+          "client_id": "418391546865-cgev660gv8smvv3m5qreo885r7lh2lvg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "uz.kodlikino.top4",
+            "certificate_hash": "49d6ed77798da7e3f4169b2ea30b4f15ecde7eb0"
+          }
+        },
+        {
+          "client_id": "418391546865-kdc4ob63epbck4b341mce0bhlufq6hpk.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "uz.kodlikino.top4",
+            "certificate_hash": "2aac4b75c22442a9f6a2411a88b13e73d5efda5e"
+          }
+        },
+        {
+          "client_id": "418391546865-8frnvkpj08uvh2943pjobh0oi57586uk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMEKUf0dVHe3U570n3VQLm33L0w-BhrEM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "418391546865-8frnvkpj08uvh2943pjobh0oi57586uk.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:418391546865:android:42881a582253c99d5f4250",
+        "android_client_info": {
+          "package_name": "uz.versechat.top"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "418391546865-4lefemvpgesfabke34m06ni9k2pnktmo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "uz.versechat.top",
+            "certificate_hash": "49d6ed77798da7e3f4169b2ea30b4f15ecde7eb0"
+          }
+        },
+        {
+          "client_id": "418391546865-d8jcnabbeh9icmq3o88qmht50ad3dmar.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "uz.versechat.top",
+            "certificate_hash": "39a3d0459a9add0e448a564d8aa063340c283093"
+          }
+        },
+        {
+          "client_id": "418391546865-8frnvkpj08uvh2943pjobh0oi57586uk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMEKUf0dVHe3U570n3VQLm33L0w-BhrEM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "418391546865-8frnvkpj08uvh2943pjobh0oi57586uk.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

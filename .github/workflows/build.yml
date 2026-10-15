@@ -86,6 +86,18 @@ jobs:
           echo "=== App abiFilters ==="; grep -n "abiFilters" TMessagesProj_App/build.gradle || true
           echo "=== Lib ndk ==="; grep -n "abiFilters" TMessagesProj/build.gradle || true
 
+      - name: Cache native libraries (ffmpeg, libvpx, boringssl)
+        uses: actions/cache@v4
+        with:
+          path: |
+            TMessagesProj/jni/ffmpeg/build
+            TMessagesProj/jni/libvpx/build
+            TMessagesProj/jni/boringssl/build
+          key: native-${{ runner.os }}-ndk${{ env.NDK_VERSION }}-${{ hashFiles('TMessagesProj/jni/build_ffmpeg_clang.sh', 'TMessagesProj/jni/build_libvpx_clang.sh', 'TMessagesProj/jni/build_boringssl.sh', 'TMessagesProj/jni/patch_ffmpeg.sh', 'TMessagesProj/jni/patch_boringssl.sh', 'TMessagesProj/jni/CMakeLists.txt') }}
+          restore-keys: |
+            native-${{ runner.os }}-ndk${{ env.NDK_VERSION }}-
+            native-${{ runner.os }}-
+
       - name: Build native libraries (ffmpeg, libvpx, boringssl)
         working-directory: TMessagesProj/jni
         run: |
@@ -93,6 +105,17 @@ jobs:
           export NINJA_PATH="$(command -v ninja)"
           export COMPILATION_PROC_COUNT="$(nproc)"
           echo "NDK=$NDK"; echo "NINJA=$NINJA_PATH"
+          # Skip the ~25min native build when the cached .a files are already present.
+          have() { ls "$1" >/dev/null 2>&1; }
+          if have ffmpeg/build/arm64/lib/libavcodec.a && have ffmpeg/build/arm64/lib/libswscale.a \
+             && have ffmpeg/build/arm/lib/libavcodec.a \
+             && have libvpx/build/arm64/lib/libvpx.a && have libvpx/build/arm/lib/libvpx.a \
+             && have boringssl/build/arm64/ssl/libssl.a && have boringssl/build/arm64/crypto/libcrypto.a \
+             && have boringssl/build/arm/ssl/libssl.a && have boringssl/build/arm/crypto/libcrypto.a; then
+            echo "=== native libs already present (cache hit) -> skipping build ==="
+            find ffmpeg/build libvpx/build boringssl/build -name '*.a' 2>/dev/null | sort
+            exit 0
+          fi
           ./build_libvpx_clang.sh arm64 arm
           ./build_ffmpeg_clang.sh arm64 arm
           ./patch_ffmpeg.sh
@@ -100,6 +123,16 @@ jobs:
           ./build_boringssl.sh arm64 arm
           echo "=== produced static libs ==="
           find ffmpeg/build libvpx/build boringssl/build -name '*.a' 2>/dev/null | sort
+
+      - name: Cache gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle/wrapper/gradle-wrapper.properties', 'gradle.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
       - name: Prepare YuzGram release keystore (from secrets)
         env:
