@@ -15,4 +15,7 @@
 <color name="text_hint">#5E6F84</color>
 <color name="text_primary">#FFFFFF</color>
 <color name="text_secondary">#95A1B4</color>
+<color name="home_bg">#000000</color>
+<color name="chat_bg_top">#0E1621</color>
+<color name="nav_chat_active">#A855F7</color>
 </resources>
