@@ -77,10 +77,14 @@ jobs:
           echo "=== cmake ==="; ls "$SDK_ROOT/cmake"
           echo "=== ndk ==="; ls "$SDK_ROOT/ndk"
 
-      - name: Trim ABIs to arm64-v8a + armeabi-v7a (faster + reliable build)
+      - name: Restrict ABIs to arm64-v8a + armeabi-v7a (match native libs)
         run: |
+          # App module: drop x86/x86_64 from packaging abiFilters
           sed -i 's/, "x86", "x86_64"//g' TMessagesProj_App/build.gradle
-          grep -n "abiFilters" TMessagesProj_App/build.gradle || true
+          # Library module: restrict CMake/externalNativeBuild to arm, else ninja wants x86 .a we never built
+          sed -i '/^        multiDexEnabled true$/a\        ndk { abiFilters "armeabi-v7a", "arm64-v8a" }' TMessagesProj/build.gradle
+          echo "=== App abiFilters ==="; grep -n "abiFilters" TMessagesProj_App/build.gradle || true
+          echo "=== Lib ndk ==="; grep -n "abiFilters" TMessagesProj/build.gradle || true
 
       - name: Build native libraries (ffmpeg, libvpx, boringssl)
         working-directory: TMessagesProj/jni
