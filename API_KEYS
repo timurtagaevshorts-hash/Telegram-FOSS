@@ -1,0 +1,5 @@
+# YuzGram — Telegram API credentials (reused from previous KinoTOP4 build)
+# Source: app/src/main/java/uz/kodlikino/top4/telegram/TelegramConfig.kt
+# Consumed by TMessagesProj/build.gradle via Properties.load
+APP_ID = 34607471
+APP_HASH = 1949b721c03dd554984993b56491f12d

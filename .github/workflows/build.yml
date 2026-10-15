@@ -1,0 +1,94 @@
+name: Build YuzGram APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, yuzgram-ci ]
+  pull_request:
+
+env:
+  NDK_VERSION: 21.4.7075529
+
+jobs:
+  build:
+    # Telegram-FOSS native + gradle build needs a full Linux toolchain.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Install host tools (yasm, autoconf, cmake, ninja, patch)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yasm autoconf libtool cmake ninja-build patch file
+
+      - name: Set up JDK 11 (AGP 7.0.3)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Set up Go (boringssl codegen)
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.20'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK + SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-33" \
+            "build-tools;33.0.0" \
+            "build-tools;30.0.3" \
+            "cmake;3.10.2.4988405" \
+            "ndk;${NDK_VERSION}"
+          # Telegram-FOSS/Dockerfile parity: AGP 7.0.3 still expects a dx in build-tools 33
+          if [ -f "$ANDROID_HOME/build-tools/30.0.3/dx" ] && [ ! -f "$ANDROID_HOME/build-tools/33.0.0/dx" ]; then
+            cp "$ANDROID_HOME/build-tools/30.0.3/dx" "$ANDROID_HOME/build-tools/33.0.0/dx"
+            cp "$ANDROID_HOME/build-tools/30.0.3/lib/dx.jar" "$ANDROID_HOME/build-tools/33.0.0/lib/dx.jar"
+          fi
+
+      - name: Trim ABIs to arm64-v8a + armeabi-v7a (faster + reliable build)
+        run: |
+          sed -i 's/, "x86", "x86_64"//g' TMessagesProj_App/build.gradle
+          grep -n "abiFilters" TMessagesProj_App/build.gradle || true
+
+      - name: Build native libraries (ffmpeg, libvpx, boringssl)
+        working-directory: TMessagesProj/jni
+        run: |
+          export NDK="$ANDROID_HOME/ndk/${NDK_VERSION}"
+          export NINJA_PATH="$(command -v ninja)"
+          export COMPILATION_PROC_COUNT="$(nproc)"
+          echo "NDK=$NDK"; echo "NINJA=$NINJA_PATH"
+          ./build_libvpx_clang.sh arm64 arm
+          ./build_ffmpeg_clang.sh arm64 arm
+          ./patch_ffmpeg.sh
+          ./patch_boringssl.sh
+          ./build_boringssl.sh arm64 arm
+          echo "=== produced static libs ==="
+          find ffmpeg/build libvpx/build boringssl/build -name '*.a' 2>/dev/null | sort
+
+      - name: Build APK (:TMessagesProj_App:assembleAfatRelease)
+        run: ./gradlew --no-daemon :TMessagesProj_App:assembleAfatRelease
+
+      - name: Collect APKs
+        run: |
+          mkdir -p /tmp/artifacts
+          find TMessagesProj_App/build/outputs/apk -name '*.apk' -exec cp -v {} /tmp/artifacts/ \;
+          ls -la /tmp/artifacts
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YuzGram-APK
+          path: /tmp/artifacts/*.apk
+          if-no-files-found: error
+          retention-days: 30
