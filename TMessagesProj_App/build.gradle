@@ -71,12 +71,17 @@ android {
         debug {
             debuggable true
             jniDebuggable true
-            applicationIdSuffix ".beta"
+            // NOTE: no applicationIdSuffix — keeps package = uz.kodlikino.top4 so the
+            // Telegram api_id signature/package check still passes on-device for fast debug iteration.
             minifyEnabled false
             shrinkResources false
             multiDexEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), '../TMessagesProj/proguard-rules.pro'
             ndk.debugSymbolLevel = 'FULL'
+            // Sign debug with the same YuzGram keystore so login/api_id keeps working.
+            if (project.hasProperty('YUZGRAM_STORE_FILE')) {
+                signingConfig signingConfigs.release
+            }
         }
 
         standalone {

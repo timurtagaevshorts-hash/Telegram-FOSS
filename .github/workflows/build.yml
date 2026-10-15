@@ -2,6 +2,15 @@ name: Build YuzGram APK
 
 on:
   workflow_dispatch:
+    inputs:
+      variant:
+        description: 'APK variant to build'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
   push:
     branches: [ main, yuzgram-ci ]
   pull_request:
@@ -158,8 +167,22 @@ jobs:
             echo "YuzGram signing DISABLED (unsigned APK)"
           fi
 
-      - name: Build APK (:TMessagesProj_App:assembleAfatRelease)
-        run: ./gradlew --no-daemon :TMessagesProj_App:assembleAfatRelease
+      - name: Resolve build variant
+        run: |
+          # Debug = fast iteration (no R8 shrinking, ~much quicker). Release = final signed/publish build.
+          # push/PR always build debug; workflow_dispatch honors the chosen 'variant' input.
+          VAR="${{ github.event.inputs.variant }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$VAR" = "release" ]; then
+            echo "GRADLE_TASK=:TMessagesProj_App:assembleAfatRelease" >> "$GITHUB_ENV"
+            echo "APK_LABEL=release" >> "$GITHUB_ENV"
+          else
+            echo "GRADLE_TASK=:TMessagesProj_App:assembleAfatDebug" >> "$GITHUB_ENV"
+            echo "APK_LABEL=debug" >> "$GITHUB_ENV"
+          fi
+          echo "Building $GRADLE_TASK (label: $APK_LABEL)"
+
+      - name: Build APK
+        run: ./gradlew --no-daemon "$GRADLE_TASK"
 
       - name: Collect APKs
         run: |
@@ -170,7 +193,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: YuzGram-APK
+          name: YuzGram-APK-${{ env.APK_LABEL }}
           path: /tmp/artifacts/*.apk
           if-no-files-found: error
           retention-days: 30
