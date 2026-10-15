@@ -230,9 +230,9 @@ class ClassifiedAdDetailActivity(
         actionBar?.visibility = View.GONE
     }
 
-    override fun onDestroy() {
+    override fun onFragmentDestroy() {
         scope?.cancel()
         scope = null
-        super.onDestroy()
+        super.onFragmentDestroy()
     }
 }
