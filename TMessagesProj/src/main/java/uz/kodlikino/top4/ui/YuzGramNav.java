@@ -44,13 +44,6 @@ public final class YuzGramNav {
                 args.putBoolean("my_profile", true);
                 current.presentFragment(new ProfileActivity(args, null), true);
                 break;
-            case YuzGramBottomBar.TAB_PROFIL: {
-                Bundle args = new Bundle();
-                args.putLong("user_id", UserConfig.getInstance(current.getCurrentAccount()).getClientUserId());
-                args.putBoolean("my_profile", true);
-                current.presentFragment(new ProfileActivity(args, null), true);
-                break;
-            }
         }
     }
 }
