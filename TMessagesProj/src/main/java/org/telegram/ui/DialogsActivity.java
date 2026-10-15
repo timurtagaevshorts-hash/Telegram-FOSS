@@ -589,6 +589,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     private int folderId;
 
+    // YuzGram pastki navigatsiya bari (faqat asosiy chats root'ida ko'rinadi)
+    private uz.kodlikino.top4.ui.YuzGramBottomBar yuzGramBottomBar;
+    private boolean hasYuzGramBottomBar;
+
     private final static int pin = 100;
     private final static int read = 101;
     private final static int delete = 102;
@@ -2074,9 +2078,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     t += authHintCell.getMeasuredHeight();
                     additionalPadding += authHintCell.getMeasuredHeight();
                 }
-                if (t != getPaddingTop()) {
+                final int yuzBottomPad = hasYuzGramBottomBar ? uz.kodlikino.top4.ui.YuzGramBottomBar.height() : 0;
+                if (t != getPaddingTop() || yuzBottomPad != getPaddingBottom()) {
                     setTopGlowOffset(t);
-                    setPadding(0, t, 0, 0);
+                    setPadding(0, t, 0, yuzBottomPad);
                     if (hasStories) {
                         parentPage.progressView.setPaddingTop(t - dp(DialogStoriesCell.HEIGHT_IN_DP));
                     } else {
@@ -2663,6 +2668,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     public DialogsActivity(Bundle args) {
         super(args);
+    }
+
+    /**
+     * Pastki navigatsiya faqat haqiqiy asosiy chats root'ida ko'rsatiladi:
+     * papka emas, tanlash rejimi emas, izlash emas, standart dialoglar turi.
+     */
+    private boolean shouldShowYuzGramBottomBar() {
+        return !onlySelect && folderId == 0 && searchString == null
+                && initialDialogsType == DIALOGS_TYPE_DEFAULT;
     }
 
     @Override
@@ -5073,6 +5087,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (!onlySelect) {
             animatedStatusView = new DrawerProfileCell.AnimatedStatusView(context, 20, 60);
             contentView.addView(animatedStatusView, LayoutHelper.createFrame(20, 20, Gravity.LEFT | Gravity.TOP));
+        }
+
+        if (shouldShowYuzGramBottomBar()) {
+            hasYuzGramBottomBar = true;
+            yuzGramBottomBar = new uz.kodlikino.top4.ui.YuzGramBottomBar(context);
+            yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ASOSIY);
+            yuzGramBottomBar.setOnTabSelectedListener(tab ->
+                    uz.kodlikino.top4.ui.YuzGramNav.select(DialogsActivity.this, tab));
+            contentView.addView(yuzGramBottomBar, LayoutHelper.createFrame(
+                    LayoutHelper.MATCH_PARENT, uz.kodlikino.top4.ui.YuzGramBottomBar.height(), Gravity.BOTTOM));
         }
 
         if (searchString == null && initialDialogsType == DIALOGS_TYPE_DEFAULT) {
