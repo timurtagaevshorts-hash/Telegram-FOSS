@@ -48,21 +48,19 @@ jobs:
           fi
           "$SDKMANAGER" --version || true
 
-      - name: Install NDK + SDK packages
+      - name: Install NDK (required for native build) + SDK packages
         run: |
-          yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" --install \
-            "platform-tools" \
-            "platforms;android-33" \
-            "build-tools;33.0.0" \
-            "build-tools;30.0.3" \
-            "cmake;3.10.2.4988405" \
-            "ndk;${NDK_VERSION}"
-          # Telegram-FOSS/Dockerfile parity: AGP 7.0.3 still expects a dx in build-tools 33
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          # NDK is mandatory and must exist before the native build scripts run.
+          "$SDKMANAGER" "ndk;${NDK_VERSION}" "platform-tools"
+          # Best-effort extras; AGP auto-downloads any missing build-tools/platform/cmake.
+          "$SDKMANAGER" "platforms;android-33" "build-tools;33.0.0" "build-tools;30.0.3" || true
+          # Telegram-FOSS/Dockerfile parity: AGP 7.0.3 may still expect a dx in build-tools 33
           if [ -f "$ANDROID_HOME/build-tools/30.0.3/dx" ] && [ ! -f "$ANDROID_HOME/build-tools/33.0.0/dx" ]; then
             cp "$ANDROID_HOME/build-tools/30.0.3/dx" "$ANDROID_HOME/build-tools/33.0.0/dx"
             cp "$ANDROID_HOME/build-tools/30.0.3/lib/dx.jar" "$ANDROID_HOME/build-tools/33.0.0/lib/dx.jar"
           fi
+          echo "=== installed NDK ==="; ls "$ANDROID_HOME/ndk" || true
 
       - name: Trim ABIs to arm64-v8a + armeabi-v7a (faster + reliable build)
         run: |
