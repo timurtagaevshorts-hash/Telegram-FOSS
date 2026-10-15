@@ -102,7 +102,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnShareFriends"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
                 android:layout_marginTop="12dp"

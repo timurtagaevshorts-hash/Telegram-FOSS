@@ -53,7 +53,7 @@ class ElonlarActivity : BaseFragment() {
     private var etFilterLocation: TextInputEditText? = null
 
     private val adapter = ClassifiedAdsAdapter(
-        onAdClick = { openSoon() },
+        onAdClick = { openDetail(it) },
         onEditClick = { openSoon() },
         onDeleteClick = { }
     )
@@ -147,6 +147,10 @@ class ElonlarActivity : BaseFragment() {
         swipeRefresh?.setOnRefreshListener { startAdsListener() }
 
         return root
+    }
+
+    private fun openDetail(ad: ClassifiedAd) {
+        presentFragment(ClassifiedAdDetailActivity(ad.id), false)
     }
 
     private fun openSoon() {
