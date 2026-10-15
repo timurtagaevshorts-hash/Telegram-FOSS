@@ -56,7 +56,12 @@ dependencies {
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3'
     implementation 'com.github.bumptech.glide:glide:4.14.2'
-    implementation 'com.google.android.material:material:1.8.0'
+    // 1.6.1 = highest Material with ZERO <macro> tags. Material 1.7.0+ emits
+    // <macro name="m3_comp_*_shape"> in values.xml, which AGP 7.0.3's resource
+    // merger cannot parse ("Can't determine type for tag <macro>"). 1.6.1 still
+    // ships Theme.Material3.* / Widget.Material3.* (24+136 styles) that our ported
+    // ads layouts use, so it is safe. compileSdk 33 compatible.
+    implementation 'com.google.android.material:material:1.6.1'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.viewpager2:viewpager2:1.0.0'
