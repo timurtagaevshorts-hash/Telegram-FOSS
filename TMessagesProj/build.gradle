@@ -1,6 +1,8 @@
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
 
 apply plugin: 'com.android.library'
+// Kotlin for the ported "elonlar" (classifieds) feature (source lives under src/main/java/uz/kodlikino/top4).
+apply plugin: 'kotlin-android'
 
 repositories {
     mavenCentral()
@@ -43,6 +45,27 @@ dependencies {
         }
     }
     implementation 'org.osmdroid:osmdroid-android:6.1.14'
+
+    // ===== YuzGram "elonlar" (classifieds) — ported from KinoTOP4 =====
+    // All pinned to the last versions that build on compileSdk 33 / AGP 7.0.3.
+    implementation platform('com.google.firebase:firebase-bom:32.7.4')
+    implementation 'com.google.firebase:firebase-firestore'
+    implementation 'com.google.firebase:firebase-storage'
+    implementation 'com.google.firebase:firebase-auth'
+    implementation 'com.google.firebase:firebase-functions'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3'
+    implementation 'com.github.bumptech.glide:glide:4.14.2'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.viewpager2:viewpager2:1.0.0'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    implementation 'androidx.activity:activity-ktx:1.7.2'
+    implementation 'androidx.fragment:fragment-ktx:1.5.7'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
+    // Kotlin stdlib pinned to match the 1.8.22 compiler (also satisfies the jdk7/jdk8 constraints above).
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
 
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:1.1.5'
 }
@@ -89,6 +112,12 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
 
         coreLibraryDesugaringEnabled true
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+        // Telegram's Java uses some experimental/legacy constructs; keep Kotlin lenient.
+        freeCompilerArgs += ['-Xjvm-default=all']
     }
 
     defaultConfig.versionCode = Integer.parseInt(APP_VERSION_CODE)

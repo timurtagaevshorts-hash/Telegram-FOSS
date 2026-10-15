@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<color name="home_accent">#8B5CFF</color>
+<color name="home_accent_purple">#A855F7</color>
+<color name="home_card">#0D121D</color>
+<color name="modern_border">#202B3C</color>
+<color name="modern_surface">#000000</color>
+<color name="modern_surface_high">#0D121D</color>
+<color name="surface_elevated">#121925</color>
+<color name="classified_field_bg">#121824</color>
+<color name="classified_field_stroke">#26FFFFFF</color>
+<color name="classified_card_default_bg">#0E141E</color>
+<color name="classified_card_default_stroke">#1CFFFFFF</color>
+<color name="classified_price_gold">#FFD84D</color>
+<color name="text_hint">#5E6F84</color>
+<color name="text_primary">#FFFFFF</color>
+<color name="text_secondary">#95A1B4</color>
+</resources>

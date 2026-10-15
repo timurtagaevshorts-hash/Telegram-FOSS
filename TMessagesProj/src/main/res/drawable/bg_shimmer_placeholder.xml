@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Rasm yuklanguncha ko'rinadigan placeholder -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:angle="135"
+        android:startColor="#1E1E1E"
+        android:centerColor="#252525"
+        android:endColor="#1E1E1E"
+        android:type="linear" />
+    <corners android:radius="0dp" />
+</shape>

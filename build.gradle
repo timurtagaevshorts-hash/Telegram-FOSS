@@ -7,6 +7,9 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:7.0.3'
         classpath 'com.google.gms:google-services:4.3.15'
+        // Kotlin compiler for the ported "elonlar" (classifieds) feature. 1.8.22 is the
+        // newest line that works with AGP 7.0.3 + Gradle 7.2 + compileSdk 33.
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.22'
     }
 }
 repositories {

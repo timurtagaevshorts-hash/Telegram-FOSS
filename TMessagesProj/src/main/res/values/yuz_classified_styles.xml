@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Elonlar (classifieds) ekrani Material komponentlaridan (CoordinatorLayout, AppBarLayout,
+      ChipGroup, ExtendedFloatingActionButton, TextInputLayout) foydalanadi. Ular Telegram'ning
+      o'z temasi ostida emas, balki ContextThemeWrapper orqali shu Material tema ostida inflate
+      qilinadi — aks holda "requires Theme.MaterialComponents" xatosi beradi.
+      Feed dizayni qorong'i (karta #121212, fon #000000), shuning uchun Material (dark) parent.
+    -->
+    <style name="Theme.YuzGramAds" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="colorPrimary">@color/home_accent</item>
+        <item name="colorPrimaryVariant">@color/home_accent</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/home_accent_purple</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:colorBackground">@android:color/black</item>
+    </style>
+</resources>
