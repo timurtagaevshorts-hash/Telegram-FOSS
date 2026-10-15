@@ -37,13 +37,21 @@ jobs:
         with:
           go-version: '1.20'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Locate preinstalled Android SDK (JDK-11 compatible sdkmanager)
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME/cmdline-tools" || true
+          if [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            echo "SDKMANAGER=$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" >> "$GITHUB_ENV"
+          else
+            echo "SDKMANAGER=$ANDROID_HOME/tools/bin/sdkmanager" >> "$GITHUB_ENV"
+          fi
+          "$SDKMANAGER" --version || true
 
       - name: Install NDK + SDK packages
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager --install \
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" --install \
             "platform-tools" \
             "platforms;android-33" \
             "build-tools;33.0.0" \
