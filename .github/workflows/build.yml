@@ -112,7 +112,8 @@ jobs:
           # TMessagesProj_App/build.gradle only wires signingConfig when YUZGRAM_STORE_FILE is present,
           # so a missing secret cleanly produces an unsigned build instead of failing.
           if [ -n "$KS_B64" ]; then
-            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/yuzgram-release.keystore"
+            echo "$KS_B64" | base64 -d -i > "$RUNNER_TEMP/yuzgram-release.keystore"
+            ls -l "$RUNNER_TEMP/yuzgram-release.keystore"
             {
               echo "ORG_GRADLE_PROJECT_YUZGRAM_STORE_FILE=$RUNNER_TEMP/yuzgram-release.keystore"
               echo "ORG_GRADLE_PROJECT_YUZGRAM_STORE_PASSWORD=$KS_PASS"
