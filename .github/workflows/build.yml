@@ -39,27 +39,37 @@ jobs:
 
       - name: Set up isolated Android SDK (clean, AGP 7.0.3 compatible)
         run: |
-          set -euo pipefail
+          set -uo pipefail
           SDK_ROOT="$HOME/android-sdk"
-          mkdir -p "$SDK_ROOT/cmdline-tools"
-          # cmdline-tools 11.0 (JDK-11 compatible; 16.0 needs JDK 17)
-          curl -fsSL -o /tmp/cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-9476863_latest.zip
-          ( cd "$SDK_ROOT/cmdline-tools" && unzip -q /tmp/cmdtools.zip && mv cmdline-tools latest )
-          SDKM="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          mkdir -p "$SDK_ROOT"
+          # Reuse the runner's preinstalled cmdline-tools (JDK-11 compatible) but target a CLEAN sdk_root,
+          # so AGP 7.0.3 never scans the preinstalled API-34/35/36/37 preview platforms (parse crash).
+          SDKM="$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1)"
+          [ -z "$SDKM" ] && SDKM="$(command -v sdkmanager)"
+          echo "Using sdkmanager: $SDKM"
           yes | "$SDKM" --sdk_root="$SDK_ROOT" --licenses >/dev/null 2>&1 || true
-          "$SDKM" --sdk_root="$SDK_ROOT" \
+          "$SDKM" --sdk_root="$SDK_ROOT" --install \
             "platform-tools" \
             "platforms;android-33" \
             "build-tools;33.0.0" \
             "build-tools;30.0.3" \
-            "cmake;3.10.2.4988405" \
             "ndk;${NDK_VERSION}"
-          # Telegram-FOSS/Dockerfile parity: AGP 7.0.3 may still expect a dx in build-tools 33
+          # cmake;3.10.2.4988405 is often delisted -> install an available one and align build.gradle
+          "$SDKM" --sdk_root="$SDK_ROOT" --install "cmake;3.18.1" || "$SDKM" --sdk_root="$SDK_ROOT" --install "cmake;3.22.1"
+          CMAKE_VER="$(ls "$SDK_ROOT/cmake" | sort -V | tail -1)"
+          echo "Installed cmake: $CMAKE_VER"
+          # Align AGP's expected cmake with the version we actually installed
+          sed -i "s/version '3.10.2'/version '${CMAKE_VER}'/" TMessagesProj/build.gradle
+          grep -n "version '3" TMessagesProj/build.gradle || true
+          # dx parity
           if [ -f "$SDK_ROOT/build-tools/30.0.3/dx" ] && [ ! -f "$SDK_ROOT/build-tools/33.0.0/dx" ]; then
             cp "$SDK_ROOT/build-tools/30.0.3/dx" "$SDK_ROOT/build-tools/33.0.0/dx"
             cp "$SDK_ROOT/build-tools/30.0.3/lib/dx.jar" "$SDK_ROOT/build-tools/33.0.0/lib/dx.jar"
           fi
-          # Point AGP/gradle at this clean SDK only (avoids preinstalled API-34+ parse crash)
+          # Fail fast if mandatory pieces are missing
+          [ -d "$SDK_ROOT/ndk/${NDK_VERSION}" ] || { echo "NDK missing"; exit 1; }
+          [ -d "$SDK_ROOT/platforms/android-33" ] || { echo "platform android-33 missing"; exit 1; }
+          # Point AGP/gradle at this clean SDK only
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
           printf 'sdk.dir=%s\n' "$SDK_ROOT" > local.properties
