@@ -328,6 +328,17 @@ class CreateClassifiedAdActivity(
         Toast.makeText(ctx, resId, Toast.LENGTH_SHORT).show()
     }
 
+    // View'da getString() yo'q (faqat Context'da bor) — shuning uchun o'z helperimiz.
+    private fun getString(resId: Int): String {
+        val ctx = themedContext ?: context ?: return ""
+        return ctx.getString(resId)
+    }
+
+    private fun getString(resId: Int, vararg args: Any): String {
+        val ctx = themedContext ?: context ?: return ""
+        return ctx.getString(resId, *args)
+    }
+
     override fun onResume() {
         super.onResume()
         actionBar?.visibility = View.GONE
