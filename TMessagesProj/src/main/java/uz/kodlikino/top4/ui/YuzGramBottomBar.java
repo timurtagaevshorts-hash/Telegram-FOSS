@@ -3,27 +3,29 @@ package uz.kodlikino.top4.ui;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.animation.DecelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.Theme;
 
 /**
- * YuzGram pastki navigatsiya bari — LaunchActivity tomonidan doimiy (persistent)
- * usulda boshqariladi. 3 tab: Asosiy / Elonlar / Profil.
+ * YuzGram pastki navigatsiya bari — zamonaviy "floating pill" uslubidagi ko'tarma panel.
  *
- * Xususiyatlari:
- *  - Ikonkalar Canvas bilan chiziladi (resursga bog'liq emas).
- *  - Faol tab ostida silliq siljuvchi "pill" indikator (animatsiyali).
- *  - show()/hide() — translationY + alpha animatsiyasi (chat kabi ichki ekranlarda yashiriladi).
- *  - Mavzu ranglariga moslashadi.
+ * Dizayn:
+ *  - Kichraytirilgan balandlik, yon tomonlarda chekinish bilan suzuvchi yumaloq panel.
+ *  - Faol tab'ning orqasida silliq siljuvchi gradient "pill" indikator.
+ *  - Har bir tab uchun o'ziga xos jonli accent rang (suzuvchi ikon + gradient).
+ *  - Ikonkalar Canvas'da chiziladi, matn — kichik va aniq.
+ *  - Dark/Light mavzuga avtomatik moslashadi.
  */
 public class YuzGramBottomBar extends View {
 
@@ -32,26 +34,39 @@ public class YuzGramBottomBar extends View {
     public static final int TAB_PROFIL = 2;
     public static final int COUNT = 3;
 
-    public static final int HEIGHT_DP = 62;
+    /** Panelning umumiy balandligi (dip) — pastki chekinish bilan. */
+    public static final int HEIGHT_DP = 58;
 
     private static final String[] LABELS = {"Asosiy", "Elonlar", "Profil"};
-    private static final int ACCENT = 0xFF12B7A6; // YuzGram brend to'q ko'k-yashil
 
-    private final Paint bgPaint = new Paint();
-    private final Paint dividerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    // Zamonaviy gradient accent ranglar (start/end) — har tab uchun o'ziga xos.
+    private static final int[] GRAD_START = {0xFF5B8CFF, 0xFF22C7A0, 0xFFF56B9E};
+    private static final int[] GRAD_END = {0xFF8E6BFF, 0xFF24C1D6, 0xFFFA7B54};
+    private static final int INACTIVE_DARK = 0xFF8A93A6;   // dark mavzuda grey ikon
+    private static final int INACTIVE_LIGHT = 0xFF9AA0AE;  // light mavzuda grey ikon
+
+    private final Paint surfacePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint pillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final RectF panelRect = new RectF();
     private final RectF pillRect = new RectF();
     private final Path path = new Path();
 
     private int activeTab = TAB_ASOSIY;
     private float indicatorPos = 0f; // 0..COUNT-1, animatsiyalanadi
+    private float pressScale = 0f;   // bosilganda pill'ning kichik "bounce" effekti
     private OnTabSelectedListener listener;
     private boolean shown = false;
 
-    private final float textSize = AndroidUtilities.dp(12);
-    private final float iconSize = AndroidUtilities.dp(22);
+    private final float textSize = AndroidUtilities.dp(10.5f);
+    private final float iconSize = AndroidUtilities.dp(20);
+
+    // Panel geometriyasi (onDraw hisoblagan)
+    private float panelTop, panelBottom, panelLeft, panelRight;
+    private float segLeft, segRight, cellW, pillW, pillH, pillTop;
 
     public interface OnTabSelectedListener {
         void onTabSelected(int tab);
@@ -70,14 +85,15 @@ public class YuzGramBottomBar extends View {
     private void init() {
         setClickable(true);
         setWillNotDraw(false);
-        dividerPaint.setStyle(Paint.Style.STROKE);
-        dividerPaint.setStrokeWidth(AndroidUtilities.dp(0.7f));
         textPaint.setTextAlign(Paint.Align.CENTER);
         textPaint.setTextSize(textSize);
         iconPaint.setStyle(Paint.Style.STROKE);
-        iconPaint.setStrokeWidth(AndroidUtilities.dp(2f));
+        iconPaint.setStrokeWidth(AndroidUtilities.dp(1.9f));
         iconPaint.setStrokeCap(Paint.Cap.ROUND);
         iconPaint.setStrokeJoin(Paint.Join.ROUND);
+        borderPaint.setStyle(Paint.Style.STROKE);
+        borderPaint.setStrokeWidth(AndroidUtilities.dp(0.6f));
+        setLayerType(LAYER_TYPE_SOFTWARE, null); // soya (setShadowLayer) uchun
         indicatorPos = activeTab;
     }
 
@@ -121,8 +137,8 @@ public class YuzGramBottomBar extends View {
             return;
         }
         indicatorAnim = ValueAnimator.ofFloat(indicatorPos, target);
-        indicatorAnim.setDuration(280);
-        indicatorAnim.setInterpolator(new DecelerateInterpolator(1.6f));
+        indicatorAnim.setDuration(320);
+        indicatorAnim.setInterpolator(new OvershootInterpolator(0.9f));
         indicatorAnim.addUpdateListener(a -> {
             indicatorPos = (float) a.getAnimatedValue();
             invalidate();
@@ -142,11 +158,11 @@ public class YuzGramBottomBar extends View {
             setAlpha(0f);
             setTranslationY(height());
             animate().alpha(1f).translationY(0f).setDuration(220)
-                    .setInterpolator(new DecelerateInterpolator(1.4f)).start();
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator(1.4f)).start();
         } else {
             animate().cancel();
             animate().alpha(0f).translationY(height()).setDuration(180)
-                    .setInterpolator(new DecelerateInterpolator())
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator())
                     .withEndAction(() -> setVisibility(GONE)).start();
         }
     }
@@ -155,55 +171,103 @@ public class YuzGramBottomBar extends View {
         return shown;
     }
 
-    private void applyTheme() {
-        bgPaint.setColor(Theme.getColor(Theme.key_windowBackgroundWhite));
-        dividerPaint.setColor(Theme.getColor(Theme.key_divider));
+    private boolean isDarkTheme() {
+        int bg = Theme.getColor(Theme.key_windowBackgroundWhite);
+        double lum = (0.299 * (bg >> 16 & 0xFF) + 0.587 * (bg >> 8 & 0xFF) + 0.114 * (bg & 0xFF)) / 255.0;
+        return lum < 0.5;
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
-        applyTheme();
         int w = getWidth();
         int h = getHeight();
-        float tabW = w / (float) COUNT;
+        if (w <= 0 || h <= 0) return;
 
-        // fon + tepa divider
-        canvas.drawRect(0, 0, w, h, bgPaint);
-        float dy = dividerPaint.getStrokeWidth() / 2f;
-        canvas.drawLine(0, dy, w, dy, dividerPaint);
+        boolean dark = isDarkTheme();
 
-        // siljuvchi pill indikator
-        float pillW = tabW * 0.82f;
-        float cx = (indicatorPos + 0.5f) * tabW;
-        pillRect.set(cx - pillW / 2f, AndroidUtilities.dp(6), cx + pillW / 2f, h - AndroidUtilities.dp(6));
-        pillPaint.setColor((ACCENT & 0x00FFFFFF) | 0x22000000);
-        canvas.drawRoundRect(pillRect, AndroidUtilities.dp(16), AndroidUtilities.dp(16), pillPaint);
+        // Suuvchi panel: kichik chekinish + katta radius.
+        float sideMargin = AndroidUtilities.dp(10);
+        float bottomMargin = AndroidUtilities.dp(7);
+        float topMargin = AndroidUtilities.dp(4);
+        float corner = AndroidUtilities.dp(24);
+        panelLeft = sideMargin;
+        panelRight = w - sideMargin;
+        panelTop = topMargin;
+        panelBottom = h - bottomMargin;
+        float panelRadius = Math.min(corner, (panelBottom - panelTop) / 2f);
 
-        float iconCy = AndroidUtilities.dp(24);
-        float textBaseline = h - AndroidUtilities.dp(11);
+        // Soya (muloyim, chuqurlik)
+        if (dark) {
+            shadowPaint.setColor(0x66000000);
+        } else {
+            shadowPaint.setColor(0x22000000);
+        }
+        shadowPaint.setShadowLayer(AndroidUtilities.dp(14), 0, AndroidUtilities.dp(3),
+                dark ? 0x99000000 : 0x33000000);
+        canvas.drawRoundRect(panelRect.set(
+                panelLeft, panelTop, panelRight, panelBottom), panelRadius, panelRadius, shadowPaint);
+        shadowPaint.clearShadowLayer();
+
+        // Panel sirti
+        surfacePaint.setColor(dark ? 0xFF1B2530 : 0xFFFFFFFF);
+        canvas.drawRoundRect(panelRect, panelRadius, panelRadius, surfacePaint);
+        borderPaint.setColor(dark ? 0x33FFFFFF : 0x14000000);
+        canvas.drawRoundRect(panelRect, panelRadius, panelRadius, borderPaint);
+
+        // Gradient pill (siljuvchi indikator)
+        segLeft = panelLeft + AndroidUtilities.dp(6);
+        segRight = panelRight - AndroidUtilities.dp(6);
+        cellW = (segRight - segLeft) / COUNT;
+        pillW = cellW - AndroidUtilities.dp(12);
+        pillH = panelBottom - panelTop - AndroidUtilities.dp(10);
+        pillTop = panelTop + AndroidUtilities.dp(5);
+        float pillCx = segLeft + (indicatorPos + 0.5f) * cellW;
+        float pillCy = pillTop + pillH / 2f;
+        float pillRadius = pillH / 2f;
+        float scale = 1f + 0.06f * pressScale;
+        float halfW = pillW / 2f * scale;
+        float halfH = pillH / 2f * scale;
+        pillRect.set(pillCx - halfW, pillCy - halfH, pillCx + halfW, pillCy + halfH);
+        int idx = Math.max(0, Math.min(COUNT - 1, activeTab));
+        LinearGradient lg = new LinearGradient(
+                pillRect.left, pillRect.top, pillRect.right, pillRect.bottom,
+                GRAD_START[idx], GRAD_END[idx], Shader.TileMode.CLAMP);
+        pillPaint.setShader(lg);
+        pillPaint.setAlpha(dark ? 235 : 225);
+        canvas.drawRoundRect(pillRect, pillRadius, pillRadius, pillPaint);
+        pillPaint.setShader(null);
+
+        float iconCy = pillTop + AndroidUtilities.dp(16);
+        float textBaseline = panelBottom - AndroidUtilities.dp(9);
 
         for (int i = 0; i < COUNT; i++) {
-            float tcx = (i + 0.5f) * tabW;
+            float tcx = segLeft + (i + 0.5f) * cellW;
             boolean active = i == activeTab;
-            int color = active ? ACCENT : Theme.getColor(Theme.key_windowBackgroundWhiteGrayText);
+            int color;
+            if (active) {
+                color = 0xFFFFFFFF;
+            } else {
+                color = dark ? INACTIVE_DARK : INACTIVE_LIGHT;
+            }
             drawIcon(canvas, i, tcx, iconCy, color, active);
 
             textPaint.setColor(color);
             textPaint.setTypeface(Typeface.create(Typeface.DEFAULT, active ? Typeface.BOLD : Typeface.NORMAL));
+            textPaint.setAlpha(active ? 255 : (dark ? 200 : 180));
             canvas.drawText(LABELS[i], tcx, textBaseline, textPaint);
         }
     }
 
     private void drawIcon(Canvas canvas, int tab, float cx, float cy, int color, boolean active) {
         iconPaint.setColor(color);
-        textPaint.setColor(color);
-        float s = iconSize;
+        float s = iconSize * (active ? 1.06f : 1f);
         float half = s / 2f;
         switch (tab) {
             case TAB_ASOSIY: {
                 // suhbat ko'pigi: rounded rect + dumi
                 float r = AndroidUtilities.dp(5);
-                RectF bubble = new RectF(cx - half, cy - half + AndroidUtilities.dp(1), cx + half, cy + half - AndroidUtilities.dp(4));
+                RectF bubble = new RectF(cx - half, cy - half + AndroidUtilities.dp(1),
+                        cx + half, cy + half - AndroidUtilities.dp(4));
                 drawRoundRectStroke(canvas, bubble, r);
                 path.reset();
                 path.moveTo(cx - half + AndroidUtilities.dp(6), bubble.bottom);
@@ -234,10 +298,11 @@ public class YuzGramBottomBar extends View {
             }
             case TAB_PROFIL: {
                 // odam: bosh doira + yelka yoyi
-                float headR = AndroidUtilities.dp(4.5f);
-                canvas.drawCircle(cx, cy - AndroidUtilities.dp(4), headR, iconPaint);
+                float headR = AndroidUtilities.dp(4.2f);
+                canvas.drawCircle(cx, cy - AndroidUtilities.dp(3.5f), headR, iconPaint);
                 path.reset();
-                RectF body = new RectF(cx - half, cy + AndroidUtilities.dp(2), cx + half, cy + half + AndroidUtilities.dp(8));
+                RectF body = new RectF(cx - half, cy + AndroidUtilities.dp(2),
+                        cx + half, cy + half + AndroidUtilities.dp(7));
                 path.addArc(body, 200, 140);
                 canvas.drawPath(path, iconPaint);
                 break;
@@ -256,11 +321,22 @@ public class YuzGramBottomBar extends View {
         int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
             super.onTouchEvent(event);
+            // bosilgan tab'ni aniqla va kichik "bounce" ber
+            int index = indexAt(event.getX());
+            if (index == activeTab) {
+                pressScale = 0f;
+                ValueAnimator bounce = ValueAnimator.ofFloat(0f, 1f, 0f);
+                bounce.setDuration(220);
+                bounce.addUpdateListener(a -> {
+                    pressScale = (float) a.getAnimatedValue();
+                    invalidate();
+                });
+                bounce.start();
+            }
             return true;
         }
         if (action == MotionEvent.ACTION_UP) {
-            float tabW = getWidth() / (float) COUNT;
-            int index = Math.max(0, Math.min(COUNT - 1, (int) (event.getX() / tabW)));
+            int index = indexAt(event.getX());
             performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
             if (index != activeTab) {
                 setActiveTab(index);
@@ -271,5 +347,12 @@ public class YuzGramBottomBar extends View {
             return true;
         }
         return super.onTouchEvent(event);
+    }
+
+    private int indexAt(float x) {
+        float areaLeft = panelLeft != 0 ? segLeft : AndroidUtilities.dp(16);
+        float areaW = getWidth() - areaLeft * 2;
+        float cw = areaW / COUNT;
+        return Math.max(0, Math.min(COUNT - 1, (int) ((x - areaLeft) / cw)));
     }
 }
