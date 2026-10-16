@@ -4954,40 +4954,33 @@ public class Theme {
             FileLog.e(e);
             throw new RuntimeException(e);
         }
-        if (applyingTheme == null) {
+        // YuzGram: yagona majburiy mavzu — "YuzGram Neon". Undan oldin
+        // o'qilgan eski sozlamalar (stock "Night"/"Blue", serverdan kelgan
+        // remote mavzu nomi) bu yerdan keyin qayta yoziladi, applyTheme'da
+        // ham forceYuzGramTheme orqali buriladi.
+        ThemeInfo yuzGramNeon = themesDict.get("YuzGram Neon");
+        if (yuzGramNeon != null) {
+            defaultTheme = yuzGramNeon;
+            currentDayTheme = yuzGramNeon;
+            currentNightTheme = yuzGramNeon;
+            applyingTheme = yuzGramNeon;
+        } else if (applyingTheme == null) {
             applyingTheme = defaultTheme;
         } else {
             currentDayTheme = applyingTheme;
         }
 
-        if (preferences.contains("overrideThemeWallpaper") || preferences.contains("selectedBackground2")) {
-            boolean override = preferences.getBoolean("overrideThemeWallpaper", false);
-            long id = preferences.getLong("selectedBackground2", 1000001);
-            if (id == -1 || override && id != -2 && id != 1000001) {
-                OverrideWallpaperInfo overrideWallpaper = new OverrideWallpaperInfo();
-                overrideWallpaper.color = preferences.getInt("selectedColor", 0);
-                overrideWallpaper.slug = preferences.getString("selectedBackgroundSlug", "");
-                if (id >= -100 && id <= -1 && overrideWallpaper.color != 0) {
-                    overrideWallpaper.slug = COLOR_BACKGROUND_SLUG;
-                    overrideWallpaper.fileName = "";
-                    overrideWallpaper.originalFileName = "";
-                } else {
-                    overrideWallpaper.fileName = "wallpaper.jpg";
-                    overrideWallpaper.originalFileName = "wallpaper_original.jpg";
-                }
-                overrideWallpaper.gradientColor1 = preferences.getInt("selectedGradientColor", 0);
-                overrideWallpaper.gradientColor2 = preferences.getInt("selectedGradientColor2", 0);
-                overrideWallpaper.gradientColor3 = preferences.getInt("selectedGradientColor3", 0);
-                overrideWallpaper.rotation = preferences.getInt("selectedGradientRotation", 45);
-                overrideWallpaper.isBlurred = preferences.getBoolean("selectedBackgroundBlurred", false);
-                overrideWallpaper.isMotion = preferences.getBoolean("selectedBackgroundMotion", false);
-                overrideWallpaper.intensity = preferences.getFloat("selectedIntensity", 0.5f);
-                currentDayTheme.setOverrideWallpaper(overrideWallpaper);
-                if (selectedAutoNightType != AUTO_NIGHT_TYPE_NONE) {
-                    currentNightTheme.setOverrideWallpaper(overrideWallpaper);
-                }
-            }
-            preferences.edit().remove("overrideThemeWallpaper").remove("selectedBackground2").commit();
+        // YuzGram: foydalanuvchi tanlagan rasm/gradient orqa fon tiklanmaydi —
+        // ilova foni doim brendning qora-neon rangi. Eski mavzu/orqa fon
+        // qoldiqlari bir marta tozalanadi, keyingi ochilishda yozilmaydi.
+        if (preferences.contains("overrideThemeWallpaper") || preferences.contains("selectedBackground2")
+                || preferences.contains("theme") || preferences.contains("nighttheme")) {
+            preferences.edit()
+                    .remove("overrideThemeWallpaper")
+                    .remove("selectedBackground2")
+                    .remove("theme")
+                    .remove("nighttheme")
+                    .commit();
         }
 
         int switchToTheme = needSwitchToTheme();
@@ -6308,28 +6301,19 @@ public class Theme {
     }
 
     /**
-     * YuzGram brend qoidasi: ilova foni doim neon-to'q (#0A1120) bo'ladi —
-     * chat ro'yxati Elonlar bo'limi bilan bir xil fon-da ko'rinadi.
-     * Telegram chat aurasi yoki eski saqlangan sozlamalar orqali boshqa
-     * stock mavzuga ("Blue", "Day", "Night", "Dark Blue" ...) o'tib qolmaslik
-     * uchun ularning barchasi brend mavzusiga aylantiriladi. Foydalanuvchi
-     * o'zi yuklagan maxsus .attheme fayllari (pathToFile != null) o'zgarmaydi.
+     * YuzGram brend qoidasi (QAT'LIQ): ilova faqat yagona "YuzGram Neon"
+     * mavzusida ishlaydi — fon #0A1120, akcent #2AABEE.
+     * Telegramning stock (asset) mavzulari, serverdan kelgan remote mavzular
+     * (pathToFile != null) va foydalanuvchi kiritgan .attheme fayllarining
+     * HAMSASI shu mavzuga buriladi. Mavzu tanlash UI'si ham olib tashlangan.
+     * Neon topilmasa (registrsiz holat) so'ralgan mavzu qaytadi — crash bo'lmasin.
      */
     private static ThemeInfo forceYuzGramTheme(ThemeInfo themeInfo) {
-        if (themeInfo == null || themeInfo.pathToFile != null) {
-            return themeInfo;
+        if (themeInfo == null) {
+            return null;
         }
-        String key = themeInfo.getKey();
-        if ("YuzGram Neon".equals(key)) {
-            return themeInfo;
-        }
-        if (themeInfo.assetName != null) {
-            ThemeInfo neon = themesDict.get("YuzGram Neon");
-            if (neon != null) {
-                return neon;
-            }
-        }
-        return themeInfo;
+        ThemeInfo neon = themesDict.get("YuzGram Neon");
+        return neon != null ? neon : themeInfo;
     }
 
     public static void applyTheme(ThemeInfo themeInfo) {

@@ -38270,10 +38270,9 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         }
 
         public boolean isThemeChangeAvailable(boolean canEdit) {
-            return currentEncryptedChat == null && (
-                (!canEdit /*|| currentChat != null && ChatObject.isChannelAndNotMegaGroup(currentChat) && ChatObject.canChangeChatInfo(currentChat)*/) ||
-                currentChat == null && currentUser != null && !currentUser.bot
-            );
+            // YuzGram: chat uchun alohida mavzu/orqa fon tanlash olib tashlandi —
+            // hamma joyda yagona qora-neon mavzu qo'llanadi.
+            return false;
         }
 
         public EmojiThemes getCurrentTheme() {

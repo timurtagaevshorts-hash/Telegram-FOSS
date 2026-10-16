@@ -275,7 +275,8 @@ public class DrawerProfileCell extends FrameLayout implements NotificationCenter
             }
             return false;
         });
-        addView(darkThemeView, LayoutHelper.createFrame(48, 48, Gravity.RIGHT | Gravity.BOTTOM, 0, 0, 6, 90));
+        // YuzGram: kun/tun mavzu almashtirish tugmasi olib tashlandi — ilova
+        // doim yagona qora-neon "YuzGram Neon" mavzusida ishlaydi.
 
         if (Theme.getEventType() == 0) {
             snowflakesEffect = new SnowflakesEffect(0);
