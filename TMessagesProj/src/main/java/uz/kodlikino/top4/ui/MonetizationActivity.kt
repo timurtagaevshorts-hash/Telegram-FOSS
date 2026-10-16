@@ -176,7 +176,7 @@ class MonetizationActivity : BaseFragment() {
         val row = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
-            setPadding(0, AndroidUtilities.dp(10), 0, AndroidUtilities.dp(10))
+            setPadding(0, AndroidUtilities.dp(10f), 0, AndroidUtilities.dp(10f))
         }
         val label = TextView(ctx).apply {
             text = "${tier.subscribers} → ${MonetizationCalculator.formatSom(tier.rewardSom)}"
@@ -207,8 +207,8 @@ class MonetizationActivity : BaseFragment() {
                 setOnClickListener { withdrawForTier(tier) }
             }
             val lp = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(36)
-            ).apply { marginStart = AndroidUtilities.dp(8) }
+                ViewGroup.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(36f)
+            ).apply { marginStart = AndroidUtilities.dp(8f) }
             row.addView(btn, lp)
         }
         return row
@@ -239,7 +239,7 @@ class MonetizationActivity : BaseFragment() {
         val row = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
-            setPadding(0, AndroidUtilities.dp(10), 0, AndroidUtilities.dp(10))
+            setPadding(0, AndroidUtilities.dp(10f), 0, AndroidUtilities.dp(10f))
         }
         val title = TextView(ctx).apply {
             text = reel.title.ifBlank { reel.caption() }.ifBlank { reel.id }
@@ -265,7 +265,7 @@ class MonetizationActivity : BaseFragment() {
             setOnClickListener { deleteReel(reel) }
         }
         row.addView(del, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(36)
+            ViewGroup.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(36f)
         ))
         return row
     }
@@ -316,7 +316,7 @@ class MonetizationActivity : BaseFragment() {
             toast(R.string.withdraw_no_balance)
             return
         }
-        val pad = AndroidUtilities.dp(20)
+        val pad = AndroidUtilities.dp(20f)
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(pad, pad, pad, 0)
@@ -355,25 +355,25 @@ class MonetizationActivity : BaseFragment() {
     ) {
         val firstName = etFirst.text.toString().trim()
         val lastName = etLast.text.toString().trim()
+        if (firstName.isBlank() || lastName.isBlank()) {
+            toast(R.string.withdraw_fill_fields); return
+        }
         val card = MonetizationCalculator.normalizeHumoCard(etCard.text.toString())
+            ?: run { toast(R.string.withdraw_fill_fields); return }
         val amount = MonetizationCalculator.parseSom(etAmount.text.toString())
-        when {
-            firstName.isBlank() || lastName.isBlank() || card == null -> {
-                toast(R.string.withdraw_fill_fields); return
-            }
-            amount == null || amount <= 0 -> { toast(R.string.withdraw_fill_fields); return }
-            amount < MonetizationCalculator.MIN_WITHDRAWAL -> {
-                toast(getString(R.string.withdraw_min_amount,
-                    MonetizationCalculator.formatSom(MonetizationCalculator.MIN_WITHDRAWAL))); return
-            }
-            amount > MonetizationCalculator.MAX_WITHDRAWAL -> {
-                toast(getString(R.string.withdraw_max_amount,
-                    MonetizationCalculator.formatSom(MonetizationCalculator.MAX_WITHDRAWAL))); return
-            }
-            amount > balance.available -> {
-                toast(getString(R.string.withdraw_balance_insufficient,
-                    MonetizationCalculator.formatSom(balance.available))); return
-            }
+            ?: run { toast(R.string.withdraw_fill_fields); return }
+        if (amount <= 0) { toast(R.string.withdraw_fill_fields); return }
+        if (amount < MonetizationCalculator.MIN_WITHDRAWAL) {
+            toast(getString(R.string.withdraw_min_amount,
+                MonetizationCalculator.formatSom(MonetizationCalculator.MIN_WITHDRAWAL))); return
+        }
+        if (amount > MonetizationCalculator.MAX_WITHDRAWAL) {
+            toast(getString(R.string.withdraw_max_amount,
+                MonetizationCalculator.formatSom(MonetizationCalculator.MAX_WITHDRAWAL))); return
+        }
+        if (amount > balance.available) {
+            toast(getString(R.string.withdraw_balance_insufficient,
+                MonetizationCalculator.formatSom(balance.available))); return
         }
         val s = scope ?: return
         s.launch {

@@ -202,7 +202,7 @@ class CreateJobCardActivity(
         pickedUri = uri
         ivPreview?.visibility = View.VISIBLE
         val ctx = themedContext ?: return
-        Glide.with(ctx).load(uri).centerCrop().into(ivPreview)
+        ivPreview?.let { Glide.with(ctx).load(uri).centerCrop().into(it) }
         tvPickImageLabel?.text = getString(R.string.job_board_change_image)
     }
 

@@ -71,8 +71,8 @@ class JobCardsActivity : BaseFragment() {
             layoutManager = LinearLayoutManager(themed)
             adapter = this@JobCardsActivity.adapter
             clipToPadding = false
-            val bottomPad = YuzGramBottomBar.height() + AndroidUtilities.dp(12)
-            setPadding(AndroidUtilities.dp(20), AndroidUtilities.dp(8), AndroidUtilities.dp(20), bottomPad)
+            val bottomPad = YuzGramBottomBar.height() + AndroidUtilities.dp(12f)
+            setPadding(AndroidUtilities.dp(20f), AndroidUtilities.dp(8f), AndroidUtilities.dp(20f), bottomPad)
         }
 
         tabSections?.apply {

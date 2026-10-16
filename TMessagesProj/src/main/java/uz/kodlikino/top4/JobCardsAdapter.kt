@@ -7,6 +7,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
+import org.telegram.messenger.R
 import uz.kodlikino.top4.models.JobCard
 
 class JobCardsAdapter(

@@ -53,7 +53,7 @@ class TaxiCallActivity : BaseFragment() {
         val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
         themedContext = themed
         val root = LayoutInflater.from(themed)
-            .inflate(R.layout.fragment_taxi_call, null) as ViewGroup
+            .inflate(R.layout.fragment_taksi_call, null) as ViewGroup
         fragmentView = root
         actionBar?.visibility = View.GONE
 
@@ -95,7 +95,7 @@ class TaxiCallActivity : BaseFragment() {
 
     private fun startListening() {
         if (uid.isBlank()) return
-        ordersListener = repo.listenUserOrders(uid) { orders ->
+        ordersListener = repo.listenUserOrders(uid, onChange = { orders ->
             val active = orders.firstOrNull { repo.isActiveTrackingStatus(it.status) }
             if (active != null) {
                 activeOrderId = active.id
@@ -105,7 +105,7 @@ class TaxiCallActivity : BaseFragment() {
                 activeOrderId = ""
                 activeCard?.visibility = View.GONE
             }
-        }
+        })
     }
 
     private fun statusText(order: TaxiOrder): String {
@@ -122,7 +122,7 @@ class TaxiCallActivity : BaseFragment() {
 
     private fun submitOrder() {
         if (busy) return
-        val phone = etPhone?.text?.toString()?.filter { it.isDigit || it == '+' }.orEmpty().trim()
+        val phone = etPhone?.text?.toString()?.filter { it.isDigit() || it == '+' }.orEmpty().trim()
         val pickup = etPickup?.text?.toString()?.trim().orEmpty()
         val destination = etDestination?.text?.toString()?.trim().orEmpty()
         if (phone.isBlank() || pickup.isBlank()) {
