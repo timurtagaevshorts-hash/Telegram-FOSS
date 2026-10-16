@@ -4,10 +4,9 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
@@ -20,18 +19,22 @@ import android.view.animation.OvershootInterpolator;
 import org.telegram.messenger.AndroidUtilities;
 
 /**
- * YuzGram pastki navigatsiya bari — rasmdagi neon uslubga mos "floating dock".
+ * YuzGram pastki navigatsiya bari — neon "floating dock".
  *
- * Tuzilishi (5 slot):  Asosiy | Reels | [ + markaz FAB ] | Elonlar | Profil
- *  - Panel: yumaloq, to'q-ko'k neon sirt, tashqi ko'k "glow" nur, nozik border.
- *  - Markazda ko'tarilgan dumaloq "+" FAB (gradient binafsha→ko'k), atrofidagi
- *    panelda "cradle" notch (o'yiq) kesilgan.
- *  - Faol tab: yorqin ikon + matn + pastida silliq siljuvchi neon underline.
- *  - "+" FAB amaliyotga ega: qaysi tab ochiq bo'lsa, shu bo'lim uchun "joylash"
- *    ekranini ochadi (Elonlar -> e'lon, Reels/Asosiy -> reel). Ulanish
- *    LaunchActivity'da setOnFabClickListener() orqali qilinadi.
+ * Tuzilishi (4 teng slot):  Asosiy | Reels | Elonlar | Profil
+ * Markazdagi dumaloq "+" FAB olib tashlangan (e'lon/reel joylash tugmalari
+ * o'z bo'limlari ichida: ElonlarActivity va ReelsActivity).
+ *
+ * Animatsiyalar:
+ *  - Faol slot ostida gradientli "pill" — tab almashganda u spring (overshoot)
+ *    bilan siljiydi va yo'lning o'rtasida cho'zilib, o'rniga qaytadi (morph).
+ *  - Tanlangan ikon "pop" qiladi (kattalashib qaytadi) va atrofidan halqa tarqaydi.
+ *  - Ikon/matn rangi va qalinligi pill bilan masofaga qarap crossfade bo'ladi
+ *    (shu sababli siljish paytida ikkala tab ham qisman yorqin ko'rinadi).
+ *  - Bosilganda slot cho'kadi (press), bar ko'rinmaganda pastdan spring bilan chiqadi.
  *
  * Ikonkalar Canvas'da chiziladi (resursga bog'liq emas), dark neon mavzu doimiy.
+ * Brend palitrasining ko'klari YuzGramChatRail bilan bir xil (38B6FF -> 5B6CF9).
  */
 public class YuzGramBottomBar extends View {
 
@@ -41,55 +44,66 @@ public class YuzGramBottomBar extends View {
     public static final int TAB_PROFIL = 3;
     public static final int COUNT = 4;
 
-    /** Panelning umumiy balandligi (dip) — markaz FAB ko'tarilishi uchun tepa bo'shliq bilan. */
-    public static final int HEIGHT_DP = 70;
+    /** Panelning umumiy balandligi (dip) — tepada panel + glow uchun bo'shliq bilan. */
+    public static final int HEIGHT_DP = 68;
 
     private static final String[] LABELS = {"Asosiy", "Reels", "Elonlar", "Profil"};
-    // tab index -> slot index (0..4); slot 2 = markaz FAB
-    private static final int[] TAB_SLOT = {0, 1, 3, 4};
 
-    // Neon palitra (YuzGram brendi)
-    private static final int SURFACE = 0xFF0A1120;      // chuqur to'q-ko'k sirt (Elonlar home_bg bilan bir xil)
+    // Neon palitra (YuzGram brendi; rail bilan bir xil ko'klar)
+    private static final int SURFACE = 0xFF0A1120;      // chuqur to'q-ko'k sirt (elonlar foni bilan bir xil)
     private static final int BORDER = 0x662AABEE;       // brend-ko'k neon border (#2AABEE)
-    private static final int GLOW_BLUE = 0xAA2AABEE;    // tashqi nur (#2AABEE)
-    private static final int FAB_START = 0xFF5B6CF9;    // brend indigo (home_accent_purple)
-    private static final int FAB_END = 0xFF2AABEE;      // brend-ko'k (chat/Profil/Elonlar bilan bir xil)
-    private static final int ACTIVE = 0xFF2AABEE;       // faol ikon/matn (brend-ko'k)
-    private static final int INACTIVE = 0xFF6B7794;     // o'chiq ikon/matn
+    private static final int GLOW_BLUE = 0x992AABEE;    // tashqi nur (#2AABEE)
+    private static final int PILL_START = 0xFF38B6FF;   // och-ko'k (rail ACTIVE_START)
+    private static final int PILL_END = 0xFF5B6CF9;     // brend indigo (rail ACTIVE_END)
+    private static final int PILL_STROKE = 0x99A8E4FF; // pill ustidagi yorqin neon chet
+    private static final int ICON_ACTIVE = 0xFFFFFFFF;  // faol ikon (pill ustida oq)
+    private static final int ICON_IDLE = 0xFF8E9DBB;    // o'chiq ikon
+    private static final int TEXT_ACTIVE = 0xFFE9F6FF;  // faol matn
+    private static final int TEXT_IDLE = 0xFF74809B;    // o'chiq matn
 
     private final Paint surfacePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint clearPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint fabPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint fabGlowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint highlightPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint pillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint pillStrokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint underlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
     private final RectF panelRect = new RectF();
-    private final RectF fabRect = new RectF();
+    private final RectF pillRect = new RectF();
+    private final RectF tmpRect = new RectF();
     private final Path path = new Path();
+    private final Matrix shaderMatrix = new Matrix();
 
     private int activeTab = TAB_ASOSIY;
     private float indicatorPos = 0f;   // tab-space 0..COUNT-1, animatsiyalanadi
-    private float fabPress = 0f;       // "+" bosilganda bounce
-    private OnTabSelectedListener listener;
-    private OnFabClickListener fabListener;
+    private float stretch = 0f;        // 0..1 — pill siljish paytidagi cho'zilishi
+    private int popTab = -1;           // "pop" animatsiyasi ketayotgan tab
+    private float popAmount = 0f;      // 0..1
+    private int pressSlot = -1;        // bosilayotgan slot (0..COUNT-1)
+    private float pressAmount = 0f;    // 0..1
     private boolean shown = false;
 
+    private OnTabSelectedListener listener;
+
+    // Typeface'ni har kadrda yaratmaymiz (4 slot x 60 fps = tebranish)
+    private Typeface regularTypeface;
+    private Typeface boldTypeface;
+
     private final float textSize = AndroidUtilities.dp(10.5f);
-    private final float iconSize = AndroidUtilities.dp(21);
+    private final float iconSize = AndroidUtilities.dp(20.5f);
 
     // Geometriya (onDraw hisoblaydi)
     private float panelLeft, panelRight, panelTop, panelBottom;
-    private float[] slotCx = new float[5];
-    private float fabCx, fabCy, fabR;
+    private final float[] slotCx = new float[COUNT];
+
+    // Gradient faqat 1x1 birlik katakda quriladi; har kadrda Matrix orqali
+    // pill o'lchamiga masshtablanadi — shuning uchun per-frame Shader yaratilmaydi.
+    private LinearGradient pillGrad;
 
     public interface OnTabSelectedListener {
         void onTabSelected(int tab);
-    }
-
-    public interface OnFabClickListener {
-        void onFabClick();
     }
 
     public YuzGramBottomBar(Context context) {
@@ -105,6 +119,8 @@ public class YuzGramBottomBar extends View {
     private void init() {
         setClickable(true);
         setWillNotDraw(false);
+        regularTypeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL);
+        boldTypeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD);
         textPaint.setTextAlign(Paint.Align.CENTER);
         textPaint.setTextSize(textSize);
         iconPaint.setStyle(Paint.Style.STROKE);
@@ -113,8 +129,14 @@ public class YuzGramBottomBar extends View {
         iconPaint.setStrokeJoin(Paint.Join.ROUND);
         borderPaint.setStyle(Paint.Style.STROKE);
         borderPaint.setStrokeWidth(AndroidUtilities.dp(1f));
-        underlinePaint.setStyle(Paint.Style.FILL);
-        clearPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
+        highlightPaint.setStyle(Paint.Style.STROKE);
+        highlightPaint.setStrokeWidth(AndroidUtilities.dp(1f));
+        pillStrokePaint.setStyle(Paint.Style.STROKE);
+        pillStrokePaint.setStrokeWidth(AndroidUtilities.dp(1.1f));
+        ringPaint.setStyle(Paint.Style.STROKE);
+        ringPaint.setStrokeWidth(AndroidUtilities.dp(1.6f));
+        pillGrad = new LinearGradient(0f, 0f, 1f, 1f,
+                PILL_START, PILL_END, Shader.TileMode.CLAMP);
         setLayerType(LAYER_TYPE_SOFTWARE, null); // glow (setShadowLayer) uchun
         indicatorPos = activeTab;
     }
@@ -126,7 +148,7 @@ public class YuzGramBottomBar extends View {
     /**
      * Balandlikni qat'iy dp(HEIGHT_DP)ga qotamiz. LaunchActivity'dagi frameLayout
      * (maxsus FrameLayout) bolaga ba'zan kutilganidan katta balandlik bermoqda —
-     * bunda panel (panelBottom = h - dp(8)) butun ekranni egallab, ikonlar bilan
+     * bunda panel (panelBottom = h - dp(7)) butun ekranni egallab, ikonlar bilan
      * matn orasida ulkan bo'sh joy qolardi. EXACTLY spec bu xato holatdan qat'i-nazar
      * barni doim kompakt saqlaydi.
      */
@@ -138,10 +160,6 @@ public class YuzGramBottomBar extends View {
 
     public void setOnTabSelectedListener(OnTabSelectedListener l) {
         this.listener = l;
-    }
-
-    public void setOnFabClickListener(OnFabClickListener l) {
-        this.fabListener = l;
     }
 
     public int getActiveTab() {
@@ -160,29 +178,80 @@ public class YuzGramBottomBar extends View {
         activeTab = tab;
         if (changed) {
             animateIndicatorTo(tab, animated);
+            animatePop(tab, animated);
         }
         invalidate();
     }
 
     private ValueAnimator indicatorAnim;
+    private float travelFrom, travelTo;
 
+    /**
+     * Pill siljishi: masofaga qarab davomiylik (1 ta tab — tezkor, 3 ta tab —
+     * sekinroq) va OvershootInterpolator — shuning uchun u o'rniga "urilib"
+     * qaytadi (spring hissi). stretch yo'lning o'rtasida cho'zishni beradi.
+     */
     private void animateIndicatorTo(int target, boolean animated) {
         if (indicatorAnim != null) {
             indicatorAnim.cancel();
         }
-        if (!animated) {
+        travelFrom = indicatorPos;
+        travelTo = target;
+        if (!animated || Math.abs(travelTo - travelFrom) < 0.01f) {
             indicatorPos = target;
+            stretch = 0f;
             invalidate();
             return;
         }
-        indicatorAnim = ValueAnimator.ofFloat(indicatorPos, target);
-        indicatorAnim.setDuration(300);
-        indicatorAnim.setInterpolator(new OvershootInterpolator(0.8f));
+        float dist = Math.abs(travelTo - travelFrom);
+        indicatorAnim = ValueAnimator.ofFloat(0f, 1f);
+        indicatorAnim.setDuration((long) (250 + 45 * dist));
+        indicatorAnim.setInterpolator(new OvershootInterpolator(1.7f));
         indicatorAnim.addUpdateListener(a -> {
-            indicatorPos = (float) a.getAnimatedValue();
+            float f = (float) a.getAnimatedValue();
+            indicatorPos = travelFrom + (travelTo - travelFrom) * f;
+            float k = Math.max(0f, Math.min(1f, f));
+            stretch = (float) Math.sin(Math.PI * k);
             invalidate();
         });
         indicatorAnim.start();
+    }
+
+    private ValueAnimator popAnim;
+
+    /** Tanlangan ikon bir marta kattalashib qaytadi va halqa tarqaydi. */
+    private void animatePop(int tab, boolean animated) {
+        if (popAnim != null) {
+            popAnim.cancel();
+        }
+        popTab = tab;
+        if (!animated) {
+            popAmount = 0f;
+            return;
+        }
+        popAnim = ValueAnimator.ofFloat(0f, 1f, 0f);
+        popAnim.setDuration(430);
+        popAnim.setInterpolator(new DecelerateInterpolator(1.1f));
+        popAnim.addUpdateListener(a -> {
+            popAmount = (float) a.getAnimatedValue();
+            invalidate();
+        });
+        popAnim.start();
+    }
+
+    private ValueAnimator pressAnim;
+
+    private void animatePress(float to, long duration) {
+        if (pressAnim != null) {
+            pressAnim.cancel();
+        }
+        pressAnim = ValueAnimator.ofFloat(pressAmount, to);
+        pressAnim.setDuration(duration);
+        pressAnim.addUpdateListener(a -> {
+            pressAmount = (float) a.getAnimatedValue();
+            invalidate();
+        });
+        pressAnim.start();
     }
 
     /** Barning ko'rinishini animatsiya bilan yoqish/o'chirish. */
@@ -191,16 +260,15 @@ public class YuzGramBottomBar extends View {
             return;
         }
         shown = visible;
+        animate().cancel();
         if (visible) {
             setVisibility(VISIBLE);
-            animate().cancel();
             setAlpha(0f);
-            setTranslationY(height());
-            animate().alpha(1f).translationY(0f).setDuration(220)
-                    .setInterpolator(new DecelerateInterpolator(1.4f)).start();
+            setTranslationY(height() * 0.7f);
+            animate().alpha(1f).translationY(0f).setDuration(300)
+                    .setInterpolator(new OvershootInterpolator(0.55f)).start();
         } else {
-            animate().cancel();
-            animate().alpha(0f).translationY(height()).setDuration(180)
+            animate().alpha(0f).translationY(height() * 0.85f).setDuration(190)
                     .setInterpolator(new DecelerateInterpolator())
                     .withEndAction(() -> setVisibility(GONE)).start();
         }
@@ -214,131 +282,138 @@ public class YuzGramBottomBar extends View {
     protected void onDraw(Canvas canvas) {
         int w = getWidth();
         int h = getHeight();
-        if (w <= 0 || h <= 0) return;
+        if (w <= 0 || h <= 0) {
+            return;
+        }
 
         float sideMargin = AndroidUtilities.dp(10);
-        float bottomMargin = AndroidUtilities.dp(8);
+        float bottomMargin = AndroidUtilities.dp(7);
         panelLeft = sideMargin;
         panelRight = w - sideMargin;
-        panelTop = AndroidUtilities.dp(22);        // tepada FAB ko'tarilishi uchun joy
+        panelTop = AndroidUtilities.dp(8);
         panelBottom = h - bottomMargin;
-        float corner = AndroidUtilities.dp(24);
+        float corner = AndroidUtilities.dp(23);
         panelRect.set(panelLeft, panelTop, panelRight, panelBottom);
 
-        // 5 slot markazlari
         float usable = panelRight - panelLeft;
-        for (int i = 0; i < 5; i++) {
-            slotCx[i] = panelLeft + usable * (i + 0.5f) / 5f;
+        for (int i = 0; i < COUNT; i++) {
+            slotCx[i] = panelLeft + usable * (i + 0.5f) / COUNT;
         }
-        fabCx = slotCx[2];
-        fabR = AndroidUtilities.dp(21);
-        fabCy = panelTop;                          // FAB panel tepasiga o'tiradi, yarmi tepada
 
-        // --- Panel sirti + tashqi neon glow + cradle notch ---
+        float iconCy = panelTop + AndroidUtilities.dp(18.5f);
+        float textBaseline = panelBottom - AndroidUtilities.dp(9);
+        float pillHalfBase = AndroidUtilities.dp(20f);
+        float pillHalfH = AndroidUtilities.dp(13f);
+        float ind = clampIndicator();
+
+        // --- Panel sirti + tashqi neon glow ---
         int layer = canvas.saveLayer(
                 panelLeft - AndroidUtilities.dp(20), panelTop - AndroidUtilities.dp(20),
                 panelRight + AndroidUtilities.dp(20), panelBottom + AndroidUtilities.dp(20), null);
 
         surfacePaint.setColor(SURFACE);
-        surfacePaint.setShadowLayer(AndroidUtilities.dp(16), 0, AndroidUtilities.dp(2), GLOW_BLUE);
+        surfacePaint.setShadowLayer(AndroidUtilities.dp(15), 0, AndroidUtilities.dp(2), GLOW_BLUE);
         canvas.drawRoundRect(panelRect, corner, corner, surfacePaint);
         surfacePaint.clearShadowLayer();
 
-        // border
+        // border + tepadagi nozik yorug' chiziq (sirt "ustidagi" neon chiroyi)
         borderPaint.setColor(BORDER);
         canvas.drawRoundRect(panelRect, corner, corner, borderPaint);
-
-        // cradle: FAB atrofida panelni "yeb" qo'yamiz (CLEAR)
-        float notchR = fabR + AndroidUtilities.dp(6);
-        canvas.drawCircle(fabCx, fabCy, notchR, clearPaint);
+        highlightPaint.setColor(0x22FFFFFF);
+        tmpRect.set(panelLeft + AndroidUtilities.dp(16), panelTop + AndroidUtilities.dp(0.6f),
+                panelRight - AndroidUtilities.dp(16), panelTop + AndroidUtilities.dp(0.7f));
+        canvas.drawLine(tmpRect.left, tmpRect.top, tmpRect.right, tmpRect.top, highlightPaint);
         canvas.restoreToCount(layer);
 
-        // --- Markaz FAB ---
-        float fabScale = 1f + 0.08f * fabPress;
-        float fr = fabR * fabScale;
-        // tashqi nur halqasi
-        fabGlowPaint.setShader(null);
-        fabGlowPaint.setColor(FAB_END);
-        fabGlowPaint.setAlpha(90);
-        fabGlowPaint.setShadowLayer(AndroidUtilities.dp(18), 0, 0, FAB_START);
-        canvas.drawCircle(fabCx, fabCy, fr, fabGlowPaint);
-        fabGlowPaint.clearShadowLayer();
-        // gradient disk
-        fabRect.set(fabCx - fr, fabCy - fr, fabCx + fr, fabCy + fr);
-        LinearGradient fabGrad = new LinearGradient(
-                fabRect.left, fabRect.top, fabRect.right, fabRect.bottom,
-                FAB_START, FAB_END, Shader.TileMode.CLAMP);
-        fabPaint.setShader(fabGrad);
-        canvas.drawCircle(fabCx, fabCy, fr, fabPaint);
-        fabPaint.setShader(null);
-        // "+" belgisi
-        iconPaint.setStyle(Paint.Style.STROKE);
-        iconPaint.setColor(0xFFFFFFFF);
-        iconPaint.setStrokeWidth(AndroidUtilities.dp(2.6f));
-        float plus = AndroidUtilities.dp(8.5f);
-        canvas.drawLine(fabCx - plus, fabCy, fabCx + plus, fabCy, iconPaint);
-        canvas.drawLine(fabCx, fabCy - plus, fabCx, fabCy + plus, iconPaint);
-        iconPaint.setColor(INACTIVE);
-        iconPaint.setStrokeWidth(AndroidUtilities.dp(1.9f));
+        // --- Faol pill (siljuvchi + cho'ziluvchi) ---
+        float pillCx = panelLeft + usable * (ind + 0.5f) / COUNT;
+        float pillHalfW = pillHalfBase + AndroidUtilities.dp(10f) * stretch;
+        pillRect.set(pillCx - pillHalfW, iconCy - pillHalfH,
+                pillCx + pillHalfW, iconCy + pillHalfH);
+        // Mulohaza: Paint rangi Shader'ga alpha'ni "modulyatsiya" qiladi —
+        // oldin qolgan alpha gradientni xiralashtiradi, shuning uchun AVVAL oq.
+        pillPaint.setColor(0xFFFFFFFF);
+        shaderMatrix.reset();
+        shaderMatrix.setTranslate(pillRect.left, pillRect.top);
+        shaderMatrix.preScale(pillRect.width(), pillRect.height());
+        pillGrad.setLocalMatrix(shaderMatrix);
+        pillPaint.setShader(pillGrad);
+        pillPaint.setAlpha((int) (235 - 40 * pressAmount));
+        pillPaint.setShadowLayer(AndroidUtilities.dp(11), 0, AndroidUtilities.dp(1.5f), PILL_START);
+        canvas.drawRoundRect(pillRect, pillHalfH, pillHalfH, pillPaint);
+        pillPaint.clearShadowLayer();
+        pillPaint.setShader(null);
+        pillStrokePaint.setColor(PILL_STROKE);
+        canvas.drawRoundRect(pillRect, pillHalfH, pillHalfH, pillStrokePaint);
 
-        // --- Faol tab underline (siljuvchi neon) ---
-        float activeCx = slotCxForIndicator();
-        float underlineY = panelBottom - AndroidUtilities.dp(5);
-        float uw = AndroidUtilities.dp(16);
-        underlinePaint.setShader(null);
-        underlinePaint.setColor(ACTIVE);
-        underlinePaint.setShadowLayer(AndroidUtilities.dp(8), 0, 0, ACTIVE);
-        canvas.drawRoundRect(new RectF(activeCx - uw, underlineY, activeCx + uw, underlineY + AndroidUtilities.dp(3)),
-                AndroidUtilities.dp(2), AndroidUtilities.dp(2), underlinePaint);
-        underlinePaint.clearShadowLayer();
+        // --- "pop" halqasi: tanlangan ikon atrofidan tarqaydi ---
+        if (popTab >= 0 && popAmount > 0.01f) {
+            float rc = AndroidUtilities.dp(13f) + AndroidUtilities.dp(17f) * popAmount;
+            ringPaint.setColor(PILL_START);
+            ringPaint.setAlpha((int) (110 * (1f - popAmount)));
+            canvas.drawCircle(slotCx[popTab], iconCy, rc, ringPaint);
+        }
 
-        // --- Tab ikonlari + matnlari ---
-        float iconCy = panelTop + AndroidUtilities.dp(13);
-        float textBaseline = panelBottom - AndroidUtilities.dp(9);
+        // --- Slotlar: ikon + matn (masofaga qarab crossfade) ---
         for (int i = 0; i < COUNT; i++) {
-            float tcx = slotCx[TAB_SLOT[i]];
-            boolean active = i == activeTab;
-            int color = active ? ACTIVE : INACTIVE;
-            drawIcon(canvas, i, tcx, iconCy, color, active);
-            textPaint.setColor(color);
-            textPaint.setTypeface(Typeface.create(Typeface.DEFAULT, active ? Typeface.BOLD : Typeface.NORMAL));
-            canvas.drawText(LABELS[i], tcx, textBaseline, textPaint);
+            float prox = 1f - Math.min(1f, Math.abs(i - ind));
+            float squeeze = i == pressSlot ? 1f - 0.07f * pressAmount : 1f;
+            float cx = slotCx[i];
+
+            boolean bold = prox > 0.5f;
+            int iconColor = lerpColor(ICON_IDLE, ICON_ACTIVE, easeOut(prox));
+            int textColor = lerpColor(TEXT_IDLE, TEXT_ACTIVE, easeOut(prox));
+
+            float scale = (1f + 0.1f * prox) * squeeze;
+            if (popTab == i && popAmount > 0.01f) {
+                scale *= 1f + 0.16f * popAmount;
+            }
+            drawIcon(canvas, i, cx, iconCy, iconSize * scale, iconColor, bold);
+
+            textPaint.setColor(textColor);
+            textPaint.setTypeface(bold ? boldTypeface : regularTypeface);
+            float ty = textBaseline + (1f - prox) * AndroidUtilities.dp(0.8f);
+            canvas.drawText(LABELS[i], cx, ty, textPaint);
         }
     }
 
     /**
-     * indicatorPos (tab-space 0..COUNT-1) ni slot markaziga aylantiradi.
-     * Oradagi markaz FAB sloti (2) tab emas — siljish 1→3 oralig'ida uzluksiz
-     * interpolatsiya bilan chiziladi, shuning uchun underline FAB ustidan o'tadi.
+     * indicatorPos spring sababli chegaradan biroz chiqib qoladi (overshoot) —
+     * geometriyani 0..COUNT-1 oralig'ida ushlab turamiz, aks holda pill panel
+     * chetidan chiqib ketadi.
      */
-    private float slotCxForIndicator() {
-        int idx = (int) Math.floor(indicatorPos);
-        if (idx < 0) idx = 0;
-        if (idx >= COUNT - 1) idx = COUNT - 2;
-        float t = indicatorPos - idx;
-        if (t < 0f) t = 0f;
-        if (t > 1f) t = 1f;
-        return lerp(slotCx[TAB_SLOT[idx]], slotCx[TAB_SLOT[idx + 1]], t);
+    private float clampIndicator() {
+        return Math.max(-0.30f, Math.min(COUNT - 1 + 0.30f, indicatorPos));
     }
 
-    private static float lerp(float a, float b, float t) {
-        return a + (b - a) * t;
+    private static float easeOut(float t) {
+        float k = Math.max(0f, Math.min(1f, t));
+        return 1f - (1f - k) * (1f - k);
     }
 
-    private void drawIcon(Canvas canvas, int tab, float cx, float cy, int color, boolean active) {
+    private static int lerpColor(int from, int to, float t) {
+        float k = Math.max(0f, Math.min(1f, t));
+        int a = (int) (((from >>> 24) & 0xff) + (((to >>> 24) & 0xff) - ((from >>> 24) & 0xff)) * k);
+        int r = (int) (((from >> 16) & 0xff) + (((to >> 16) & 0xff) - ((from >> 16) & 0xff)) * k);
+        int g = (int) (((from >> 8) & 0xff) + (((to >> 8) & 0xff) - ((from >> 8) & 0xff)) * k);
+        int b = (int) ((from & 0xff) + ((to & 0xff) - (from & 0xff)) * k);
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    private void drawIcon(Canvas canvas, int tab, float cx, float cy, float size, int color, boolean active) {
         iconPaint.setColor(color);
-        float s = iconSize * (active ? 1.08f : 1f);
-        float half = s / 2f;
+        iconPaint.setStrokeWidth(AndroidUtilities.dp(active ? 2.1f : 1.8f));
+        float half = size / 2f;
         switch (tab) {
             case TAB_ASOSIY: {
                 float r = AndroidUtilities.dp(5);
-                RectF bubble = new RectF(cx - half, cy - half + AndroidUtilities.dp(1),
+                tmpRect.set(cx - half, cy - half + AndroidUtilities.dp(1),
                         cx + half, cy + half - AndroidUtilities.dp(4));
-                drawRoundRectStroke(canvas, bubble, r);
+                drawRoundRectStroke(canvas, tmpRect, r);
                 path.reset();
-                path.moveTo(cx - half + AndroidUtilities.dp(6), bubble.bottom);
-                path.lineTo(cx - half + AndroidUtilities.dp(4), bubble.bottom + AndroidUtilities.dp(5));
-                path.lineTo(cx - half + AndroidUtilities.dp(11), bubble.bottom);
+                path.moveTo(cx - half + AndroidUtilities.dp(6), tmpRect.bottom);
+                path.lineTo(cx - half + AndroidUtilities.dp(4), tmpRect.bottom + AndroidUtilities.dp(5));
+                path.lineTo(cx - half + AndroidUtilities.dp(11), tmpRect.bottom);
                 path.close();
                 iconPaint.setStyle(Paint.Style.FILL);
                 canvas.drawPath(path, iconPaint);
@@ -346,11 +421,11 @@ public class YuzGramBottomBar extends View {
                 break;
             }
             case TAB_REELS: {
-                // Reels: yumaloq to'rtburchak ichida "play" uchburchagi (film kadrati)
+                // Reels: yumaloq kadr ichida "play" uchburchagi
                 float r = AndroidUtilities.dp(5);
-                RectF frame = new RectF(cx - half, cy - half, cx + half, cy + half);
-                drawRoundRectStroke(canvas, frame, r);
-                float tri = AndroidUtilities.dp(4.6f);
+                tmpRect.set(cx - half, cy - half, cx + half, cy + half);
+                drawRoundRectStroke(canvas, tmpRect, r);
+                float tri = AndroidUtilities.dp(4.6f) * (size / iconSize);
                 path.reset();
                 path.moveTo(cx - tri * 0.7f, cy - tri);
                 path.lineTo(cx - tri * 0.7f, cy + tri);
@@ -362,28 +437,36 @@ public class YuzGramBottomBar extends View {
                 break;
             }
             case TAB_ELONLAR: {
-                float gap = AndroidUtilities.dp(2.5f);
-                float cell = (s - gap) / 2f;
+                // Elonlar: 2x2 katalog to'rini; faol slotda yuqori-chap katak to'ldiriladi
+                float gap = AndroidUtilities.dp(2.5f) * (size / iconSize);
+                float cell = (size - gap) / 2f;
                 float left = cx - half, top = cy - half;
                 for (int gx = 0; gx < 2; gx++) {
                     for (int gy = 0; gy < 2; gy++) {
-                        RectF cellRect = new RectF(
+                        tmpRect.set(
                                 left + gx * (cell + gap),
                                 top + gy * (cell + gap),
                                 left + gx * (cell + gap) + cell,
                                 top + gy * (cell + gap) + cell);
-                        drawRoundRectStroke(canvas, cellRect, AndroidUtilities.dp(3));
+                        if (active && gx == 0 && gy == 0) {
+                            iconPaint.setStyle(Paint.Style.FILL);
+                            canvas.drawRoundRect(tmpRect, AndroidUtilities.dp(3), AndroidUtilities.dp(3), iconPaint);
+                            iconPaint.setStyle(Paint.Style.STROKE);
+                        } else {
+                            drawRoundRectStroke(canvas, tmpRect, AndroidUtilities.dp(3));
+                        }
                     }
                 }
                 break;
             }
             case TAB_PROFIL: {
-                float headR = AndroidUtilities.dp(4.2f);
-                canvas.drawCircle(cx, cy - AndroidUtilities.dp(3.5f), headR, iconPaint);
+                float k = size / iconSize;
+                float headR = AndroidUtilities.dp(4.2f) * k;
+                canvas.drawCircle(cx, cy - AndroidUtilities.dp(3.5f) * k, headR, iconPaint);
                 path.reset();
-                RectF body = new RectF(cx - half, cy + AndroidUtilities.dp(2),
-                        cx + half, cy + half + AndroidUtilities.dp(7));
-                path.addArc(body, 200, 140);
+                tmpRect.set(cx - half, cy + AndroidUtilities.dp(2) * k,
+                        cx + half, cy + half + AndroidUtilities.dp(7f) * k);
+                path.addArc(tmpRect, 200, 140);
                 canvas.drawPath(path, iconPaint);
                 break;
             }
@@ -401,57 +484,59 @@ public class YuzGramBottomBar extends View {
         int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
             super.onTouchEvent(event);
-            if (isFabHit(event.getX(), event.getY())) {
-                fabPress = 0f;
-                ValueAnimator bounce = ValueAnimator.ofFloat(0f, 1f, 0f);
-                bounce.setDuration(240);
-                bounce.addUpdateListener(a -> {
-                    fabPress = (float) a.getAnimatedValue();
-                    invalidate();
-                });
-                bounce.start();
+            int slot = slotAt(event.getX());
+            if (slot >= 0) {
+                pressSlot = slot;
+                animatePress(1f, 90);
+            }
+            return true;
+        }
+        if (action == MotionEvent.ACTION_MOVE) {
+            int slot = slotAt(event.getX());
+            if (slot != pressSlot) {
+                pressSlot = slot;
+                animatePress(slot >= 0 ? 1f : 0f, 110);
             }
             return true;
         }
         if (action == MotionEvent.ACTION_UP) {
-            if (isFabHit(event.getX(), event.getY())) {
+            int slot = pressSlot;
+            pressSlot = -1;
+            animatePress(0f, 200);
+            if (slot >= 0) {
                 performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
-                if (fabListener != null) {
-                    fabListener.onFabClick();
-                }
-                return true;
-            }
-            int tab = tabAt(event.getX());
-            if (tab >= 0) {
-                performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
-                if (tab != activeTab) {
-                    setActiveTab(tab);
+                if (slot != activeTab) {
+                    setActiveTab(slot);
+                } else {
+                    // qayta bosish: indicator joyida, faqat ikon "pop" qiladi
+                    animatePop(slot, true);
                 }
                 if (listener != null) {
-                    listener.onTabSelected(tab);
+                    listener.onTabSelected(slot);
                 }
             }
             return true;
         }
+        if (action == MotionEvent.ACTION_CANCEL) {
+            pressSlot = -1;
+            animatePress(0f, 200);
+            return super.onTouchEvent(event);
+        }
         return super.onTouchEvent(event);
     }
 
-    private boolean isFabHit(float x, float y) {
-        float dx = x - fabCx;
-        float dy = y - fabCy;
-        return (float) Math.hypot(dx, dy) <= fabR + AndroidUtilities.dp(10);
-    }
-
-    /** Bosingan x koordinatani tab indeksiga aylantiradi (markaz FAB sloti -1 qaytaradi). */
-    private int tabAt(float x) {
-        if (slotCx[0] == 0) return TAB_ASOSIY; // hali chizilmagan
-        float usable = panelRight - panelLeft;
-        int slot = (int) ((x - panelLeft) / (usable / 5f));
-        slot = Math.max(0, Math.min(4, slot));
-        if (slot == 2) return -1; // markaz FAB — tab emas
-        if (slot == 0) return TAB_ASOSIY;
-        if (slot == 1) return TAB_REELS;
-        if (slot == 3) return TAB_ELONLAR;
-        return TAB_PROFIL;
+    /**
+     * Bosingan x koordinatani slot indeksiga aylantiradi. Markaz FAB yo'q — 4 teng
+     * slot, shuning uchun panel kengligi bo'ylab istalgan joyda urish ishlaydi.
+     */
+    private int slotAt(float x) {
+        if (panelRight <= panelLeft) {
+            return -1;
+        }
+        if (x < panelLeft || x > panelRight) {
+            return -1;
+        }
+        int slot = (int) ((x - panelLeft) / ((panelRight - panelLeft) / COUNT));
+        return Math.max(0, Math.min(COUNT - 1, slot));
     }
 }

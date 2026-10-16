@@ -473,20 +473,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             BaseFragment top = getLastFragment();
             uz.kodlikino.top4.ui.YuzGramNav.select(top, tab);
         });
-        // Markaz "+" FAB — ochiq bo'limga qarab "joylash" ekranini ochadi:
-        // Elonlar tab'ida e'lon, boshqa hollarda reel (Asosiy/Reels/Profil).
-        yuzGramBottomBar.setOnFabClickListener(() -> {
-            BaseFragment top = getLastFragment();
-            if (top == null) {
-                return;
-            }
-            if (top instanceof uz.kodlikino.top4.ui.ElonlarActivity
-                    || yuzGramBottomBar.getActiveTab() == uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ELONLAR) {
-                top.presentFragment(new uz.kodlikino.top4.ui.CreateClassifiedAdActivity(), false);
-            } else {
-                top.presentFragment(new uz.kodlikino.top4.ui.CreateReelActivity(), false);
-            }
-        });
+        // Markaz "+" FAB olib tashlandi: e'lon/reel joylash tugmalari o'z bo'limlari
+        // ichida (ElonlarActivity / ReelsActivity) joylashgan.
         yuzGramBottomBar.setVisibility(View.GONE);
         yuzGramBottomBar.setTranslationY(uz.kodlikino.top4.ui.YuzGramBottomBar.height());
         frameLayout.addView(yuzGramBottomBar, LayoutHelper.createFrame(
