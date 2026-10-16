@@ -6310,17 +6310,20 @@ public class Theme {
     /**
      * YuzGram brend qoidasi: ilova foni doim neon-to'q (#0A1120) bo'ladi —
      * chat ro'yxati Elonlar bo'limi bilan bir xil fon-da ko'rinadi.
-     * Telegram chat aurasi yoki eski saqlangan sozlamalar orqali stock
-     * YORUG' mavzularga ("Blue", "Day", "Arctic Blue") o'tib qolmaslik uchun
-     * ularni brend mavzusiga aylantiramiz. Foydalanuvchi o'zi yuklagan
-     * maxsus .attheme fayllari (pathToFile != null) o'zgarishsiz ishlaydi.
+     * Telegram chat aurasi yoki eski saqlangan sozlamalar orqali boshqa
+     * stock mavzuga ("Blue", "Day", "Night", "Dark Blue" ...) o'tib qolmaslik
+     * uchun ularning barchasi brend mavzusiga aylantiriladi. Foydalanuvchi
+     * o'zi yuklagan maxsus .attheme fayllari (pathToFile != null) o'zgarmaydi.
      */
     private static ThemeInfo forceYuzGramTheme(ThemeInfo themeInfo) {
         if (themeInfo == null || themeInfo.pathToFile != null) {
             return themeInfo;
         }
         String key = themeInfo.getKey();
-        if ("Blue".equals(key) || "Day".equals(key) || "Arctic Blue".equals(key)) {
+        if ("YuzGram Neon".equals(key)) {
+            return themeInfo;
+        }
+        if (themeInfo.assetName != null) {
             ThemeInfo neon = themesDict.get("YuzGram Neon");
             if (neon != null) {
                 return neon;
@@ -6345,8 +6348,8 @@ public class Theme {
         applyTheme(themeInfo, save, true, nightTheme);
     }
 
-    private static void applyTheme(ThemeInfo themeInfo, boolean save, boolean removeWallpaperOverride, final boolean nightTheme) {
-        themeInfo = forceYuzGramTheme(themeInfo);
+    private static void applyTheme(ThemeInfo requestedTheme, boolean save, boolean removeWallpaperOverride, final boolean nightTheme) {
+        final ThemeInfo themeInfo = forceYuzGramTheme(requestedTheme);
         if (themeInfo == null) {
             return;
         }
@@ -6471,8 +6474,8 @@ public class Theme {
         }
     }
 
-    private static void applyThemeInBackground(ThemeInfo themeInfo, boolean save, boolean removeWallpaperOverride, final boolean nightTheme, Runnable onDone) {
-        themeInfo = forceYuzGramTheme(themeInfo);
+    private static void applyThemeInBackground(ThemeInfo requestedTheme, boolean save, boolean removeWallpaperOverride, final boolean nightTheme, Runnable onDone) {
+        final ThemeInfo themeInfo = forceYuzGramTheme(requestedTheme);
         if (themeInfo == null) {
             if (onDone != null) {
                 onDone.run();

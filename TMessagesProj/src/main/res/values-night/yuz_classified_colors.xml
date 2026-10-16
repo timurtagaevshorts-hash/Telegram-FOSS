@@ -9,7 +9,7 @@
 
     <color name="primary">#2AABEE</color>
     <color name="home_accent">#2AABEE</color>
-    <color name="home_accent_purple">#8B5CFF</color>
+    <color name="home_accent_purple">#5B6CF9</color>
 
     <color name="home_card">#0D121D</color>
     <color name="modern_border">#202B3C</color>
@@ -29,7 +29,7 @@
 
     <color name="home_bg">#0A1120</color>
     <color name="chat_bg_top">#0A1120</color>
-    <color name="nav_chat_active">#8B5CFF</color>
+    <color name="nav_chat_active">#5B6CF9</color>
     <color name="telegram_white">#FFFFFF</color>
     <color name="telegram_blue">#2AABEE</color>
 </resources>

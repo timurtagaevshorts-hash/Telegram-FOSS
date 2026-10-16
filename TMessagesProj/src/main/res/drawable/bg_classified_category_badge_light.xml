@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Kategoriya chipi. Eski holida yorug' (#E8ECF4) edi: qorong'i neon fonda
+  beg'ubor dog' bo'lib ko'rinardi va ustidagi oq matn o'qib bo'lmas edi.
+  Endi brend sirti (surface_elevated) + neon ko'k border — ilovaning qolgan
+  qismlari bilan bitta uslub.
+-->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#E8ECF4" />
+    <solid android:color="@color/surface_elevated" />
+    <stroke
+        android:width="1dp"
+        android:color="#592AABEE" />
     <corners android:radius="8dp" />
 </shape>

@@ -3,13 +3,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="@color/modern_surface">
 
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/adsAppBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#000000"
+        android:background="@color/modern_surface"
         app:elevation="0dp">
 
         <LinearLayout
@@ -54,7 +54,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Yangi imkoniyatlar, siz uchun"
-                        android:textColor="#8B92A8"
+                        android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -84,7 +84,7 @@
                         android:paddingBottom="7dp"
                         android:singleLine="true"
                         android:text="@string/classified_my_ads"
-                        android:textColor="#8B92A8"
+                        android:textColor="@color/text_secondary"
                         android:textSize="12sp"
                         android:textStyle="bold" />
 
@@ -163,7 +163,7 @@
                         android:inputType="text"
                         android:maxLines="1"
                         android:textColor="#FFFFFF"
-                        android:textColorHint="#5E6F84"
+                        android:textColorHint="@color/text_hint"
                         android:textSize="14sp" />
                 </LinearLayout>
 
@@ -202,7 +202,7 @@
                             android:inputType="textCapSentences"
                             android:maxLines="1"
                             android:textColor="#FFFFFF"
-                            android:textColorHint="#5E6F84"
+                            android:textColorHint="@color/text_hint"
                             android:textSize="14sp" />
                     </LinearLayout>
 
@@ -214,7 +214,7 @@
                         android:background="@drawable/bg_classified_search_bar"
                         android:padding="10dp"
                         android:src="@drawable/ic_filter"
-                        app:tint="#A855F7" />
+                        app:tint="@color/home_accent_purple" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -249,12 +249,12 @@
                         android:layout_weight="1"
                         android:layout_marginEnd="8dp"
                         android:hint="Min narx"
-                        app:boxBackgroundColor="#0D121D"
+                        app:boxBackgroundColor="@color/home_card"
                         app:boxCornerRadiusTopStart="12dp"
                         app:boxCornerRadiusTopEnd="12dp"
                         app:boxCornerRadiusBottomStart="12dp"
                         app:boxCornerRadiusBottomEnd="12dp"
-                        app:hintTextColor="#8B92A8"
+                        app:hintTextColor="@color/text_secondary"
                         style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox.Dense">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etFilterMinPrice"
@@ -269,12 +269,12 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:hint="Max narx"
-                        app:boxBackgroundColor="#0D121D"
+                        app:boxBackgroundColor="@color/home_card"
                         app:boxCornerRadiusTopStart="12dp"
                         app:boxCornerRadiusTopEnd="12dp"
                         app:boxCornerRadiusBottomStart="12dp"
                         app:boxCornerRadiusBottomEnd="12dp"
-                        app:hintTextColor="#8B92A8"
+                        app:hintTextColor="@color/text_secondary"
                         style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox.Dense">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etFilterMaxPrice"
@@ -290,12 +290,12 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:hint="Joylashuv (Shahar/Tuman)"
-                    app:boxBackgroundColor="#0D121D"
+                    app:boxBackgroundColor="@color/home_card"
                     app:boxCornerRadiusTopStart="12dp"
                     app:boxCornerRadiusTopEnd="12dp"
                     app:boxCornerRadiusBottomStart="12dp"
                     app:boxCornerRadiusBottomEnd="12dp"
-                    app:hintTextColor="#8B92A8"
+                    app:hintTextColor="@color/text_secondary"
                     style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox.Dense">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etFilterLocation"
@@ -319,7 +319,7 @@
                         android:layout_weight="1"
                         android:layout_marginEnd="8dp"
                         android:text="Tozalash"
-                        android:textColor="#8B92A8"
+                        android:textColor="@color/text_secondary"
                         app:cornerRadius="12dp" />
 
                     <com.google.android.material.button.MaterialButton
