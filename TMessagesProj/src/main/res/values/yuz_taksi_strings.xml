@@ -18,4 +18,5 @@
     <string name="taksi_status_cancelled">Bekor qilingan</string>
     <string name="taksi_status_arrived">Yakunlangan</string>
     <string name="taksi_cancel">Bekor qilish</string>
+    <string name="taksi_cancelled_ok">Buyurtma bekor qilindi.</string>
 </resources>

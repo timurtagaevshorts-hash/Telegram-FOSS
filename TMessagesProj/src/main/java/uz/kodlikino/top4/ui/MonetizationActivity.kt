@@ -2,6 +2,9 @@ package uz.kodlikino.top4.ui
 
 import android.app.AlertDialog
 import android.content.Context
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.text.InputType
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
@@ -173,45 +176,74 @@ class MonetizationActivity : BaseFragment() {
 
     private fun buildTierRow(tier: FollowerRewardTier, state: FollowerRewardManager.TierState): View {
         val ctx = themedContext ?: return View(context)
-        val row = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_VERTICAL
-            setPadding(0, AndroidUtilities.dp(10f), 0, AndroidUtilities.dp(10f))
+        val row = cardRow(ctx)
+        val labelCol = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
         }
         val label = TextView(ctx).apply {
             text = "${tier.subscribers} → ${MonetizationCalculator.formatSom(tier.rewardSom)}"
             setTextColor(resources.getColor(R.color.text_primary, null))
-            textSize = 14f
+            textSize = 15f
+            setTypeface(typeface, Typeface.BOLD)
         }
-        val stateTv = TextView(ctx).apply {
-            text = stateLabel(state)
-            setTextColor(
-                resources.getColor(
-                    when (state) {
-                        FollowerRewardManager.TierState.READY -> R.color.classified_price_gold
-                        FollowerRewardManager.TierState.APPROVED -> R.color.primary
-                        else -> R.color.text_secondary
-                    }, null
-                )
-            )
-            textSize = 12f
-        }
-        row.addView(label, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        row.addView(stateTv, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ))
+        val stateTv = makeChip(ctx, stateLabel(state), stateColor(state))
+        labelCol.addView(label)
+        row.addView(labelCol, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        row.addView(
+            stateTv,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = AndroidUtilities.dp(10f) }
+        )
         if (state == FollowerRewardManager.TierState.READY) {
-            val btn = MaterialButton(ctx, null, 0).apply {
+            val btn = MaterialButton(ctx, null, com.google.android.material.R.style.Widget_MaterialComponents_Button_OutlinedButton).apply {
                 text = getString(R.string.monet_withdraw)
-                textSize = 11f
+                textSize = 12f
+                isAllCaps = false
+                strokeColor = android.content.res.ColorStateList.valueOf(resources.getColor(R.color.primary, null))
+                setTextColor(resources.getColor(R.color.primary, null))
                 setOnClickListener { withdrawForTier(tier) }
             }
             val lp = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(36f)
-            ).apply { marginStart = AndroidUtilities.dp(8f) }
+                ViewGroup.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(38f)
+            )
             row.addView(btn, lp)
         }
         return row
+    }
+
+    private fun stateColor(state: FollowerRewardManager.TierState): Int = when (state) {
+        FollowerRewardManager.TierState.READY -> Color.parseColor("#FFD84D")
+        FollowerRewardManager.TierState.PENDING -> Color.parseColor("#5B6CF9")
+        FollowerRewardManager.TierState.APPROVED -> Color.parseColor("#2AABEE")
+        FollowerRewardManager.TierState.REJECTED -> Color.parseColor("#FF5252")
+        FollowerRewardManager.TierState.LOCKED -> Color.parseColor("#95A1B4")
+    }
+
+    private fun makeChip(ctx: Context, text: String, color: Int): TextView {
+        return TextView(ctx).apply {
+            this.text = text
+            setTextColor(color)
+            textSize = 11f
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(AndroidUtilities.dp(10f), AndroidUtilities.dp(4f), AndroidUtilities.dp(10f), AndroidUtilities.dp(4f))
+            background = GradientDrawable().apply {
+                cornerRadius = AndroidUtilities.dp(9f).toFloat()
+                setColor((color and 0x00FFFFFF) or 0x24000000)
+            }
+        }
+    }
+
+    private fun cardRow(ctx: Context): LinearLayout {
+        return LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setBackgroundResource(R.drawable.bg_monet_row)
+            setPadding(AndroidUtilities.dp(16f), AndroidUtilities.dp(14f), AndroidUtilities.dp(14f), AndroidUtilities.dp(14f))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = AndroidUtilities.dp(10f) }
+        }
     }
 
     private fun stateLabel(state: FollowerRewardManager.TierState): String = when (state) {
@@ -236,16 +268,13 @@ class MonetizationActivity : BaseFragment() {
 
     private fun buildReelRow(reel: Reel): View {
         val ctx = themedContext ?: return View(context)
-        val row = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_VERTICAL
-            setPadding(0, AndroidUtilities.dp(10f), 0, AndroidUtilities.dp(10f))
-        }
+        val row = cardRow(ctx)
         val title = TextView(ctx).apply {
             text = reel.title.ifBlank { reel.caption() }.ifBlank { reel.id }
             setTextColor(resources.getColor(R.color.text_primary, null))
-            textSize = 14f
+            textSize = 15f
             maxLines = 2
+            ellipsize = android.text.TextUtils.Truncate.END
         }
         val views = TextView(ctx).apply {
             text = getString(R.string.monet_reel_views, reel.views)
@@ -259,13 +288,18 @@ class MonetizationActivity : BaseFragment() {
         left.addView(views)
         row.addView(left, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
 
-        val del = MaterialButton(ctx, null, 0).apply {
+        val del = MaterialButton(
+            ctx, null,
+            com.google.android.material.R.style.Widget_MaterialComponents_Button_TextButton
+        ).apply {
             text = getString(R.string.classified_delete)
-            textSize = 11f
+            textSize = 12f
+            isAllCaps = false
+            setTextColor(Color.parseColor("#FF5252"))
             setOnClickListener { deleteReel(reel) }
         }
         row.addView(del, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(36f)
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
         ))
         return row
     }

@@ -41,6 +41,7 @@ class TaxiCallActivity : BaseFragment() {
     private var btnSubmit: MaterialButton? = null
     private var activeCard: LinearLayout? = null
     private var tvActiveStatus: TextView? = null
+    private var btnCancel: MaterialButton? = null
 
     private var scope: CoroutineScope? = null
     private val repo = TaxiOrderRepository()
@@ -71,8 +72,10 @@ class TaxiCallActivity : BaseFragment() {
         btnSubmit = root.findViewById(R.id.btnTaxiSubmit)
         activeCard = root.findViewById(R.id.taksiActiveCard)
         tvActiveStatus = root.findViewById(R.id.tvTaxiActiveStatus)
+        btnCancel = root.findViewById(R.id.btnTaxiCancel)
 
         btnSubmit?.setOnClickListener { submitOrder() }
+        btnCancel?.setOnClickListener { cancelActiveOrder() }
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         uid = YuzGramAdsAuth.expectedUid(currentAccount)
@@ -159,6 +162,27 @@ class TaxiCallActivity : BaseFragment() {
             } catch (e: Exception) {
                 setBusyUi(false)
                 toast(getString(R.string.taksi_failed))
+            }
+        }
+    }
+
+    private fun cancelActiveOrder() {
+        if (busy) return
+        val orderId = activeOrderId
+        if (orderId.isBlank()) return
+        val s = scope ?: return
+        busy = true
+        btnCancel?.isEnabled = false
+        s.launch {
+            try {
+                YuzGramAdsAuth.ensureSignedIn(currentAccount)
+                repo.cancelOrder(orderId)
+                toast(R.string.taksi_cancelled_ok)
+            } catch (e: Exception) {
+                toast(getString(R.string.taksi_failed))
+            } finally {
+                busy = false
+                btnCancel?.isEnabled = true
             }
         }
     }
