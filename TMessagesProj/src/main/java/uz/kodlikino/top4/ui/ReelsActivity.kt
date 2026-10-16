@@ -648,4 +648,10 @@ class ReelsActivity : BaseFragment() {
         val ctx = themedContext ?: context ?: return ""
         return ctx.getString(resId)
     }
+
+    /** Formatlangan variant (`Izohlar (%1$d)` kabi) — shu overload bo'lmasa kotlinc xato beradi. */
+    private fun getString(resId: Int, vararg args: Any): String {
+        val ctx = themedContext ?: context ?: return ""
+        return ctx.getString(resId, *args)
+    }
 }
