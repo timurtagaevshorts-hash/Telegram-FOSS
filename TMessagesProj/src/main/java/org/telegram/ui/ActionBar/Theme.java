@@ -4595,7 +4595,14 @@ public class Theme {
         themeInfo.firstAccentIsDefault = true;
         themeInfo.currentAccentId = DEFALT_THEME_ACCENT_ID;
         themeInfo.sortIndex = 0;
-        themeInfo.setAccentColorOptions(new int[]{0xFF2AABEE});
+        // Kamida id=0 (accentBaseColor shu orqali o'qiladi) va id=99
+        // (firstAccentIsDefault => DEFALT_THEME_ACCENT_ID=99 kutiladi) bo'lishi shart,
+        // aks holda applyTheme'da themeAccentsMap.get(...) null → NPE (LaunchActivity crash).
+        themeInfo.setAccentColorOptions(
+                new int[]{0xFF2AABEE, 0xFF2AABEE},
+                null, null, null, null, null, null,
+                new int[]{0, DEFALT_THEME_ACCENT_ID},
+                null, null, null);
         sortAccents(themeInfo);
         themes.add(themeInfo);
         themesDict.put("YuzGram Neon", themeInfo);
