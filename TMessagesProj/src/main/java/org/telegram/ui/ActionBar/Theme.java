@@ -4581,7 +4581,26 @@ public class Theme {
                 );
         sortAccents(themeInfo);
         themes.add(themeInfo);
-        themesDict.put("Dark Blue", currentNightTheme = themeInfo);
+        themesDict.put("Dark Blue", themeInfo);
+
+        // YuzGram neon mavzusi: chat/Profil ekranlarini dizayndagi neon palitraga
+        // (#0A1120 chuqur fon, #2AABEE brend-ko'k akcent) keltiradi. Ranglar
+        // yuzgram_neon.attheme faylida (darkblue.asosida qayta bo'yalgan).
+        themeInfo = new ThemeInfo();
+        themeInfo.name = "YuzGram Neon";
+        themeInfo.assetName = "yuzgram_neon.attheme";
+        themeInfo.previewBackgroundColor = 0xff0a1120;
+        themeInfo.previewInColor = 0xff121925;
+        themeInfo.previewOutColor = 0xff16324d;
+        themeInfo.firstAccentIsDefault = true;
+        themeInfo.currentAccentId = DEFALT_THEME_ACCENT_ID;
+        themeInfo.sortIndex = 0;
+        themeInfo.setAccentColorOptions(new int[]{0xFF2AABEE});
+        sortAccents(themeInfo);
+        themes.add(themeInfo);
+        themesDict.put("YuzGram Neon", themeInfo);
+        // Neon mavzuni standart, kunduzgi va tungi mavzu qilamiz (chat/Profil shu bo'ladi).
+        defaultTheme = currentDayTheme = currentNightTheme = themeInfo;
 
         themeInfo = new ThemeInfo();
         themeInfo.name = "Arctic Blue";
