@@ -1,0 +1,132 @@
+package uz.kodlikino.top4.ui
+
+import android.content.Context
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.request.RequestOptions
+import org.telegram.messenger.R
+import uz.kodlikino.top4.models.ReelComment
+import java.util.Locale
+
+/**
+ * Reel izohlari ro'yxati adapter'i ([ReelsActivity] ichidagi pastki panel uchun).
+ *
+ * KinoTOP4'dagi `ReelCommentsAdapter` xulqiyati saqlandi:
+ *  - avtor nom, matn, nisbiy vaqt;
+ *  - javob izohlarida "… javob: @name" ko'rsatiladi;
+ *  - izohni bosish (yoki uzun bosish) javob berish rejimini yoqadi.
+ *
+ * Telegram'ning ichida (AAR emas, manba kodi) ishlaydigan yagona RecyclerView
+ * versiyasi saqlanadi — shuning uchun faqat `adapterPosition` kabi eski API'lar
+ * ishlatiladi (`getBindingAdapterPosition()` bu nusxada yo'q).
+ */
+class ReelCommentsAdapter(
+    private val appContext: Context,
+    private val onReply: (ReelComment) -> Unit
+) : RecyclerView.Adapter<ReelCommentsAdapter.CommentHolder>() {
+
+    private val items = ArrayList<ReelComment>()
+
+    fun submit(list: List<ReelComment>) {
+        items.clear()
+        items.addAll(list)
+        notifyDataSetChanged()
+    }
+
+    /** Yangi yozilgan izohni oxiriga qo'shadi (qayta yuklashni talab qilmaydi). */
+    fun append(comment: ReelComment) {
+        if (items.any { it.id == comment.id }) return
+        items.add(comment)
+        notifyItemInserted(items.size - 1)
+    }
+
+    fun clear() {
+        items.clear()
+        notifyDataSetChanged()
+    }
+
+    fun lastId(): String = items.lastOrNull()?.id.orEmpty()
+
+    override fun getItemCount(): Int = items.size
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CommentHolder {
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_reel_comment, parent, false)
+        return CommentHolder(view)
+    }
+
+    override fun onBindViewHolder(holder: CommentHolder, position: Int) {
+        items.getOrNull(position)?.let(holder::bind)
+    }
+
+    inner class CommentHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val tvAvatar: TextView = itemView.findViewById(R.id.tvCommentAvatar)
+        private val ivAvatar: ImageView = itemView.findViewById(R.id.ivCommentAvatar)
+        private val tvAuthor: TextView = itemView.findViewById(R.id.tvCommentAuthor)
+        private val tvText: TextView = itemView.findViewById(R.id.tvCommentText)
+        private val tvTime: TextView = itemView.findViewById(R.id.tvCommentTime)
+        private val tvReplyHint: TextView = itemView.findViewById(R.id.tvCommentReplyHint)
+
+        fun bind(comment: ReelComment) {
+            val name = comment.authorName.ifBlank { "YuzGram" }
+            tvAuthor.text = name
+            tvText.text = comment.text
+            tvTime.text = relativeTime(comment.createdAt)
+            tvAvatar.text = name.take(1).uppercase(Locale.getDefault())
+
+            val photo = comment.authorPhotoUrl
+            if (photo.isNotBlank()) {
+                ivAvatar.visibility = View.VISIBLE
+                Glide.with(ivAvatar)
+                    .load(photo)
+                    .apply(RequestOptions.circleCropTransform())
+                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                    .error(R.drawable.bg_classified_image_placeholder)
+                    .into(ivAvatar)
+            } else {
+                ivAvatar.visibility = View.GONE
+                ivAvatar.setImageDrawable(null)
+            }
+
+            if (comment.isReply) {
+                tvReplyHint.visibility = View.VISIBLE
+                tvReplyHint.text = appContext.getString(
+                    R.string.reels_comment_reply_to,
+                    comment.replyToAuthorName.ifBlank { "YuzGram" }
+                )
+            } else {
+                tvReplyHint.visibility = View.GONE
+            }
+
+            val reply = View.OnClickListener { onReply(comment) }
+            itemView.setOnClickListener(reply)
+            itemView.setOnLongClickListener {
+                onReply(comment)
+                true
+            }
+        }
+
+        /** Nisbiy vaqt — eski loyihadagi kabi o'zbekcha ("5 daqiqa oldin"). */
+        private fun relativeTime(millis: Long): String {
+            if (millis <= 0L) return appContext.getString(R.string.reels_comment_now)
+            val diff = System.currentTimeMillis() - millis
+            if (diff < 0L) return appContext.getString(R.string.reels_comment_now)
+            val minutes = diff / 60_000L
+            val hours = diff / 3_600_000L
+            val days = diff / 86_400_000L
+            return when {
+                minutes < 1 -> appContext.getString(R.string.reels_comment_now)
+                minutes < 60 -> appContext.getString(R.string.reels_comment_minutes, minutes.toInt())
+                hours < 24 -> appContext.getString(R.string.reels_comment_hours, hours.toInt())
+                days < 30 -> appContext.getString(R.string.reels_comment_days, days.toInt())
+                else -> appContext.getString(R.string.reels_comment_months, (days / 30L).toInt())
+            }
+        }
+    }
+}

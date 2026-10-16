@@ -36,4 +36,22 @@
     <!-- Ovoz tugmasi belgilari (feed yuqorisida) -->
     <string name="reels_sound_on">🔊</string>
     <string name="reels_sound_off">🔇</string>
+
+    <!-- Izohlar paneli -->
+    <string name="reels_comments">Izohlar</string>
+    <string name="reels_comments_title">Izohlar (%1$d)</string>
+    <string name="reels_comments_close">Izohlarni yopish</string>
+    <string name="reels_comments_empty">Hali izoh yo\'q — birinchi bo\'lib yozing</string>
+    <string name="reels_comments_load_failed">Izohlar yuklanmadi. Bosib qayta urinib ko\'ring</string>
+    <string name="reels_comment_hint">Izoh yozing…</string>
+    <string name="reels_comment_send">Yuborish</string>
+    <string name="reels_comment_empty">Izoh matnini kiriting</string>
+    <string name="reels_comment_failed">Izoh yuborilmadi</string>
+    <string name="reels_comment_reply_to">↩ %1$s javob</string>
+    <string name="reels_comment_replying_to">%1$s ga javob</string>
+    <string name="reels_comment_now">hozirgina</string>
+    <string name="reels_comment_minutes">%1$d daqiqa oldin</string>
+    <string name="reels_comment_hours">%1$d soat oldin</string>
+    <string name="reels_comment_days">%1$d kun oldin</string>
+    <string name="reels_comment_months">%1$d oy oldin</string>
 </resources>

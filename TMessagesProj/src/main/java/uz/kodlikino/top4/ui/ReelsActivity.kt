@@ -1,10 +1,15 @@
 package uz.kodlikino.top4.ui
 
 import android.content.Context
+import android.graphics.Rect
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
@@ -22,6 +27,7 @@ import org.telegram.messenger.R
 import org.telegram.messenger.UserConfig
 import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.models.Reel
+import uz.kodlikino.top4.models.ReelComment
 import uz.kodlikino.top4.utils.ReelsRepository
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 
@@ -35,6 +41,8 @@ import uz.kodlikino.top4.utils.YuzGramAdsAuth
  *    orqali, video esa BITTA ExoPlayer bilan ishlaydi (quvvat/tejamkorlik);
  *  - feed Firestore `reels` kolleksiyasidan o'qiladi — KinoTOP4 bilan umumiy tasma;
  *  - like/ko'rish Firestore'ga yoziladi (rules `views`/`likeCount` update'ga ruxsat beradi);
+ *  - izohlar (`💬`) shu ekran ichidagi pastki panel ochib ko'rsatiladi — KinoTOP4'dagi
+ *    `ReelCommentsBottomSheet` o'rniga; yozish `reels/{id}/comments` ga ketadi;
  *  - "Reel joylash" -> [CreateReelActivity].
  *
  * Nima uchun ViewPager2 EMAS: Telegram `androidx.recyclerview` AAR'ini exclude qilib,
@@ -55,6 +63,28 @@ class ReelsActivity : BaseFragment() {
     private var progressBar: ProgressBar? = null
     private var emptyView: TextView? = null
     private var adapter: ReelsAdapter? = null
+
+    // Izohlar paneli (ekran ichida — alohida dialog EMAS, qarang fragment_reels.xml)
+    private var commentsScrim: View? = null
+    private var commentsPanel: View? = null
+    private var commentsTitle: TextView? = null
+    private var commentsList: RecyclerView? = null
+    private var commentsLayoutManager: LinearLayoutManager? = null
+    private var commentsAdapter: ReelCommentsAdapter? = null
+    private var commentsProgress: ProgressBar? = null
+    private var commentsEmpty: TextView? = null
+    private var commentInput: EditText? = null
+    private var sendButton: View? = null
+    private var replyHint: TextView? = null
+
+    private var commentsOpen = false
+    private var commentsLoading = false
+    private var sendingComment = false
+    private var commentsReelId = ""
+    private var loadedCommentCount = 0
+    private var replyTarget: ReelComment? = null
+    private var panelBottomMarginNormal = 0
+    private var keyboardListener: ViewTreeObserver.OnGlobalLayoutListener? = null
 
     private var scope: CoroutineScope? = null
     private var loading = false
@@ -98,7 +128,8 @@ class ReelsActivity : BaseFragment() {
         val reelsAdapter = ReelsAdapter(
             appContext = themed,
             onLikeToggle = { reelId, likedNow -> toggleLike(reelId, likedNow) },
-            onViewed = { reelId -> registerView(reelId) }
+            onViewed = { reelId -> registerView(reelId) },
+            onOpenComments = { reelId -> openComments(reelId) }
         )
         adapter = reelsAdapter
 
@@ -133,9 +164,98 @@ class ReelsActivity : BaseFragment() {
         }
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        setupComments(root, themed)
         loadReels()
         warmUpAuth()
         return root
+    }
+
+    /**
+     * Izohlar panelini ulaydi: ro'yxat, yopish, javob berish va yuborish tugmalari.
+     * Panel balandligi va pastki bo'shliq qat'iy o'lchanadi — pastki navigatsiya
+     * bari butun ekran ustida doimiy turgani uchun kiritish maydoni ostida qolmasligi
+     * kerak (qarang [YuzGramBottomBar.height]).
+     */
+    private fun setupComments(root: View, themed: Context) {
+        commentsScrim = root.findViewById(R.id.commentsScrim)
+        commentsPanel = root.findViewById(R.id.commentsPanel)
+        commentsTitle = root.findViewById(R.id.tvCommentsTitle)
+        commentsList = root.findViewById(R.id.rvComments)
+        commentsProgress = root.findViewById(R.id.progressComments)
+        commentsEmpty = root.findViewById(R.id.emptyComments)
+        commentInput = root.findViewById(R.id.etComment)
+        sendButton = root.findViewById(R.id.btnSendComment)
+        replyHint = root.findViewById(R.id.tvReplyHint)
+
+        val panel = commentsPanel ?: return
+        val lp = panel.layoutParams as? ViewGroup.MarginLayoutParams
+        if (lp != null) {
+            lp.height = (AndroidUtilities.displaySize.y * 0.58f).toInt().coerceAtLeast(AndroidUtilities.dp(280f))
+            lp.bottomMargin = YuzGramBottomBar.height()
+            panel.layoutParams = lp
+        }
+        // Panel ichidagi tugmalar/klaviatura barni bosib olmasin: scrim panel ostida.
+        commentsScrim?.setOnClickListener { closeComments() }
+        commentsPanel?.let { p -> p.isClickable = true }
+
+        root.findViewById<View>(R.id.btnCloseComments)?.setOnClickListener { closeComments() }
+
+        val commentsRvAdapter = ReelCommentsAdapter(themed) { comment -> setReplyTarget(comment) }
+        commentsAdapter = commentsRvAdapter
+        val clm = LinearLayoutManager(themed, RecyclerView.VERTICAL, false)
+        commentsLayoutManager = clm
+        commentsList?.let { list ->
+            list.layoutManager = clm
+            list.adapter = commentsRvAdapter
+        }
+        // Xato/bo'sh xabarni bosish izohlarni qayta yuklaydi.
+        commentsEmpty?.setOnClickListener {
+            if (commentsReelId.isNotBlank()) loadComments(commentsReelId)
+        }
+
+        sendButton?.setOnClickListener { sendComment() }
+        commentInput?.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEND) {
+                sendComment()
+                true
+            } else {
+                false
+            }
+        }
+        attachKeyboardOffset(root)
+    }
+
+    /**
+     * Klaviatura balandligini kuzatish. LaunchActivity manifest'da `adjustResize`
+     * (telefonda ham) — klaviatura ochilganda fragmentroot qisqaradi va pastga
+     * langangan panel o'zi yuqoriga chiqadi. Lekin panelda bar uchun qoldirilgan
+     * pastki bo'shliq (70dp) klaviatura ustida "o'lik zona" bo'lib qolmasligi uchun
+     * klaviatura ko'ringanda uni 6dp ga qisqartiramiz.
+     *
+     * Aniqlash usuli — klassik "ko'rinish maydoni" farqi: `getWindowVisibleDisplayFrame`
+     * IME ni hisobga olmaydi, `rootView.height` butun ekran balandligini beradi.
+     */
+    private fun attachKeyboardOffset(root: View) {
+        val panel = commentsPanel ?: return
+        val lp = panel.layoutParams as? ViewGroup.MarginLayoutParams ?: return
+        panelBottomMarginNormal = lp.bottomMargin
+        val listener = ViewTreeObserver.OnGlobalLayoutListener {
+            val p = commentsPanel ?: return@OnGlobalLayoutListener
+            val params = p.layoutParams as? ViewGroup.MarginLayoutParams ?: return@OnGlobalLayoutListener
+            val visible = Rect()
+            root.getWindowVisibleDisplayFrame(visible)
+            val full = root.rootView.height
+            if (full <= 0 || visible.bottom <= 0) return@OnGlobalLayoutListener
+            val keyboard = full - visible.bottom
+            val showing = keyboard > full * 0.15f
+            val target = if (showing) AndroidUtilities.dp(6f) else panelBottomMarginNormal
+            if (params.bottomMargin != target) {
+                params.bottomMargin = target
+                p.layoutParams = params
+            }
+        }
+        keyboardListener = listener
+        root.viewTreeObserver.addOnGlobalLayoutListener(listener)
     }
 
     /** Snap tugagach: faol sahifani aniqlaymiz va videoni almashtiramiz. */
@@ -146,6 +266,8 @@ class ReelsActivity : BaseFragment() {
         val position = lm.getPosition(view)
         if (position < 0 || position == selectedPosition) return
         selectedPosition = position
+        // Boshqa reel'ga o'tdik: eski reel izohlari endi kerak emas.
+        if (commentsOpen) closeComments()
         adapter?.setActivePosition(position)
         refreshLikeState(currentReels.getOrNull(position)?.id)
     }
@@ -244,6 +366,204 @@ class ReelsActivity : BaseFragment() {
     }
 
     /**
+     * Izohlar panelini ochish (oldingi loyihadagi BottomSheet o'rniga).
+     * Panel avval ochilgan reel'ga tegishli bo'lsa — qayta yuklamaymiz.
+     */
+    private fun openComments(reelId: String) {
+        if (reelId.isBlank()) return
+        val alreadyOpen = commentsOpen && commentsReelId == reelId
+        commentsOpen = true
+        commentsReelId = reelId
+        replyTarget = null
+        updateReplyHint()
+        commentsScrim?.visibility = View.VISIBLE
+        commentsPanel?.visibility = View.VISIBLE
+        if (alreadyOpen) return
+        commentsAdapter?.clear()
+        loadedCommentCount = 0
+        updateCommentsTitle()
+        loadComments(reelId)
+    }
+
+    private fun closeComments() {
+        if (!commentsOpen) return
+        commentsOpen = false
+        commentsReelId = ""
+        replyTarget = null
+        hideKeyboard()
+        commentInput?.setText("")
+        updateReplyHint()
+        commentsScrim?.visibility = View.GONE
+        commentsPanel?.visibility = View.GONE
+    }
+
+    /** Izohlarni Firestore'dan o'qiydi (`null` = xato, bo'sh ro'yxat = izoh yo'q). */
+    private fun loadComments(reelId: String) {
+        if (commentsLoading) return
+        val s = scope ?: return
+        commentsLoading = true
+        if (loadedCommentCount == 0) commentsProgress?.visibility = View.VISIBLE
+        s.launch {
+            val comments = ReelsRepository.getComments(reelId)
+            commentsLoading = false
+            if (fragmentView == null || commentsReelId != reelId) return@launch
+            commentsProgress?.visibility = View.GONE
+            if (comments == null) {
+                commentsAdapter?.clear()
+                loadedCommentCount = 0
+                commentsList?.visibility = View.GONE
+                commentsEmpty?.visibility = View.VISIBLE
+                commentsEmpty?.text = getString(R.string.reels_comments_load_failed)
+                updateCommentsTitle()
+                return@launch
+            }
+            commentsAdapter?.submit(comments)
+            loadedCommentCount = comments.size
+            commentsList?.visibility = if (comments.isEmpty()) View.GONE else View.VISIBLE
+            commentsEmpty?.visibility = if (comments.isEmpty()) View.VISIBLE else View.GONE
+            commentsEmpty?.text = getString(R.string.reels_comments_empty)
+            updateCommentsTitle()
+            if (comments.isNotEmpty()) {
+                // Eng yangi izoh ko'rinsin (ro'yxat eskidana yangi tartibida).
+                commentsLayoutManager?.scrollToPositionWithOffset(comments.size - 1, 0)
+            }
+        }
+    }
+
+    /**
+     * Yangi izoh yozish. Qoida: `comments` create faqat Firebase sessiyasida va
+     * `data.userId == auth.uid` da o'tadi — shuning uchun yozuvdan oldin sessiya
+     * ochiladi (qarang [warmUpAuth] va [YuzGramAdsAuth.ensureSignedIn]).
+     */
+    private fun sendComment() {
+        if (sendingComment) return
+        val reelId = commentsReelId
+        if (reelId.isBlank()) return
+        val input = commentInput ?: return
+        val text = input.text?.toString()?.trim().orEmpty()
+        if (text.isEmpty()) {
+            toast(R.string.reels_comment_empty)
+            return
+        }
+        val uid = currentUid()
+        if (uid.isBlank()) {
+            toast(R.string.reels_sign_in_required)
+            return
+        }
+        val account = currentAccount
+        val reply = replyTarget
+        val draft = ReelComment(
+            text = text,
+            authorName = authorName(account),
+            userId = uid,
+            deviceId = uid,
+            createdAt = System.currentTimeMillis(),
+            replyToCommentId = reply?.id.orEmpty(),
+            replyToUserId = reply?.userId.orEmpty(),
+            replyToAuthorName = reply?.authorName.orEmpty()
+        )
+        val s = scope ?: return
+        sendingComment = true
+        sendButton?.alpha = 0.5f
+        s.launch {
+            val saved = try {
+                awaitAuth()
+                val signedUid = YuzGramAdsAuth.ensureSignedIn(account)
+                ReelsRepository.addComment(reelId, draft.copy(userId = signedUid))
+            } catch (e: Exception) {
+                sendingComment = false
+                sendButton?.alpha = 1f
+                // Ekran yopilsa xabar ko'rsatmaymiz.
+                if (fragmentView == null) return@launch
+                toast(e.message ?: getString(R.string.reels_comment_failed))
+                return@launch
+            }
+            sendingComment = false
+            sendButton?.alpha = 1f
+            if (fragmentView == null || commentsReelId != reelId) return@launch
+            input.setText("")
+            replyTarget = null
+            updateReplyHint()
+            commentsAdapter?.append(saved)
+            loadedCommentCount += 1
+            commentsList?.visibility = View.VISIBLE
+            commentsEmpty?.visibility = View.GONE
+            commentsLayoutManager?.scrollToPositionWithOffset(
+                (commentsAdapter?.itemCount ?: 1) - 1, 0
+            )
+            updateCommentsTitle()
+            adapter?.addCommentCount(reelId, 1)
+        }
+    }
+
+    /** Izohga javob berish rejimi (maydon fokus oladi, yonida bekor tugmasi chiqadi). */
+    private fun setReplyTarget(comment: ReelComment) {
+        if (comment.id.isBlank()) return
+        replyTarget = comment
+        updateReplyHint()
+        commentInput?.requestFocus()
+    }
+
+    private fun updateReplyHint() {
+        val hint = replyHint ?: return
+        val target = replyTarget
+        if (target == null) {
+            hint.visibility = View.GONE
+            hint.setOnClickListener(null)
+            hint.isClickable = false
+            return
+        }
+        hint.visibility = View.VISIBLE
+        hint.text = getString(R.string.reels_comment_replying_to,
+            target.authorName.ifBlank { "YuzGram" }) + "   ✕"
+        hint.isClickable = true
+        hint.setOnClickListener {
+            replyTarget = null
+            updateReplyHint()
+        }
+    }
+
+    /** Sarlavhadagi son — o'qilgan izohlar + yozilgan yangilar. */
+    private fun updateCommentsTitle() {
+        val title = commentsTitle ?: return
+        title.text = if (loadedCommentCount <= 0) {
+            getString(R.string.reels_comments)
+        } else {
+            getString(R.string.reels_comments_title, loadedCommentCount)
+        }
+    }
+
+    /** Telegram profilidagi ism — izoh muallifi shu nom bilan ko'rinadi. */
+    private fun authorName(account: Int): String {
+        val user = UserConfig.getInstance(account).currentUser
+        val first = user?.first_name.orEmpty().trim()
+        val last = user?.last_name.orEmpty().trim()
+        val full = listOf(first, last).filter { it.isNotBlank() }.joinToString(" ")
+        return full.ifBlank { user?.username.orEmpty().ifBlank { "YuzGram" } }
+    }
+
+    private fun hideKeyboard() {
+        val input = commentInput ?: return
+        val activity = parentActivity ?: return
+        val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager ?: return
+        imm.hideSoftInputFromWindow(input.windowToken, 0)
+    }
+
+    /**
+     * Orqaga bosilganda: avval izohlar panelini yopamiz.
+     * Diqqat: Telegram semantikası bo'yicha `false` = "orqa tugmani men ishlatdim,
+     * fragmentni yopma" (qarang ActionBarLayout.onBackPressed — `true` bo'lsa
+     * closeLastFragment() chaqiriladi).
+     */
+    override fun onBackPressed(): Boolean {
+        if (commentsOpen) {
+            closeComments()
+            return false
+        }
+        return super.onBackPressed()
+    }
+
+    /**
      * Firebase sessiyasini oldindan ochib qo'yish: like/ko'rish yozuvlari
      * shuni talab qiladi, foydachi bosgunicha kutib qolmasligi uchun.
      * Bir vaqtning o'zida ikki `mintTelegramCustomToken` so'rovi ketmasligi uchun
@@ -289,6 +609,25 @@ class ReelsActivity : BaseFragment() {
     override fun onFragmentDestroy() {
         adapter?.release()
         adapter = null
+        keyboardListener?.let { listener ->
+            fragmentView?.viewTreeObserver?.removeOnGlobalLayoutListener(listener)
+        }
+        keyboardListener = null
+        // Izohlar paneli ham shu view bilan yo'qoladi — referensiyalarni bo'shatamiz.
+        commentsOpen = false
+        commentsReelId = ""
+        replyTarget = null
+        commentsAdapter = null
+        commentsLayoutManager = null
+        commentsList = null
+        commentsScrim = null
+        commentsPanel = null
+        commentsTitle = null
+        commentsProgress = null
+        commentsEmpty = null
+        commentInput = null
+        sendButton = null
+        replyHint = null
         scope?.cancel()
         scope = null
         super.onFragmentDestroy()

@@ -42,7 +42,8 @@ import uz.kodlikino.top4.models.Reel
 class ReelsAdapter(
     private val appContext: Context,
     private val onLikeToggle: (reelId: String, likedNow: Boolean) -> Unit,
-    private val onViewed: (reelId: String) -> Unit
+    private val onViewed: (reelId: String) -> Unit,
+    private val onOpenComments: (reelId: String) -> Unit
 ) : RecyclerView.Adapter<ReelsAdapter.PageHolder>() {
 
     private val items = ArrayList<Reel>()
@@ -51,6 +52,7 @@ class ReelsAdapter(
     private val likeShown = HashMap<String, Int>()
     private val liked = HashMap<String, Boolean>()
     private val viewsShown = HashMap<String, Int>()
+    private val commentShown = HashMap<String, Int>()
     private val viewedOnce = HashSet<String>()
 
     private var player: ExoPlayer? = null
@@ -94,6 +96,7 @@ class ReelsAdapter(
         likeShown.clear()
         liked.clear()
         viewsShown.clear()
+        commentShown.clear()
         // viewedOnce SAQLANADI — aks holda har bir refresh (onResume) ko'rishni
         // qaytadan hisoblab, sun'iy ravishda ko'rishlar sonini oshirardi.
         activePos = -1
@@ -207,6 +210,20 @@ class ReelsAdapter(
         }
     }
 
+    /**
+     * Izohlar sonini lokal ravishda oshiradi/kamaytiradi (yangi izoh yozilganda).
+     * Asos sifatda serverdagi `commentCount` olinadi, keyingi qo'shishlar uning
+     * ustiga yig'iladi — har safar reload talab qilinmaydi.
+     */
+    fun addCommentCount(reelId: String, by: Int) {
+        val base = commentShown[reelId] ?: items.firstOrNull { it.id == reelId }?.commentCount ?: 0
+        commentShown[reelId] = (base + by).coerceAtLeast(0)
+        val holder = activeHolder
+        if (holder?.reel?.id == reelId) {
+            holder.refreshCommentUi()
+        }
+    }
+
     fun release() {
         activeHolder?.playerView?.player = null
         activeHolder = null
@@ -268,6 +285,8 @@ class ReelsAdapter(
         private val tvCaption: TextView = itemView.findViewById(R.id.tvCaption)
         private val btnLike: TextView = itemView.findViewById(R.id.btnLike)
         private val tvLikeCount: TextView = itemView.findViewById(R.id.tvLikeCount)
+        private val btnComments: TextView = itemView.findViewById(R.id.btnComments)
+        private val tvCommentCount: TextView = itemView.findViewById(R.id.tvCommentCount)
         val tvViews: TextView = itemView.findViewById(R.id.tvViews)
 
         var reel: Reel? = null
@@ -307,6 +326,17 @@ class ReelsAdapter(
                 refreshLikeUi()
                 onLikeToggle(r.id, nowLiked)
             }
+            refreshCommentUi()
+            btnComments.setOnClickListener {
+                val r = this.reel ?: return@setOnClickListener
+                onOpenComments(r.id)
+            }
+        }
+
+        /** Izohlar soni — Firestore'dagi `commentCount` yoki lokal optimistik qiymat. */
+        fun refreshCommentUi() {
+            val r = reel ?: return
+            tvCommentCount.text = compactCount(commentShown[r.id] ?: r.commentCount)
         }
 
         fun refreshLikeUi() {

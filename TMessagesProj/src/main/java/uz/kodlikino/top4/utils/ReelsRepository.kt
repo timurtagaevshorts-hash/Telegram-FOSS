@@ -6,6 +6,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.tasks.await
 import uz.kodlikino.top4.models.Reel
+import uz.kodlikino.top4.models.ReelComment
 
 /**
  * "Reels" ma'lumotlar ombori — Firestore `reels` kolleksiyasi.
@@ -17,7 +18,9 @@ object ReelsRepository {
     private const val TAG = "ReelsRepository"
     const val COLLECTION = "reels"
     private const val LIKES = "likes"
+    private const val COMMENTS = "comments"
     private const val FEED_LIMIT = 100L
+    private const val COMMENTS_LIMIT = 200L
 
     private val db = FirebaseFirestore.getInstance()
 
@@ -137,5 +140,89 @@ object ReelsRepository {
         } catch (e: Exception) {
             Log.e(TAG, "registerView $reelId: ${e.message}", e)
         }
+    }
+
+    /**
+     * Izohlar — `reels reelId / comments` subkolleksiyasi (eskidana yangi).
+     * O'qish qoidasi `if true`, shuning uchun Firebase sessiyasi shart emas.
+     *
+     * @return `null` — o'qish xatosi (tarmoq/ruxsat), bo'sh ro'yxat — izoh yo'q.
+     */
+    suspend fun getComments(reelId: String): List<ReelComment>? {
+        if (reelId.isBlank()) return emptyList()
+        return try {
+            val snapshot = db.collection(COLLECTION).document(reelId)
+                .collection(COMMENTS)
+                .orderBy("createdAt", Query.Direction.ASCENDING)
+                .limit(COMMENTS_LIMIT)
+                .get().await()
+            snapshot.documents.mapNotNull { doc ->
+                try {
+                    val c = doc.toObject(ReelComment::class.java) ?: return@mapNotNull null
+                    c.copy(
+                        id = c.id.ifBlank { doc.id },
+                        reelId = c.reelId.ifBlank { reelId }
+                    ).takeIf { it.text.isNotBlank() }
+                } catch (e: Exception) {
+                    Log.e(TAG, "comment parse ${doc.id}: ${e.message}", e)
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "getComments $reelId: ${e.message}", e)
+            null
+        }
+    }
+
+    /**
+     * Yangi izoh yozadi va `commentCount` ni bittaga oshiradi.
+     *
+     * Qoida: izoh `create` faqat `signedIn() && data.userId == auth.uid` da o'tadi —
+     * shuning uchun chaqiruvdan oldin Firebase sessiyasi ochilgan bo'lishi shart
+     * (qarang [YuzGramAdsAuth.ensureSignedIn]). `commentCount` uchta ruxsat etilgan
+     * maydondan biri (`views`, `likeCount`, `commentCount`), shuning uchun alohida
+     * `update()` orqali ketadi — izoh yozuvi muvaffaqiyatli bo'lsagina oshiriladi.
+     *
+     * @return yozilgan izoh (id bilan)
+     */
+    suspend fun addComment(reelId: String, comment: ReelComment): ReelComment {
+        if (reelId.isBlank() || comment.text.isBlank() || comment.userId.isBlank()) {
+            throw IllegalArgumentException("Izoh matni bo'sh")
+        }
+        val docRef = db.collection(COLLECTION).document(reelId)
+            .collection(COMMENTS).document()
+        val saved = comment.copy(id = docRef.id, reelId = reelId)
+        val data = hashMapOf<String, Any>(
+            "id" to docRef.id,
+            "reelId" to reelId,
+            "text" to saved.text,
+            "authorName" to saved.authorName,
+            "authorPhotoUrl" to saved.authorPhotoUrl,
+            "userId" to saved.userId,
+            "deviceId" to saved.deviceId,
+            "createdAt" to saved.createdAt,
+            "replyToCommentId" to saved.replyToCommentId,
+            "replyToUserId" to saved.replyToUserId,
+            "replyToAuthorName" to saved.replyToAuthorName
+        )
+        try {
+            docRef.set(data).await()
+        } catch (e: Exception) {
+            val message = e.message.orEmpty()
+            if (message.contains("PERMISSION_DENIED", true) || message.contains("permission", true)) {
+                throw IllegalStateException(
+                    "Izoh yozish ruxsati yo'q. Telegram orqali qayta kiring yoki biroz kutib urinib ko'ring."
+                )
+            }
+            throw e
+        }
+        try {
+            db.collection(COLLECTION).document(reelId)
+                .update(mapOf("commentCount" to FieldValue.increment(1L))).await()
+        } catch (e: Exception) {
+            // Hisob yozuvi muvaffaqiyatli bo'lsa, izoh baribir ko'rinadi.
+            Log.e(TAG, "commentCount $reelId: ${e.message}", e)
+        }
+        return saved
     }
 }
