@@ -261,6 +261,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     private RLottieDrawable themeSwitchSunDrawable;
     private ActionBarLayout actionBarLayout;
     private uz.kodlikino.top4.ui.YuzGramBottomBar yuzGramBottomBar;
+    // YuzGram: bar ko'rinishi = (root ekrandamiz) AND (skroll yashirmagan).
+    private boolean yuzGramBarEligible;
+    private boolean yuzGramBarScrollHidden;
     private ActionBarLayout layersActionBarLayout;
     private ActionBarLayout rightActionBarLayout;
     private RelativeLayout launchLayout;
@@ -7958,24 +7961,47 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         if (top == null) {
             return; // o'tish payti — joriy holatni saqlaymiz (flicker oldini oladi)
         }
-        int tab = -1;
+        boolean eligible;
         if (drawerLayoutContainer != null && drawerLayoutContainer.isDrawerOpened()) {
-            tab = -1; // yon menyu ochiq — bar ko'rinmasin
+            eligible = false; // yon menyu ochiq — bar ko'rinmasin
         } else if (top instanceof uz.kodlikino.top4.ui.ReelsActivity) {
-            tab = uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_REELS;
+            yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_REELS, yuzGramBottomBar.isShownBar());
+            eligible = true;
         } else if (top instanceof uz.kodlikino.top4.ui.ElonlarActivity) {
-            tab = uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ELONLAR;
+            yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ELONLAR, yuzGramBottomBar.isShownBar());
+            eligible = true;
         } else if (top instanceof ProfileActivity && ((ProfileActivity) top).myProfile) {
-            tab = uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_PROFIL;
+            yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_PROFIL, yuzGramBottomBar.isShownBar());
+            eligible = true;
         } else if (top instanceof DialogsActivity && ((DialogsActivity) top).isYuzGramMainRoot()) {
-            tab = uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ASOSIY;
-        }
-        if (tab >= 0) {
-            yuzGramBottomBar.setActiveTab(tab, yuzGramBottomBar.isShownBar());
-            yuzGramBottomBar.setVisible(true);
+            yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ASOSIY, yuzGramBottomBar.isShownBar());
+            eligible = true;
         } else {
-            yuzGramBottomBar.setVisible(false);
+            eligible = false;
         }
+        if (eligible != yuzGramBarEligible) {
+            // yangi ekranga kirdik — skroll yashirinishini tiklaymiz, bar qaytadan ko'rinadi
+            yuzGramBarScrollHidden = false;
+        }
+        yuzGramBarEligible = eligible;
+        applyYuzGramBarVisibility();
+    }
+
+    private void applyYuzGramBarVisibility() {
+        yuzGramBottomBar.setVisible(yuzGramBarEligible && !yuzGramBarScrollHidden);
+    }
+
+    /**
+     * YuzGram: DialogsActivity skroll yo'nalishidan keladi.
+     * @param hidden true — ro'yxat pastga surilyapti, bar yashirilsin;
+     *               false — tepaga qaytyapti yoki tepadaman, bar ko'rsatilsin.
+     */
+    public void setYuzGramBarScrollHidden(boolean hidden) {
+        if (yuzGramBottomBar == null || !yuzGramBarEligible || yuzGramBarScrollHidden == hidden) {
+            return;
+        }
+        yuzGramBarScrollHidden = hidden;
+        applyYuzGramBarVisibility();
     }
 
     public static BaseFragment getLastFragment() {
