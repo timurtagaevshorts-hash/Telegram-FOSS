@@ -142,7 +142,7 @@ class ElonlarActivity : BaseFragment() {
             applyFilter()
         }
 
-        root.findViewById<ExtendedFloatingActionButton>(R.id.fabPostAd)?.setOnClickListener { openSoon() }
+        root.findViewById<ExtendedFloatingActionButton>(R.id.fabPostAd)?.setOnClickListener { openCreate() }
 
         swipeRefresh?.setOnRefreshListener { startAdsListener() }
 
@@ -151,6 +151,11 @@ class ElonlarActivity : BaseFragment() {
 
     private fun openDetail(ad: ClassifiedAd) {
         presentFragment(ClassifiedAdDetailActivity(ad.id), false)
+    }
+
+    /** "Elon joylash" — yangi e'lon yaratish ekrani (Faza D). */
+    private fun openCreate() {
+        presentFragment(CreateClassifiedAdActivity(), false)
     }
 
     private fun openSoon() {
