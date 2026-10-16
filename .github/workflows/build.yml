@@ -92,12 +92,39 @@ jobs:
           echo "=== cmake ==="; ls "$SDK_ROOT/cmake"
           echo "=== ndk ==="; ls "$SDK_ROOT/ndk"
 
-      - name: Restrict ABIs to arm64-v8a + armeabi-v7a (match native libs)
+      # VARIANT + ABI: keyni va qaysi ABI'lar compile qilinishini shu yerda
+      # hal qilamiz — chunki CMake cache kaliti ABI ro'yxatini ham o'z ichiga
+      # olishi kerak (debug = bitta ABI, release = ikkalasi).
+      - name: Resolve build variant and ABIs
+        run: |
+          # Debug = tez iteratsiya (R8 yo'q). Release = yakuniy imzolangan APK.
+          # push/PR doim debug; workflow_dispatch tanlangan variant'ni hurmat qiladi.
+          VAR="${{ github.event.inputs.variant }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$VAR" = "release" ]; then
+            TASK=:TMessagesProj_App:assembleAfatRelease
+            LABEL=release
+            FILTERS='"armeabi-v7a", "arm64-v8a"'
+            ABIS=arm64-arm
+          else
+            TASK=:TMessagesProj_App:assembleAfatDebug
+            LABEL=debug
+            FILTERS='"arm64-v8a"'
+            ABIS=arm64
+          fi
+          {
+            echo "GRADLE_TASK=$TASK"
+            echo "APK_LABEL=$LABEL"
+            echo "YUZ_ABI_FILTERS=$FILTERS"
+            echo "YUZ_ABIS=$ABIS"
+          } >> "$GITHUB_ENV"
+          echo "Building $TASK (label: $LABEL, abis: $ABIS)"
+
+      - name: Restrict ABIs (debug=arm64 only, release=arm64+arm)
         run: |
           # App module: drop x86/x86_64 from packaging abiFilters
           sed -i 's/, "x86", "x86_64"//g' TMessagesProj_App/build.gradle
-          # Library module: restrict CMake/externalNativeBuild to arm, else ninja wants x86 .a we never built
-          sed -i '/^        multiDexEnabled true$/a\        ndk { abiFilters "armeabi-v7a", "arm64-v8a" }' TMessagesProj/build.gradle
+          # Library module: restrict CMake/externalNativeBuild, else ninja wants .a we never built
+          sed -i "/^        multiDexEnabled true$/a\\        ndk { abiFilters $YUZ_ABI_FILTERS }" TMessagesProj/build.gradle
           echo "=== App abiFilters ==="; grep -n "abiFilters" TMessagesProj_App/build.gradle || true
           echo "=== Lib ndk ==="; grep -n "abiFilters" TMessagesProj/build.gradle || true
 
@@ -139,6 +166,45 @@ jobs:
           echo "=== produced static libs ==="
           find ffmpeg/build libvpx/build boringssl/build -name '*.a' 2>/dev/null | sort
 
+      # CMake cache kaliti uchun BIZNING jni manbalary (submodule'larsiz) —
+      # ffmpeg/libvpx/boringssl alohida .a cache'da, ular bu yerda kerak emas.
+      - name: Compute jni source hash
+        run: |
+          H=$(find TMessagesProj/jni -maxdepth 3 \
+                \( -path 'TMessagesProj/jni/ffmpeg' -o -path 'TMessagesProj/jni/libvpx' \
+                   -o -path 'TMessagesProj/jni/boringssl' -o -path 'TMessagesProj/jni/libwebp' \
+                   -o -name build \) -prune -o \
+                -type f \( -name '*.c' -o -name '*.cpp' -o -name '*.cc' -o -name '*.h' \
+                           -o -name '*.hpp' -o -name 'CMakeLists.txt' \) -print0 \
+                | sort -z | xargs -0 sha1sum | sha1sum | cut -c1-16)
+          echo "YUZ_JNI_HASH=$H" >> "$GITHUB_ENV"
+          echo "jni source hash = $H"
+
+      # 17 daqiqalik C++ compile (libtmessages.so) — eng katta vaqt yeyuvchi
+      # bosqich. Bizning .kt/.java o'zgarishlarida C++ umuman o'zgarmaydi,
+      # shuning uchun ninja obyektlarini cache qilamiz: keyingi run'da ninja
+      # obyektlarni "tayyor" ko'radi va faqat link qiladi (~1-2 daqiqa).
+      - name: Cache CMake objects (libtmessages.so)
+        uses: actions/cache@v4
+        with:
+          path: |
+            TMessagesProj/.cxx
+            TMessagesProj/build/intermediates/cxx
+          key: cxx-${{ runner.os }}-ndk${{ env.NDK_VERSION }}-${{ env.YUZ_ABIS }}-${{ env.YUZ_JNI_HASH }}
+          restore-keys: |
+            cxx-${{ runner.os }}-ndk${{ env.NDK_VERSION }}-${{ env.YUZ_ABIS }}-
+
+      # Ninja mtime bilan ishlaydi: manbalar ESKI, obyektlar YANGI bo'lsa —
+      # "hammasi up-to-date" deb qayta compile qilmaydi. Checkout yangi mtime
+      # beradi, shuning uchun jni manbalarini ataylab 2020 yilga qaytaramiz.
+      - name: Age jni sources (so cached objects look newer)
+        run: |
+          find TMessagesProj/jni -maxdepth 3 \
+            \( -path 'TMessagesProj/jni/ffmpeg' -o -path 'TMessagesProj/jni/libvpx' \
+               -o -path 'TMessagesProj/jni/boringssl' -o -path 'TMessagesProj/jni/libwebp' \) -prune -o \
+            -type f -exec touch -d '2020-01-01 00:00:00' {} +
+          echo "jni manbalari 2020-01-01 ga o'rnatildi (obyektlar yangiroq ko'rinadi)"
+
       - name: Cache gradle dependencies
         uses: actions/cache@v4
         with:
@@ -172,20 +238,6 @@ jobs:
           else
             echo "YuzGram signing DISABLED (unsigned APK)"
           fi
-
-      - name: Resolve build variant
-        run: |
-          # Debug = fast iteration (no R8 shrinking, ~much quicker). Release = final signed/publish build.
-          # push/PR always build debug; workflow_dispatch honors the chosen 'variant' input.
-          VAR="${{ github.event.inputs.variant }}"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$VAR" = "release" ]; then
-            echo "GRADLE_TASK=:TMessagesProj_App:assembleAfatRelease" >> "$GITHUB_ENV"
-            echo "APK_LABEL=release" >> "$GITHUB_ENV"
-          else
-            echo "GRADLE_TASK=:TMessagesProj_App:assembleAfatDebug" >> "$GITHUB_ENV"
-            echo "APK_LABEL=debug" >> "$GITHUB_ENV"
-          fi
-          echo "Building $GRADLE_TASK (label: $APK_LABEL)"
 
       - name: Build APK
         run: ./gradlew --no-daemon "$GRADLE_TASK"
