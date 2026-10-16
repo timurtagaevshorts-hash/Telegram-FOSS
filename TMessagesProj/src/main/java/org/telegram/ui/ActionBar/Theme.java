@@ -2495,14 +2495,23 @@ public class Theme {
             if (isDark != UNKNOWN) {
                 return isDark == DARK;
             }
-            if ("Dark Blue".equals(name) || "Night".equals(name)) {
+            if ("Dark Blue".equals(name) || "Night".equals(name) || "YuzGram Neon".equals(name)) {
                 isDark = DARK;
             } else if ("Blue".equals(name) || "Arctic Blue".equals(name) || "Day".equals(name)) {
                 isDark = LIGHT;
             }
             if (isDark == UNKNOWN) {
                 String[] wallpaperLink = new String[1];
-                SparseIntArray colors = getThemeFileValues(new File(pathToFile), null, wallpaperLink);
+                SparseIntArray colors;
+                if (pathToFile != null) {
+                    colors = getThemeFileValues(new File(pathToFile), null, wallpaperLink);
+                } else if (assetName != null) {
+                    // Ichki (assets/*.attheme) mavzularda pathToFile = null —
+                    // `new File(null)` NPE berardi (LaunchActivity → IntroActivity crash).
+                    colors = getThemeFileValues(null, assetName, wallpaperLink);
+                } else {
+                    colors = null;
+                }
                 checkIsDark(colors, this);
             }
             return isDark == DARK;
