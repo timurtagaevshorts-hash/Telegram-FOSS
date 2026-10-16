@@ -52,7 +52,8 @@
 <string name="classified_publish_failed">E\'lon joylanmadi</string>
 <string name="classified_published">E\'lon muvaffaqiyatli joylandi</string>
 <string name="classified_remove_image">Rasmni olib tashlash</string>
-<string name="classified_search_hint">Mahsulot yoki manzil bo'yicha qidirish…</string>
+<string name="classified_search_hint">Mahsulot yoki manzil bo\'yicha qidirish…</string>
+<string name="classified_my_ads">Mening e\'lonlarim</string>
 <string name="classified_share_friends">Do\'stlarga ulashish</string>
 <string name="classified_sign_in_required">E\'lon joylash uchun avval tizimga kiring</string>
 <string name="classified_theme_black">Qora</string>

@@ -33,17 +33,20 @@ data class ClassifiedCardStyle(
 object ClassifiedAdCardTheme {
 
     fun styleFor(themeRaw: String, context: Context, isPremiumUser: Boolean = false): ClassifiedCardStyle {
+        // Neon palitra (yuz_classified_colors.xml) bilan bir xil: kartalar ham to'q
+        // ko'k-keymish sirt ustida, brend ko'ki va oltin narx bilan chiqadi — shunda
+        // Elonlar feed'i chat/pastki bar bilan bitta uslubda ko'rinadi.
         return ClassifiedCardStyle(
-            cardBackground = Color.parseColor("#121212"),
+            cardBackground = Color.parseColor("#0D121D"),
             titleColor = Color.parseColor("#FFFFFF"),
-            secondaryColor = Color.parseColor("#B0B0B0"),
-            priceColor = Color.parseColor("#FFD700"),
-            strokeColor = Color.parseColor("#2A2A2A"),
+            secondaryColor = Color.parseColor("#95A1B4"),
+            priceColor = Color.parseColor("#FFD84D"),
+            strokeColor = Color.parseColor("#202B3C"),
             categoryBgRes = R.drawable.bg_classified_category_badge,
             categoryTextColor = Color.parseColor("#FFFFFF"),
             priceBadgeBgRes = R.drawable.bg_classified_price_badge,
-            addressIconTint = Color.parseColor("#FFD700"),
-            imageStrokeColor = Color.parseColor("#2A2A2A"),
+            addressIconTint = Color.parseColor("#2AABEE"),
+            imageStrokeColor = Color.parseColor("#202B3C"),
             premiumAccent = false
         )
     }

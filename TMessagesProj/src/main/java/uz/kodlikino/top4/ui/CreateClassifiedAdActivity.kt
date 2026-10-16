@@ -34,6 +34,7 @@ import uz.kodlikino.top4.models.ClassifiedAdCategories
 import uz.kodlikino.top4.utils.ClassifiedAdRepository
 import uz.kodlikino.top4.utils.ClassifiedAdStorageHelper
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
+import uz.kodlikino.top4.utils.YuzUploadUi
 
 /**
  * "Elon joylash" (Faza D) — yangi e'lon yaratish / mavjud e'lonni tahrirlash ekrani.
@@ -70,6 +71,7 @@ class CreateClassifiedAdActivity(
     private var etPhone: TextInputEditText? = null
     private var etDescription: TextInputEditText? = null
     private var uploadProgress: ProgressBar? = null
+    private var tvUploadStatus: android.widget.TextView? = null
     private var btnPublish: MaterialButton? = null
 
     private val imageItems = mutableListOf<ClassifiedAdImageThumbAdapter.ImageItem>()
@@ -103,6 +105,7 @@ class CreateClassifiedAdActivity(
         etPhone = root.findViewById(R.id.etPhone)
         etDescription = root.findViewById(R.id.etDescription)
         uploadProgress = root.findViewById(R.id.uploadProgress)
+        tvUploadStatus = root.findViewById(R.id.tvUploadStatus)
         btnPublish = root.findViewById(R.id.btnPublish)
 
         toolbar?.apply {
@@ -110,10 +113,18 @@ class CreateClassifiedAdActivity(
             setNavigationOnClickListener { removeSelfFromStack() }
         }
 
-        // Manzil: KinoTOP4'da joy tanlagich edi — bu yerda oddiy matn maydoni.
-        // TextInputEditText allaqachon tahrirlanuvchan; faqat inputType'ni sozlaymiz.
-        etAddress?.inputType = android.text.InputType.TYPE_CLASS_TEXT or
-            android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+        // Manzil — oddiy matn maydoni (KinoTOP4'dagi joy tanlagich bu portda yo'q).
+        // Eski XML'da `focusable="false"` + `inputType="none"` qoldig'i bor edi:
+        // maydon bosilganda klaviatura chiqmas, "manzilni tanlab bo'lmaydi" deb
+        // shikoyat qilingan edi. Endi ham matnada, ham defensive ravishda focusable.
+        etAddress?.apply {
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            isFocusable = true
+            isFocusableInTouchMode = true
+            isClickable = true
+            isLongClickable = true
+        }
 
         val categoryLabels = ClassifiedAdCategories.all.map { "${it.emoji} ${it.label}" }
         spinnerCategory?.adapter = ArrayAdapter(
@@ -277,14 +288,28 @@ class CreateClassifiedAdActivity(
         btnPublish?.isEnabled = false
         uploadProgress?.visibility = View.VISIBLE
         uploadProgress?.progress = 0
+        tvUploadStatus?.visibility = View.VISIBLE
+        tvUploadStatus?.text = if (localUris.isEmpty()) {
+            getString(R.string.classified_saving)
+        } else {
+            getString(R.string.classified_upload_images, 0, 0, localUris.size)
+        }
+        // Ekran o'chib qolmasa yuklash sekinlashadi (ba'zi tovushlarda) — publish
+        // tugaguncha ekranni yonib turishga majburlaymiz.
+        keepScreenOn(true)
 
         val s = scope ?: return
         s.launch {
             try {
                 val uid = YuzGramAdsAuth.ensureSignedIn(account)
-                val uploaded = ClassifiedAdStorageHelper.uploadImages(uid, adId, localUris) { pct ->
+                val uploaded = ClassifiedAdStorageHelper.uploadImages(
+                    uid, adId, localUris
+                ) { pct, done, total ->
                     uploadProgress?.progress = pct
+                    tvUploadStatus?.text =
+                        getString(R.string.classified_upload_images, pct, done, total)
                 }
+                tvUploadStatus?.text = getString(R.string.classified_saving)
                 val allUrls = (existingUrls + uploaded).filter { it.isNotBlank() }.take(5)
                 val ad = ClassifiedAd(
                     id = adId,
@@ -307,15 +332,24 @@ class CreateClassifiedAdActivity(
                 if (removedRemoteUrls.isNotEmpty()) {
                     ClassifiedAdStorageHelper.deleteImages(removedRemoteUrls.toList())
                 }
+                keepScreenOn(false)
                 toast(R.string.classified_published)
                 removeSelfFromStack()
             } catch (e: Exception) {
                 publishing = false
                 btnPublish?.isEnabled = true
                 uploadProgress?.visibility = View.GONE
-                toast(e.message ?: getString(R.string.classified_publish_failed))
+                tvUploadStatus?.visibility = View.GONE
+                keepScreenOn(false)
+                val reason = e.message ?: getString(R.string.classified_publish_failed)
+                // Uzun sabab toast'da o'qilmaydi — dialog + "Qayta urinish".
+                YuzUploadUi.showError(themedContext ?: context, reason) { publishAd() }
             }
         }
+    }
+
+    private fun keepScreenOn(on: Boolean) {
+        YuzUploadUi.keepScreenOn(parentActivity, on)
     }
 
     private fun toast(text: String) {
@@ -344,9 +378,23 @@ class CreateClassifiedAdActivity(
         actionBar?.visibility = View.GONE
     }
 
+    /**
+     * Yuklash ketayotganda orqaga qaytish — scope'yni buzadi va yuklash abadiy
+     * "to'xtamaydi" holatiga tushadi. Shuning uchun publish davomida orqaga
+     * ruxsat bermaymiz (BaseFragment: true = fragment yopiladi, false = biz holat).
+     */
+    override fun onBackPressed(): Boolean {
+        if (publishing) {
+            toast(getString(R.string.classified_saving))
+            return false
+        }
+        return super.onBackPressed()
+    }
+
     override fun onFragmentDestroy() {
         scope?.cancel()
         scope = null
+        keepScreenOn(false)
         super.onFragmentDestroy()
     }
 }

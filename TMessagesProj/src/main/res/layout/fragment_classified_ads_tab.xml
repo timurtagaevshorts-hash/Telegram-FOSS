@@ -33,7 +33,7 @@
                     android:layout_height="32dp"
                     android:layout_centerVertical="true"
                     android:src="@drawable/ic_channel"
-                    app:tint="#4F8CFF" />
+                    app:tint="@color/primary" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"
@@ -63,26 +63,65 @@
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
+                    android:gravity="center_vertical"
                     android:orientation="horizontal">
+
+                    <!--
+                      Faza E: "Mening e'lonlarim" rejimi. Sarlavha qatoriga ko'chirildi —
+                      avval kategoriya chiplari bilan bir qatorda turgani uchun chiplarni
+                      siqib, gorizontal aylandirishni qiyinlashtirar edi.
+                      (Eski qo'ng'iroq/pictogramma tugmasi hech qayerga ulanmagan edi — olib tashlandi.)
+                    -->
+                    <TextView
+                        android:id="@+id/btnMyAds"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/bg_classified_search_bar"
+                        android:paddingStart="12dp"
+                        android:paddingTop="7dp"
+                        android:paddingEnd="12dp"
+                        android:paddingBottom="7dp"
+                        android:singleLine="true"
+                        android:text="@string/classified_my_ads"
+                        android:textColor="#8B92A8"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
 
                     <ImageButton
                         android:id="@+id/btnElonlarSearch"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/classified_search_hint"
                         android:src="@drawable/ic_search"
-                        app:tint="#FFFFFF" />
-
-                    <ImageButton
-                        android:id="@+id/btnElonlarNotifications"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:layout_marginStart="8dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_notifications"
                         app:tint="#FFFFFF" />
                 </LinearLayout>
             </RelativeLayout>
+
+            <!--
+              Kategoriyalar — endi alohida, to'liq kenglikdagi qatorda.
+              Oldin "Mening e'lonlarim" bilan bitta qatorda edi: chip qatori ~60% kenglikka
+              qisqarib, birinchi 2-3 kategoriya ko'rinmas edi.
+            -->
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clipToPadding="false"
+                android:overScrollMode="never"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:paddingBottom="12dp"
+                android:scrollbars="none">
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chipGroupCategories"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:chipSpacingHorizontal="8dp"
+                    app:singleLine="true"
+                    app:singleSelection="true" />
+            </HorizontalScrollView>
 
             <!-- Search + Filter Bar (Hidden by default, shown via search button) -->
             <LinearLayout
@@ -158,10 +197,10 @@
                             android:layout_marginStart="8dp"
                             android:layout_weight="1"
                             android:background="@null"
-                            android:cursorVisible="false"
-                            android:focusable="false"
-                            android:hint="Joylashuvni tanlang..."
-                            android:inputType="none"
+                            android:hint="Joylashuvni yozing (Toshkent, Samarqand...)"
+                            android:imeOptions="actionSearch"
+                            android:inputType="textCapSentences"
+                            android:maxLines="1"
                             android:textColor="#FFFFFF"
                             android:textColorHint="#5E6F84"
                             android:textSize="14sp" />
@@ -289,63 +328,15 @@
                         android:layout_height="48dp"
                         android:layout_weight="1"
                         android:text="Qidirish"
-                        app:backgroundTint="#4F8CFF"
+                        app:backgroundTint="@color/primary"
                         app:cornerRadius="12dp" />
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Categories + "Mening e'lonlarim" tugmasi (bir qatorda) -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <HorizontalScrollView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:clipToPadding="false"
-                    android:overScrollMode="never"
-                    android:paddingStart="20dp"
-                    android:paddingEnd="12dp"
-                    android:paddingBottom="16dp"
-                    android:scrollbars="none">
-
-                    <com.google.android.material.chip.ChipGroup
-                        android:id="@+id/chipGroupCategories"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:chipSpacingHorizontal="8dp"
-                        app:singleSelection="true" />
-                </HorizontalScrollView>
-
-                <!--
-                  Faza E: faqat o'z e'lonlarini ko'rsatish rejimi.
-                  Holat ElonlarActivity'da — tugma matni o'zgarmaydi, faqat
-                  rangi/neon'i yoqilganini bildiradi (ekrani qisqartirmaslik uchun).
-                -->
-                <TextView
-                    android:id="@+id/btnMyAds"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="20dp"
-                    android:background="@drawable/bg_classified_search_bar"
-                    android:paddingStart="14dp"
-                    android:paddingTop="8dp"
-                    android:paddingEnd="14dp"
-                    android:paddingBottom="8dp"
-                    android:singleLine="true"
-                    android:text="Mening e'lonlarim"
-                    android:textColor="#8B92A8"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
+            <!-- Kategoriyalar qatori yuqoriga (sarlavha ostiga) ko'chirildi. -->
             <View
                 android:layout_width="match_parent"
-                android:layout_height="0.5dp"
-                android:background="#1AFFFFFF" />
+                android:layout_height="16dp" />
         </LinearLayout>
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -399,7 +390,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:indeterminateTint="#4F8CFF"
+                android:indeterminateTint="@color/primary"
                 android:visibility="gone" />
         </FrameLayout>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
@@ -413,7 +404,7 @@
         android:layout_marginBottom="92dp"
         android:text="E'lon berish"
         android:textColor="#FFFFFF"
-        app:backgroundTint="#4F8CFF"
+        app:backgroundTint="@color/primary"
         app:elevation="8dp"
         app:icon="@drawable/ic_add"
         app:iconTint="#FFFFFF" />

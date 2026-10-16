@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Yuklash (reel/elon) holat xabarlari. Alokida fayl: bu matnlar CreateReelActivity
+  va CreateClassifiedAdActivity ikkalasida ishlatiladi.
+  Diqqat: apostroflar XML'da majburiy escape qilinadi (bo'lmasa aapt2
+  "Invalid unicode escape sequence" bilan qurilishni buzydi — 2026-10-16 hodisasi).
+-->
+<resources>
+    <string name="yuz_upload_failed_title">Yuklash tugamadi</string>
+    <string name="yuz_upload_retry">Qayta urinish</string>
+    <string name="yuz_upload_close">Yopish</string>
+    <string name="yuz_upload_stall_hint">Internet sekin bo\'lsa, mobil ma\'lumotga o\'tib qayta urinib ko\'ring.</string>
+
+    <string name="classified_upload_images">Rasm yuklanmoqda… %1$d%% (%2$d/%3$d)</string>
+    <string name="classified_saving">E\'lon saqlanmoqda…</string>
+
+    <string name="reels_cancel_upload">Yuklashni bekor qilish</string>
+    <string name="reels_upload_canceled">Yuklash bekor qilindi</string>
+</resources>

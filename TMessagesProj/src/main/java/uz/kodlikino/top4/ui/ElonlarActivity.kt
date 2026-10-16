@@ -57,6 +57,7 @@ class ElonlarActivity : BaseFragment() {
     private var filterPanel: LinearLayout? = null
     private var btnMyAds: TextView? = null
     private var etSearchKeyword: EditText? = null
+    private var etSearchAddress: EditText? = null
     private var etFilterMinPrice: TextInputEditText? = null
     private var etFilterMaxPrice: TextInputEditText? = null
     private var etFilterLocation: TextInputEditText? = null
@@ -105,6 +106,7 @@ class ElonlarActivity : BaseFragment() {
         filterPanel = root.findViewById(R.id.filterPanel)
         btnMyAds = root.findViewById(R.id.btnMyAds)
         etSearchKeyword = root.findViewById(R.id.etSearchKeyword)
+        etSearchAddress = root.findViewById(R.id.etSearchAddress)
         etFilterMinPrice = root.findViewById(R.id.etFilterMinPrice)
         etFilterMaxPrice = root.findViewById(R.id.etFilterMaxPrice)
         etFilterLocation = root.findViewById(R.id.etFilterLocation)
@@ -137,10 +139,29 @@ class ElonlarActivity : BaseFragment() {
                 applyFilter()
             }
         })
+        // Manzil bo'yicha qidiruv — avval bu maydon focusable="false" edi, ya'ni
+        // bosilganda hech narsa bo'lmaydi (klaviatura chiqmasdi). Endi u haqiqiy
+        // filtr: har bir belgida `filterLocation` yangilanadi va feed qisqaradi.
+        etSearchAddress?.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, c: Int, a: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, b: Int, c: Int) = Unit
+            override fun afterTextChanged(s: android.text.Editable?) {
+                filterLocation = s?.toString()?.trim().orEmpty()
+                // Filtrlar panelidagi manzil maydoni bilan bir xil ko'rinsin.
+                if (etFilterLocation?.text?.toString()?.trim() != filterLocation) {
+                    etFilterLocation?.setText(filterLocation)
+                }
+                applyFilter()
+            }
+        })
         root.findViewById<MaterialButton>(R.id.btnFilterApply)?.setOnClickListener {
             filterMinPrice = etFilterMinPrice?.text?.toString()?.trim()?.toLongOrNull()
             filterMaxPrice = etFilterMaxPrice?.text?.toString()?.trim()?.toLongOrNull()
             filterLocation = etFilterLocation?.text?.toString()?.trim().orEmpty()
+            // Paneldagi manzil qidiruv qatoriga ham qaytarilsin (ikki maydon chalkashmasin).
+            if (etSearchAddress?.text?.toString()?.trim() != filterLocation) {
+                etSearchAddress?.setText(filterLocation)
+            }
             filterPanel?.visibility = View.GONE
             applyFilter()
         }
@@ -148,6 +169,7 @@ class ElonlarActivity : BaseFragment() {
             etFilterMinPrice?.text?.clear()
             etFilterMaxPrice?.text?.clear()
             etFilterLocation?.text?.clear()
+            etSearchAddress?.text?.clear()
             filterMinPrice = null
             filterMaxPrice = null
             filterLocation = ""
@@ -177,7 +199,10 @@ class ElonlarActivity : BaseFragment() {
             btn.setTextColor(android.graphics.Color.WHITE)
         } else {
             btn.setBackgroundResource(R.drawable.bg_classified_search_bar)
-            btn.setTextColor(0xFF8B92A8.toInt())
+            val ctx = themedContext ?: context ?: return
+            btn.setTextColor(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.text_secondary)
+            )
         }
     }
 
@@ -188,11 +213,6 @@ class ElonlarActivity : BaseFragment() {
     /** "Elon joylash" — yangi e'lon yaratish ekrani (Faza D). */
     private fun openCreate() {
         presentFragment(CreateClassifiedAdActivity(), false)
-    }
-
-    private fun openSoon() {
-        val ctx = parentActivity ?: context ?: return
-        Toast.makeText(ctx, "Bu bo'lim tez orada qo'shiladi", Toast.LENGTH_SHORT).show()
     }
 
     /** Faza E: kartochkadagi qalam — e'lonni tahrirlash (CreateClassifiedAd edit rejimi). */
@@ -237,6 +257,11 @@ class ElonlarActivity : BaseFragment() {
     private fun setupCategoryChips(context: Context) {
         val group = chipGroup ?: return
         group.removeAllViews()
+        // Palitra resurslardan olinadi — chat/Elonlar/Reels bir xil aksentni ishlatadi.
+        val accent = androidx.core.content.ContextCompat.getColor(context, R.color.primary)
+        val surface = androidx.core.content.ContextCompat.getColor(context, R.color.home_card)
+        val muted = androidx.core.content.ContextCompat.getColor(context, R.color.text_secondary)
+        val density = resources.displayMetrics.density
         fun addPill(label: String, id: String?, checked: Boolean) {
             val chip = Chip(context).apply {
                 text = label
@@ -244,17 +269,17 @@ class ElonlarActivity : BaseFragment() {
                 isChecked = checked
                 setTextColor(
                     android.content.res.ColorStateList.valueOf(
-                        if (checked) android.graphics.Color.WHITE else 0xFF8B92A8.toInt()
+                        if (checked) android.graphics.Color.WHITE else muted
                     )
                 )
                 chipBackgroundColor = android.content.res.ColorStateList.valueOf(
-                    if (checked) 0xFF4F8CFF.toInt() else 0xFF0D121D.toInt()
+                    if (checked) accent else surface
                 )
-                chipStrokeWidth = 1f * resources.displayMetrics.density
+                chipStrokeWidth = 1f * density
                 chipStrokeColor = android.content.res.ColorStateList.valueOf(
                     if (checked) 0x00FFFFFF else 0x1AFFFFFF
                 )
-                chipCornerRadius = 20f * resources.displayMetrics.density
+                chipCornerRadius = 20f * density
                 setOnClickListener {
                     selectedCategory = id
                     setupCategoryChips(context)
@@ -264,7 +289,8 @@ class ElonlarActivity : BaseFragment() {
             group.addView(chip)
         }
         addPill("Barchasi", null, selectedCategory == null)
-        ClassifiedAdCategories.all.forEach { addPill(it.label, it.id, selectedCategory == it.id) }
+        // Emoji bilan: qator endi to'liq kenglikda — turkumni bir qarashda ajratish oson.
+        ClassifiedAdCategories.all.forEach { addPill("${it.emoji} ${it.label}", it.id, selectedCategory == it.id) }
     }
 
     private fun startAdsListener() {

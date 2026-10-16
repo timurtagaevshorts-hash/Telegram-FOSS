@@ -216,9 +216,9 @@
                     android:id="@+id/etAddress"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:cursorVisible="false"
-                    android:focusable="false"
-                    android:inputType="none"
+                    android:imeOptions="actionNext"
+                    android:inputType="textCapSentences"
+                    android:maxLines="1"
                     android:textColor="@color/text_primary" />
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -262,144 +262,21 @@
                     android:textColor="@color/text_primary" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/classified_card_theme_title"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+            <!--
+              Eski KinoTOP4 "kartochka uslubi" tanlagichi bu yerdan olib tashlandi:
+              portda faqat bitta (black) uslub qolgan — ClassifiedAdCardThemes.normalize()
+              har doim BLACK qaytardi, shuning uchun 4 ta svatch uchun hech qanday
+              click listener yo'q edi (o'lik UI foydalanuvchini chalkashtirardi).
+            -->
 
             <TextView
+                android:id="@+id/tvUploadStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="@string/classified_card_theme_subtitle"
+                android:layout_marginTop="12dp"
                 android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
-
-            <LinearLayout
-                android:id="@+id/themePickerRow"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <FrameLayout
-                    android:id="@+id/themeWhite"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1">
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="52dp"
-                        android:background="@drawable/bg_classified_theme_swatch_white" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="bottom|center_horizontal"
-                        android:layout_marginBottom="4dp"
-                        android:text="@string/classified_theme_white"
-                        android:textColor="#5C6478"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
-                </FrameLayout>
-
-                <FrameLayout
-                    android:id="@+id/themeBlack"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1">
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="52dp"
-                        android:background="@drawable/bg_classified_theme_swatch_black" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="bottom|center_horizontal"
-                        android:layout_marginBottom="4dp"
-                        android:text="@string/classified_theme_black"
-                        android:textColor="#CCCCCC"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
-                </FrameLayout>
-
-                <FrameLayout
-                    android:id="@+id/themePremiumRed"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1">
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="52dp"
-                        android:background="@drawable/bg_classified_theme_swatch_red" />
-
-                    <TextView
-                        android:id="@+id/tvThemeRedLabel"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="bottom|center_horizontal"
-                        android:layout_marginBottom="4dp"
-                        android:text="@string/classified_theme_red"
-                        android:textColor="#FFFFFF"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvThemeRedLock"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="top|end"
-                        android:layout_margin="4dp"
-                        android:text="👑"
-                        android:textSize="12sp"
-                        android:visibility="gone" />
-                </FrameLayout>
-
-                <FrameLayout
-                    android:id="@+id/themePremiumBlue"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1">
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="52dp"
-                        android:background="@drawable/bg_classified_theme_swatch_blue" />
-
-                    <TextView
-                        android:id="@+id/tvThemeBlueLabel"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="bottom|center_horizontal"
-                        android:layout_marginBottom="4dp"
-                        android:text="@string/classified_theme_blue"
-                        android:textColor="#FFFFFF"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvThemeBlueLock"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="top|end"
-                        android:layout_margin="4dp"
-                        android:text="👑"
-                        android:textSize="12sp"
-                        android:visibility="gone" />
-                </FrameLayout>
-            </LinearLayout>
+                android:textSize="12sp"
+                android:visibility="gone" />
 
             <ProgressBar
                 android:id="@+id/uploadProgress"

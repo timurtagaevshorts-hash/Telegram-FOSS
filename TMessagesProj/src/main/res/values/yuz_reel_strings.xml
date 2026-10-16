@@ -21,7 +21,7 @@
     <string name="reels_sign_in_required">Reel joylash uchun Telegram orqali kiring</string>
     <string name="reels_video_pick_failed">Video tanlagich topilmadi</string>
     <string name="reels_views">%1$s ko\'rish</string>
-    <string name="reels_upload_progress">Yuklanmoqda… %1$d%%</string>
+    <string name="reels_upload_progress">Yuklanmoqda… %1$d%% · %2$s / %3$s</string>
 
     <string name="reels_like">Yoqtirish</string>
     <string name="reels_pick_video_subtitle">Video tanlang — 200 MB gacha, mp4</string>
@@ -31,7 +31,7 @@
     <string name="reels_video_too_large">Video 200 MB dan katta — boshqa video tanlang</string>
     <string name="reels_video_not_readable">Video o\'qilmadi. Qaytadan tanlang</string>
     <string name="reels_uploading_video">Video yuklanmoqda…</string>
-    <string name="reels_saving">Sahifa saqlanmoqda…</string>
+    <string name="reels_saving">Reel saqlanmoqda…</string>
 
     <!-- Ovoz tugmasi belgilari (feed yuqorisida) -->
     <string name="reels_sound_on">🔊</string>

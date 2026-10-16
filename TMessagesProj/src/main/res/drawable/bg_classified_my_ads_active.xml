@@ -2,6 +2,6 @@
 <!-- "Mening e'lonlarim" tugmasi YOQILGAN holat (qarang ElonlarActivity.updateMyAdsButton). -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#4F8CFF" />
+    <solid android:color="@color/primary" />
     <corners android:radius="14dp" />
 </shape>

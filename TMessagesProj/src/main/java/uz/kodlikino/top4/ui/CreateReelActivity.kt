@@ -30,6 +30,7 @@ import uz.kodlikino.top4.models.Reel
 import uz.kodlikino.top4.utils.ReelStorageHelper
 import uz.kodlikino.top4.utils.ReelsRepository
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
+import uz.kodlikino.top4.utils.YuzUploadUi
 
 /**
  * "Reel joylash" — video tanlash, Firebase Storage'ga yuklash va Firestore `reels`
@@ -202,14 +203,32 @@ class CreateReelActivity : BaseFragment() {
         uploadProgress?.progress = 0
         tvUploadStatus?.visibility = View.VISIBLE
         tvUploadStatus?.text = getString(R.string.reels_uploading_video)
+        YuzUploadUi.keepScreenOn(parentActivity, true)
 
         val s = scope ?: return
         s.launch {
             val id = System.currentTimeMillis().toString()
+            // Fayl cho'zzisi tanlangan videodan olinadi — Storage qoidasi
+            // `contentType` video/* bo'lishini talab qiladi, cho'zi esa uni belgilaydi.
+            val rawExt = videoDisplayName.substringAfterLast('.', "mp4")
+                .lowercase()
+                .takeIf { it.length in 2..4 && it.all { c -> c.isLetterOrDigit() } }
+            val ext = when (rawExt) {
+                "mov", "mkv", "webm", "3gp", "mp4" -> rawExt!!
+                else -> "mp4"
+            }
             try {
                 val uid = YuzGramAdsAuth.ensureSignedIn(account)
-                val url = ReelStorageHelper.uploadVideo(uid, "$id.mp4", uri) { pct ->
+                val url = ReelStorageHelper.uploadVideo(
+                    uid, "$id.$ext", uri
+                ) { pct, transferred, total ->
                     uploadProgress?.progress = pct
+                    tvUploadStatus?.text = getString(
+                        R.string.reels_upload_progress,
+                        pct,
+                        YuzUploadUi.humanBytes(transferred),
+                        YuzUploadUi.humanBytes(total)
+                    )
                 }
                 tvUploadStatus?.text = getString(R.string.reels_saving)
                 val reel = Reel(
@@ -229,6 +248,7 @@ class CreateReelActivity : BaseFragment() {
                     isUserUpload = true
                 )
                 ReelsRepository.saveReel(reel)
+                YuzUploadUi.keepScreenOn(parentActivity, false)
                 toast(getString(R.string.reels_published))
                 removeSelfFromStack()
             } catch (e: Exception) {
@@ -236,9 +256,24 @@ class CreateReelActivity : BaseFragment() {
                 btnPublish?.isEnabled = true
                 uploadProgress?.visibility = View.GONE
                 tvUploadStatus?.visibility = View.GONE
-                toast(e.message ?: getString(R.string.reels_publish_failed))
+                YuzUploadUi.keepScreenOn(parentActivity, false)
+                val reason = e.message ?: getString(R.string.reels_publish_failed)
+                // Uzun sabab 2 soniyalik toast'da o'qilmaydi — dialog + qayta urinish.
+                YuzUploadUi.showError(themedContext ?: context, reason) { publishReel() }
             }
         }
+    }
+
+    /**
+     * Yuklash ketayotganda orqaga qaytish scope'ni buzadi — yuklash abadiy
+     * "yuqolgan" bo'ladi. BaseFragment: true = fragment yopiladi, false = bizni.
+     */
+    override fun onBackPressed(): Boolean {
+        if (publishing) {
+            toast(getString(R.string.reels_uploading_video))
+            return false
+        }
+        return super.onBackPressed()
     }
 
     override fun onResume() {
@@ -249,6 +284,7 @@ class CreateReelActivity : BaseFragment() {
     override fun onFragmentDestroy() {
         scope?.cancel()
         scope = null
+        YuzUploadUi.keepScreenOn(parentActivity, false)
         super.onFragmentDestroy()
     }
 
@@ -266,5 +302,11 @@ class CreateReelActivity : BaseFragment() {
     private fun getString(resId: Int): String {
         val ctx = themedContext ?: context ?: return ""
         return ctx.getString(resId)
+    }
+
+    /** Formatlangan matnlar uchun (`%1$d%% · 12.4 MB / 36.0 MB`). */
+    private fun getString(resId: Int, vararg args: Any): String {
+        val ctx = themedContext ?: context ?: return ""
+        return ctx.getString(resId, *args)
     }
 }

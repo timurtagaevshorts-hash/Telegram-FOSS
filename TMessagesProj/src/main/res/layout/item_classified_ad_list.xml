@@ -42,7 +42,7 @@
                 android:layout_gravity="bottom|start"
                 android:layout_margin="6dp"
                 android:background="@drawable/bg_chat_nav_new_badge"
-                android:backgroundTint="#4F8CFF"
+                android:backgroundTint="@color/primary"
                 android:paddingStart="6dp"
                 android:paddingTop="2dp"
                 android:paddingEnd="6dp"
