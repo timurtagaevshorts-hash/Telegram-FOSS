@@ -72,7 +72,9 @@ class AdImageViewerActivity(
         btnBack?.setOnClickListener { removeSelfFromStack() }
 
         if (images.isEmpty()) {
-            removeSelfFromStack()
+            // createView ichida stack hali to'lmagan bo'lishi mumkin — yopishni
+            // keyingi message'ga suramiz (batch'da removeSelfFromStack xavfsiz).
+            AndroidUtilities.runOnUIThread { removeSelfFromStack() }
             return root
         }
 
