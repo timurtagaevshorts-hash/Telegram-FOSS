@@ -1671,7 +1671,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         float containersAlpha;
 
         if (hasStories || animateToHasStories) {
-            float p = Utilities.clamp(-scrollYOffset / dp(DialogStoriesCell.HEIGHT_IN_DP), 1f, 0f);
+            // YuzGram: storylar doim KATTA (expanded) holatda — ro'yxatni aylantirsangiz
+            // ham mini qatoriga yig'ilmaydi. Faqat ko'p tanlash (action mode) rejimida yashiradi.
+            float p = 0f;
             if (progressToActionMode == 1f) {
                 p = 1f;
             }
@@ -3431,11 +3433,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             } else {
                 statusDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(null, dp(26));
                 statusDrawable.center = true;
-                if (BuildVars.DEBUG_VERSION) {
-                    actionBar.setTitle(LocaleController.getString("AppNameBeta", R.string.AppNameBeta), statusDrawable);
-                } else {
-                    actionBar.setTitle(LocaleController.getString("AppName", R.string.AppName), statusDrawable);
-                }
+                // YuzGram: debug (Beta) qurilmalarda ham "Telegram" emas, "YuzGram" ko'rsatiladi.
+                actionBar.setTitle(LocaleController.getString("AppName", R.string.AppName), statusDrawable);
                 updateStatus(UserConfig.getInstance(currentAccount).getCurrentUser(), false);
             }
             if (folderId == 0) {
