@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ish kartasi (Job Board) — KinoTOP4'dan port qilingan matnlar. -->
+<resources>
+    <string name="job_board_title">Ish bo\'limi</string>
+    <string name="job_board_detail">Ish e\'loni</string>
+    <string name="job_board_post">E\'lon qo\'shish</string>
+    <string name="job_board_publish">E\'lonni joylash</string>
+    <string name="job_board_published">E\'lon joylandi</string>
+    <string name="job_board_not_found">E\'lon topilmadi</string>
+    <string name="job_board_empty">Hozircha e\'lon yo\'q</string>
+    <string name="job_board_empty_jobs">Ishchi kerak e\'lonlari hozircha yo\'q</string>
+    <string name="job_board_empty_workers">Ishlayman e\'lonlari hozircha yo\'q</string>
+    <string name="job_board_tab_jobs">Ishlar</string>
+    <string name="job_board_tab_workers">Ishchilar</string>
+    <string name="job_board_listing_type">Kategoriya</string>
+    <string name="job_board_type_hiring">Ishchi kerak</string>
+    <string name="job_board_type_seeking">Ishlayman</string>
+    <string name="job_board_title_hint">Ish / ko\'nikma</string>
+    <string name="job_board_title_hiring_hint">Qanday ishchi kerak?</string>
+    <string name="job_board_title_seeking_hint">Nima ish qila olasiz?</string>
+    <string name="job_board_title_required">Ish yoki ko\'nikma kiriting</string>
+    <string name="job_board_description_hint">Qo\'shimcha ma\'lumot</string>
+    <string name="job_board_salary_type">To\'lov turi</string>
+    <string name="job_board_salary_hint">Ish haqi</string>
+    <string name="job_board_location_hint">Manzil</string>
+    <string name="job_board_pick_image_optional">Rasm (ixtiyoriy)</string>
+    <string name="job_board_change_image">Rasmni almashtirish</string>
+
+    <!-- Elon batafsil ekranida qo'ng'iroq tugmasi uchun umumiy yozuv -->
+    <string name="classified_call">Qo\'ng\'iroq</string>
+
+    <!-- Funksiyalar hub -->
+    <string name="funksiyalar_title">Funksiyalar</string>
+    <string name="funksiyalar_subtitle">Barcha imkoniyatlar bir joyda</string>
+    <string name="func_elonlar_title">Elonlar</string>
+    <string name="func_elonlar_desc">Sotish va xarid uchun e\'lonlar</string>
+    <string name="func_ish_title">Ish kartasi</string>
+    <string name="func_ish_desc">Ish topish va ishchi qidirish</string>
+    <string name="func_taksi_title">Taksi chaqirish</string>
+    <string name="func_taksi_desc">Manzil belgilab taksi yuborish</string>
+    <string name="func_instagram_title">Instagram video</string>
+    <string name="func_instagram_desc">Instagram relsni yuklab olish</string>
+    <string name="func_monet_title">Monetizatsiya</string>
+    <string name="func_monet_desc">Daromad, mukofotlar va pul yechish</string>
+    <string name="func_soon">Bu funksiya tez orada qo\'shiladi</string>
+</resources>

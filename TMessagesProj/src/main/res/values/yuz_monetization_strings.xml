@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="monet_title">Monetizatsiya</string>
+    <string name="monet_subtitle">Ko\'rishlar daromadi, obunachi mukofotlari va hisobdan pul yechish</string>
+    <string name="monet_available">Mavjud balans</string>
+    <string name="monet_earned">Jami daromad</string>
+    <string name="monet_withdrawn">Yechilgan</string>
+    <string name="monet_pending">Kutilmoqda</string>
+    <string name="monet_views">Jami ko\'rishlar</string>
+    <string name="monet_rate">Kurs</string>
+    <string name="monet_withdraw">Pul yechish</string>
+    <string name="monet_sign_in_required">Balansni ko\'rish uchun Telegram orqali kiring</string>
+    <string name="monet_loading">Yuklanmoqda…</string>
+    <string name="monet_reels_section">Mening reel\'larim</string>
+    <string name="monet_no_reels">Hali reel yuklanmagan</string>
+    <string name="monet_reel_views">%1$d ko\'rish</string>
+    <string name="monet_manage">Kontentni boshqarish</string>
+    <string name="monet_followers">Obunachilar</string>
+    <string name="monet_following">Obunalar</string>
+    <string name="monet_rewards_section">Obunachi mukofotlari</string>
+    <string name="monet_no_rewards">Mukofot dasturi hozircha o\'chiq</string>
+    <string name="monet_tier_ready">Yechish mumkin</string>
+    <string name="monet_tier_locked">Qulflangan</string>
+    <string name="monet_tier_pending">Ko\'rib chiqilmoqda</string>
+    <string name="monet_tier_approved">Tasdiqlangan</string>
+    <string name="monet_tier_rejected">Rad etilgan</string>
+    <string name="monet_reel_deleted">Reel o\'chirildi</string>
+
+    <string name="withdraw_title">Hisobdan pul yechish</string>
+    <string name="withdraw_amount_hint">Summa (so\'m)</string>
+    <string name="withdraw_card_hint">Karta raqami</string>
+    <string name="withdraw_cvv_hint">CVV</string>
+    <string name="withdraw_first_hint">Ism</string>
+    <string name="withdraw_last_hint">Familiya</string>
+    <string name="withdraw_submit">Yuborish</string>
+    <string name="withdraw_cancel">Bekor qilish</string>
+    <string name="withdraw_created">So\'rov yuborildi, administrator tasdiqlagach pul o\'tkaziladi</string>
+    <string name="withdraw_failed">Yuborib bo\'lmadi, qayta urinib ko\'ring</string>
+    <string name="withdraw_fill_fields">Ism, familiya va kartani to\'ldiring</string>
+    <string name="withdraw_min_amount">Minimal yechish summasi: %1$s</string>
+    <string name="withdraw_max_amount">Maksimal yechish summasi: %1$s</string>
+    <string name="withdraw_balance_insufficient">Balans yetarli emas (mavjud: %1$s)</string>
+    <string name="withdraw_no_balance">Yechish uchun balans yo\'q</string>
+</resources>

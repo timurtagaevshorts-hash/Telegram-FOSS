@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/modern_surface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="100dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="20dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="20dp"
+            android:text="@string/funksiyalar_title"
+            android:textColor="@color/text_primary"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="20dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="16dp"
+            android:text="@string/funksiyalar_subtitle"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardElonlar"
+            style="@style/FuncsionCard">
+
+            <LinearLayout style="@style/FuncsionCardRow">
+
+                <TextView style="@style/FuncsionCardIcon" android:text="🏷️" />
+
+                <LinearLayout style="@style/FuncsionCardText">
+                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_elonlar_title" />
+                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_elonlar_desc" />
+                </LinearLayout>
+
+                <ImageView style="@style/FuncsionCardChevron" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardIsh"
+            style="@style/FuncsionCard">
+
+            <LinearLayout style="@style/FuncsionCardRow">
+
+                <TextView style="@style/FuncsionCardIcon" android:text="💼" />
+
+                <LinearLayout style="@style/FuncsionCardText">
+                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_ish_title" />
+                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_ish_desc" />
+                </LinearLayout>
+
+                <ImageView style="@style/FuncsionCardChevron" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardTaksi"
+            style="@style/FuncsionCard">
+
+            <LinearLayout style="@style/FuncsionCardRow">
+
+                <TextView style="@style/FuncsionCardIcon" android:text="🚕" />
+
+                <LinearLayout style="@style/FuncsionCardText">
+                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_taksi_title" />
+                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_taksi_desc" />
+                </LinearLayout>
+
+                <ImageView style="@style/FuncsionCardChevron" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardInstagram"
+            style="@style/FuncsionCard">
+
+            <LinearLayout style="@style/FuncsionCardRow">
+
+                <TextView style="@style/FuncsionCardIcon" android:text="📥" />
+
+                <LinearLayout style="@style/FuncsionCardText">
+                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_instagram_title" />
+                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_instagram_desc" />
+                </LinearLayout>
+
+                <ImageView style="@style/FuncsionCardChevron" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardMonet"
+            style="@style/FuncsionCard">
+
+            <LinearLayout style="@style/FuncsionCardRow">
+
+                <TextView style="@style/FuncsionCardIcon" android:text="💎" />
+
+                <LinearLayout style="@style/FuncsionCardText">
+                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_monet_title" />
+                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_monet_desc" />
+                </LinearLayout>
+
+                <ImageView style="@style/FuncsionCardChevron" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

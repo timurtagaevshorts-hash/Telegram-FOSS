@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="instagram_save_title">Instagram video</string>
+    <string name="instagram_save_subtitle">Reels havolasini joylang — video yuklab olinadi va galereyaga saqlanadi.</string>
+    <string name="instagram_save_link_hint">Instagram havolasi</string>
+    <string name="instagram_save_paste">Buferdan olish</string>
+    <string name="instagram_save_download">Yuklab olish</string>
+    <string name="instagram_save_gallery">Galereyaga saqlash</string>
+    <string name="instagram_save_clipboard_empty">Buferda Instagram havolasi topilmadi</string>
+    <string name="instagram_save_error_link">Instagram havolasi noto\'g\'ri</string>
+    <string name="instagram_save_error_offline">Internet aloqasi yo\'q</string>
+    <string name="instagram_save_resolving">Havola tekshirilmoqda…</string>
+    <string name="instagram_save_downloading">Yuklanmoqda: %1$d%%</string>
+    <string name="instagram_save_error_not_found">Video topilmadi yoki maxfiy</string>
+    <string name="instagram_save_error_failed">Yuklab bo\'lmadi, qayta urinib ko\'ring</string>
+    <string name="instagram_save_saving">Saqlanmoqda…</string>
+    <string name="instagram_save_saved">Galereyaga saqlandi</string>
+    <string name="instagram_save_author">Muallif: %1$s</string>
+</resources>

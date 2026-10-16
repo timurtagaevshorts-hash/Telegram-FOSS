@@ -47,7 +47,7 @@ public class YuzGramBottomBar extends View {
     /** Panelning umumiy balandligi (dip) — tepada panel + glow uchun bo'shliq bilan. */
     public static final int HEIGHT_DP = 68;
 
-    private static final String[] LABELS = {"Asosiy", "Reels", "Elonlar", "Profil"};
+    private static final String[] LABELS = {"Asosiy", "Reels", "Funksiyalar", "Profil"};
 
     // Neon palitra (YuzGram brendi; rail bilan bir xil ko'klar)
     private static final int SURFACE = 0xFF0A1120;      // chuqur to'q-ko'k sirt (elonlar foni bilan bir xil)

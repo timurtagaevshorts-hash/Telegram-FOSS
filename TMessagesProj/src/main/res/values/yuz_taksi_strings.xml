@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="taksi_title">Taksi chaqirish</string>
+    <string name="taksi_subtitle">Buyurtma yuboring — administrator tasdiqlagach sizga qo\'ng\'iroq qilishadi.</string>
+    <string name="taksi_phone_hint">Telefon raqamingiz</string>
+    <string name="taksi_pickup_hint">Nerdan olasiz (manzil)</string>
+    <string name="taksi_destination_hint">Qayerga borasiz</string>
+    <string name="taksi_submit">Buyurtma berish</string>
+    <string name="taksi_creating">Yuborilmoqda…</string>
+    <string name="taksi_created">Buyurtmangiz qabul qilindi. Tez orada bog\'lanamiz.</string>
+    <string name="taksi_failed">Yuborib bo\'lmadi, qayta urinib ko\'ring</string>
+    <string name="taksi_fill_fields">Telefon va manzilni to\'ldiring</string>
+    <string name="taksi_sign_in_required">Buyurtma uchun Telegram orqali kiring</string>
+    <string name="taksi_active_title">Faol buyurtma</string>
+    <string name="taksi_status_pending">Kutilmoqda</string>
+    <string name="taksi_status_approved">Tasdiqlangan</string>
+    <string name="taksi_status_rejected">Rad etilgan</string>
+    <string name="taksi_status_cancelled">Bekor qilingan</string>
+    <string name="taksi_status_arrived">Yakunlangan</string>
+    <string name="taksi_cancel">Bekor qilish</string>
+</resources>

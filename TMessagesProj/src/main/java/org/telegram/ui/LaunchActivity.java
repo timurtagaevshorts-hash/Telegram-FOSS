@@ -7967,7 +7967,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         } else if (top instanceof uz.kodlikino.top4.ui.ReelsActivity) {
             yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_REELS, yuzGramBottomBar.isShownBar());
             eligible = true;
-        } else if (top instanceof uz.kodlikino.top4.ui.ElonlarActivity) {
+        } else if (top instanceof uz.kodlikino.top4.ui.FunksiyalarActivity) {
             yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ELONLAR, yuzGramBottomBar.isShownBar());
             eligible = true;
         } else if (top instanceof ProfileActivity && ((ProfileActivity) top).myProfile) {

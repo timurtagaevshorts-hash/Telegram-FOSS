@@ -16,4 +16,74 @@
         <item name="android:windowBackground">@color/home_bg</item>
         <item name="android:colorBackground">@color/home_bg</item>
     </style>
+
+    <!--
+      Funksiyalar hub kartochkalari. Qasddan `Funcsion*` (bitta qo'shimcha i) —
+      eskilar bilan nom to'qnashmasligi uchun. Faqat yuqoridagi Material tema ostida
+      ishlatiladi ( Elonlar/Reels bilan bir xil ContextThemeWrapper).
+    -->
+    <style name="FuncsionCard" parent="Widget.MaterialComponents.CardView">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">16dp</item>
+        <item name="android:layout_marginEnd">16dp</item>
+        <item name="android:layout_marginTop">10dp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:foreground">?attr/selectableItemBackground</item>
+        <item name="cardBackgroundColor">@color/classified_card_default_bg</item>
+        <item name="cardCornerRadius">18dp</item>
+        <item name="cardElevation">3dp</item>
+        <item name="strokeColor">@color/classified_card_default_stroke</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <style name="FuncsionCardRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:padding">16dp</item>
+    </style>
+
+    <style name="FuncsionCardIcon">
+        <item name="android:layout_width">48dp</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@drawable/bg_classified_premium_fab</item>
+        <item name="android:textSize">22sp</item>
+    </style>
+
+    <style name="FuncsionCardText">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginStart">14dp</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="FuncsionCardTitle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="FuncsionCardDesc">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="FuncsionCardChevron">
+        <item name="android:layout_width">20dp</item>
+        <item name="android:layout_height">20dp</item>
+        <item name="android:src">@drawable/ic_back</item>
+        <item name="android:rotation">180</item>
+        <item name="android:contentDescription">@null</item>
+        <item name="tint">@color/text_secondary</item>
+    </style>
 </resources>

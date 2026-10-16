@@ -35,10 +35,10 @@ public final class YuzGramNav {
                 current.presentFragment(new ReelsActivity(), true);
                 break;
             case YuzGramBottomBar.TAB_ELONLAR:
-                if (current instanceof ElonlarActivity) {
+                if (current instanceof FunksiyalarActivity) {
                     return;
                 }
-                current.presentFragment(new ElonlarActivity(), true);
+                current.presentFragment(new FunksiyalarActivity(), true);
                 break;
             case YuzGramBottomBar.TAB_PROFIL:
                 if (current instanceof ProfileActivity) {

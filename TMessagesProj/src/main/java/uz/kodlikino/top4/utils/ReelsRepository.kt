@@ -56,6 +56,31 @@ object ReelsRepository {
         }
     }
 
+    /** Muayyan uid tomonidan yuklangan reel'lar (monetizatsiya va kontent boshqaruvi uchun). */
+    suspend fun getReelsByUploader(uid: String): List<Reel> {
+        if (uid.isBlank()) return emptyList()
+        return try {
+            val snapshot = db.collection(COLLECTION)
+                .whereEqualTo("uploadedByUid", uid)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(FEED_LIMIT)
+                .get()
+                .await()
+            snapshot.documents.mapNotNull { doc ->
+                try {
+                    val reel = doc.toObject(Reel::class.java) ?: return@mapNotNull null
+                    reel.copy(id = reel.id.ifBlank { doc.id })
+                } catch (e: Exception) {
+                    Log.e(TAG, "parse ${doc.id}: ${e.message}", e)
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "getReelsByUploader: ${e.message}", e)
+            emptyList()
+        }
+    }
+
     /** Yangi reel hujjatini `reels/{id}` ga yozadi. */
     suspend fun saveReel(reel: Reel) {
         val id = reel.id.ifBlank { System.currentTimeMillis().toString() }
