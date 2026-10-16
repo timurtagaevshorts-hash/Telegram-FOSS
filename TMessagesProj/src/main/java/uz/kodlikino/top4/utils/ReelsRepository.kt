@@ -22,7 +22,15 @@ object ReelsRepository {
     private val db = FirebaseFirestore.getInstance()
 
     /** Feed — oxirgi qo'shilgan reelslar (createdAt bo'yicha kamayish tartibida). */
-    suspend fun getReels(): List<Reel> {
+    suspend fun getReels(): List<Reel> = getReelsOrNull() ?: emptyList()
+
+    /**
+     * [getReels]ning xato holatini ajratib qaytaradigan varianti:
+     * `null` — o'qish XATO bilan tugadi (internet/qoida),
+     * bo'sh ro'yxat — haqiqatan ham reels yo'q. Ekranda "bo'sh" va "yuklanmadi"
+     * xabarlarini chalkashtirmaslik uchun kerak.
+     */
+    suspend fun getReelsOrNull(): List<Reel>? {
         return try {
             val snapshot = db.collection(COLLECTION)
                 .orderBy("createdAt", Query.Direction.DESCENDING)
@@ -41,7 +49,7 @@ object ReelsRepository {
             }
         } catch (e: Exception) {
             Log.e(TAG, "getReels: ${e.message}", e)
-            emptyList()
+            null
         }
     }
 

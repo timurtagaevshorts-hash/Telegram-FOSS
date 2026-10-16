@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.PagerSnapHelper
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -22,6 +23,7 @@ import org.telegram.messenger.UserConfig
 import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.models.Reel
 import uz.kodlikino.top4.utils.ReelsRepository
+import uz.kodlikino.top4.utils.YuzGramAdsAuth
 
 /**
  * "Reels" bo'limi — YuzGram pastki navigatsiyasining alohida tab'i.
@@ -56,6 +58,8 @@ class ReelsActivity : BaseFragment() {
 
     private var scope: CoroutineScope? = null
     private var loading = false
+    private var authWarmedUp = false
+    private var authJob: Job? = null
     private var currentReels: List<Reel> = emptyList()
     private var selectedPosition = 0
 
@@ -78,6 +82,8 @@ class ReelsActivity : BaseFragment() {
         muteButton = root.findViewById(R.id.btnMute)
         progressBar = root.findViewById(R.id.progressReels)
         emptyView = root.findViewById(R.id.emptyReels)
+        // Bo'sh/xato holatida xabarni bosish qayta yuklaydi (tarmoq shu yerda beqaror).
+        emptyView?.setOnClickListener { loadReels() }
 
         // Status bari ostiga tushmasligi uchun overlay'ga tepa bo'shliq.
         reelsTopBar?.let { bar ->
@@ -128,6 +134,7 @@ class ReelsActivity : BaseFragment() {
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         loadReels()
+        warmUpAuth()
         return root
     }
 
@@ -154,14 +161,25 @@ class ReelsActivity : BaseFragment() {
         loading = true
         if (currentReels.isEmpty()) progressBar?.visibility = View.VISIBLE
         s.launch {
-            val reels = ReelsRepository.getReels()
+            val reels = ReelsRepository.getReelsOrNull()
             loading = false
             if (fragmentView == null) return@launch
+            if (reels == null) {
+                // O'qish xatosi — "bo'sh" deb aldamaymiz, bosilganda qayta urinadi.
+                progressBar?.visibility = View.GONE
+                if (currentReels.isEmpty()) {
+                    emptyView?.visibility = View.VISIBLE
+                    reelsList?.visibility = View.GONE
+                }
+                emptyView?.text = getString(R.string.reels_load_failed)
+                return@launch
+            }
             currentReels = reels
             adapter?.submit(reels)
             progressBar?.visibility = View.GONE
             val isEmpty = reels.isEmpty()
             emptyView?.visibility = if (isEmpty) View.VISIBLE else View.GONE
+            emptyView?.text = getString(R.string.reels_empty)
             reelsList?.visibility = if (isEmpty) View.GONE else View.VISIBLE
             if (!isEmpty) {
                 val target = keepPosition.coerceIn(0, reels.size - 1)
@@ -192,12 +210,19 @@ class ReelsActivity : BaseFragment() {
             return
         }
         val s = scope ?: return
+        val account = currentAccount
         s.launch {
             try {
+                // Firestore qoidasi: `likes/{uid}` yozish faqat Firebase Auth
+                // sessiyasida o'tadi (`request.auth.uid == userId`).
+                awaitAuth()
+                YuzGramAdsAuth.ensureSignedIn(account)
                 ReelsRepository.setLiked(reelId, uid, likedNow)
             } catch (e: Exception) {
+                // Ekran yopilsa (scope bekor qilinsa) foydachiga xabar ko'rsatmaymiz.
+                if (fragmentView == null) return@launch
                 // Optimistik UI'ni orqaga qaytaramiz.
-                if (fragmentView != null) adapter?.applyLikeState(reelId, !likedNow)
+                adapter?.applyLikeState(reelId, !likedNow)
                 toast(R.string.reels_like_failed)
             }
         }
@@ -205,7 +230,45 @@ class ReelsActivity : BaseFragment() {
 
     private fun registerView(reelId: String) {
         val s = scope ?: return
-        s.launch { ReelsRepository.registerView(reelId) }
+        val account = currentAccount
+        s.launch {
+            // `views` increment ham qoidaga ko'ra signedIn() talab qiladi.
+            try {
+                awaitAuth()
+                YuzGramAdsAuth.ensureSignedIn(account)
+            } catch (_: Exception) {
+                // Ko'rish hisobi muhim emas — xato feed'ni buzmasligi kerak.
+            }
+            ReelsRepository.registerView(reelId)
+        }
+    }
+
+    /**
+     * Firebase sessiyasini oldindan ochib qo'yish: like/ko'rish yozuvlari
+     * shuni talab qiladi, foydachi bosgunicha kutib qolmasligi uchun.
+     * Bir vaqtning o'zida ikki `mintTelegramCustomToken` so'rovi ketmasligi uchun
+     * job saqlanadi va yozuv yo'llari uni kutadi (`join`).
+     */
+    private fun warmUpAuth() {
+        if (authWarmedUp) return
+        authWarmedUp = true
+        if (currentUid().isBlank()) return
+        val s = scope ?: return
+        val account = currentAccount
+        authJob = s.launch {
+            try {
+                YuzGramAdsAuth.ensureSignedIn(account)
+            } catch (_: Exception) {
+                // Sessiya keyinroq yozuvda o'zi ochiladi (yoki tokensiz like urinishi
+                // xabar bilan tugaydi) — bu yerda foydachini chalg'itmaymiz.
+            }
+        }
+    }
+
+    /** Davom etayotgan auth job'ini kutish (bir xili mint so'rovlarining oldini oladi). */
+    private suspend fun awaitAuth() {
+        val job = authJob ?: return
+        if (job.isActive) job.join()
     }
 
     override fun onResume() {
@@ -239,5 +302,11 @@ class ReelsActivity : BaseFragment() {
     private fun toast(resId: Int) {
         val ctx = themedContext ?: context ?: return
         Toast.makeText(ctx, resId, Toast.LENGTH_SHORT).show()
+    }
+
+    /** [BaseFragment] View bo'lgani uchun `getString(resId)` yo'q — o'zimiz yasaymiz. */
+    private fun getString(resId: Int): String {
+        val ctx = themedContext ?: context ?: return ""
+        return ctx.getString(resId)
     }
 }
