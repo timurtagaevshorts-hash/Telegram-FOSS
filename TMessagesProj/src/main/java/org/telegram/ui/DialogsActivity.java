@@ -2727,8 +2727,17 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             lp.topMargin = top;
             yuzChatRail.setLayoutParams(lp);
         }
+        // Ustun pastki bar va qalam FAB'iga tegmasin.
+        int railReserve = uz.kodlikino.top4.ui.YuzGramBottomBar.height() + dp(74);
+        int railMax = yuzChatRail.getResources().getDisplayMetrics().heightPixels - top - railReserve;
+        yuzChatRail.setMaxRailHeight(Math.max(dp(70), railMax));
         ArrayList<MessagesController.DialogFilter> filters = getMessagesController().getDialogFilters();
-        int selected = viewPages != null && viewPages.length > 0 && viewPages[0] != null ? viewPages[0].selectedType : 0;
+        int selected = 0;
+        if (filterTabsView != null && filterTabsView.getCurrentTabId() >= 0) {
+            selected = filterTabsView.getCurrentTabId();
+        } else if (viewPages != null && viewPages.length > 0 && viewPages[0] != null) {
+            selected = viewPages[0].selectedType;
+        }
         // Papkalar umuman yo'q bo'lsa ustun bitta "Barchasi"dan iborat bo'lib qoladi,
         // shuning uchun oxiriga papka qo'shish tugmasini qo'yamiz.
         yuzChatRail.setFilters(filters, selected, filters.size() <= 1, animated);

@@ -39,10 +39,12 @@ public class YuzGramChatRail extends View {
 
     /** Ustun kengligi (panel + o'ng chekkaye). */
     public static final int WIDTH_DP = 64;
-    private static final float ITEM_H_DP = 58f;
-    private static final float CIRCLE_DP = 34f;
-    private static final float LABEL_SP = 8.6f;
+    private static final float ITEM_H_DP = 53f;
+    private static final float CIRCLE_DP = 31f;
+    private static final float LABEL_SP = 8.2f;
     private static final float V_PAD_DP = 10f;
+    /** Pastki yumaloq chet oxirgi label'ni kesmasligi uchun qo'shimcha joy. */
+    private static final float V_PAD_BOTTOM_DP = 26f;
 
     // Neon palitra (YuzGram brendi — pastki bar bilan bir xil)
     private static final int SURFACE = 0xF20A1120;
@@ -103,6 +105,7 @@ public class YuzGramChatRail extends View {
     private float downScroll = 0f;
     private boolean dragging = false;
     private float pressIndex = -1f;
+    private int maxRailHeight;
     private LinearGradient activeShader;
     private float activeShaderCx = Float.MIN_VALUE;
     private float activeShaderCy = Float.MIN_VALUE;
@@ -206,6 +209,17 @@ public class YuzGramChatRail extends View {
         return AndroidUtilities.dp(WIDTH_DP);
     }
 
+    /**
+     * Ustunning maksimal balandligi (px). Pastki bar va qalam FAB'i bilan
+     * to'qnashganda ustun ichida aylantiriladi.
+     */
+    public void setMaxRailHeight(int px) {
+        if (maxRailHeight != px) {
+            maxRailHeight = px;
+            requestLayout();
+        }
+    }
+
     private static int dp(float v) {
         return AndroidUtilities.dp(v);
     }
@@ -220,7 +234,7 @@ public class YuzGramChatRail extends View {
     }
 
     private float totalContentHeight() {
-        return dp(V_PAD_DP) * 2f + itemCount() * itemHeight();
+        return dp(V_PAD_DP) + dp(V_PAD_BOTTOM_DP) + itemCount() * itemHeight();
     }
 
     private float maxScroll() {
@@ -253,7 +267,10 @@ public class YuzGramChatRail extends View {
             // Papkalar ko'p — ekranga sig'maydi: o'lcham cheklanadi, ichida aylantiriladi.
             h = specH;
         } else {
-            h = (int) Math.ceil(Math.max(contentHeight, itemHeight() + dp(V_PAD_DP) * 2f));
+            h = (int) Math.ceil(Math.max(contentHeight, itemHeight() + dp(V_PAD_DP) + dp(V_PAD_BOTTOM_DP)));
+        }
+        if (maxRailHeight > 0 && h > maxRailHeight) {
+            h = maxRailHeight;
         }
         // Balandlikni qat'iy qotamiz: maxsus FrameLayout bolaga kutilganidan katta
         // balandlik bersa, panel butun ekranni egallib qo'yardi (YuzGramBottomBar'dagi
@@ -324,6 +341,10 @@ public class YuzGramChatRail extends View {
                 activeShaderCy = cy;
                 activeShaderR = r;
             }
+            // Muhim: fillPaint'da oldingi kadrdan qolgan shaffoflik (0x40)
+            // shader'ga ham ta'sir qiladi — gradient xira (to'q ko'k) bo'lib
+            // qolmasligi uchun avval to'liq opaq rang qo'yamiz.
+            fillPaint.setColor(0xFFFFFFFF);
             fillPaint.setShader(activeShader);
             iconPaint.setColor(ICON_ACTIVE);
             textPaint.setColor(0xFFFFFFFF);
@@ -350,7 +371,7 @@ public class YuzGramChatRail extends View {
         String label = add ? LocaleController.getString("Add", R.string.Add) : labelFor(filter);
         textPaint.setAlpha(active ? 255 : 215);
         float textY = cy + r + dp(7.5f);
-        float maxTextW = getWidth() - dp(9);
+        float maxTextW = labelMaxWidth(textY);
         CharSequence ell = android.text.TextUtils.ellipsize(label, textPaint,
                 (int) Math.max(dp(24), maxTextW), android.text.TextUtils.TruncateAt.END);
         canvas.drawText(ell.toString(), cx, textY, textPaint);
@@ -377,6 +398,23 @@ public class YuzGramChatRail extends View {
             canvas.drawCircle(cx - r + dp(3f), cy - r + dp(3f), dp(2.6f), fillPaint);
         }
         canvas.restore();
+    }
+
+    /**
+     * Panelning yumaloq uchlari label'ni kesib qo'ymasligi uchun yozuv
+     * chiziladigan qatordagi haqiqiy ochiq kenglikni hisoblaymiz.
+     */
+    private float labelMaxWidth(float textY) {
+        float inset = dp(4);
+        float w = getWidth();
+        float radius = (w - inset * 2f) / 2f;
+        float d = (getHeight() - inset) - (textY + dp(3.5f));
+        float squeeze = 0f;
+        if (d < radius) {
+            float k = radius - Math.max(0f, d);
+            squeeze = radius - (float) Math.sqrt(Math.max(0f, radius * radius - k * k));
+        }
+        return Math.max(dp(22), w - inset * 2f - squeeze * 2f - dp(3));
     }
 
     private String labelFor(MessagesController.DialogFilter filter) {

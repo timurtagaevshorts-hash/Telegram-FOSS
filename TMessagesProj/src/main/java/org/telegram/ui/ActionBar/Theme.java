@@ -6307,6 +6307,28 @@ public class Theme {
         return themesDict.get(key);
     }
 
+    /**
+     * YuzGram brend qoidasi: ilova foni doim neon-to'q (#0A1120) bo'ladi —
+     * chat ro'yxati Elonlar bo'limi bilan bir xil fon-da ko'rinadi.
+     * Telegram chat aurasi yoki eski saqlangan sozlamalar orqali stock
+     * YORUG' mavzularga ("Blue", "Day", "Arctic Blue") o'tib qolmaslik uchun
+     * ularni brend mavzusiga aylantiramiz. Foydalanuvchi o'zi yuklagan
+     * maxsus .attheme fayllari (pathToFile != null) o'zgarishsiz ishlaydi.
+     */
+    private static ThemeInfo forceYuzGramTheme(ThemeInfo themeInfo) {
+        if (themeInfo == null || themeInfo.pathToFile != null) {
+            return themeInfo;
+        }
+        String key = themeInfo.getKey();
+        if ("Blue".equals(key) || "Day".equals(key) || "Arctic Blue".equals(key)) {
+            ThemeInfo neon = themesDict.get("YuzGram Neon");
+            if (neon != null) {
+                return neon;
+            }
+        }
+        return themeInfo;
+    }
+
     public static void applyTheme(ThemeInfo themeInfo) {
         applyTheme(themeInfo, true, true, false);
     }
@@ -6324,6 +6346,7 @@ public class Theme {
     }
 
     private static void applyTheme(ThemeInfo themeInfo, boolean save, boolean removeWallpaperOverride, final boolean nightTheme) {
+        themeInfo = forceYuzGramTheme(themeInfo);
         if (themeInfo == null) {
             return;
         }
@@ -6449,6 +6472,7 @@ public class Theme {
     }
 
     private static void applyThemeInBackground(ThemeInfo themeInfo, boolean save, boolean removeWallpaperOverride, final boolean nightTheme, Runnable onDone) {
+        themeInfo = forceYuzGramTheme(themeInfo);
         if (themeInfo == null) {
             if (onDone != null) {
                 onDone.run();
