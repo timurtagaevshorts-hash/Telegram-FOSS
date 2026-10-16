@@ -240,7 +240,6 @@ jobs:
       - name: Cache gradle build cache
         if: github.event.inputs.clean_cache != 'yes'
         uses: actions/cache@v4
-        save-always: true
         with:
           path: ~/.gradle/caches/build-cache-1
           key: buildcache-${{ runner.os }}-${{ github.run_id }}
