@@ -72,7 +72,20 @@
         android:textSize="64sp"
         android:visibility="gone" />
 
-    <!-- O'ng ustun: like + ko'rishlar -->
+    <!-- Ikki marta bosilganda paydo bo'ladigan yurak (KinoTOP4'dagi kabi) -->
+    <TextView
+        android:id="@+id/tvLikeBurst"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:shadowColor="#80000000"
+        android:shadowRadius="16"
+        android:text="♥"
+        android:textColor="#FFFF4D6D"
+        android:textSize="86sp"
+        android:visibility="gone" />
+
+    <!-- O'ng ustun: like + izoh + ulashish + ko'rishlar -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -121,6 +134,18 @@
             android:text="0"
             android:textColor="@color/white"
             android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/btnShare"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:contentDescription="@string/reels_share"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
+            android:padding="6dp"
+            android:text="↗"
+            android:textColor="@color/white"
+            android:textSize="26sp" />
 
         <TextView
             android:id="@+id/tvViews"
@@ -188,5 +213,54 @@
             android:maxLines="4"
             android:textColor="#F2FFFFFF"
             android:textSize="14sp" />
+
+        <!--
+          KinoTOP4'dagi CTA qatori: `movieUrl` bo'lsa "Kinoni ko'rish",
+          `adTitle`+`adUrl` bo'lsa sponsor plani. Ikkalasi ham bo'sh bo'lsa
+          qator butunlay ko'rinmaydi (oddiy foydachi reel'lari uchun).
+        -->
+        <LinearLayout
+            android:id="@+id/reelCtaRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="9dp"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/btnWatchMovie"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_classified_category_badge"
+                android:contentDescription="@string/reels_watch_movie"
+                android:foreground="?attr/selectableItemBackground"
+                android:paddingStart="11dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="11dp"
+                android:paddingBottom="6dp"
+                android:text="@string/reels_watch_movie"
+                android:textColor="@color/home_accent"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/btnAd"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_classified_category_badge_light"
+                android:ellipsize="end"
+                android:foreground="?attr/selectableItemBackground"
+                android:maxLines="1"
+                android:paddingStart="11dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="11dp"
+                android:paddingBottom="6dp"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
 </FrameLayout>

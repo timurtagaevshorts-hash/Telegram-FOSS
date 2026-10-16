@@ -54,4 +54,10 @@
     <string name="reels_comment_hours">%1$d soat oldin</string>
     <string name="reels_comment_days">%1$d kun oldin</string>
     <string name="reels_comment_months">%1$d oy oldin</string>
+
+    <!-- Ulashish va CTA (kino/sponsor) -->
+    <string name="reels_share">Ulashish</string>
+    <string name="reels_share_failed">Ulashish menyusi ochilmadi</string>
+    <string name="reels_link_failed">Havola ochilmadi</string>
+    <string name="reels_watch_movie">🎬 Kinoni ko\'rish</string>
 </resources>

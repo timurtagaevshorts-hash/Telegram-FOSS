@@ -1,15 +1,22 @@
 package uz.kodlikino.top4.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.view.GestureDetector
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -288,12 +295,109 @@ class ReelsAdapter(
         private val btnComments: TextView = itemView.findViewById(R.id.btnComments)
         private val tvCommentCount: TextView = itemView.findViewById(R.id.tvCommentCount)
         val tvViews: TextView = itemView.findViewById(R.id.tvViews)
+        private val btnShare: TextView = itemView.findViewById(R.id.btnShare)
+        private val tvLikeBurst: TextView = itemView.findViewById(R.id.tvLikeBurst)
+        private val reelCtaRow: LinearLayout = itemView.findViewById(R.id.reelCtaRow)
+        private val btnWatchMovie: TextView = itemView.findViewById(R.id.btnWatchMovie)
+        private val btnAd: TextView = itemView.findViewById(R.id.btnAd)
 
         var reel: Reel? = null
 
+        /**
+         * Bir bosish = play/pause, ikki bosish = like (KinoTOP4 xulqiyati).
+         * `onSingleTapUp` darhol ishga tushadi (kechikishsiz), ikkinchi bosishda
+         * play/pause ikki marta almashib asl holatiga qaytadi — like esa qo'shimcha
+         * ravishda amalga oshadi, xuddi Instagram/oldingi loyihadagi kabi.
+         */
+        private val tapDetector = GestureDetector(appContext, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onSingleTapUp(e: MotionEvent): Boolean {
+                togglePlay()
+                return true
+            }
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                likeFromDoubleTap()
+                return true
+            }
+        })
+
         init {
             playerView.useController = false
-            playerView.setOnClickListener { togglePlay() }
+            bindTouch()
+        }
+
+        /**
+         * Bosishlarni gesture detector orqali o'qiymiz.
+         * PlayerView `clickable` bo'lishi shart: aks holda u ACTION_DOWN'ni
+         * iste'mol qilmaydi va detector qolgan hodisalarni olmaydi.
+         * RecyclerView drag'ni keyin o'zi tortib oladi — vertikal scroll ishlaydi.
+         */
+        @SuppressLint("ClickableViewAccessibility")
+        private fun bindTouch() {
+            playerView.isClickable = true
+            playerView.setOnTouchListener { _, event ->
+                tapDetector.onTouchEvent(event)
+                true
+            }
+        }
+
+        private fun likeFromDoubleTap() {
+            val r = reel ?: return
+            val already = liked[r.id] ?: r.isLikedByMe
+            if (!already) {
+                liked[r.id] = true
+                likeShown[r.id] = (likeShown[r.id] ?: r.likeCount) + 1
+                refreshLikeUi()
+                onLikeToggle(r.id, true)
+            }
+            showLikeBurst()
+        }
+
+        private fun showLikeBurst() {
+            tvLikeBurst.animate().cancel()
+            tvLikeBurst.alpha = 1f
+            tvLikeBurst.scaleX = 1.15f
+            tvLikeBurst.scaleY = 1.15f
+            tvLikeBurst.visibility = View.VISIBLE
+            tvLikeBurst.animate()
+                .alpha(0f)
+                .scaleX(1.7f)
+                .scaleY(1.7f)
+                .setDuration(520L)
+                .withEndAction { tvLikeBurst.visibility = View.GONE }
+                .start()
+        }
+
+        /** Reel'ni tizim ulashish menyusiga chiqaradi (video URL + sarlavha). */
+        private fun shareReel() {
+            val r = reel ?: return
+            if (r.videoUrl.isBlank()) return
+            val header = r.title.ifBlank { appContext.getString(R.string.reels_title) }
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, "$header\n${r.videoUrl}")
+            }
+            try {
+                appContext.startActivity(
+                    Intent.createChooser(send, appContext.getString(R.string.reels_share))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } catch (_: Exception) {
+                Toast.makeText(appContext, R.string.reels_share_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        /** Tashqi havola (kino/sponsor) — brauzer yoki o'ynatuvchi o'zi tanlaydi. */
+        private fun openUrl(url: String) {
+            if (url.isBlank()) return
+            try {
+                appContext.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } catch (_: Exception) {
+                Toast.makeText(appContext, R.string.reels_link_failed, Toast.LENGTH_SHORT).show()
+            }
         }
 
         fun bind(reel: Reel) {
@@ -330,6 +434,28 @@ class ReelsAdapter(
             btnComments.setOnClickListener {
                 val r = this.reel ?: return@setOnClickListener
                 onOpenComments(r.id)
+            }
+            btnShare.setOnClickListener { shareReel() }
+            bindCta(reel)
+        }
+
+        /**
+         * KinoTOP4'dan ko'chirilgan CTA qatori: reel'da `movieUrl` bo'lsa
+         * "Kinoni ko'rish" tugmasi, `adTitle`+`adUrl` bo'lsa sponsor plani
+         * chiqadi. Ikkalasi ham bo'sh — qator ko'rinmaydi.
+         */
+        private fun bindCta(reel: Reel) {
+            val hasMovie = reel.movieUrl.isNotBlank()
+            val hasAd = reel.adTitle.isNotBlank() && reel.adUrl.isNotBlank()
+            btnWatchMovie.visibility = if (hasMovie) View.VISIBLE else View.GONE
+            btnAd.visibility = if (hasAd) View.VISIBLE else View.GONE
+            if (hasAd) btnAd.text = reel.adTitle
+            reelCtaRow.visibility = if (hasMovie || hasAd) View.VISIBLE else View.GONE
+            btnWatchMovie.setOnClickListener {
+                if (hasMovie) openUrl(reel.movieUrl)
+            }
+            btnAd.setOnClickListener {
+                if (hasAd) openUrl(reel.adUrl)
             }
         }
 
