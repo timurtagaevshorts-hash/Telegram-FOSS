@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fullscreen rasm ko'ruvchi saifasi — bir rasm butun ekranda, ZoomableImageView
+  bilan (pinch + ikki marta bosish). Fon qora: rasm chetlari ekran bilan "erib"
+  ketmasin va neon UI matnlari o'qilsin.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF000000">
+
+    <uz.kodlikino.top4.ui.ZoomableImageView
+        android:id="@+id/ivFullImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null" />
+
+    <ProgressBar
+        android:id="@+id/pbFullImage"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_gravity="center"
+        android:indeterminateTint="@color/home_accent"
+        android:visibility="gone" />
+</FrameLayout>

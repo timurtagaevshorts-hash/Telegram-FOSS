@@ -52,7 +52,7 @@
 <string name="classified_publish_failed">E\'lon joylanmadi</string>
 <string name="classified_published">E\'lon muvaffaqiyatli joylandi</string>
 <string name="classified_remove_image">Rasmni olib tashlash</string>
-<string name="classified_search_hint">Mahsulot yoki manzil bo\'yicha qidirish���</string>
+<string name="classified_search_hint">Mahsulot yoki manzil bo'yicha qidirish…</string>
 <string name="classified_share_friends">Do\'stlarga ulashish</string>
 <string name="classified_sign_in_required">E\'lon joylash uchun avval tizimga kiring</string>
 <string name="classified_theme_black">Qora</string>
@@ -66,7 +66,7 @@
 <string name="classified_upload_background_started">E\'lon fon rejimida yuklanmoqda. Profilda jarayonni kuzating.</string>
 <string name="classified_upload_progress_percent">%1$d%%</string>
 <string name="classified_upload_progress_title">Yuklanmoqda: %1$s</string>
-<string name="classified_upload_summary_progress">�Ϧ E\'lon yuklanmoqda: %1$d%% ��� boshqa amallarni davom ettirishingiz mumkin</string>
+<string name="classified_upload_summary_progress">E\'lon yuklanmoqda: %1$d%% — boshqa amallarni davom ettirishingiz mumkin</string>
 <string name="classified_user_blocked_cannot_message">Hisobingiz bloklangan. Xabar yuborib bo\'lmaydi</string>
 <string name="classified_user_blocked_cannot_post">Hisobingiz bloklangan. E\'lon joylay olmaysiz</string>
 <string name="home_board_post_promo_title">O\'z eloningizni joylashtiring — tez soting!</string>
@@ -76,4 +76,8 @@
 <string name="profile_my_classified_ads_empty_summary">E\'lon joylash uchun tugmani bosing</string>
 <!-- referenced by dialog_comment_auth.xml (Faza D) but must link now -->
 <string name="auth_phone_sign_in_button">Kirish</string>
+<!-- Fullscreen rasm ko'ruvchi (Faza D pariteti: KinoTOP4 ChatImageViewerDialog) -->
+<string name="classified_viewer_close">Yopish</string>
+<string name="classified_viewer_counter">%1$d / %2$d</string>
+<string name="classified_viewer_hint">Barmoqlarni yoying — yaqinlashtirish</string>
 </resources>

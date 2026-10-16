@@ -61,8 +61,12 @@ class ClassifiedAdDetailActivity(
     private var btnCall: MaterialButton? = null
     private var btnShareFriends: MaterialButton? = null
 
-    private val imageAdapter = ClassifiedAdDetailImageAdapter { _, _ ->
-        // Fullscreen ko'ruvchi Faza D'da qo'shiladi.
+    private val imageAdapter = ClassifiedAdDetailImageAdapter { urls, index ->
+        // Rasmga bosiladi — to'liq ekranli ko'ruvchi (KinoTOP4'dagi
+        // ChatImageViewerDialog pariteti). Yangi saifa ochiladi, dialog emas:
+        // shunda orqaga bosish Telegram'ning o'z stack'ini yopadi.
+        if (urls.isEmpty()) return@ClassifiedAdDetailImageAdapter
+        presentFragment(AdImageViewerActivity(urls, index), false)
     }
 
     private var scope: CoroutineScope? = null
