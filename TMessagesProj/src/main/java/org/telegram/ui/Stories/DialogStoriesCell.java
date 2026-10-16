@@ -530,6 +530,14 @@ public class DialogStoriesCell extends FrameLayout implements NotificationCenter
     @Override
     protected void dispatchDraw(Canvas canvas) {
         canvas.save();
+        // YuzGram: storylar doim KATTA (mini holatga yig'ilmaydi). Shuning uchun
+        // ro'yxat tepaga surilganda chat qatorlari storiyalar orqasidagi shaffof
+        // joydan ko'rinib qolmasin — hujayraga action bar bilan BIR XIL to'liq fon
+        // chizamiz (neyon mavzuda ikkalasi ham #0A1120 => chok ko'rinmaydi).
+        backgroundPaint.setColor(type == TYPE_DIALOGS
+                ? Theme.getColor(Theme.key_actionBarDefault)
+                : Theme.getColor(Theme.key_actionBarDefaultArchived));
+        canvas.drawRect(0, 0, getMeasuredWidth(), getMeasuredHeight(), backgroundPaint);
         if (clipTop > 0) {
             canvas.clipRect(0, clipTop, getMeasuredWidth(), getMeasuredHeight());
         }
