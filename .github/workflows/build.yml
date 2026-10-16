@@ -18,6 +18,12 @@ on:
 env:
   NDK_VERSION: 21.4.7075529
 
+# Bir branch'da yangi push kelganda eski (allaqachon keraksiz) run avtomatik
+# bekor qilinadi — CI daqiqlari va runner o'rinlari bo'shaydi.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     # Telegram-FOSS native + gradle build needs a full Linux toolchain.
