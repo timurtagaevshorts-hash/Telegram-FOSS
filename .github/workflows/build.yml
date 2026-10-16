@@ -11,6 +11,14 @@ on:
         options:
           - debug
           - release
+      clean_cache:
+        description: "Gradle build cache'ni chetlatish (toza kompilyatsiya)"
+        required: true
+        default: 'no'
+        type: choice
+        options:
+          - 'no'
+          - 'yes'
   push:
     branches: [ main, yuzgram-ci ]
   pull_request:
@@ -118,7 +126,15 @@ jobs:
             echo "YUZ_ABIS=$ABIS"
           } >> "$GITHUB_ENV"
           echo "Building $TASK (label: $LABEL, abis: $ABIS)"
-
+          # Gradle build cache: o'zgarmagan tasklarning output'i qayta
+          # ishlanmaydi. clean_cache=yes bo'lsa — butunlay chetlatiladi.
+          if [ "${{ github.event.inputs.clean_cache }}" = "yes" ]; then
+            echo "GRADLE_EXTRA=" >> "$GITHUB_ENV"
+            echo "gradle build cache BYPASSED"
+          else
+            echo "GRADLE_EXTRA=--build-cache" >> "$GITHUB_ENV"
+            echo "gradle build cache ENABLED"
+          fi
       - name: Restrict ABIs (debug=arm64 only, release=arm64+arm)
         run: |
           # App module: drop x86/x86_64 from packaging abiFilters
@@ -215,6 +231,22 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
+      # Gradle BUILD CACHE (~/.gradle/caches/build-cache-1) — kompilyatsiya
+      # vaqtini eng ko'p qisqartiradigan narsa: javac/kotlinc/dex tasklari
+      # input hash bo'yicha saqlanadi, o'zgarmagan fayllar qayta ishlanmaydi.
+      # MUHIM: kalit HAR run'da yangi (${github.run_id}), chunki actions/cache
+      # mavjud bir xil kalitni yangilamaydi — aks holda build cache hech
+      # qachon o'smas edi. restore-keys eng yangisini oladi.
+      - name: Cache gradle build cache
+        if: github.event.inputs.clean_cache != 'yes'
+        uses: actions/cache@v4
+        save-always: true
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: buildcache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            buildcache-${{ runner.os }}-
+
       - name: Prepare YuzGram release keystore (from secrets)
         env:
           KS_B64: ${{ secrets.YUZGRAM_KEYSTORE_B64 }}
@@ -240,7 +272,7 @@ jobs:
           fi
 
       - name: Build APK
-        run: ./gradlew --no-daemon "$GRADLE_TASK"
+        run: ./gradlew --no-daemon $GRADLE_EXTRA "$GRADLE_TASK"
 
       - name: Collect APKs
         run: |
