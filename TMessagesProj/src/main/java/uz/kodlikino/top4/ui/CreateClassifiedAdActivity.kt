@@ -21,6 +21,7 @@ import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
@@ -110,14 +111,9 @@ class CreateClassifiedAdActivity(
         }
 
         // Manzil: KinoTOP4'da joy tanlagich edi — bu yerda oddiy matn maydoni.
-        etAddress?.apply {
-            isFocusableInTouchMode = true
-            isFocusable = true
-            isClickable = true
-            cursorVisible = true
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-        }
+        // TextInputEditText allaqachon tahrirlanuvchan; faqat inputType'ni sozlaymiz.
+        etAddress?.inputType = android.text.InputType.TYPE_CLASS_TEXT or
+            android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
 
         val categoryLabels = ClassifiedAdCategories.all.map { "${it.emoji} ${it.label}" }
         spinnerCategory?.adapter = ArrayAdapter(
@@ -330,11 +326,6 @@ class CreateClassifiedAdActivity(
     private fun toast(resId: Int) {
         val ctx = themedContext ?: context ?: return
         Toast.makeText(ctx, resId, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun getString(resId: Int): String {
-        val ctx = themedContext ?: context ?: return ""
-        return ctx.getString(resId)
     }
 
     override fun onResume() {

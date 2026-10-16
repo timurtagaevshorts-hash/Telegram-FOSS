@@ -10,7 +10,7 @@ import org.telegram.messenger.UserConfig
 /**
  * YuzGram "elonlar" yozuvlari uchun Firebase Auth ko'prigi.
  *
- * Firestore/Storage qoidalari (`classified_ads` create/update, `classified_ads/{uid}/**`
+ * Firestore/Storage qoidalari (`classified_ads` create/update, `classified_ads/{uid}/...`
  * upload) `request.auth.uid == ownerUid` talab qiladi — ya'ni yozuv uchun Firebase Auth
  * sessiyasi kerak. YuzGram Telegram-only (TDLib) bo'lgani uchun Firebase Auth'ga
  * o'zi kirmaydi; shuning uchun Telegram identitetini (`telegramId`) deploy qilingan
