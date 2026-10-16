@@ -2692,6 +2692,42 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         return top + dp(10);
     }
 
+    /** Ustun pastki navigatsiya panelidan biroz yuqorida turadi. */
+    private int yuzChatRailBottomMargin() {
+        return uz.kodlikino.top4.ui.YuzGramBottomBar.height() + dp(8);
+    }
+
+    /** Ustundagi qalamcha / kamera plitalari bosilganda (pastki FABlar o'rniga). */
+    private void onYuzGramRailAction(int action) {
+        if (action == uz.kodlikino.top4.ui.YuzGramChatRail.ACTION_CAMERA) {
+            openYuzGramCamera();
+        } else {
+            openYuzGramCompose();
+        }
+    }
+
+    private void openYuzGramCompose() {
+        if (parentLayout != null && parentLayout.isInPreviewMode()) {
+            finishPreviewFragment();
+            return;
+        }
+        Bundle args = new Bundle();
+        args.putBoolean("destroyAfterSelect", true);
+        presentFragment(new ContactsActivity(args));
+    }
+
+    private void openYuzGramCamera() {
+        if (parentLayout != null && parentLayout.isInPreviewMode()) {
+            finishPreviewFragment();
+            return;
+        }
+        if (!storiesEnabled || dialogStoriesCell == null) {
+            openYuzGramCompose();
+            return;
+        }
+        dialogStoriesCell.openStoryRecorder();
+    }
+
     /**
      * YuzGram o'ng ustunini Telegram papkalari bilan sinxronlaydi: nomlar,
      * o'qilmaganlar soni, faol indeks va ko'rinish holati.
@@ -2722,14 +2758,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             return;
         }
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) yuzChatRail.getLayoutParams();
-        int top = yuzChatRailTopMargin();
-        if (lp != null && lp.topMargin != top) {
-            lp.topMargin = top;
+        int bottom = yuzChatRailBottomMargin();
+        int wantGravity = Gravity.RIGHT | Gravity.BOTTOM;
+        if (lp != null && (lp.gravity != wantGravity || lp.bottomMargin != bottom)) {
+            lp.gravity = wantGravity;
+            lp.bottomMargin = bottom;
             yuzChatRail.setLayoutParams(lp);
         }
-        // Ustun pastki bar va qalam FAB'iga tegmasin.
-        int railReserve = uz.kodlikino.top4.ui.YuzGramBottomBar.height() + dp(74);
-        int railMax = yuzChatRail.getResources().getDisplayMetrics().heightPixels - top - railReserve;
+        // Ustun pastdan yuqoriga o'sadi; tepada action bar / stories paneliga tegmasin.
+        int topReserve = yuzChatRailTopMargin();
+        int railMax = yuzChatRail.getResources().getDisplayMetrics().heightPixels - topReserve - bottom - dp(6);
         yuzChatRail.setMaxRailHeight(Math.max(dp(70), railMax));
         ArrayList<MessagesController.DialogFilter> filters = getMessagesController().getDialogFilters();
         int selected = 0;
@@ -5035,8 +5073,20 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             yuzChatRail.setListener(index -> selectYuzGramFilter(index));
             yuzChatRail.setOnAddFolder(() -> presentFragment(new FiltersSetupActivity()));
             yuzChatRail.setCounterProvider(this::yuzChatRailCounter);
-            contentView.addView(yuzChatRail, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.RIGHT | Gravity.TOP, 0, dp(72), dp(4), 0));
+            yuzChatRail.setActionListener(this::onYuzGramRailAction);
+            yuzChatRail.setActions(true, true);
+            contentView.addView(yuzChatRail, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.RIGHT | Gravity.BOTTOM, 0, 0, 0, yuzChatRailBottomMargin()));
             updateYuzGramChatRail(false);
+            // Pastki qalamcha + kamera FAB'larini olib tashlaymiz — ular ustun tepasiga ko'chdi.
+            if (floatingButtonContainer != null) {
+                contentView.removeView(floatingButtonContainer);
+            }
+            if (floatingButton2Container != null) {
+                contentView.removeView(floatingButton2Container);
+            }
+            if (storyHint != null) {
+                contentView.removeView(storyHint);
+            }
         }
 
         dialogStoriesCell = new DialogStoriesCell(context, this, currentAccount, isArchive() ? DialogStoriesCell.TYPE_ARCHIVE : DialogStoriesCell.TYPE_DIALOGS) {

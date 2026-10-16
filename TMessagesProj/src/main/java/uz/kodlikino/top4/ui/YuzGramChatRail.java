@@ -67,6 +67,16 @@ public class YuzGramChatRail extends View {
     private static final int GLYPH_BOT = 4;
     private static final int GLYPH_ARCHIVE = 5;
     private static final int GLYPH_LIST = 6;
+    private static final int GLYPH_PENCIL = 7;
+    private static final int GLYPH_CAMERA = 8;
+
+    /** Yuqoridagi amaliyot plitalari (pastki FAB'lardan ko'chirilgan). */
+    public static final int ACTION_COMPOSE = 0;
+    public static final int ACTION_CAMERA = 1;
+
+    public interface ActionListener {
+        void onActionClicked(int action);
+    }
 
     public interface Listener {
         /** @param index getDialogFilters() bo'yicha indeks */
@@ -91,6 +101,8 @@ public class YuzGramChatRail extends View {
     private final android.text.TextPaint textPaint = new android.text.TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
     private final Path path = new Path();
+    // Yarim-doira (o'ng tomoni tekis) shakli uchun burchak radiuslari (qayta alloc qilmaslik uchun).
+    private final float[] cornerRadii = new float[8];
 
     private ArrayList<MessagesController.DialogFilter> filters = new ArrayList<>();
     private CounterProvider counterProvider;
@@ -98,6 +110,9 @@ public class YuzGramChatRail extends View {
     private Runnable addFolderAction;
     private int selectedIndex = 0;
     private Listener listener;
+    private ActionListener actionListener;
+    private boolean showCompose, showCamera;
+    private int pressAction = -1;
 
     private float scrollY = 0f;
     private float contentHeight = 0f;
@@ -153,6 +168,65 @@ public class YuzGramChatRail extends View {
 
     public void setCounterProvider(CounterProvider p) {
         counterProvider = p;
+    }
+
+    public void setActionListener(ActionListener l) {
+        actionListener = l;
+    }
+
+    /** Yuqoridagi amaliyot plitalarini (pencil/kamera) ko'rsatishni boshqaradi. */
+    public void setActions(boolean compose, boolean camera) {
+        if (showCompose == compose && showCamera == camera) {
+            return;
+        }
+        showCompose = compose;
+        showCamera = camera;
+        requestLayout();
+        invalidate();
+    }
+
+    private int actionCount() {
+        return (showCompose ? 1 : 0) + (showCamera ? 1 : 0);
+    }
+
+    /** Papkalardan yuqoridagi qat'iy (aylanmaydigan) amaliyot sarlavhasi + tepa bo'shliq. */
+    private float topInset() {
+        return dp(V_PAD_DP) + actionCount() * itemHeight();
+    }
+
+    /** Ko'rinadigan slot (0..) ni haqiqiy amaliyot turiga aylantiradi. */
+    private int actionTypeAt(int slot) {
+        int idx = 0;
+        if (showCompose) {
+            if (slot == idx) return ACTION_COMPOSE;
+            idx++;
+        }
+        if (showCamera) {
+            if (slot == idx) return ACTION_CAMERA;
+            idx++;
+        }
+        return -1;
+    }
+
+    /** y sarvisi sarlavhadagi amaliyot plitasiga tegishli bo'lsa slot qaytaradi, aksincha -1. */
+    private int actionSlotAt(float y) {
+        int ac = actionCount();
+        if (ac == 0) {
+            return -1;
+        }
+        float top = dp(V_PAD_DP);
+        if (y < top) {
+            return -1;
+        }
+        int a = (int) ((y - top) / itemHeight());
+        if (a < 0 || a >= ac) {
+            return -1;
+        }
+        float local = y - (top + a * itemHeight());
+        if (local > itemHeight() - dp(2f)) {
+            return -1;
+        }
+        return a;
     }
 
     /**
@@ -234,7 +308,7 @@ public class YuzGramChatRail extends View {
     }
 
     private float totalContentHeight() {
-        return dp(V_PAD_DP) + dp(V_PAD_BOTTOM_DP) + itemCount() * itemHeight();
+        return topInset() + dp(V_PAD_BOTTOM_DP) + itemCount() * itemHeight();
     }
 
     private float maxScroll() {
@@ -245,7 +319,7 @@ public class YuzGramChatRail extends View {
         if (getHeight() == 0) {
             return;
         }
-        float top = dp(V_PAD_DP) + index * itemHeight();
+        float top = topInset() + index * itemHeight();
         float bottom = top + itemHeight();
         float m = maxScroll();
         if (top - scrollY < 0) {
@@ -288,26 +362,49 @@ public class YuzGramChatRail extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
-        if (filters.isEmpty() || getWidth() == 0 || getHeight() == 0) {
+        if ((filters.isEmpty() && actionCount() == 0) || getWidth() == 0 || getHeight() == 0) {
             return;
         }
         float w = getWidth();
         float h = getHeight();
-        float inset = dp(4);
-        rect.set(inset, inset, w - inset, h - inset);
-        float radius = (rect.width()) / 2f;
-        canvas.drawRoundRect(rect, radius, radius, bgPaint);
-        canvas.drawRoundRect(rect, radius, radius, strokePaint);
+        float inset = dp(3);
+        // Shakl: o'ng tomoni TEKIS (ekran chekkasiga yopishgan), chap tomoni
+        // yarim-doira kabi botiq (yuqori va pastki chap burchaklar = w/2 radius).
+        rect.set(inset, inset, w - dp(1f), h - inset);
+        float radius = rect.width() / 2f;
+        // radii tartibi: top-left, top-right, bottom-right, bottom-left (har biri x,y)
+        cornerRadii[0] = radius; cornerRadii[1] = radius; // top-left  (dumaloq)
+        cornerRadii[2] = 0f;      cornerRadii[3] = 0f;     // top-right (tekis)
+        cornerRadii[4] = 0f;      cornerRadii[5] = 0f;     // bottom-right (tekis)
+        cornerRadii[6] = radius;  cornerRadii[7] = radius; // bottom-left (dumaloq)
+        path.reset();
+        path.addRoundRect(rect, cornerRadii, Path.Direction.CW);
+        canvas.drawPath(path, bgPaint);
+        canvas.drawPath(path, strokePaint);
+
+        int clipSave = canvas.save();
+        canvas.clipPath(path);
 
         float cxBase = w / 2f;
-        int n = itemCount();
         float amp = dp(3.2f);
-        // Elementlar (va badgilar) doim panel ichida qolishi uchun iqlimlaymiz.
-        int clipSave = canvas.save();
-        canvas.clipRect(inset, inset, w - inset, h - inset);
+
+        // 1) Yuqoridagi amaliyot plitalari (qalamcha + kamera) — qat'iy, aylanmaydi.
+        int ac = actionCount();
+        for (int a = 0; a < ac; a++) {
+            float cy = dp(V_PAD_DP) + a * itemHeight() + itemHeight() / 2f;
+            drawAction(canvas, actionTypeAt(a), cxBase, cy, dp(CIRCLE_DP));
+        }
+
+        // 2) Papkalar — amaliyot sarlavhasidan pastda, ichida aylantiriladi.
+        //    Aylantirilganda sarlavhadagi plitalar ustiga chiqmasligi uchun
+        //    faqat topInset() dan pastga qirqamiz.
+        int n = itemCount();
+        int folderClip = canvas.save();
+        canvas.clipRect(inset, topInset(), w - inset, h - inset);
+        float folderTop0 = topInset() - scrollY;
         for (int i = 0; i < n; i++) {
-            float top = dp(V_PAD_DP) + i * itemHeight() - scrollY;
-            if (top + itemHeight() < inset || top > h - inset + itemHeight()) {
+            float top = folderTop0 + i * itemHeight();
+            if (top + itemHeight() < topInset() || top > h - inset + itemHeight()) {
                 continue;
             }
             float cy = top + itemHeight() / 2f;
@@ -317,7 +414,33 @@ public class YuzGramChatRail extends View {
             float cx = cxBase - amp * s;
             drawItem(canvas, i, cx, cy, dp(CIRCLE_DP), i == selectedIndex);
         }
+        canvas.restoreToCount(folderClip);
         canvas.restoreToCount(clipSave);
+    }
+
+    /**
+     * Yuqoridagi amaliyot plitasi: papkalardek doira ichida pencil/kamera ikonkasi.
+     * Bosilganda actionListener orqali DialogsActivity ga xabar beriladi.
+     */
+    private void drawAction(Canvas canvas, int action, float cx, float cy, float d) {
+        float r = d / 2f;
+        float scale = pressAction == action ? 0.9f : 1f;
+        canvas.save();
+        canvas.scale(scale, scale, cx, cy);
+        fillPaint.setColor(INACTIVE_FILL);
+        canvas.drawCircle(cx, cy, r, fillPaint);
+        strokePaint.setColor(INACTIVE_STROKE);
+        canvas.drawCircle(cx, cy, r, strokePaint);
+        strokePaint.setColor(BORDER);
+        iconPaint.setColor(ICON_IDLE);
+        float glyph = d * 0.56f;
+        float gcy = cy;
+        if (action == ACTION_CAMERA) {
+            drawCamera(canvas, cx, gcy, glyph);
+        } else {
+            drawPencil(canvas, cx, gcy, glyph);
+        }
+        canvas.restore();
     }
 
     private void drawItem(Canvas canvas, int index, float cx, float cy, float d, boolean active) {
@@ -472,6 +595,39 @@ public class YuzGramChatRail extends View {
         canvas.drawLine(cx, cy - s * 0.85f, cx, cy + s * 0.85f, iconPaint);
     }
 
+    /** Qalamcha (yangi xabar) ikonkasi — diagonal qalam. */
+    private void drawPencil(Canvas canvas, float cx, float cy, float size) {
+        float s = size / 2f;
+        // korpus (diagonal)
+        canvas.drawLine(cx - s * 0.55f, cy + s * 0.55f, cx + s * 0.5f, cy - s * 0.5f, iconPaint);
+        // uch qismi (kichik uchburchak)
+        path.reset();
+        path.moveTo(cx - s * 0.78f, cy + s * 0.78f);
+        path.lineTo(cx - s * 0.55f, cy + s * 0.28f);
+        path.lineTo(cx - s * 0.05f, cy + s * 0.78f);
+        path.close();
+        canvas.drawPath(path, iconPaint);
+        // orqasi (ochirg'ich chiziq)
+        canvas.drawLine(cx + s * 0.28f, cy - s * 0.78f, cx + s * 0.78f, cy - s * 0.28f, iconPaint);
+    }
+
+    /** Kamera (story) ikonkasi — korp + linza + tepa chiqindisi. */
+    private void drawCamera(Canvas canvas, float cx, float cy, float size) {
+        float s = size / 2f;
+        // tepa chiqindisi (vizir)
+        path.reset();
+        path.moveTo(cx - s * 0.35f, cy - s * 0.5f);
+        path.lineTo(cx - s * 0.18f, cy - s * 0.78f);
+        path.lineTo(cx + s * 0.22f, cy - s * 0.78f);
+        path.lineTo(cx + s * 0.38f, cy - s * 0.5f);
+        canvas.drawPath(path, iconPaint);
+        // korpus
+        rect.set(cx - s * 0.85f, cy - s * 0.5f, cx + s * 0.85f, cy + s * 0.72f);
+        canvas.drawRoundRect(rect, s * 0.24f, s * 0.24f, iconPaint);
+        // linza
+        canvas.drawCircle(cx, cy + s * 0.12f, s * 0.34f, iconPaint);
+    }
+
     private void drawGlyph(Canvas canvas, int type, float cx, float cy, float size) {
         float s = size / 2f;
         switch (type) {
@@ -551,7 +707,7 @@ public class YuzGramChatRail extends View {
     }
 
     private int indexAt(float y) {
-        float top = dp(V_PAD_DP) - scrollY;
+        float top = topInset() - scrollY;
         if (y < top) {
             return -1;
         }
@@ -568,7 +724,7 @@ public class YuzGramChatRail extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (filters.isEmpty()) {
+        if (filters.isEmpty() && actionCount() == 0) {
             return false;
         }
         switch (event.getActionMasked()) {
@@ -581,6 +737,13 @@ public class YuzGramChatRail extends View {
                 downY = event.getY();
                 downScroll = scrollY;
                 dragging = false;
+                int slot = actionSlotAt(downY);
+                if (slot >= 0) {
+                    pressAction = slot;
+                    pressIndex = -1;
+                    invalidate();
+                    return true;
+                }
                 int i = indexAt(downY);
                 if (i >= 0) {
                     pressIndex = i;
@@ -590,6 +753,14 @@ public class YuzGramChatRail extends View {
             }
             case MotionEvent.ACTION_MOVE: {
                 float dy = event.getY() - downY;
+                if (pressAction >= 0) {
+                    // Sarlavhadagi plitadan boshlangan bosim aylantirmaydi.
+                    if (Math.abs(dy) > dp(10f)) {
+                        pressAction = -1;
+                        invalidate();
+                    }
+                    return true;
+                }
                 if (!dragging && Math.abs(dy) > dp(6f) && maxScroll() > 0) {
                     dragging = true;
                     pressIndex = -1;
@@ -602,20 +773,30 @@ public class YuzGramChatRail extends View {
             }
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL: {
+                boolean wasAction = pressAction >= 0;
+                int actionSlot = pressAction;
+                pressAction = -1;
                 pressIndex = -1;
                 if (!dragging && event.getActionMasked() == MotionEvent.ACTION_UP) {
-                    int i = indexAt(event.getY());
-                    if (i >= 0 && i == filters.size() && addTile && addFolderAction != null) {
-                        addFolderAction.run();
-                    } else if (i >= 0 && i < filters.size()) {
-                        MessagesController.DialogFilter f = filters.get(i);
-                        if (f != null && f.locked) {
-                            shake();
-                        } else {
-                            selectedIndex = i;
-                            ensureVisible(i);
-                            if (listener != null) {
-                                listener.onFolderSelected(i);
+                    if (wasAction) {
+                        int type = actionTypeAt(actionSlot);
+                        if (actionListener != null && type >= 0) {
+                            actionListener.onActionClicked(type);
+                        }
+                    } else {
+                        int i = indexAt(event.getY());
+                        if (i >= 0 && i == filters.size() && addTile && addFolderAction != null) {
+                            addFolderAction.run();
+                        } else if (i >= 0 && i < filters.size()) {
+                            MessagesController.DialogFilter f = filters.get(i);
+                            if (f != null && f.locked) {
+                                shake();
+                            } else {
+                                selectedIndex = i;
+                                ensureVisible(i);
+                                if (listener != null) {
+                                    listener.onFolderSelected(i);
+                                }
                             }
                         }
                     }
