@@ -47,12 +47,12 @@ public class YuzGramBottomBar extends View {
     private static final int[] TAB_SLOT = {0, 2, 3};
 
     // Neon palitra (YuzGram brendi)
-    private static final int SURFACE = 0xFF0A1120;      // chuqur to'q-ko'k sirt
-    private static final int BORDER = 0x662AA7FF;       // ko'k neon border
-    private static final int GLOW_BLUE = 0xAA2AA7FF;    // tashqi nur
-    private static final int FAB_START = 0xFF8A5CFF;    // binafsha
-    private static final int FAB_END = 0xFF2AA7FF;      // ko'k
-    private static final int ACTIVE = 0xFF35C2FF;       // faol ikon/matn
+    private static final int SURFACE = 0xFF0A1120;      // chuqur to'q-ko'k sirt (Elonlar home_bg bilan bir xil)
+    private static final int BORDER = 0x662AABEE;       // brend-ko'k neon border (#2AABEE)
+    private static final int GLOW_BLUE = 0xAA2AABEE;    // tashqi nur (#2AABEE)
+    private static final int FAB_START = 0xFF8A5CFF;    // binafsha (home_accent_purple)
+    private static final int FAB_END = 0xFF2AABEE;      // brend-ko'k (chat/Profil/Elonlar bilan bir xil)
+    private static final int ACTIVE = 0xFF2AABEE;       // faol ikon/matn (brend-ko'k)
     private static final int INACTIVE = 0xFF6B7794;     // o'chiq ikon/matn
 
     private final Paint surfacePaint = new Paint(Paint.ANTI_ALIAS_FLAG);

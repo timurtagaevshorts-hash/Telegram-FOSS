@@ -1,27 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  YuzGram "Elonlar" palitrasi — MAJBURIY qorong'i neon.
+  Qasddan `values/` (yorug' konfiguratsiya) ham qorong'i: shunda telefon tizimi
+  yorug' rejimda bo'lsa ham Elonlar ekranlari doimiy qorong'i neon ko'rinishida
+  qoladi va pastdagi neon navigatsiya bari bilan bir xil "effect"ga ega bo'ladi.
+  Aksent bitta brend-ko'k (#2AABEE, Telegram'ning o'z ko'ki = chat/Profil bilan mos),
+  ikkilamchi binafsha (#8B5CFF = bar FAB'ining binafsasi).
+-->
 <resources>
-<color name="text_primary">#FFFFFF</color>
-<color name="text_secondary">#707579</color>
-<color name="primary">#2AABEE</color>
-<color name="home_accent">#8B5CFF</color>
-<color name="home_accent_purple">#A855F7</color>
-<color name="home_card">#FFFFFF</color>
-<color name="modern_border">#E5E5EA</color>
-<color name="modern_surface">#F4F4F5</color>
-<color name="modern_surface_high">#EFEFF4</color>
-<color name="surface_elevated">#FFFFFF</color>
-<color name="classified_field_bg">#FFFFFF</color>
-<color name="classified_field_stroke">#D8DEE8</color>
-<color name="classified_card_default_bg">#FFFFFF</color>
-<color name="classified_card_default_stroke">#D0D7E2</color>
-<color name="classified_price_gold">#C77800</color>
-<color name="text_hint">#8E8E93</color>
-<color name="text_on_gold">#1A1A1A</color>
-<color name="white">#FFFFFFFF</color>
-<!-- referenced by copied drawables (bg_home_main, bg_chat_room_gradient, bg_chat_nav_new_badge, ic_channel, ic_verified) -->
-<color name="home_bg">#FFFFFF</color>
-<color name="chat_bg_top">#0E1621</color>
-<color name="nav_chat_active">#A855F7</color>
-<color name="telegram_white">#FFFFFF</color>
-<color name="telegram_blue">#2AABEE</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#95A1B4</color>
+
+    <!-- Brend aksentlari (bar bilan bitta) -->
+    <color name="primary">#2AABEE</color>
+    <color name="home_accent">#2AABEE</color>
+    <color name="home_accent_purple">#8B5CFF</color>
+
+    <!-- Sirtlar: bar yuzasi #0A1120 atrofida to'q ko'k-keymish -->
+    <color name="home_card">#0D121D</color>
+    <color name="modern_border">#202B3C</color>
+    <color name="modern_surface">#0A1120</color>
+    <color name="modern_surface_high">#0D121D</color>
+    <color name="surface_elevated">#121925</color>
+
+    <!-- Input maydonlari / kartalar -->
+    <color name="classified_field_bg">#121824</color>
+    <color name="classified_field_stroke">#26FFFFFF</color>
+    <color name="classified_card_default_bg">#0E141E</color>
+    <color name="classified_card_default_stroke">#1CFFFFFF</color>
+    <color name="classified_price_gold">#FFD84D</color>
+
+    <color name="text_hint">#5E6F84</color>
+    <color name="text_on_gold">#1A1A1A</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- Fond -->
+    <color name="home_bg">#0A1120</color>
+    <color name="chat_bg_top">#0A1120</color>
+    <color name="nav_chat_active">#8B5CFF</color>
+    <color name="telegram_white">#FFFFFF</color>
+    <color name="telegram_blue">#2AABEE</color>
 </resources>
