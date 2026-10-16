@@ -4601,12 +4601,17 @@ public class Theme {
         themeInfo.previewBackgroundColor = 0xff0a1120;
         themeInfo.previewInColor = 0xff121925;
         themeInfo.previewOutColor = 0xff16324d;
-        themeInfo.firstAccentIsDefault = true;
-        themeInfo.currentAccentId = DEFALT_THEME_ACCENT_ID;
+        // MUHIM: firstAccentIsDefault=FALSE. Bu true bo'lsa + accent 99
+        // bo'lsa, Theme `currentTheme == defaultTheme` va loadWallpaper'dagi
+        // `firstAccentIsDefault && accent==99` shortcut'lari orqali ranglarni
+        // yorug' defaultColors/default-gradient'ga qaytaradi (chat ro'yxati OQ
+        // bo'lib qolardi). false => neon to'liq CUSTOM mavzu: hamma rang
+        // yuzgram_neon.attheme'dan o'qiladi.
+        themeInfo.firstAccentIsDefault = false;
+        themeInfo.currentAccentId = 0;
         themeInfo.sortIndex = 0;
         // Kamida id=0 (accentBaseColor shu orqali o'qiladi) va id=99
-        // (firstAccentIsDefault => DEFALT_THEME_ACCENT_ID=99 kutiladi) bo'lishi shart,
-        // aks holda applyTheme'da themeAccentsMap.get(...) null → NPE (LaunchActivity crash).
+        // bo'lishi shart, aks holda applyTheme'da themeAccentsMap.get(...) null → NPE.
         themeInfo.setAccentColorOptions(
                 new int[]{0xFF2AABEE, 0xFF2AABEE},
                 null, null, null, null, null, null,
@@ -4615,8 +4620,14 @@ public class Theme {
         sortAccents(themeInfo);
         themes.add(themeInfo);
         themesDict.put("YuzGram Neon", themeInfo);
-        // Neon mavzuni standart, kunduzgi va tungi mavzu qilamiz (chat/Profil shu bo'ladi).
-        defaultTheme = currentDayTheme = currentNightTheme = themeInfo;
+        // Neon mavzuni kunduzgi va tungi mavzu qilamiz (chat/Profil shu bo'ladi).
+        // MUHIM: defaultTheme'ni O'ZGARTIRMAYMIZ. getColor() ichida
+        // `if (currentTheme == defaultTheme)` bloki mavzuning o'z ranglarini
+        // e'borib yuborib, firstAccentIsDefault + default accent bo'lsa
+        // yorug' defaultColors'ni qaytaradi (windowBackgroundWhite => OQ).
+        // Neon defaultTheme bo'lmasa, shu shortcut chetlanadi va haqiqiy
+        // qora-neon ranglari o'qiladi.
+        currentDayTheme = currentNightTheme = themeInfo;
 
         themeInfo = new ThemeInfo();
         themeInfo.name = "Arctic Blue";
@@ -4960,7 +4971,8 @@ public class Theme {
         // ham forceYuzGramTheme orqali buriladi.
         ThemeInfo yuzGramNeon = themesDict.get("YuzGram Neon");
         if (yuzGramNeon != null) {
-            defaultTheme = yuzGramNeon;
+            // defaultTheme'ga tegmaymiz (yqoridagi izohga qarang) — aks holda
+            // getColor yorug' defaultColors'ga qaytadi.
             currentDayTheme = yuzGramNeon;
             currentNightTheme = yuzGramNeon;
             applyingTheme = yuzGramNeon;
