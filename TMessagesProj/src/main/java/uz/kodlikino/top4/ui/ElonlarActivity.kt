@@ -9,7 +9,9 @@ import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -19,6 +21,11 @@ import com.google.android.material.chip.ChipGroup
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import org.telegram.messenger.UserConfig
@@ -27,6 +34,7 @@ import uz.kodlikino.top4.ClassifiedAdsAdapter
 import uz.kodlikino.top4.models.ClassifiedAd
 import uz.kodlikino.top4.models.ClassifiedAdCategories
 import uz.kodlikino.top4.utils.ClassifiedAdRepository
+import uz.kodlikino.top4.utils.YuzGramAdsAuth
 
 /**
  * "Elonlar" (classifieds) bo'limi — YuzGram pastki navigatsiyasining 2-tab'i.
@@ -34,8 +42,8 @@ import uz.kodlikino.top4.utils.ClassifiedAdRepository
  * Telegram BaseFragment ichiga Material tema (ContextThemeWrapper) ostida joylashtirilgan.
  * Pastki bar LaunchActivity darajasida (doimiy) — bu ekran o'z barini qo'shmaydi.
  *
- * Faza C (bu bosqich): feed + dizayn to'liq ishlaydi. Detail/Create ekranlari
- * Faza D'da qo'shiladi — hozircha bosilganda "tez orada" ko'rsatiladi.
+ * Faza C: feed + dizayn. Faza D: detail + "E'lon berish" (yaratish/tahrirlash).
+ * Faza E: "Mening e'lonlarim" rejimi + kartochkadan tahrirlash/o'chirish.
  */
 class ElonlarActivity : BaseFragment() {
 
@@ -47,6 +55,7 @@ class ElonlarActivity : BaseFragment() {
     private var adsAppBar: View? = null
     private var searchContainer: View? = null
     private var filterPanel: LinearLayout? = null
+    private var btnMyAds: TextView? = null
     private var etSearchKeyword: EditText? = null
     private var etFilterMinPrice: TextInputEditText? = null
     private var etFilterMaxPrice: TextInputEditText? = null
@@ -54,19 +63,21 @@ class ElonlarActivity : BaseFragment() {
 
     private val adapter = ClassifiedAdsAdapter(
         onAdClick = { openDetail(it) },
-        onEditClick = { openSoon() },
-        onDeleteClick = { }
+        onEditClick = { openEdit(it) },
+        onDeleteClick = { confirmDelete(it) }
     )
 
     private var adsListener: ListenerRegistration? = null
     private var themedContext: Context? = null
     private var allAds: List<ClassifiedAd> = emptyList()
     private var selectedCategory: String? = null
+    private var mineOnly = false
     private var searchQuery = ""
     private var filterMinPrice: Long? = null
     private var filterMaxPrice: Long? = null
     private var filterLocation = ""
     private val feedShuffleSeed = System.currentTimeMillis()
+    private var scope: CoroutineScope? = null
 
     private fun currentUid(): String {
         val id = UserConfig.getInstance(currentAccount).clientUserId
@@ -92,6 +103,7 @@ class ElonlarActivity : BaseFragment() {
         chipGroup = root.findViewById(R.id.chipGroupCategories)
         searchContainer = root.findViewById(R.id.adsSearchContainer)
         filterPanel = root.findViewById(R.id.filterPanel)
+        btnMyAds = root.findViewById(R.id.btnMyAds)
         etSearchKeyword = root.findViewById(R.id.etSearchKeyword)
         etFilterMinPrice = root.findViewById(R.id.etFilterMinPrice)
         etFilterMaxPrice = root.findViewById(R.id.etFilterMaxPrice)
@@ -144,9 +156,29 @@ class ElonlarActivity : BaseFragment() {
 
         root.findViewById<ExtendedFloatingActionButton>(R.id.fabPostAd)?.setOnClickListener { openCreate() }
 
+        btnMyAds?.setOnClickListener {
+            mineOnly = !mineOnly
+            updateMyAdsButton()
+            startAdsListener()
+        }
+        updateMyAdsButton()
+
         swipeRefresh?.setOnRefreshListener { startAdsListener() }
 
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         return root
+    }
+
+    /** "Mening e'lonlarim" tugmasining holati — yoqilganda neon ko'k, o'chganda kulrang. */
+    private fun updateMyAdsButton() {
+        val btn = btnMyAds ?: return
+        if (mineOnly) {
+            btn.setBackgroundResource(R.drawable.bg_classified_my_ads_active)
+            btn.setTextColor(android.graphics.Color.WHITE)
+        } else {
+            btn.setBackgroundResource(R.drawable.bg_classified_search_bar)
+            btn.setTextColor(0xFF8B92A8.toInt())
+        }
     }
 
     private fun openDetail(ad: ClassifiedAd) {
@@ -161,6 +193,45 @@ class ElonlarActivity : BaseFragment() {
     private fun openSoon() {
         val ctx = parentActivity ?: context ?: return
         Toast.makeText(ctx, "Bu bo'lim tez orada qo'shiladi", Toast.LENGTH_SHORT).show()
+    }
+
+    /** Faza E: kartochkadagi qalam — e'lonni tahrirlash (CreateClassifiedAd edit rejimi). */
+    private fun openEdit(ad: ClassifiedAd) {
+        presentFragment(CreateClassifiedAdActivity(ad.id), false)
+    }
+
+    /** Faza E: kartochkadagi chiqindiy qutisi — tasdiqlab o'chirish. */
+    private fun confirmDelete(ad: ClassifiedAd) {
+        val themed = themedContext ?: context ?: return
+        val title = if (ad.title.isBlank()) ad.model else ad.title
+        AlertDialog.Builder(themed)
+            .setTitle("E'lonni o'chirish")
+            .setMessage("\"$title\" o'chirilsinmi? Bu amalni qaytarib bo'lmaydi.")
+            .setNegativeButton("Bekor qilish", null)
+            .setPositiveButton("O'chirish") { _, _ -> deleteAd(ad) }
+            .show()
+    }
+
+    private fun deleteAd(ad: ClassifiedAd) {
+        val s = scope ?: return
+        val account = currentAccount
+        s.launch {
+            try {
+                // Firestore qoidasi: o'chirish faqat tashabbus egasiga ruxsat beradi,
+                // shuning uchun avval Telegram identiteti Firebase sessiyasiga almashtiriladi.
+                YuzGramAdsAuth.ensureSignedIn(account)
+                ClassifiedAdRepository.deleteAd(ad.id)
+                Toast.makeText(
+                    parentActivity ?: context ?: return@launch,
+                    "E'lon o'chirildi", Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    parentActivity ?: context ?: return@launch,
+                    "O'chirib bo'lmadi: ${e.message}", Toast.LENGTH_LONG
+                ).show()
+            }
+        }
     }
 
     private fun setupCategoryChips(context: Context) {
@@ -201,13 +272,32 @@ class ElonlarActivity : BaseFragment() {
         progressBar?.visibility = View.VISIBLE
         adapter.setMyUid(currentUid())
         // Firestore snapshot listener Android'da default main-thread'da yetkazadi.
+        if (mineOnly) {
+            val uid = currentUid()
+            if (uid.isBlank()) {
+                progressBar?.visibility = View.GONE
+                swipeRefresh?.isRefreshing = false
+                allAds = emptyList()
+                applyFilter()
+                return
+            }
+            adsListener = ClassifiedAdRepository.listenUserAds(uid) { ads ->
+                if (fragmentView == null) return@listenUserAds
+                onAdsReceived(ads)
+            }
+            return
+        }
         adsListener = ClassifiedAdRepository.listenActiveAds(shuffleForFeed = false) { ads ->
             if (fragmentView == null) return@listenActiveAds
-            progressBar?.visibility = View.GONE
-            swipeRefresh?.isRefreshing = false
-            allAds = ads
-            applyFilter()
+            onAdsReceived(ads)
         }
+    }
+
+    private fun onAdsReceived(ads: List<ClassifiedAd>) {
+        progressBar?.visibility = View.GONE
+        swipeRefresh?.isRefreshing = false
+        allAds = ads
+        applyFilter()
     }
 
     private fun applyFilter() {
@@ -249,5 +339,13 @@ class ElonlarActivity : BaseFragment() {
         adsListener?.remove()
         adsListener = null
         super.onPause()
+    }
+
+    override fun onFragmentDestroy() {
+        adsListener?.remove()
+        adsListener = null
+        scope?.cancel()
+        scope = null
+        super.onFragmentDestroy()
     }
 }
