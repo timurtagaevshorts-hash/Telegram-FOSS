@@ -261,7 +261,9 @@ class ElonlarActivity : BaseFragment() {
         val accent = androidx.core.content.ContextCompat.getColor(context, R.color.primary)
         val surface = androidx.core.content.ContextCompat.getColor(context, R.color.home_card)
         val muted = androidx.core.content.ContextCompat.getColor(context, R.color.text_secondary)
-        val density = resources.displayMetrics.density
+        // BaseFragment — View emas (oddiy abstract klass), shuning uchun `resources`
+        // yoki `requireContext()` bu yerda yo'q: parametr kelgan Context ishlatiladi.
+        val density = context.resources.displayMetrics.density
         fun addPill(label: String, id: String?, checked: Boolean) {
             val chip = Chip(context).apply {
                 text = label

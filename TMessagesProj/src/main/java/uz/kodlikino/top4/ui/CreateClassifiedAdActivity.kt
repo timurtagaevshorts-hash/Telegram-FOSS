@@ -302,8 +302,12 @@ class CreateClassifiedAdActivity(
         s.launch {
             try {
                 val uid = YuzGramAdsAuth.ensureSignedIn(account)
+                // Siqish ContentResolver talab qiladi — fragment attach bo'lmasa
+                // ham ishlashi uchun ApplicationLoader'ga fallback.
+                val uploadContext = themedContext ?: context
+                    ?: org.telegram.messenger.ApplicationLoader.applicationContext
                 val uploaded = ClassifiedAdStorageHelper.uploadImages(
-                    uid, adId, localUris
+                    uploadContext, uid, adId, localUris
                 ) { pct, done, total ->
                     uploadProgress?.progress = pct
                     tvUploadStatus?.text =

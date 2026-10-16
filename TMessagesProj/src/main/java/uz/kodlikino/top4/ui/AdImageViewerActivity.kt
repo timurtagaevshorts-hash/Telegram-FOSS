@@ -36,7 +36,9 @@ import org.telegram.ui.ActionBar.BaseFragment
  */
 class AdImageViewerActivity(
     urls: List<String>,
-    startIndex: Int,
+    // `val` shart: createView() ichida ham ishlatiladi, konstructor parametri
+    // property bo'lmasa klass a'zosi sifatida ko'rinmaydi (compile xatosi).
+    private val startIndex: Int,
 ) : BaseFragment() {
 
     private val images: List<String> = urls.filter { it.isNotBlank() }

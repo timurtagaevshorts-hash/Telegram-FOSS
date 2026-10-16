@@ -1,7 +1,7 @@
 package uz.kodlikino.top4.utils
 
 import android.util.Log
-import com.google.android.gms.tasks.OnProgressListener
+import com.google.firebase.storage.OnProgressListener
 import com.google.firebase.storage.UploadTask
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -70,9 +70,14 @@ object YuzUploadWatchdog {
             throw e
         } finally {
             watchdog.cancel()
-            // Progress listener'ni alohida o'chirmaymiz: task allaqachon tugagan
-            // yoki bekor qilingan — listener bir marta ishlatilgan holda qoladi.
-            // (removeOnProgressListener API'siga tayanmaslik = CI'da compile xatosi riski yo'q.)
+            // `removeOnProgressListener(OnProgressListener<? super ResultT>)` Firebase
+            // Storage 20.3.0'da mavjud (classes.jar'da tekshirildi) — shuning uchun
+            // listener'ni ochib qo'yamiz: urinishlar soniicha lambda sizib qolmasligi uchun.
+            try {
+                task.removeOnProgressListener(listener)
+            } catch (e: Exception) {
+                Log.w(TAG, "removeOnProgressListener: ${e.message}")
+            }
         }
     }
 

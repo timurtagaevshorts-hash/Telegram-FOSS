@@ -1,5 +1,6 @@
 package uz.kodlikino.top4.utils
 
+import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
@@ -7,6 +8,7 @@ import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
+import java.io.File
 
 /**
  * Elon rasmlarini Cloud Storage'ga yuklaydi (`classified_ads/{uid}/{adId}_{i}.jpg`).
@@ -16,6 +18,10 @@ import kotlinx.coroutines.tasks.await
  * [YuzUploadWatchdog] + urinishlar: oldin bitta rasm "tutaqib" qolsa butun e'lon
  * abadiy yuklanayotgan holatda qolardi. Endi har bir rasm uchun to'xtab qolish
  * kuzatiladi va kerak bo'lsa qaytadan urinish boradi.
+ *
+ * Rasm avval [YuzImageCompressor] bilan siqiladi — telefon kamerasining 8–15 MB li
+ * fayllari mobil internetda yuklab bo'lmas edi va storage.rules 15 MB chegarasiga
+ * urilardi.
  */
 object ClassifiedAdStorageHelper {
 
@@ -29,6 +35,7 @@ object ClassifiedAdStorageHelper {
      * @throws IllegalStateException matni foydalanuvchiga ko'rsatishga tayyor.
      */
     suspend fun uploadImages(
+        context: Context,
         uid: String,
         adId: String,
         uris: List<Uri>,
@@ -39,6 +46,7 @@ object ClassifiedAdStorageHelper {
             ?: throw IllegalStateException("Avval Telegram orqali kiring")
         if (user.uid != uid) throw IllegalStateException("Foydalanuvchi tasdiqlanmadi")
 
+        val appContext = context.applicationContext
         val files = uris.take(5)
         val urls = mutableListOf<String>()
         files.forEachIndexed { index, uri ->
@@ -47,28 +55,39 @@ object ClassifiedAdStorageHelper {
                 .setContentType("image/jpeg")
                 .setCacheControl("public, max-age=31536000")
                 .build()
+            // Siqilgan fayl barcha urinishlarda qayta ishlatiladi (bir marta
+            // kodlash yetarli), oxirida o'chiriladi.
             var lastError: Exception? = null
             var uploaded = false
-            for (attempt in 1..UPLOAD_ATTEMPTS) {
-                try {
-                    YuzUploadWatchdog.awaitWithStall(ref.putFile(uri, metadata), "Rasm ${index + 1}")
-                    urls.add(ref.downloadUrl.await().toString())
-                    uploaded = true
-                    break
-                } catch (e: Exception) {
-                    lastError = e
-                    val message = e.message.orEmpty()
-                    if (message.contains("permission", true) ||
-                        message.contains("unauthorized", true)
-                    ) {
-                        throw IllegalStateException(
-                            "Firebase Storage ruxsati yo'q. Firebase Console → Storage → Rules " +
-                                "bo'limiga storage.rules qoidalarini Publish qiling."
+            val compressed: File? = YuzImageCompressor.compressForUpload(appContext, uri)
+            val payload = compressed?.let { Uri.fromFile(it) } ?: uri
+            try {
+                for (attempt in 1..UPLOAD_ATTEMPTS) {
+                    try {
+                        YuzUploadWatchdog.awaitWithStall(
+                            ref.putFile(payload, metadata),
+                            "Rasm ${index + 1}"
                         )
+                        urls.add(ref.downloadUrl.await().toString())
+                        uploaded = true
+                        break
+                    } catch (e: Exception) {
+                        lastError = e
+                        val message = e.message.orEmpty()
+                        if (message.contains("permission", true) ||
+                            message.contains("unauthorized", true)
+                        ) {
+                            throw IllegalStateException(
+                                "Firebase Storage ruxsati rad etildi. Sabab: storage.rules " +
+                                    "yoyilmagan yoki rasm 15 MB dan katta (qoida chegarasi)."
+                            )
+                        }
+                        Log.w(TAG, "rasm $index urinish $attempt: ${e.message}")
+                        if (attempt < UPLOAD_ATTEMPTS) delay(1500L * attempt)
                     }
-                    Log.w(TAG, "rasm $index urinish $attempt: ${e.message}")
-                    if (attempt < UPLOAD_ATTEMPTS) delay(1500L * attempt)
                 }
+            } finally {
+                YuzImageCompressor.deleteQuietly(compressed)
             }
             if (!uploaded) {
                 throw IllegalStateException(
