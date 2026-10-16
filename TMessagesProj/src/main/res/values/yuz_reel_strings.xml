@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reels_title">Reels</string>
+    <string name="reels_empty">Hozircha reels yo\'q. Birinchi bo\'lib joylang!</string>
+    <string name="reels_loading">Yuklanmoqda…</string>
+    <string name="reels_load_failed">Reels yuklanmadi. Internetni tekshiring.</string>
+    <string name="reels_post">Reel joylash</string>
+    <string name="reels_refresh">Yangilash</string>
+
+    <string name="reels_create_title">Reel joylash</string>
+    <string name="reels_pick_video">Video tanlash</string>
+    <string name="reels_change_video">Boshqa video</string>
+    <string name="reels_caption_hint">Sarlavha / tavsif</string>
+    <string name="reels_hashtags_hint">#hashtag lar (ixtiyoriy)</string>
+    <string name="reels_publish">Joylash</string>
+    <string name="reels_publishing">Yuklanmoqda…</string>
+    <string name="reels_video_required">Avval video tanlang</string>
+    <string name="reels_caption_required">Sarlavha kiriting</string>
+    <string name="reels_published">Reel joylandi!</string>
+    <string name="reels_publish_failed">Reel joylanmadi</string>
+    <string name="reels_sign_in_required">Reel joylash uchun Telegram orqali kiring</string>
+    <string name="reels_video_pick_failed">Video tanlagich topilmadi</string>
+    <string name="reels_views">%1$s ko\'rish</string>
+    <string name="reels_upload_progress">Yuklanmoqda… %1$d%%</string>
+
+    <string name="reels_like">Yoqtirish</string>
+    <string name="reels_pick_video_subtitle">Video tanlang — 200 MB gacha, mp4</string>
+    <string name="reels_video_chosen">Video tanlandi</string>
+    <string name="reels_like_failed">Like saqlanmadi</string>
+    <string name="reels_new">Yangi</string>
+    <string name="reels_video_too_large">Video 200 MB dan katta — boshqa video tanlang</string>
+    <string name="reels_video_not_readable">Video o\'qilmadi. Qaytadan tanlang</string>
+    <string name="reels_uploading_video">Video yuklanmoqda…</string>
+    <string name="reels_saving">Sahifa saqlanmoqda…</string>
+
+    <!-- Ovoz tugmasi belgilari (feed yuqorisida) -->
+    <string name="reels_sound_on">🔊</string>
+    <string name="reels_sound_off">🔇</string>
+</resources>

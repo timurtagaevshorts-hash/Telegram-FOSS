@@ -28,6 +28,12 @@ public final class YuzGramNav {
                 }
                 current.presentFragment(new DialogsActivity(null), true);
                 break;
+            case YuzGramBottomBar.TAB_REELS:
+                if (current instanceof ReelsActivity) {
+                    return;
+                }
+                current.presentFragment(new ReelsActivity(), true);
+                break;
             case YuzGramBottomBar.TAB_ELONLAR:
                 if (current instanceof ElonlarActivity) {
                     return;

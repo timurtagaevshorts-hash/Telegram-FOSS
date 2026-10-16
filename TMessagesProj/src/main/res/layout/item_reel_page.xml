@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Reels feed'ining bitta sahifasi — to'liq ekranli video + ustidagi ma'lumot qatlamlari.
+  PlayerView controller'i (boshqaruv paneli) yoqilmaydi — boshqaruv ReelsAdapter'da
+  qo'lda amalga oshiriladi (bosish = play/pause). Shunda media3'ning murakkab
+  controller layoutlari ishga tushmaydi va Material 1.6.1 / minSdk 21 muhitida
+  xatosiz ishlaydi.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <!--
+      use_controller=false — PlayerView controller (PlayerControlView) umuman
+      yaratilmaydi. Bu muhim: media3-ui AAR'ida RecyclerView faqat
+      PlayerControlView ichida ishlatiladi, Telegram esa AAR'ni butunlay
+      chiqarib tashlab o'z manba kodidagi RecyclerView'idan foydalanadi
+      (qarang TMessagesProj/build.gradle configurations.all exclude).
+      surface_type=texture_view — video oynani ichida chizadi, shuning uchun
+      ustidagi poster/gradient qatlamlari telefon xotirasida (SurfaceView'da
+      uchadigan "teshik") xatosiz ustma-ust tushadi.
+      resize_mode=zoom — 9:16 video to'liq ekranni kesib to'ldiradi (Reels standart).
+    -->
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/playerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:resize_mode="zoom"
+        app:surface_type="texture_view"
+        app:use_controller="false" />
+
+    <!--
+      Poster (thumbnailUrl). PlayerView sirt (SurfaceView) ko'rinishida ishlagani uchun
+      rasm video USTIDA turadi — birinchi kadr chiqishi bilan GONE qilinadi
+      (qarang ReelsAdapter.onPlaybackStateChanged), aks holda video ko'rinmas edi.
+    -->
+    <ImageView
+        android:id="@+id/ivThumbnail"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/home_bg"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop" />
+
+    <!-- Pastdagi qora gradient — matn o'qilishi uchun -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="220dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_classified_ad_scrim" />
+
+    <ProgressBar
+        android:id="@+id/pageProgress"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="center"
+        android:indeterminateTint="@color/home_accent"
+        android:visibility="gone" />
+
+    <!-- Bosilganda qisqa ko'rinadigan play/pause belgisi -->
+    <TextView
+        android:id="@+id/tvPlayPauseBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:shadowColor="#80000000"
+        android:shadowRadius="12"
+        android:text="▶"
+        android:textColor="#E6FFFFFF"
+        android:textSize="64sp"
+        android:visibility="gone" />
+
+    <!-- O'ng ustun: like + ko'rishlar -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="96dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/btnLike"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/reels_like"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
+            android:padding="6dp"
+            android:text="♡"
+            android:textColor="@color/white"
+            android:textSize="30sp" />
+
+        <TextView
+            android:id="@+id/tvLikeCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0"
+            android:textColor="@color/white"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/tvViews"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="0"
+            android:textColor="@color/white"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- Chap past: muallif + caption -->
+    <LinearLayout
+        android:id="@+id/reelInfoContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="84dp"
+        android:layout_marginBottom="88dp"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <FrameLayout
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:background="@drawable/bg_classified_premium_fab">
+
+                <TextView
+                    android:id="@+id/tvAvatarInitial"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="R"
+                    android:textColor="@color/white"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tvUploaderName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/white"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:ellipsize="end"
+            android:lineSpacingExtra="2dp"
+            android:maxLines="4"
+            android:textColor="#F2FFFFFF"
+            android:textSize="14sp" />
+    </LinearLayout>
+</FrameLayout>

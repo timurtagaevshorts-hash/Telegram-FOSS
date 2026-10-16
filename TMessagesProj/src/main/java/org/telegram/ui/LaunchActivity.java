@@ -473,6 +473,20 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             BaseFragment top = getLastFragment();
             uz.kodlikino.top4.ui.YuzGramNav.select(top, tab);
         });
+        // Markaz "+" FAB — ochiq bo'limga qarab "joylash" ekranini ochadi:
+        // Elonlar tab'ida e'lon, boshqa hollarda reel (Asosiy/Reels/Profil).
+        yuzGramBottomBar.setOnFabClickListener(() -> {
+            BaseFragment top = getLastFragment();
+            if (top == null) {
+                return;
+            }
+            if (top instanceof uz.kodlikino.top4.ui.ElonlarActivity
+                    || yuzGramBottomBar.getActiveTab() == uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ELONLAR) {
+                top.presentFragment(new uz.kodlikino.top4.ui.CreateClassifiedAdActivity(), false);
+            } else {
+                top.presentFragment(new uz.kodlikino.top4.ui.CreateReelActivity(), false);
+            }
+        });
         yuzGramBottomBar.setVisibility(View.GONE);
         yuzGramBottomBar.setTranslationY(uz.kodlikino.top4.ui.YuzGramBottomBar.height());
         frameLayout.addView(yuzGramBottomBar, LayoutHelper.createFrame(
@@ -7944,8 +7958,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
 
     /**
      * YuzGram pastki navigatsiya barining ko'rinishini joriy top fragment'dan
-     * kelib chiqib yangilaydi. Faqat 3 ta root ekranda ko'rsatiladi; chat kabi
-     * ichki ekranlar, varaqalar (sheet) va qatlamlar (layer) ustida yashiriladi.
+     * kelib chiqib yangilaydi. Faqat 4 ta root ekranda ko'rsatiladi (Asosiy, Reels,
+     * Elonlar, Profil); chat kabi ichki ekranlar, varaqalar (sheet) va qatlamlar
+     * (layer) ustida yashiriladi.
      */
     private void updateYuzGramBottomBar() {
         if (yuzGramBottomBar == null) {
@@ -7958,6 +7973,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         int tab = -1;
         if (drawerLayoutContainer != null && drawerLayoutContainer.isDrawerOpened()) {
             tab = -1; // yon menyu ochiq — bar ko'rinmasin
+        } else if (top instanceof uz.kodlikino.top4.ui.ReelsActivity) {
+            tab = uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_REELS;
         } else if (top instanceof uz.kodlikino.top4.ui.ElonlarActivity) {
             tab = uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ELONLAR;
         } else if (top instanceof ProfileActivity && ((ProfileActivity) top).myProfile) {

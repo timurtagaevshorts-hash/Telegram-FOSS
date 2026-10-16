@@ -18,33 +18,35 @@ import android.view.animation.DecelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
 
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.ui.ActionBar.Theme;
 
 /**
  * YuzGram pastki navigatsiya bari — rasmdagi neon uslubga mos "floating dock".
  *
- * Tuzilishi (4 slot):  Asosiy | [ + markaz FAB ] | Elonlar | Profil
+ * Tuzilishi (5 slot):  Asosiy | Reels | [ + markaz FAB ] | Elonlar | Profil
  *  - Panel: yumaloq, to'q-ko'k neon sirt, tashqi ko'k "glow" nur, nozik border.
  *  - Markazda ko'tarilgan dumaloq "+" FAB (gradient binafsha→ko'k), atrofidagi
  *    panelda "cradle" notch (o'yiq) kesilgan.
  *  - Faol tab: yorqin ikon + matn + pastida silliq siljuvchi neon underline.
- *  - "+" hozircha bezak (bosilganda yumshoq bounce, amaliyot keyin belgilanadi).
+ *  - "+" FAB amaliyotga ega: qaysi tab ochiq bo'lsa, shu bo'lim uchun "joylash"
+ *    ekranini ochadi (Elonlar -> e'lon, Reels/Asosiy -> reel). Ulanish
+ *    LaunchActivity'da setOnFabClickListener() orqali qilinadi.
  *
  * Ikonkalar Canvas'da chiziladi (resursga bog'liq emas), dark neon mavzu doimiy.
  */
 public class YuzGramBottomBar extends View {
 
     public static final int TAB_ASOSIY = 0;
-    public static final int TAB_ELONLAR = 1;
-    public static final int TAB_PROFIL = 2;
-    public static final int COUNT = 3;
+    public static final int TAB_REELS = 1;
+    public static final int TAB_ELONLAR = 2;
+    public static final int TAB_PROFIL = 3;
+    public static final int COUNT = 4;
 
     /** Panelning umumiy balandligi (dip) — markaz FAB ko'tarilishi uchun tepa bo'shliq bilan. */
     public static final int HEIGHT_DP = 70;
 
-    private static final String[] LABELS = {"Asosiy", "Elonlar", "Profil"};
-    // tab index -> slot index (0..3); slot 1 = markaz FAB
-    private static final int[] TAB_SLOT = {0, 2, 3};
+    private static final String[] LABELS = {"Asosiy", "Reels", "Elonlar", "Profil"};
+    // tab index -> slot index (0..4); slot 2 = markaz FAB
+    private static final int[] TAB_SLOT = {0, 1, 3, 4};
 
     // Neon palitra (YuzGram brendi)
     private static final int SURFACE = 0xFF0A1120;      // chuqur to'q-ko'k sirt (Elonlar home_bg bilan bir xil)
@@ -71,6 +73,7 @@ public class YuzGramBottomBar extends View {
     private float indicatorPos = 0f;   // tab-space 0..COUNT-1, animatsiyalanadi
     private float fabPress = 0f;       // "+" bosilganda bounce
     private OnTabSelectedListener listener;
+    private OnFabClickListener fabListener;
     private boolean shown = false;
 
     private final float textSize = AndroidUtilities.dp(10.5f);
@@ -78,11 +81,15 @@ public class YuzGramBottomBar extends View {
 
     // Geometriya (onDraw hisoblaydi)
     private float panelLeft, panelRight, panelTop, panelBottom;
-    private float[] slotCx = new float[4];
+    private float[] slotCx = new float[5];
     private float fabCx, fabCy, fabR;
 
     public interface OnTabSelectedListener {
         void onTabSelected(int tab);
+    }
+
+    public interface OnFabClickListener {
+        void onFabClick();
     }
 
     public YuzGramBottomBar(Context context) {
@@ -131,6 +138,10 @@ public class YuzGramBottomBar extends View {
 
     public void setOnTabSelectedListener(OnTabSelectedListener l) {
         this.listener = l;
+    }
+
+    public void setOnFabClickListener(OnFabClickListener l) {
+        this.fabListener = l;
     }
 
     public int getActiveTab() {
@@ -214,12 +225,12 @@ public class YuzGramBottomBar extends View {
         float corner = AndroidUtilities.dp(24);
         panelRect.set(panelLeft, panelTop, panelRight, panelBottom);
 
-        // 4 slot markazlari
+        // 5 slot markazlari
         float usable = panelRight - panelLeft;
-        for (int i = 0; i < 4; i++) {
-            slotCx[i] = panelLeft + usable * (i + 0.5f) / 4f;
+        for (int i = 0; i < 5; i++) {
+            slotCx[i] = panelLeft + usable * (i + 0.5f) / 5f;
         }
-        fabCx = slotCx[1];
+        fabCx = slotCx[2];
         fabR = AndroidUtilities.dp(21);
         fabCy = panelTop;                          // FAB panel tepasiga o'tiradi, yarmi tepada
 
@@ -273,7 +284,7 @@ public class YuzGramBottomBar extends View {
         // --- Faol tab underline (siljuvchi neon) ---
         float activeCx = slotCxForIndicator();
         float underlineY = panelBottom - AndroidUtilities.dp(5);
-        float uw = AndroidUtilities.dp(18);
+        float uw = AndroidUtilities.dp(16);
         underlinePaint.setShader(null);
         underlinePaint.setColor(ACTIVE);
         underlinePaint.setShadowLayer(AndroidUtilities.dp(8), 0, 0, ACTIVE);
@@ -295,17 +306,19 @@ public class YuzGramBottomBar extends View {
         }
     }
 
-    /** indicatorPos (tab-space) ni slot markaziga aylantiradi (2 va 3 oralig'ida interpolatsiya). */
+    /**
+     * indicatorPos (tab-space 0..COUNT-1) ni slot markaziga aylantiradi.
+     * Oradagi markaz FAB sloti (2) tab emas — siljish 1→3 oralig'ida uzluksiz
+     * interpolatsiya bilan chiziladi, shuning uchun underline FAB ustidan o'tadi.
+     */
     private float slotCxForIndicator() {
-        // tab 0 -> slot 0 ; tab 1 -> slot 2 ; tab 2 -> slot 3
-        // indicatorPos 0..1..2 ni uzluksiz slot x ga chizamiz
-        if (indicatorPos <= 1f) {
-            float t = indicatorPos;
-            return lerp(slotCx[TAB_SLOT[0]], slotCx[TAB_SLOT[1]], t);
-        } else {
-            float t = indicatorPos - 1f;
-            return lerp(slotCx[TAB_SLOT[1]], slotCx[TAB_SLOT[2]], t);
-        }
+        int idx = (int) Math.floor(indicatorPos);
+        if (idx < 0) idx = 0;
+        if (idx >= COUNT - 1) idx = COUNT - 2;
+        float t = indicatorPos - idx;
+        if (t < 0f) t = 0f;
+        if (t > 1f) t = 1f;
+        return lerp(slotCx[TAB_SLOT[idx]], slotCx[TAB_SLOT[idx + 1]], t);
     }
 
     private static float lerp(float a, float b, float t) {
@@ -326,6 +339,22 @@ public class YuzGramBottomBar extends View {
                 path.moveTo(cx - half + AndroidUtilities.dp(6), bubble.bottom);
                 path.lineTo(cx - half + AndroidUtilities.dp(4), bubble.bottom + AndroidUtilities.dp(5));
                 path.lineTo(cx - half + AndroidUtilities.dp(11), bubble.bottom);
+                path.close();
+                iconPaint.setStyle(Paint.Style.FILL);
+                canvas.drawPath(path, iconPaint);
+                iconPaint.setStyle(Paint.Style.STROKE);
+                break;
+            }
+            case TAB_REELS: {
+                // Reels: yumaloq to'rtburchak ichida "play" uchburchagi (film kadrati)
+                float r = AndroidUtilities.dp(5);
+                RectF frame = new RectF(cx - half, cy - half, cx + half, cy + half);
+                drawRoundRectStroke(canvas, frame, r);
+                float tri = AndroidUtilities.dp(4.6f);
+                path.reset();
+                path.moveTo(cx - tri * 0.7f, cy - tri);
+                path.lineTo(cx - tri * 0.7f, cy + tri);
+                path.lineTo(cx + tri, cy);
                 path.close();
                 iconPaint.setStyle(Paint.Style.FILL);
                 canvas.drawPath(path, iconPaint);
@@ -387,7 +416,9 @@ public class YuzGramBottomBar extends View {
         if (action == MotionEvent.ACTION_UP) {
             if (isFabHit(event.getX(), event.getY())) {
                 performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
-                // "+" hozircha bezak — amaliyot keyin belgilanadi.
+                if (fabListener != null) {
+                    fabListener.onFabClick();
+                }
                 return true;
             }
             int tab = tabAt(event.getX());
@@ -415,11 +446,12 @@ public class YuzGramBottomBar extends View {
     private int tabAt(float x) {
         if (slotCx[0] == 0) return TAB_ASOSIY; // hali chizilmagan
         float usable = panelRight - panelLeft;
-        int slot = (int) ((x - panelLeft) / (usable / 4f));
-        slot = Math.max(0, Math.min(3, slot));
-        if (slot == 1) return -1; // markaz FAB — tab emas
+        int slot = (int) ((x - panelLeft) / (usable / 5f));
+        slot = Math.max(0, Math.min(4, slot));
+        if (slot == 2) return -1; // markaz FAB — tab emas
         if (slot == 0) return TAB_ASOSIY;
-        if (slot == 2) return TAB_ELONLAR;
+        if (slot == 1) return TAB_REELS;
+        if (slot == 3) return TAB_ELONLAR;
         return TAB_PROFIL;
     }
 }

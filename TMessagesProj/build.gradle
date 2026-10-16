@@ -69,6 +69,13 @@ dependencies {
     implementation 'androidx.activity:activity-ktx:1.7.2'
     implementation 'androidx.fragment:fragment-ktx:1.5.7'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
+    // Media3 (ExoPlayer) — Reels video feed uchun. 1.0.2 = compileSdk 33 mos
+    // (1.1.0+ SDK 34 talab qiladi). Faqat kerakli modullar: exoplayer/ui/common/datasource.
+    def media3 = "1.0.2"
+    implementation "androidx.media3:media3-exoplayer:$media3"
+    implementation "androidx.media3:media3-ui:$media3"
+    implementation "androidx.media3:media3-common:$media3"
+    implementation "androidx.media3:media3-datasource:$media3"
     // Kotlin stdlib pinned to match the 1.8.22 compiler (also satisfies the jdk7/jdk8 constraints above).
     implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
 
