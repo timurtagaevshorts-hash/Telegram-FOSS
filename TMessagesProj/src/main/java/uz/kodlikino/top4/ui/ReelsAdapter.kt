@@ -50,7 +50,10 @@ class ReelsAdapter(
     private val appContext: Context,
     private val onLikeToggle: (reelId: String, likedNow: Boolean) -> Unit,
     private val onViewed: (reelId: String) -> Unit,
-    private val onOpenComments: (reelId: String) -> Unit
+    private val onOpenComments: (reelId: String) -> Unit,
+    /** Joriy foydachi uid'si (`tg_<telegramId>`) — o'z reel'ini o'chirish uchun. */
+    private val myUid: String,
+    private val onDelete: (Reel) -> Unit
 ) : RecyclerView.Adapter<ReelsAdapter.PageHolder>() {
 
     private val items = ArrayList<Reel>()
@@ -131,6 +134,29 @@ class ReelsAdapter(
         activePos = -1
         activeHolder = null
         notifyDataSetChanged()
+    }
+
+    /**
+     * O'chirilgan reel'ni feed'dan chiqaradi. Faol sahifa o'chirilsa player
+     * bo'shatiladi — chaqiruvchi tomon `[reactivate()]` qayta faollashtiriladi.
+     */
+    fun removeById(reelId: String): Boolean {
+        val idx = items.indexOfFirst { it.id == reelId }
+        if (idx < 0) return false
+        items.removeAt(idx)
+        likeShown.remove(reelId)
+        liked.remove(reelId)
+        viewsShown.remove(reelId)
+        commentShown.remove(reelId)
+        if (activePos == idx) {
+            activeHolder?.playerView?.player = null
+            activeHolder = null
+            activePos = -1
+        } else if (activePos > idx) {
+            activePos -= 1
+        }
+        notifyItemRemoved(idx)
+        return true
     }
 
     override fun getItemCount(): Int = items.size
@@ -321,6 +347,7 @@ class ReelsAdapter(
         private val tvCommentCount: TextView = itemView.findViewById(R.id.tvCommentCount)
         val tvViews: TextView = itemView.findViewById(R.id.tvViews)
         private val btnShare: TextView = itemView.findViewById(R.id.btnShare)
+        private val btnReelMenu: TextView = itemView.findViewById(R.id.btnReelMenu)
         private val tvLikeBurst: TextView = itemView.findViewById(R.id.tvLikeBurst)
         private val reelCtaRow: LinearLayout = itemView.findViewById(R.id.reelCtaRow)
         private val btnWatchMovie: TextView = itemView.findViewById(R.id.btnWatchMovie)
@@ -462,6 +489,18 @@ class ReelsAdapter(
                 onOpenComments(r.id)
             }
             btnShare.setOnClickListener { shareReel() }
+            // "⋮" faqat reel egasiga ko'rinadi (Firestore qoidasi ham shuni tekshiradi).
+            val mine = myUid.isNotBlank() && reel.uploadedByUid == myUid
+            btnReelMenu.visibility = if (mine) View.VISIBLE else View.GONE
+            if (mine) {
+                btnReelMenu.setOnClickListener {
+                    val r = this.reel ?: return@setOnClickListener
+                    onDelete(r)
+                }
+            } else {
+                btnReelMenu.setOnClickListener(null)
+                btnReelMenu.isClickable = false
+            }
             bindCta(reel)
         }
 

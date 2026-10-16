@@ -52,4 +52,24 @@ object ReelStorageHelper {
             throw e
         }
     }
+
+    /**
+     * Reel videosini Storage'dan o'chiradi (`user_reels/{uid}/{file}`).
+     * Fayl nomi [videoUrl]'dan olinadi — eski reel'larda nom boshqacha bo'lsa
+     * jim o'tamiz (Firestore yozuvi o'chirilgan bo'lsa ham ishlayveradi).
+     */
+    suspend fun deleteVideo(uid: String, videoUrl: String) {
+        if (uid.isBlank() || videoUrl.isBlank()) return
+        val name = try {
+            Uri.decode(videoUrl.substringBefore('?').substringAfterLast('/'))
+        } catch (_: Exception) {
+            ""
+        }
+        if (name.isBlank() || !name.contains('.')) return
+        try {
+            storage.reference.child("user_reels/$uid/$name").delete().await()
+        } catch (e: Exception) {
+            android.util.Log.w("ReelStorageHelper", "deleteVideo $name: ${e.message}")
+        }
+    }
 }

@@ -60,4 +60,11 @@
     <string name="reels_share_failed">Ulashish menyusi ochilmadi</string>
     <string name="reels_link_failed">Havola ochilmadi</string>
     <string name="reels_watch_movie">🎬 Kinoni ko\'rish</string>
+
+    <!-- O'z reel'ini o'chirish (faqat egaga ko'rinadigan "⋮") -->
+    <string name="reels_menu">Reel menyusi</string>
+    <string name="reels_delete">O\'chirish</string>
+    <string name="reels_delete_confirm">\"%1$s\" o\'chirilsinmi? Bu amalni qaytarib bo\'lmaydi.</string>
+    <string name="reels_deleted">Reel o\'chirildi</string>
+    <string name="reels_delete_failed">Reel o\'chirilmadi</string>
 </resources>

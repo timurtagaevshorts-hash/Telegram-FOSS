@@ -225,4 +225,22 @@ object ReelsRepository {
         }
         return saved
     }
+
+    /**
+     * Reel'ni Firestore'dan o'chiradi. Qoida: faqat `uploadedByUid == auth.uid`
+     * (ega) yoki admin — shuning uchun chaqiruvchi tomon oldin
+     * [YuzGramAdsAuth.ensureSignedIn] bilan sessiya yaratilgan bo'lishi kerak.
+     */
+    suspend fun deleteReel(reelId: String) {
+        if (reelId.isBlank()) return
+        try {
+            db.collection(COLLECTION).document(reelId).delete().await()
+        } catch (e: Exception) {
+            val message = e.message.orEmpty()
+            if (message.contains("PERMISSION_DENIED", true) || message.contains("permission", true)) {
+                throw IllegalStateException("Bu reel'ni o'chirish faqat egasiga ruxsat.")
+            }
+            throw e
+        }
+    }
 }

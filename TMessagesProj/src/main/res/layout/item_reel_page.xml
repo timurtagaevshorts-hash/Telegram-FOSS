@@ -86,6 +86,25 @@
         android:visibility="gone" />
 
     <!--
+        O'z reel'i egasi uchun "⋮" menyusi (o'chirish). Faqat uploadedByUid ==
+        joriy Telegram uid bo'lganda ko'rinadi — ReelsAdapter.bind() boshqaradi.
+    -->
+    <TextView
+        android:id="@+id/btnReelMenu"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="54dp"
+        android:layout_marginEnd="14dp"
+        android:contentDescription="@string/reels_menu"
+        android:foreground="?attr/selectableItemBackgroundBorderless"
+        android:padding="8dp"
+        android:text="⋮"
+        android:textColor="@color/white"
+        android:textSize="26sp"
+        android:visibility="gone" />
+
+    <!--
       Video o'ynash progressi — nozik neon chiziq. PlayerView controller'i
       (use_controller=false) atayin o'chirilgan, shuning uchun progressni o'zimiz
       chizamiz: ReelsAdapter'dagi 250ms'lik ticker `playbackBar` ni yangilaydi.

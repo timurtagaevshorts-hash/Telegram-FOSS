@@ -28,6 +28,7 @@ import org.telegram.messenger.UserConfig
 import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.models.Reel
 import uz.kodlikino.top4.models.ReelComment
+import uz.kodlikino.top4.utils.ReelStorageHelper
 import uz.kodlikino.top4.utils.ReelsRepository
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 
@@ -129,7 +130,9 @@ class ReelsActivity : BaseFragment() {
             appContext = themed,
             onLikeToggle = { reelId, likedNow -> toggleLike(reelId, likedNow) },
             onViewed = { reelId -> registerView(reelId) },
-            onOpenComments = { reelId -> openComments(reelId) }
+            onOpenComments = { reelId -> openComments(reelId) },
+            myUid = currentUid(),
+            onDelete = { reel -> confirmDelete(reel) }
         )
         adapter = reelsAdapter
 
@@ -362,6 +365,55 @@ class ReelsActivity : BaseFragment() {
                 // Ko'rish hisobi muhim emas — xato feed'ni buzmasligi kerak.
             }
             ReelsRepository.registerView(reelId)
+        }
+    }
+
+    /**
+     * O'z reel'ini o'chirish tasdig'i. [android.app.AlertDialog] — framework
+     * dialog'i: Material/Telegram mavzusiga bog'liq emas, shuning uchun
+     * Theme.YuzGramAds ostida ham xavfsiz ishlaydi.
+     */
+    private fun confirmDelete(reel: Reel) {
+        val activity = parentActivity ?: return
+        val title = reel.title.ifBlank { getString(R.string.reels_title) }
+        try {
+            android.app.AlertDialog.Builder(activity)
+                .setTitle(R.string.reels_delete)
+                .setMessage(getString(R.string.reels_delete_confirm, title))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.reels_delete) { _, _ -> deleteReel(reel) }
+                .show()
+        } catch (_: Exception) {
+            // Dialog ko'rsatib bo'lmasa — o'chirmaymiz (xavfsiz yo'l).
+            toast(R.string.reels_delete_failed)
+        }
+    }
+
+    /** Firestore yozuvi + Storage videosini o'chirib, feed'dan chiqaradi. */
+    private fun deleteReel(reel: Reel) {
+        val uid = currentUid()
+        if (uid.isBlank()) {
+            toast(R.string.reels_sign_in_required)
+            return
+        }
+        val s = scope ?: return
+        val account = currentAccount
+        s.launch {
+            try {
+                awaitAuth()
+                val signedUid = YuzGramAdsAuth.ensureSignedIn(account)
+                ReelsRepository.deleteReel(reel.id)
+                ReelStorageHelper.deleteVideo(signedUid, reel.videoUrl)
+                if (fragmentView == null) return@launch
+                adapter?.removeById(reel.id)
+                adapter?.reactivate()
+                toast(R.string.reels_deleted)
+                if ((adapter?.itemCount ?: 0) == 0) loadReels()
+            } catch (e: Exception) {
+                if (fragmentView == null) return@launch
+                val msg = e.message
+                if (msg.isNullOrBlank()) toast(R.string.reels_delete_failed) else toast(msg)
+            }
         }
     }
 
