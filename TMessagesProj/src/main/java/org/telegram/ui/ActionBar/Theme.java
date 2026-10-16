@@ -7396,11 +7396,16 @@ public class Theme {
                     saveOtherThemes(true);
                     sortThemes();
                 }
-                currentTheme = themeInfo;
+                // YuzGram: bu yo'l mavzu editoridan keladi — jonli mavzu
+                // hech qachon tashqi mavzuga o'tkazilmaydi, forceYuzGramTheme
+                // doim brend mavzusini qaytaradi.
+                currentTheme = forceYuzGramTheme(themeInfo);
                 if (currentTheme != currentNightTheme) {
                     currentDayTheme = currentTheme;
                 }
-                if (useDefaultColors) {
+                // currentColorsNoAccent faqat fayl-orqali tushirilgan mavzularda
+                // tozalanadi; brend mavzusi asset'dan o'qilganda ranglar yo'qolmaydi.
+                if (useDefaultColors && currentTheme.assetName == null && currentTheme.pathToFile == null) {
                     currentColorsNoAccent.clear();
                     refreshThemeColors();
                 }
