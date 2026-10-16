@@ -116,6 +116,19 @@ public class YuzGramBottomBar extends View {
         return AndroidUtilities.dp(HEIGHT_DP);
     }
 
+    /**
+     * Balandlikni qat'iy dp(HEIGHT_DP)ga qotamiz. LaunchActivity'dagi frameLayout
+     * (maxsus FrameLayout) bolaga ba'zan kutilganidan katta balandlik bermoqda —
+     * bunda panel (panelBottom = h - dp(8)) butun ekranni egallab, ikonlar bilan
+     * matn orasida ulkan bo'sh joy qolardi. EXACTLY spec bu xato holatdan qat'i-nazar
+     * barni doim kompakt saqlaydi.
+     */
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec,
+                MeasureSpec.makeMeasureSpec(height(), MeasureSpec.EXACTLY));
+    }
+
     public void setOnTabSelectedListener(OnTabSelectedListener l) {
         this.listener = l;
     }
