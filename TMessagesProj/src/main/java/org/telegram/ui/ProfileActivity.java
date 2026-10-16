@@ -380,6 +380,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private ActionBarMenuItem callItem;
     private ActionBarMenuItem videoCallItem;
     private ActionBarMenuItem editItem;
+    private ActionBarMenuItem settingsItem;
     private ActionBarMenuItem otherItem;
     private ActionBarMenuItem searchItem;
     private ActionBarMenuSubItem editColorItem;
@@ -515,6 +516,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private final static int edit_profile = 41;
     private final static int copy_link_profile = 42;
     private final static int set_username = 43;
+    private final static int open_settings = 44;
 
     private Rect rect = new Rect();
 
@@ -2280,6 +2282,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     }
                 } else if (id == edit_profile) {
                     presentFragment(new UserInfoActivity());
+                } else if (id == open_settings) {
+                    // YuzGram: sozlamalar ekrani = o'z profilimiz, lekin my_profile=false (sozlamalar ro'yxati bilan).
+                    Bundle sargs = new Bundle();
+                    sargs.putLong("user_id", UserConfig.getInstance(currentAccount).clientUserId);
+                    presentFragment(new ProfileActivity(sargs));
                 } else if (id == invite_to_group) {
                     final TLRPC.User user = getMessagesController().getUser(userId);
                     if (user == null) {
@@ -3292,6 +3299,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (myProfile) {
             editItem = menu.addItem(edit_profile, R.drawable.group_edit_profile);
             editItem.setContentDescription(LocaleController.getString("Edit", R.string.Edit));
+            // YuzGram: drawer'dan olib tashlangan "Sozlamalar"ni profil tepasiga, qalamcha yoniga qo'ydik.
+            settingsItem = menu.addItem(open_settings, R.drawable.msg_settings, resourcesProvider);
+            settingsItem.setContentDescription(LocaleController.getString("Settings", R.string.Settings));
         } else {
             editItem = menu.addItem(edit_channel, R.drawable.group_edit_profile);
             editItem.setContentDescription(LocaleController.getString("Edit", R.string.Edit));
