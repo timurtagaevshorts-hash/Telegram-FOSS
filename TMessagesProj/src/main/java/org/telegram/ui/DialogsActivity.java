@@ -8891,9 +8891,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         // YuzGram: pastki navigatsion bar skroll yo'nalishiga qarab. Ro'yxatni
         // pastga (kontent yuqoriga) surganda bar yashirinadi; tepaga surganda yoki
         // tepaga yetganda qayta ko'rinadi. Faqat Asosiy ildiz ekranda ishlaydi.
-        if (parentActivity instanceof LaunchActivity && isYuzGramMainRoot() && progressToActionMode == 0) {
+        if (getParentActivity() instanceof LaunchActivity && isYuzGramMainRoot() && progressToActionMode == 0) {
             boolean hideBar = value < 0f && value < scrollYOffset;
-            ((LaunchActivity) parentActivity).setYuzGramBarScrollHidden(hideBar);
+            ((LaunchActivity) getParentActivity()).setYuzGramBarScrollHidden(hideBar);
         }
         scrollYOffset = value;
         if (topBulletin != null) {
