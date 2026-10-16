@@ -72,6 +72,28 @@ class ReelsAdapter(
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    /**
+     * Playback progress chizig'i — controller o'chirilgan (`use_controller=false`,
+     * media3-ui RecyclerView tuzaqidan saqlanish uchun), shuning uchun pozitsiyani
+     * o'zimiz 250ms da bir yangilaymiz. Player bo'lmasa yoki uzунlik hali
+     * aniq bo'lmasa (`TIME_UNSET`) progress 0 da turadi.
+     */
+    private val progressTicker = object : Runnable {
+        override fun run() {
+            val p = player
+            val holder = activeHolder
+            if (p != null) {
+                val duration = p.duration
+                if (holder != null && duration > 0L && duration < Long.MAX_VALUE) {
+                    holder.playbackBar.max = 1000
+                    holder.playbackBar.progress =
+                        ((p.currentPosition * 1000L) / duration).toInt().coerceIn(0, 1000)
+                }
+                mainHandler.postDelayed(this, 250L)
+            }
+        }
+    }
+
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             activeHolder?.setPlayingBadge(isPlaying)
@@ -232,6 +254,7 @@ class ReelsAdapter(
     }
 
     fun release() {
+        mainHandler.removeCallbacks(progressTicker)
         activeHolder?.playerView?.player = null
         activeHolder = null
         player?.let {
@@ -255,6 +278,7 @@ class ReelsAdapter(
         created.repeatMode = Player.REPEAT_MODE_ONE
         created.volume = if (muted) 0f else 1f
         player = created
+        mainHandler.post(progressTicker)
         return created
     }
 
@@ -286,6 +310,7 @@ class ReelsAdapter(
         val playerView: PlayerView = itemView.findViewById(R.id.playerView)
         val ivThumbnail: ImageView = itemView.findViewById(R.id.ivThumbnail)
         val pageProgress: ProgressBar = itemView.findViewById(R.id.pageProgress)
+        val playbackBar: ProgressBar = itemView.findViewById(R.id.playbackBar)
         private val tvPlayPauseBadge: TextView = itemView.findViewById(R.id.tvPlayPauseBadge)
         private val tvUploaderName: TextView = itemView.findViewById(R.id.tvUploaderName)
         private val tvAvatarInitial: TextView = itemView.findViewById(R.id.tvAvatarInitial)
@@ -402,6 +427,7 @@ class ReelsAdapter(
 
         fun bind(reel: Reel) {
             this.reel = reel
+            playbackBar.progress = 0
             val name = reel.uploadedByName.ifBlank { "YuzGram" }
             tvUploaderName.text = name
             tvAvatarInitial.text = name.take(1).uppercase()
