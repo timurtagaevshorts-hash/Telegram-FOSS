@@ -369,7 +369,9 @@ public class DrawerLayoutContainer extends FrameLayout {
     }
 
     public void setAllowOpenDrawerBySwipe(boolean value) {
-        allowOpenDrawerBySwipe = value;
+        // YuzGram: drawer chetdan surish (swipe) orqali HECH QACHON ochilmaydi.
+        // (drawer ochiq bo'lganda yopish uchun yon tarafdagi `drawerOpened` sharti ishlaydi.)
+        allowOpenDrawerBySwipe = false;
     }
 
     private void prepareForDrawerOpen(MotionEvent ev) {

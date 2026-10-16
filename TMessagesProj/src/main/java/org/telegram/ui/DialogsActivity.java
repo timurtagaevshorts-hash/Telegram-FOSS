@@ -3385,9 +3385,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (searchString != null || folderId != 0) {
                 actionBar.setBackButtonDrawable(backDrawable = new BackDrawable(false));
             } else {
-                actionBar.setBackButtonDrawable(menuDrawable = new MenuDrawable());
-                menuDrawable.setRoundCap();
-                actionBar.setBackButtonContentDescription(LocaleController.getString("AccDescrOpenMenu", R.string.AccDescrOpenMenu));
+                // YuzGram: hamburger menyu butunlay olib tashlandi — drawer endi ochilmaydi.
+                actionBar.setBackButtonDrawable(null);
             }
             if (folderId != 0) {
                 actionBar.setTitle(LocaleController.getString("ArchivedChats", R.string.ArchivedChats));
@@ -5381,8 +5380,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             @Override
             public void openAnimationStarted(boolean open) {
                 if (!isArchive()) {
-                    actionBar.setBackButtonDrawable(menuDrawable = new MenuDrawable());
-                    menuDrawable.setRoundCap();
+                    // YuzGram: hamburger yo'q — drawer'ga qaytishda back tugmasini bo'sh qoldiramiz.
+                    actionBar.setBackButtonDrawable(null);
                 }
 
                 rightFragmentTransitionInProgress = true;
