@@ -10,6 +10,11 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.BaseFragment
@@ -29,7 +34,7 @@ class KinolarActivity : BaseFragment() {
     private var progress: ProgressBar? = null
     private var adapter: KinolarAdapter? = null
 
-    private var scope: kotlinx.coroutines.CoroutineScope? = null
+    private var scope: CoroutineScope? = null
     private val repo = MoviesRepository()
 
     override fun createView(context: Context): View {
@@ -60,9 +65,7 @@ class KinolarActivity : BaseFragment() {
         rv?.layoutManager = GridLayoutManager(themed, 2)
         rv?.adapter = adapter
 
-        scope = kotlinx.coroutines.CoroutineScope(
-            kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.SupervisorJob()
-        )
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         loadMovies()
         return root
     }

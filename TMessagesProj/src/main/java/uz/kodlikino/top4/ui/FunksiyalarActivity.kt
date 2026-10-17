@@ -5,7 +5,6 @@ import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.BaseFragment
@@ -18,11 +17,8 @@ import org.telegram.ui.ActionBar.BaseFragment
  */
 class FunksiyalarActivity : BaseFragment() {
 
-    private var themedContext: Context? = null
-
     override fun createView(context: Context): View {
         val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
-        themedContext = themed
         val root = LayoutInflater.from(themed)
             .inflate(R.layout.fragment_funksiyalar, null) as ViewGroup
         fragmentView = root
@@ -59,10 +55,5 @@ class FunksiyalarActivity : BaseFragment() {
     override fun onResume() {
         super.onResume()
         actionBar?.visibility = View.GONE
-    }
-
-    private fun toast(resId: Int) {
-        val ctx = themedContext ?: context ?: return
-        Toast.makeText(ctx, resId, Toast.LENGTH_SHORT).show()
     }
 }
