@@ -1,11 +1,8 @@
 package uz.kodlikino.top4.ui;
 
-import android.os.Bundle;
-
 import org.telegram.messenger.UserConfig;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.DialogsActivity;
-import org.telegram.ui.ProfileActivity;
 
 /**
  * YuzGram pastki navigatsiya bo'yicha root ekranlar orasida almashish.
@@ -41,14 +38,17 @@ public final class YuzGramNav {
                 current.presentFragment(new FunksiyalarActivity(), true);
                 break;
             case YuzGramBottomBar.TAB_PROFIL:
-                if (current instanceof ProfileActivity) {
+                if (current instanceof YuzGramProfileActivity) {
                     return;
                 }
+                // Instagram uslubidagi YuzGram profili (obunalar/obunachilar soni,
+                // reel grid, kontent boshqaruvi). Tepadagi gear tugmasi orqali
+                // Telegram'ning native ProfileActivity'siga o'tish mumkin.
                 int account = current.getCurrentAccount();
-                Bundle args = new Bundle();
-                args.putLong("user_id", UserConfig.getInstance(account).getClientUserId());
-                args.putBoolean("my_profile", true);
-                current.presentFragment(new ProfileActivity(args, null), true);
+                long clientUserId = UserConfig.getInstance(account).getClientUserId();
+                String uid = "tg_" + clientUserId;
+                current.presentFragment(
+                        new YuzGramProfileActivity(uid, "", "", true, false), true);
                 break;
         }
     }

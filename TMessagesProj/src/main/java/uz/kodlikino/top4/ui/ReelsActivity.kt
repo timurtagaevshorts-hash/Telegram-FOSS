@@ -31,6 +31,7 @@ import uz.kodlikino.top4.models.ReelComment
 import uz.kodlikino.top4.utils.ReelStorageHelper
 import uz.kodlikino.top4.utils.ReelsRepository
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
+import uz.kodlikino.top4.utils.YuzGramProfileStore
 
 /**
  * "Reels" bo'limi — YuzGram pastki navigatsiyasining alohida tab'i.
@@ -52,8 +53,15 @@ import uz.kodlikino.top4.utils.YuzGramAdsAuth
  * mumkin. Bu yerda faqat shu repodalla sinovdan o'tgan klasslar ishlatiladi.
  *
  * Pastki bar LaunchActivity darajasida (doimiy) — bu ekran o'z barini qo'shmaydi.
+ *
+ * Profil grid'idan ochilganda [filterUid] beriladi — feed faqat shu foydalanuvchi-
+ * ning reel'larini ko'rsatadi va [startIndex] sahifasidan boshlaydi. Bo'sh [filterUid]
+ * — umumiy (barcha) feed, pastki "Reels" tab'i.
  */
-class ReelsActivity : BaseFragment() {
+class ReelsActivity @JvmOverloads constructor(
+    private val filterUid: String = "",
+    private val startIndex: Int = 0
+) : BaseFragment() {
 
     private var themedContext: Context? = null
     private var reelsList: RecyclerView? = null
@@ -92,7 +100,7 @@ class ReelsActivity : BaseFragment() {
     private var authWarmedUp = false
     private var authJob: Job? = null
     private var currentReels: List<Reel> = emptyList()
-    private var selectedPosition = 0
+    private var selectedPosition = startIndex.coerceAtLeast(0)
 
     private fun currentUid(): String {
         val id = UserConfig.getInstance(currentAccount).clientUserId
@@ -132,7 +140,8 @@ class ReelsActivity : BaseFragment() {
             onViewed = { reelId -> registerView(reelId) },
             onOpenComments = { reelId -> openComments(reelId) },
             myUid = currentUid(),
-            onDelete = { reel -> confirmDelete(reel) }
+            onDelete = { reel -> confirmDelete(reel) },
+            onOpenProfile = { reel -> openUploaderProfile(reel) }
         )
         adapter = reelsAdapter
 
@@ -203,7 +212,11 @@ class ReelsActivity : BaseFragment() {
 
         root.findViewById<View>(R.id.btnCloseComments)?.setOnClickListener { closeComments() }
 
-        val commentsRvAdapter = ReelCommentsAdapter(themed) { comment -> setReplyTarget(comment) }
+        val commentsRvAdapter = ReelCommentsAdapter(
+            appContext = themed,
+            onReply = { comment -> setReplyTarget(comment) },
+            onOpenProfile = { comment -> openCommentProfile(comment) }
+        )
         commentsAdapter = commentsRvAdapter
         val clm = LinearLayoutManager(themed, RecyclerView.VERTICAL, false)
         commentsLayoutManager = clm
@@ -279,6 +292,41 @@ class ReelsActivity : BaseFragment() {
         presentFragment(CreateReelActivity(), false)
     }
 
+    /** Reel muallifining YuzGram profili. Reel YuzGram orqali yuklangan — demak maqsad aniq YuzGram foydalanuvchisi. */
+    private fun openUploaderProfile(reel: Reel) {
+        val uid = reel.uploadedByUid
+        if (uid.isBlank()) return
+        val isSelf = uid == currentUid()
+        presentFragment(
+            YuzGramProfileActivity(
+                uid = uid,
+                seedName = reel.uploadedByName,
+                seedPhotoUrl = reel.uploadedByPhotoUrl,
+                isSelf = isSelf,
+                knownYuzGram = true
+            ),
+            false
+        )
+    }
+
+    /** Izoh muallifining YuzGram profili (izoh signedIn sessiyada yozilgan → aniq YuzGram foydalanuvchisi). */
+    private fun openCommentProfile(comment: ReelComment) {
+        val uid = comment.userId
+        if (uid.isBlank()) return
+        if (commentsOpen) closeComments()
+        val isSelf = uid == currentUid()
+        presentFragment(
+            YuzGramProfileActivity(
+                uid = uid,
+                seedName = comment.authorName,
+                seedPhotoUrl = comment.authorPhotoUrl,
+                isSelf = isSelf,
+                knownYuzGram = true
+            ),
+            false
+        )
+    }
+
     private fun loadReels() {
         if (loading) return
         val s = scope ?: return
@@ -286,7 +334,13 @@ class ReelsActivity : BaseFragment() {
         loading = true
         if (currentReels.isEmpty()) progressBar?.visibility = View.VISIBLE
         s.launch {
-            val reels = ReelsRepository.getReelsOrNull()
+            val reels: List<Reel>? = if (filterUid.isNotBlank()) {
+                // Scoped feed (profil grid'idan): faqat shu muallifning reel'lari.
+                // getReelsByUploader xatoda bo'sh ro'yxat qaytaradi — null bo'lmaydi.
+                ReelsRepository.getReelsByUploader(filterUid)
+            } else {
+                ReelsRepository.getReelsOrNull()
+            }
             loading = false
             if (fragmentView == null) return@launch
             if (reels == null) {
@@ -629,7 +683,19 @@ class ReelsActivity : BaseFragment() {
         val account = currentAccount
         authJob = s.launch {
             try {
-                YuzGramAdsAuth.ensureSignedIn(account)
+                val uid = YuzGramAdsAuth.ensureSignedIn(account)
+                // O'z tab'ida ( umumiy feed ) comment_profiles doc'ini yaratamiz —
+                // shunda boshqa YuzGram foydalanuvchilari bizga obuna bola oladi
+                // (follow() maqsad hujjatiga followerCount+1 yozadi, doc bo'lishi kerak).
+                if (uid.isNotBlank() && filterUid.isBlank()) {
+                    val user = UserConfig.getInstance(account).currentUser
+                    YuzGramProfileStore.ensureSelfProfile(
+                        uid = uid,
+                        firstName = user?.first_name.orEmpty(),
+                        lastName = user?.last_name.orEmpty(),
+                        photoUrl = ""
+                    )
+                }
             } catch (_: Exception) {
                 // Sessiya keyinroq yozuvda o'zi ochiladi (yoki tokensiz like urinishi
                 // xabar bilan tugaydi) — bu yerda foydachini chalg'itmaymiz.

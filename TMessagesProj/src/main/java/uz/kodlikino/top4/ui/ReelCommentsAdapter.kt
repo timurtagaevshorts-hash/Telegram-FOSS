@@ -28,7 +28,9 @@ import java.util.Locale
  */
 class ReelCommentsAdapter(
     private val appContext: Context,
-    private val onReply: (ReelComment) -> Unit
+    private val onReply: (ReelComment) -> Unit,
+    /** Izoh muallifi (avatar/ism) bosilganda — uning YuzGram profili. */
+    private val onOpenProfile: (ReelComment) -> Unit = {}
 ) : RecyclerView.Adapter<ReelCommentsAdapter.CommentHolder>() {
 
     private val items = ArrayList<ReelComment>()
@@ -110,6 +112,15 @@ class ReelCommentsAdapter(
                 onReply(comment)
                 true
             }
+
+            // Muallif avatar/ismi — bosilsa o'sha foydalanuvchining profili ochiladi
+            // (izoh YuzGram sessiyasida yozilgani uchun userId aniq `tg_<id>`).
+            val openProfile = View.OnClickListener {
+                if (comment.userId.isNotBlank()) onOpenProfile(comment)
+            }
+            tvAuthor.setOnClickListener(openProfile)
+            tvAvatar.setOnClickListener(openProfile)
+            ivAvatar.setOnClickListener(openProfile)
         }
 
         /** Nisbiy vaqt — eski loyihadagi kabi o'zbekcha ("5 daqiqa oldin"). */

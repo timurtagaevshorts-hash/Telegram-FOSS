@@ -211,9 +211,16 @@ object FollowManager {
                 val now = System.currentTimeMillis()
                 val myName = myProfile?.displayName.orEmpty().ifBlank { "Foydalanuvchi" }
                 val targetName = targetProfile?.displayName.orEmpty().ifBlank { "Foydalanuvchi" }
+                val followerRef =
+                    db.collection(ROOT).document(target).collection("followers").document(me)
+                val myProfileRef = db.collection(PROFILES).document(me)
+                val targetProfileRef = db.collection(PROFILES).document(target)
                 db.runTransaction { tx ->
+                    // BARCHA O'QISHLAR yozishdan oldin bo'lishi shart (Firestore talabi).
                     val followingSnap = tx.get(followingRef)
                     if (followingSnap.exists()) return@runTransaction
+                    val myProfileSnap = tx.get(myProfileRef)
+                    val targetProfileSnap = tx.get(targetProfileRef)
 
                     val followingEdge = mapOf(
                         "targetUid" to target,
@@ -228,20 +235,26 @@ object FollowManager {
                         "followerPhotoUrl" to myProfile?.photoUrl.orEmpty()
                     )
                     tx.set(followingRef, followingEdge)
-                    tx.set(
-                        db.collection(ROOT).document(target).collection("followers").document(me),
-                        followerEdge
-                    )
-                    tx.set(
-                        db.collection(PROFILES).document(me),
-                        mapOf("followingCount" to FieldValue.increment(1)),
-                        SetOptions.merge()
-                    )
-                    tx.set(
-                        db.collection(PROFILES).document(target),
-                        mapOf("followerCount" to FieldValue.increment(1)),
-                        SetOptions.merge()
-                    )
+                    tx.set(followerRef, followerEdge)
+                    // comment_profiles hisoblagichlarini faqat hujjat MAVBOOT bo'lsa
+                    // yangilaymiz — aks holda nodiron egasi CREATE huquqiga ega emas va
+                    // butun tranzaksiya PERMISSION_DENIED bilan qulaydi. Proldagi sonlar
+                    // user_follows listener'laridan keladi, shuning uchun bu tashlash
+                    // hisobga ta'sir qilmaydi.
+                    if (myProfileSnap.exists()) {
+                        tx.set(
+                            myProfileRef,
+                            mapOf("followingCount" to FieldValue.increment(1)),
+                            SetOptions.merge()
+                        )
+                    }
+                    if (targetProfileSnap.exists()) {
+                        tx.set(
+                            targetProfileRef,
+                            mapOf("followerCount" to FieldValue.increment(1)),
+                            SetOptions.merge()
+                        )
+                    }
                 }.await()
                 followingCache.getOrPut(me) { mutableSetOf() }.add(target)
                 Result.success(Unit)
@@ -264,21 +277,32 @@ object FollowManager {
                 if (!followingRef.get().await().exists()) {
                     return@withContext Result.success(Unit)
                 }
+                val followerRef =
+                    db.collection(ROOT).document(target).collection("followers").document(me)
+                val myProfileRef = db.collection(PROFILES).document(me)
+                val targetProfileRef = db.collection(PROFILES).document(target)
                 db.runTransaction { tx ->
+                    // Barcha o'qishlar yozishdan oldin.
                     val followingSnap = tx.get(followingRef)
                     if (!followingSnap.exists()) return@runTransaction
+                    val myProfileSnap = tx.get(myProfileRef)
+                    val targetProfileSnap = tx.get(targetProfileRef)
                     tx.delete(followingRef)
-                    tx.delete(db.collection(ROOT).document(target).collection("followers").document(me))
-                    tx.set(
-                        db.collection(PROFILES).document(me),
-                        mapOf("followingCount" to FieldValue.increment(-1)),
-                        SetOptions.merge()
-                    )
-                    tx.set(
-                        db.collection(PROFILES).document(target),
-                        mapOf("followerCount" to FieldValue.increment(-1)),
-                        SetOptions.merge()
-                    )
+                    tx.delete(followerRef)
+                    if (myProfileSnap.exists()) {
+                        tx.set(
+                            myProfileRef,
+                            mapOf("followingCount" to FieldValue.increment(-1)),
+                            SetOptions.merge()
+                        )
+                    }
+                    if (targetProfileSnap.exists()) {
+                        tx.set(
+                            targetProfileRef,
+                            mapOf("followerCount" to FieldValue.increment(-1)),
+                            SetOptions.merge()
+                        )
+                    }
                 }.await()
                 followingCache[me]?.remove(target)
                 Result.success(Unit)

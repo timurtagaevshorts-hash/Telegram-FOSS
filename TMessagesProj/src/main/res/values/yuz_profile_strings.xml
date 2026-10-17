@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_settings">Sozlamalar</string>
+    <string name="profile_app_name">YuzGram</string>
+    <string name="profile_reels">Reels</string>
+    <string name="profile_following">Obunalar</string>
+    <string name="profile_followers">Obunachilar</string>
+
+    <string name="profile_follow">Obuna bo\'lish</string>
+    <string name="profile_following_active">Obunalikni bekor qilish</string>
+    <string name="profile_followed">Obuna bo\'ldingiz</string>
+    <string name="profile_unfollowed">Obunalik bekor qilindi</string>
+    <string name="profile_follow_failed">Amalga oshmadi — qayta urinib ko\'ring</string>
+    <string name="profile_self">Bu sizning profilingiz</string>
+
+    <!-- Oddiy Telegram foydalanuvchisi YuzGram Firebase identitetiga ega emas:
+         unga obuna bo'lib bo'lmaydi — buni ochiq aytmaymiz. -->
+    <string name="profile_not_yuzgram">Bu foydalanuvchi YuzGram\'dan foydalanmaydi</string>
+    <string name="profile_follow_need_yuzgram">Obuna bo\'lib bo\'lmaydi: foydalanuvchi YuzGram o\'rnatmagan</string>
+
+    <string name="profile_reels_empty">Hali reel joylanmagan</string>
+    <string name="profile_manage_content">Kontentni boshqarish</string>
+    <string name="profile_manage_done">Boshqaruvni tugatish</string>
+    <string name="profile_manage_hint">O\'chirish uchun rasm ustidagi ✕ ni bosing</string>
+
+    <string name="profile_followers_title">Obunachilar</string>
+    <string name="profile_following_title">Obunalar</string>
+    <string name="profile_list_empty">Hali hech kim yo\'q</string>
+
+    <string name="profile_sign_in_required">Profilni ko\'rish uchun Telegram orqali kiring</string>
+    <string name="profile_reel_count">%1$d reel</string>
+</resources>

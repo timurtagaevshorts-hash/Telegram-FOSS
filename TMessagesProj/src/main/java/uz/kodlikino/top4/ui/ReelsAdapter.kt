@@ -53,7 +53,9 @@ class ReelsAdapter(
     private val onOpenComments: (reelId: String) -> Unit,
     /** Joriy foydachi uid'si (`tg_<telegramId>`) — o'z reel'ini o'chirish uchun. */
     private val myUid: String,
-    private val onDelete: (Reel) -> Unit
+    private val onDelete: (Reel) -> Unit,
+    /** Muallif ustuni bosilganda — reel egasining YuzGram profilini ochadi. */
+    private val onOpenProfile: (Reel) -> Unit
 ) : RecyclerView.Adapter<ReelsAdapter.PageHolder>() {
 
     private val items = ArrayList<Reel>()
@@ -340,6 +342,7 @@ class ReelsAdapter(
         private val tvPlayPauseBadge: TextView = itemView.findViewById(R.id.tvPlayPauseBadge)
         private val tvUploaderName: TextView = itemView.findViewById(R.id.tvUploaderName)
         private val tvAvatarInitial: TextView = itemView.findViewById(R.id.tvAvatarInitial)
+        private val uploaderRow: View = itemView.findViewById(R.id.uploaderRow)
         private val tvCaption: TextView = itemView.findViewById(R.id.tvCaption)
         private val btnLike: TextView = itemView.findViewById(R.id.btnLike)
         private val tvLikeCount: TextView = itemView.findViewById(R.id.tvLikeCount)
@@ -458,6 +461,10 @@ class ReelsAdapter(
             val name = reel.uploadedByName.ifBlank { "YuzGram" }
             tvUploaderName.text = name
             tvAvatarInitial.text = name.take(1).uppercase()
+            uploaderRow.setOnClickListener {
+                val r = this.reel ?: return@setOnClickListener
+                if (r.uploadedByUid.isNotBlank()) onOpenProfile(r)
+            }
             tvCaption.text = reel.caption()
             tvViews.text = viewsLabel(viewsShown[reel.id] ?: reel.views)
             ivThumbnail.visibility = View.VISIBLE
