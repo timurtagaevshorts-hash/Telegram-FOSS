@@ -157,10 +157,11 @@ class YuzPlayBilling(
         val params = QueryProductDetailsParams.newBuilder()
             .setProductList(productList)
             .build()
-        client.queryProductDetailsAsync(params) { result, detailsResult ->
+        // billing 5.2.1: qayta wang (callback) to'g'ridan-to'g'ri
+        // List<ProductDetails> beradi — ProductDetailsResponse obyekti 6.x+ da.
+        client.queryProductDetailsAsync(params) { result, detailsList ->
             if (result.responseCode != BillingClient.BillingResponseCode.OK) return@queryProductDetailsAsync
             productDetailsMap.clear()
-            val detailsList = detailsResult.productDetailsList ?: mutableListOf()
             detailsList.forEach { details ->
                 productDetailsMap[details.productId] = details
                 val price = details.oneTimePurchaseOfferDetails?.formattedPrice ?: return@forEach
