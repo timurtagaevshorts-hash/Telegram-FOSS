@@ -8,7 +8,6 @@ import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
 import com.android.billingclient.api.BillingResult
-import com.android.billingclient.api.PendingPurchasesParams
 import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
@@ -60,11 +59,7 @@ class YuzPlayBilling(
         }
         billingClient = BillingClient.newBuilder(activity)
             .setListener(this)
-            .enablePendingPurchases(
-                PendingPurchasesParams.newBuilder()
-                    .enableOneTimeProducts()
-                    .build()
-            )
+            .enablePendingPurchases() // billing 5.2.1: paramsli variant 6.0.1+ da
             .build()
         connect()
     }

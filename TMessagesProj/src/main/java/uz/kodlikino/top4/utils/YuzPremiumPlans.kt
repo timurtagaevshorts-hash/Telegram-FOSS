@@ -9,7 +9,7 @@ import java.util.Locale
  *
  * Ijro darajasi (oldingi loyiha bilan bir xil): Google Play Billing orqali
  * sotib olingach holat mahalliy prefs'ga yoziladi ([YuzPremiumManager]).
- * Firestore `users/*` qoidalari bilan berkitilgan, `comment_profiles` da esa
+ * Firestore `users` kolleksiyasi qoidalari bilan berkitilgan, `comment_profiles` da esa
  * premium maydonlarini client o'zgartira olmaydi — shuning uchun mirrors
  * faqat "best-effort" (jimgina rad etiladi), haqiqiy grant Play Purchase
  * tekshiruvida (Google imzosi).

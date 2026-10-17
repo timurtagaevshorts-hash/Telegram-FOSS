@@ -9,7 +9,7 @@ import android.util.Log
  * Saqlash: mahalliy `SharedPreferences` ("premium_prefs"), kalit tarif
  * `premium_plan_<uid>` — bu yerda uid = `tg_<clientUserId>`
  * ([YuzGramAdsAuth.expectedUid]). Donor bilan bir xil sabab: Firestore
- * qoidalarida `users/*` berkitilgan va `comment_profiles` premium
+ * qoidalarida `users` hujjatlari berkitilgan va `comment_profiles` premium
  * maydonlarini client'ga o'zgartirish taqiqlangan — Play Billing'da xarid
  * Google tomonidan imzolanib tasdiqlangach holat shu qurilmada yoza­miladi.
  *

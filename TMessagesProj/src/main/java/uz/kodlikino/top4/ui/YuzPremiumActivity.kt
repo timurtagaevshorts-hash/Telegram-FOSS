@@ -27,7 +27,7 @@ import uz.kodlikino.top4.utils.YuzPremiumPlans
  *  - ikki tarif kartasi (Premium Kino 12 000 / To'liq Premium 220 000 so'm);
  *  - Google Play Billing (INAPP) orqali xarid + acknowledge + restore;
  *  - grant mahalliy prefs'ga ([YuzPremiumManager]) yoziladi — donor bilan
- *    bir xil (Firestore `users/*` qoida bilan berkitilgan, `comment_profiles`
+ *    bir xil (Firestore `users` kolleksiyasi qoidasi bilan berkitilgan, `comment_profiles`
  *    premium maydonlari client'ga taqiqlangan — mirror best-effort);
  *  - sotib olingach muvaffaqiyat overlay'i ko'rsatiladi.
  *
