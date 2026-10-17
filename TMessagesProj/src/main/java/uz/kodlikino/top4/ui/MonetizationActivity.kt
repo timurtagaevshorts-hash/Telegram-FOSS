@@ -274,7 +274,6 @@ class MonetizationActivity : BaseFragment() {
             setTextColor(resources.getColor(R.color.text_primary, null))
             textSize = 15f
             maxLines = 2
-            ellipsize = android.text.TextUtils.Truncate.END
         }
         val views = TextView(ctx).apply {
             text = getString(R.string.monet_reel_views, reel.views)
