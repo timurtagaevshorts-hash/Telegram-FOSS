@@ -38,6 +38,7 @@ class KinoDetailActivity(private val movie: Movie) : BaseFragment() {
             .inflate(R.layout.fragment_kino_detail, null) as ViewGroup
         fragmentView = root
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         val topBar = root.findViewById<View>(R.id.kinoDetailTopBar)
         YuzTopInset.applyPadding(topBar)

@@ -25,6 +25,7 @@ class FunksiyalarActivity : BaseFragment() {
         fragmentView = root
 
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         // Pastki bar: ro'yxatni pastga surganda g'oyib, tepaga surganda darhol
         // qaytadi (sahifa tepasiga chiqish shart emas).

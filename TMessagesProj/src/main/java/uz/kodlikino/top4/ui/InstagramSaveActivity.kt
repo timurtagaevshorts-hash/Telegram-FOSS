@@ -63,6 +63,7 @@ class InstagramSaveActivity : BaseFragment() {
         fragmentView = root
 
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         val toolbar = root.findViewById<Toolbar>(R.id.instagramSaveToolbar)
         YuzTopInset.applyPadding(toolbar)

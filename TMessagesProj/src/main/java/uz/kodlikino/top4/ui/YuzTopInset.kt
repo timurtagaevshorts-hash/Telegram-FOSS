@@ -2,6 +2,7 @@ package uz.kodlikino.top4.ui
 
 import android.view.View
 import org.telegram.messenger.AndroidUtilities
+import org.telegram.ui.ActionBar.ActionBar
 
 /**
  * Yuz ekranlari uchun tepadagi status-bar bo'shlig'i.
@@ -20,6 +21,23 @@ import org.telegram.messenger.AndroidUtilities
  * sakrash ham bo'lmaydi.
  */
 object YuzTopInset {
+
+    /**
+     * "Qora boshliq"ning ASOSIY sababi: Yuz sahifalari ActionBar'ni
+     * `visibility = GONE` qiladi, lekin ActionBarLayout GONE bo'lgan
+     * ActionBar'ning o'lchangan balandligini (status bar + 56dp) baribir
+     * fragment tepasida zaxiralaydi — ustda bo'sh qora lenta qoladi.
+     * Har fragment o'z ActionBar nusxasiga ega, shuning uchun GLOBAL
+     * o'zgartirishsiz mahalliy yopamiz: o'lchan balandlik
+     * 56dp + 0 (occupyStatusBar=false) + (-56dp) = 0 → fragment y=0 dan
+     * (edge-to-edge) boshlanadi, fon status bar ostiga ham yoyiladi;
+     * [applyPadding] keyin haqiqiy status-bar offset'ni o'zi hisoblaydi.
+     */
+    fun collapseActionBar(bar: ActionBar?) {
+        val b = bar ?: return
+        b.setOccupyStatusBar(false)
+        b.setExtraHeight(-ActionBar.getCurrentActionBarHeight())
+    }
 
     fun applyPadding(view: View?) {
         val v = view ?: return

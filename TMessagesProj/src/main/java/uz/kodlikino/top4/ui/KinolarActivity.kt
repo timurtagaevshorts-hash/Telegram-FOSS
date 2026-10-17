@@ -44,6 +44,7 @@ class KinolarActivity : BaseFragment() {
             .inflate(R.layout.fragment_kinolar, null) as ViewGroup
         fragmentView = root
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         val topBar = root.findViewById<View>(R.id.kinoTopBar)
         YuzTopInset.applyPadding(topBar)

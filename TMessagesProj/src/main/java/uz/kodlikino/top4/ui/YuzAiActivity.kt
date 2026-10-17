@@ -58,6 +58,7 @@ class YuzAiActivity : BaseFragment() {
             .inflate(R.layout.fragment_yuz_ai, null) as ViewGroup
         fragmentView = root
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         YuzTopInset.applyPadding(root.findViewById<View>(R.id.aiTopBar))
         root.findViewById<View>(R.id.btnAiBack)?.setOnClickListener {

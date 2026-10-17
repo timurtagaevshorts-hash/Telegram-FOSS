@@ -60,6 +60,7 @@ class YuzPremiumActivity : BaseFragment() {
         fragmentView = root
 
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         scroll = root.findViewById(R.id.premiumScroll)
         overlay = root.findViewById(R.id.premiumApprovedOverlay)

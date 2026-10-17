@@ -118,6 +118,7 @@ class ReelsActivity @JvmOverloads constructor(
         fragmentView = root
 
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         reelsList = root.findViewById(R.id.rvReels)
         reelsTopBar = root.findViewById(R.id.reelsTopBar)

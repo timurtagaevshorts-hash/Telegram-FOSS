@@ -86,6 +86,7 @@ class ClassifiedAdDetailActivity(
         fragmentView = root
 
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         toolbar = root.findViewById(R.id.toolbar)
         vpImages = root.findViewById(R.id.vpImages)

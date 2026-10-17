@@ -88,6 +88,7 @@ class CreateJobCardActivity(
         fragmentView = root
 
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         toolbar = root.findViewById(R.id.toolbar)
         spinnerListingType = root.findViewById(R.id.spinnerListingType)

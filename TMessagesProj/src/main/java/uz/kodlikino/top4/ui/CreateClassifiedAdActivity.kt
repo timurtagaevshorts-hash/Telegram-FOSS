@@ -92,6 +92,7 @@ class CreateClassifiedAdActivity(
         fragmentView = root
 
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         toolbar = root.findViewById(R.id.toolbar)
         spinnerCategory = root.findViewById(R.id.spinnerCategory)

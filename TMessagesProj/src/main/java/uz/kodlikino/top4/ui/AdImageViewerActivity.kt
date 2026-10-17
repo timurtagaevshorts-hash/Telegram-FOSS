@@ -57,6 +57,7 @@ class AdImageViewerActivity(
         fragmentView = root
 
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         vpViewer = root.findViewById(R.id.vpViewer)
         tvCounter = root.findViewById(R.id.tvViewerCounter)

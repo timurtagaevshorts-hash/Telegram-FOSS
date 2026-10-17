@@ -56,6 +56,7 @@ class JobCardsActivity : BaseFragment() {
         fragmentView = root
 
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         val header = root.findViewById<View>(R.id.jobCardsAppBar)
         YuzTopInset.applyPadding(header)

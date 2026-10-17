@@ -35,6 +35,7 @@ class KinoPlayerActivity(
             .inflate(R.layout.fragment_kino_player, null) as ViewGroup
         fragmentView = root
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         webView = root.findViewById(R.id.kinoWebView)
         progress = root.findViewById(R.id.kinoPlayerProgress)

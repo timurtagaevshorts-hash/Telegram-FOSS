@@ -95,6 +95,7 @@ class ElonlarActivity : BaseFragment() {
 
         // Telegram'ning o'z action bari kerak emas — feed'ning o'z header'i bor.
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         adsAppBar = root.findViewById(R.id.adsAppBar)
         rvAds = root.findViewById(R.id.rvClassifiedAds)

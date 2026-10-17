@@ -78,6 +78,7 @@ class TaxiCallActivity : BaseFragment() {
             .inflate(R.layout.fragment_taksi_call, null) as ViewGroup
         fragmentView = root
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         val toolbar = root.findViewById<Toolbar>(R.id.taksiToolbar)
         YuzTopInset.applyPadding(toolbar)

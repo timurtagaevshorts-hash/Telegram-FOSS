@@ -87,6 +87,7 @@ class CreateReelActivity : BaseFragment() {
         fragmentView = root
 
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         toolbar = root.findViewById(R.id.toolbar)
         btnPickVideo = root.findViewById(R.id.btnPickVideo)

@@ -67,6 +67,7 @@ class JobCardDetailActivity(
         fragmentView = root
 
         actionBar?.visibility = View.GONE
+        YuzTopInset.collapseActionBar(actionBar)
 
         toolbar = root.findViewById(R.id.toolbar)
         ivHero = root.findViewById(R.id.ivHero)
