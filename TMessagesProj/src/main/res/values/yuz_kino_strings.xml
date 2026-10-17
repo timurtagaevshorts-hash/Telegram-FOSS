@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hub kartasi -->
+    <string name="func_kinolar_title">Kinolar</string>
+    <string name="func_kinolar_desc">Filmlar va multfilmlarni ko\'rish</string>
+
+    <!-- Feed -->
+    <string name="kino_title">Kinolar</string>
+    <string name="kino_admin">Admin panel</string>
+    <string name="kino_loading">Yuklanmoqda…</string>
+    <string name="kino_empty">Hozircha kinolar yo\'q</string>
+    <string name="kino_watch">Ko\'rish</string>
+    <string name="kino_views">%1$s ko\'rish</string>
+    <string name="kino_rating">⭐ %1$s</string>
+    <string name="kino_back">Orqaga</string>
+
+    <!-- Detail -->
+    <string name="kino_not_found">Kino topilmadi</string>
+    <string name="kino_no_url">Video havolasi yo\'q</string>
+
+    <!-- Player -->
+    <string name="kino_player_loading">Video tayyorlanmoqda…</string>
+
+    <!-- Admin login -->
+    <string name="kino_admin_title">Admin panelga kirish</string>
+    <string name="kino_admin_desc">Kino qo\'shish uchun login va parolingizni kiriting</string>
+    <string name="kino_admin_hint_user">Login</string>
+    <string name="kino_admin_hint_pass">Parol</string>
+    <string name="kino_admin_login">Kirish</string>
+    <string name="kino_admin_need_fields">Login va parolni kiriting</string>
+    <string name="kino_admin_failed">%1$s</string>
+    <string name="kino_admin_welcome">Xush kelibsiz, %1$s</string>
+
+    <!-- Admin manage -->
+    <string name="kino_admin_manage">Kinolarni boshqarish</string>
+    <string name="kino_admin_add">+ Yangi kino</string>
+    <string name="kino_admin_edit">Tahrirlash</string>
+    <string name="kino_admin_delete">O\'chirish</string>
+    <string name="kino_admin_saved">Saqlandi</string>
+    <string name="kino_admin_save_failed">Saqlanmadi: %1$s</string>
+    <string name="kino_admin_deleted">O\'chirildi</string>
+    <string name="kino_admin_delete_confirm">\"%1$s\" o\'chirilsinmi?</string>
+    <string name="kino_admin_count">%1$d ta kino</string>
+
+    <!-- Add/Edit dialog -->
+    <string name="kino_dlg_title_add">Yangi kino</string>
+    <string name="kino_dlg_title_edit">Kinoni tahrirlash</string>
+    <string name="kino_f_title">Nomi *</string>
+    <string name="kino_f_video">Video URL (mp4 / m3u8 / Drive) *</string>
+    <string name="kino_f_genre">Janr</string>
+    <string name="kino_f_category">Kategoriya</string>
+    <string name="kino_f_year">Yil</string>
+    <string name="kino_f_duration">Davomiyligi</string>
+    <string name="kino_f_rating">Reyting</string>
+    <string name="kino_f_image">Poster URL</string>
+    <string name="kino_f_banner">Banner URL</string>
+    <string name="kino_f_desc">Tavsif</string>
+    <string name="kino_f_adult">18+</string>
+    <string name="kino_f_premium">Premium</string>
+    <string name="kino_f_multfilm">Multfilm</string>
+    <string name="kino_f_required">Nomi va video URL majburiy</string>
+    <string name="kino_f_save">Saqlash</string>
+    <string name="kino_f_cancel">Bekor</string>
+</resources>
