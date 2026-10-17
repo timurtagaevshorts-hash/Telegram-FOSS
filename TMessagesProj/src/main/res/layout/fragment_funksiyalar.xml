@@ -102,23 +102,6 @@
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardMonet"
-            style="@style/FuncsionCard">
-
-            <LinearLayout style="@style/FuncsionCardRow">
-
-                <TextView style="@style/FuncsionCardIcon" android:text="💎" />
-
-                <LinearLayout style="@style/FuncsionCardText">
-                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_monet_title" />
-                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_monet_desc" />
-                </LinearLayout>
-
-                <ImageView style="@style/FuncsionCardChevron" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardKinolar"
             style="@style/FuncsionCard">
 

@@ -42,9 +42,6 @@ class FunksiyalarActivity : BaseFragment() {
         root.findViewById<View>(R.id.cardInstagram)?.setOnClickListener {
             presentFragment(InstagramSaveActivity(), false)
         }
-        root.findViewById<View>(R.id.cardMonet)?.setOnClickListener {
-            presentFragment(MonetizationActivity(), false)
-        }
         root.findViewById<View>(R.id.cardKinolar)?.setOnClickListener {
             presentFragment(KinolarActivity(), false)
         }

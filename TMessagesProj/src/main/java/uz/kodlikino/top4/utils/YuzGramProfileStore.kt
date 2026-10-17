@@ -8,21 +8,18 @@ import kotlinx.coroutines.withContext
 
 /**
  * YuzGram profili — Firestore `comment_profiles/{tg_<id>}` hujjati ustidagi
- * o'qish va (faqat O'ZI uchun) yaratish. Instagram uslubidagi profil ekrani
- * shu minimal kesimni ishlatadi: nom / rasm / bio + "bu foydalanuvchi YuzGram
- * foydalanuvchimi?" aniqlashi.
+ * o'qish va (faqat O'ZI uchun) yaratish. Profil ekrani shu minimal kesimni
+ * ishlatadi: nom / rasm / bio + "bu foydalanuvchi YuzGram foydalanuvchimi?"
+ * aniqlashi (Telegram ma'lumotlari uchun to'ldiruvchi manba).
  *
  * Qoida (firestore.rules `comment_profiles/{uid}`):
  *  - read  — istalgan `signedIn()` (shuning uchun profil ko'rishdan oldin
  *    [YuzGramAdsAuth.ensureSignedIn] chaqiriladi);
- *  - create — faqat o'zi (`isTelegramUser() && isOwner(uid) && commentProfileCreateSafe`);
- *  - followerCount increment — istalgan `signedIn()` ([FollowManager.follow]
- *    maqsad profiliga `+1` yozadi), lekin faqat hujjat MAVJUD bo'lsa (aks holda
- *    bu create hisoblanadi va rad etiladi).
+ *  - create — faqat o'zi (`isTelegramUser() && isOwner(uid) && commentProfileCreateSafe`).
  *
  * Shu sababli [ensureSelfProfile] har bir YuzGram foydalanuvchisi uchun o'z
- * hujjatini bir marta yaratadi — keyinchalik boshqalar unga obuna bola olsin.
- * Biz begona hujjat yarata olmaymiz (rule taqiqlaydi), faqat o'zimiznikini.
+ * hujjatini bir marta yaratadi. Biz begona hujjat yarata olmaymiz (rule
+ * taqiqlaydi), faqat o'zimiznikini.
  */
 object YuzGramProfileStore {
 
@@ -73,8 +70,7 @@ object YuzGramProfileStore {
      * HECH NARSA o'zgartirmaymiz — update qoidasiga (commentProfilePatchKeys)
      * urilmaymiz; nom/rasm keyinroq o'zi tomonidan yangilanadi.
      *
-     * @param photoUrl Telegram rasm URL'i yoki bo'sh — [FollowManager.follow]
-     *        bilan keladigan followerCount `+1` shu hujjatga tushishi uchun kerak.
+     * @param photoUrl Telegram rasm URL'i yoki bo'sh — profil kartoshkasi uchun.
      */
     suspend fun ensureSelfProfile(
         uid: String,
@@ -104,8 +100,6 @@ object YuzGramProfileStore {
                         "isPremium" to false,
                         "monetizationVerified" to false,
                         "premiumPlanType" to "",
-                        "followerCount" to 0,
-                        "followingCount" to 0,
                         "createdAt" to System.currentTimeMillis()
                     )
                 )
