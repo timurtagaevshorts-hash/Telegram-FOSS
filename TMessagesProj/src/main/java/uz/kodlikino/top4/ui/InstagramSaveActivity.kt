@@ -65,10 +65,7 @@ class InstagramSaveActivity : BaseFragment() {
         actionBar?.visibility = View.GONE
 
         val toolbar = root.findViewById<Toolbar>(R.id.instagramSaveToolbar)
-        toolbar.setPadding(
-            toolbar.paddingLeft, AndroidUtilities.statusBarHeight,
-            toolbar.paddingRight, toolbar.paddingBottom
-        )
+        YuzTopInset.applyPadding(toolbar)
         toolbar.setNavigationOnClickListener { removeSelfFromStack() }
 
         etLink = root.findViewById(R.id.etInstagramLink)

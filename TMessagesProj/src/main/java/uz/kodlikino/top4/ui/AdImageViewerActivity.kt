@@ -63,13 +63,8 @@ class AdImageViewerActivity(
         btnBack = root.findViewById(R.id.btnViewerBack)
         tvHint = root.findViewById(R.id.tvViewerHint)
 
-        // Qora fonda ustki qatorlar status bar ostiga tushmasin.
-        root.setPadding(
-            root.paddingLeft,
-            AndroidUtilities.statusBarHeight,
-            root.paddingRight,
-            root.paddingBottom
-        )
+        // Qora fonda ustki qatorlar status bar bilan kesishmasin — haqiqiy inset.
+        YuzTopInset.applyPadding(root)
 
         btnBack?.setOnClickListener { removeSelfFromStack() }
 

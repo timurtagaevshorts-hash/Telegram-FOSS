@@ -61,10 +61,7 @@ class KinoAdminActivity : BaseFragment() {
         actionBar?.visibility = View.GONE
 
         val topBar = root.findViewById<View>(R.id.kinoAdminTopBar)
-        topBar?.setPadding(
-            topBar.paddingLeft, AndroidUtilities.statusBarHeight,
-            topBar.paddingRight, topBar.paddingBottom
-        )
+        YuzTopInset.applyPadding(topBar)
         root.findViewById<View>(R.id.btnKinoAdminBack)?.setOnClickListener { removeSelfFromStack() }
 
         loginPanel = root.findViewById(R.id.loginPanel)

@@ -58,7 +58,7 @@ class JobCardsActivity : BaseFragment() {
         actionBar?.visibility = View.GONE
 
         val header = root.findViewById<View>(R.id.jobCardsAppBar)
-        header?.setPadding(0, AndroidUtilities.statusBarHeight, 0, 0)
+        YuzTopInset.applyPadding(header)
 
         tabSections = root.findViewById(R.id.tabJobSections)
         rvJobCards = root.findViewById(R.id.rvJobCards)

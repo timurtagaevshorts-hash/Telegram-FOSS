@@ -127,15 +127,9 @@ class ReelsActivity @JvmOverloads constructor(
         // Bo'sh/xato holatida xabarni bosish qayta yuklaydi (tarmoq shu yerda beqaror).
         emptyView?.setOnClickListener { loadReels() }
 
-        // Status bari ostiga tushmasligi uchun overlay'ga tepa bo'shliq.
-        reelsTopBar?.let { bar ->
-            bar.setPadding(
-                bar.paddingLeft,
-                AndroidUtilities.statusBarHeight + bar.paddingTop,
-                bar.paddingRight,
-                bar.paddingBottom
-            )
-        }
+        // Status bari bilan "bosh qora joy" qolmasin — haqiqiy inset bo'yicha
+        // (edge-to-edge bo'lsa to'liq offset, aks holda 0).
+        YuzTopInset.applyPadding(reelsTopBar)
 
         val reelsAdapter = ReelsAdapter(
             appContext = themed,

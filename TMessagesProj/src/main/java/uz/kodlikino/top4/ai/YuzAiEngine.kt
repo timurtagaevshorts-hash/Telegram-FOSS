@@ -64,13 +64,13 @@ object YuzAiEngine {
     }
 
     private fun peerName(controller: MessagesController, peer: TLRPC.Peer): String? {
-        if (peer.user_id != 0) {
+        if (peer.user_id != 0L) {
             val user = controller.getUser(peer.user_id) ?: return null
             if (UserObject.isReplyUser(user)) return null
             return UserObject.getUserName(user)
-        } else if (peer.chat_id != 0) {
+        } else if (peer.chat_id != 0L) {
             return controller.getChat(peer.chat_id)?.title
-        } else if (peer.channel_id != 0) {
+        } else if (peer.channel_id != 0L) {
             return controller.getChat(-peer.channel_id)?.title
         }
         return null
@@ -78,11 +78,11 @@ object YuzAiEngine {
 
     private fun peerNameLower(controller: MessagesController, peer: TLRPC.Peer, usernameOnly: Boolean): String? {
         return try {
-            if (peer.user_id != 0) {
+            if (peer.user_id != 0L) {
                 val u = controller.getUser(peer.user_id) ?: return null
                 if (usernameOnly) u.username?.takeIf { it.isNotBlank() } else u.username
             } else {
-                val chat = if (peer.chat_id != 0) controller.getChat(peer.chat_id)
+                val chat = if (peer.chat_id != 0L) controller.getChat(peer.chat_id)
                 else controller.getChat(-peer.channel_id)
                 if (usernameOnly) chat?.username?.takeIf { it.isNotBlank() } else chat?.username
             }

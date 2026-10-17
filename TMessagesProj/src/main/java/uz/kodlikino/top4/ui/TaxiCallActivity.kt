@@ -80,10 +80,7 @@ class TaxiCallActivity : BaseFragment() {
         actionBar?.visibility = View.GONE
 
         val toolbar = root.findViewById<Toolbar>(R.id.taksiToolbar)
-        toolbar.setPadding(
-            toolbar.paddingLeft, AndroidUtilities.statusBarHeight,
-            toolbar.paddingRight, toolbar.paddingBottom
-        )
+        YuzTopInset.applyPadding(toolbar)
         toolbar.setNavigationOnClickListener { removeSelfFromStack() }
 
         mapView = root.findViewById(R.id.taksiMap)
@@ -111,23 +108,35 @@ class TaxiCallActivity : BaseFragment() {
 
     private fun setupMap() {
         val map = mapView ?: return
-        map.setTileSource(TileSourceFactory.MAPNIK)
-        map.setTilesScaledToDpi(true)
-        map.setMultiTouchControls(true)
-        map.controller.setZoom(15.0)
-        map.controller.setCenter(GeoPoint(latitude, longitude))
-        tvPickup?.text = getString(R.string.taksi_locating)
-        map.addMapListener(object : MapListener {
-            override fun onScroll(event: ScrollEvent?): Boolean {
-                scheduleGeocode()
-                return false
-            }
+        // Osmdroid/xarita katlamany any bir sabab bilan yiqilishi mumkin
+        // (kesh, tarmoq, ROM). Bu ekran CRASH qilmasligi kerak: xarita
+        // bo'lmasa ham buyurtma standart koordinatalar bilan yuboriladi.
+        try {
+            map.setTileSource(TileSourceFactory.MAPNIK)
+            map.setTilesScaledToDpi(true)
+            map.setMultiTouchControls(true)
+            map.controller.setZoom(15.0)
+            map.controller.setCenter(GeoPoint(latitude, longitude))
+            tvPickup?.text = getString(R.string.taksi_locating)
+            map.addMapListener(object : MapListener {
+                override fun onScroll(event: ScrollEvent?): Boolean {
+                    scheduleGeocode()
+                    return false
+                }
 
-            override fun onZoom(event: ZoomEvent?): Boolean {
-                scheduleGeocode()
-                return false
+                override fun onZoom(event: ZoomEvent?): Boolean {
+                    scheduleGeocode()
+                    return false
+                }
+            })
+        } catch (e: Exception) {
+            try {
+                map.visibility = View.GONE
+            } catch (_: Exception) {
             }
-        })
+            tvPickup?.text = getString(R.string.taksi_map_failed)
+            addressLabel = ""
+        }
         ensureLocationPermission()
         moveToMyLocation()
     }
@@ -152,7 +161,10 @@ class TaxiCallActivity : BaseFragment() {
             latitude = loc.latitude
             longitude = loc.longitude
             hasCoords = true
-            map.controller.animateTo(GeoPoint(latitude, longitude))
+            try {
+                map.controller.animateTo(GeoPoint(latitude, longitude))
+            } catch (_: Exception) {
+            }
             scheduleGeocode(immediate = true)
         }
     }
@@ -181,7 +193,10 @@ class TaxiCallActivity : BaseFragment() {
     override fun onResume() {
         super.onResume()
         actionBar?.visibility = View.GONE
-        mapView?.onResume()
+        try {
+            mapView?.onResume()
+        } catch (_: Exception) {
+        }
     }
 
     override fun onFragmentDestroy() {
@@ -200,17 +215,31 @@ class TaxiCallActivity : BaseFragment() {
 
     private fun startListening() {
         if (uid.isBlank()) return
-        ordersListener = repo.listenUserOrders(uid, onChange = { orders ->
-            val active = orders.firstOrNull { repo.isActiveTrackingStatus(it.status) }
-            if (active != null) {
-                activeOrderId = active.id
-                activeCard?.visibility = View.VISIBLE
-                tvActiveStatus?.text = statusText(active)
-            } else {
-                activeOrderId = ""
-                activeCard?.visibility = View.GONE
-            }
-        })
+        // Ikki marta chaqirilsa (submit'dan keyin) eski dinlovchi takrorlanmasin.
+        try {
+            ordersListener?.remove()
+        } catch (_: Exception) {
+        }
+        ordersListener = try {
+            repo.listenUserOrders(uid, onChange = { orders ->
+                try {
+                    val active = orders.firstOrNull { repo.isActiveTrackingStatus(it.status) }
+                    if (active != null) {
+                        activeOrderId = active.id
+                        activeCard?.visibility = View.VISIBLE
+                        tvActiveStatus?.text = statusText(active)
+                    } else {
+                        activeOrderId = ""
+                        activeCard?.visibility = View.GONE
+                    }
+                } catch (_: Exception) {
+                }
+            }, onError = {
+                // Ruxsat/indeks xatosi foydachini crush qilmaydi — jim o'tamiz.
+            })
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun statusText(order: TaxiOrder): String {

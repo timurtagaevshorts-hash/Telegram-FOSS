@@ -100,12 +100,7 @@ class CreateReelActivity : BaseFragment() {
         btnPublish = root.findViewById(R.id.btnPublish)
 
         toolbar?.let { bar ->
-            bar.setPadding(
-                bar.paddingLeft,
-                AndroidUtilities.statusBarHeight,
-                bar.paddingRight,
-                bar.paddingBottom
-            )
+            YuzTopInset.applyPadding(bar)
             bar.setNavigationOnClickListener { removeSelfFromStack() }
         }
 

@@ -107,7 +107,7 @@ class CreateJobCardActivity(
         btnPublish = root.findViewById(R.id.btnPublish)
 
         toolbar?.apply {
-            setPadding(paddingLeft, AndroidUtilities.statusBarHeight, paddingRight, paddingBottom)
+            YuzTopInset.applyPadding(this)
             setNavigationOnClickListener { removeSelfFromStack() }
         }
 

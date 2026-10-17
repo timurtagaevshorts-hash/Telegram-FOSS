@@ -56,14 +56,28 @@ class TaxiOrderRepository {
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .limit(30)
             .addSnapshotListener { snap, error ->
-                if (error != null) {
-                    onError?.invoke(error)
-                    return@addSnapshotListener
+                // Eski/donor yozuvlarida maydon tiplari boshqacha bo'lsa
+                // (masalan createdAt = Timestamp) toObject() xato beradi —
+                // bu crash'ni ekranga yetkazmaymiz: bitta hujjatni o'tkazib
+                // yuboramiz, umumiy xatoni esa [onError]ga beramiz.
+                try {
+                    if (error != null) {
+                        onError?.invoke(error)
+                        return@addSnapshotListener
+                    }
+                    val list = snap?.documents
+                        ?.mapNotNull { doc ->
+                            try {
+                                doc.toObject(TaxiOrder::class.java)
+                            } catch (_: Exception) {
+                                null
+                            }
+                        }
+                        .orEmpty()
+                    onChange(list)
+                } catch (e: Exception) {
+                    onError?.invoke(e)
                 }
-                val list = snap?.documents
-                    ?.mapNotNull { it.toObject(TaxiOrder::class.java) }
-                    .orEmpty()
-                onChange(list)
             }
     }
 

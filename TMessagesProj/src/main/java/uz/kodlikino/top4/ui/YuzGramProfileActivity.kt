@@ -98,10 +98,7 @@ class YuzGramProfileActivity(
         actionBar?.visibility = View.GONE
 
         val topBar = root.findViewById<View>(R.id.profileTopBar)
-        topBar?.setPadding(
-            topBar.paddingLeft, AndroidUtilities.statusBarHeight,
-            topBar.paddingRight, topBar.paddingBottom
-        )
+        YuzTopInset.applyPadding(topBar)
 
         toolbarName = root.findViewById(R.id.tvProfileToolbarName)
         nameView = root.findViewById(R.id.tvProfileName)

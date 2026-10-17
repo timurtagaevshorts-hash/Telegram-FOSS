@@ -101,7 +101,7 @@ class ClassifiedAdDetailActivity(
 
         // Telegram action bar yashirilgan — Toolbar status bar ostiga tushmasin.
         toolbar?.apply {
-            setPadding(paddingLeft, AndroidUtilities.statusBarHeight, paddingRight, paddingBottom)
+            YuzTopInset.applyPadding(this)
             setNavigationOnClickListener { removeSelfFromStack() }
         }
 

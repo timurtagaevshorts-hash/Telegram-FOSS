@@ -46,10 +46,7 @@ class KinolarActivity : BaseFragment() {
         actionBar?.visibility = View.GONE
 
         val topBar = root.findViewById<View>(R.id.kinoTopBar)
-        topBar?.setPadding(
-            topBar.paddingLeft, AndroidUtilities.statusBarHeight,
-            topBar.paddingRight, topBar.paddingBottom
-        )
+        YuzTopInset.applyPadding(topBar)
         root.findViewById<View>(R.id.btnKinoBack)?.setOnClickListener { removeSelfFromStack() }
         root.findViewById<View>(R.id.btnKinoAdmin)?.setOnClickListener {
             presentFragment(KinoAdminActivity(), false)

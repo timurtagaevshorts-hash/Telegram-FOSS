@@ -80,7 +80,7 @@ class JobCardDetailActivity(
         btnDelete = root.findViewById(R.id.btnDelete)
 
         toolbar?.apply {
-            setPadding(paddingLeft, AndroidUtilities.statusBarHeight, paddingRight, paddingBottom)
+            YuzTopInset.applyPadding(this)
             setNavigationOnClickListener { removeSelfFromStack() }
         }
 

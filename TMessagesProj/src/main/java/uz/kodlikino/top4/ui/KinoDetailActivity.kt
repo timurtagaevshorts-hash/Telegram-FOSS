@@ -40,10 +40,7 @@ class KinoDetailActivity(private val movie: Movie) : BaseFragment() {
         actionBar?.visibility = View.GONE
 
         val topBar = root.findViewById<View>(R.id.kinoDetailTopBar)
-        topBar?.setPadding(
-            topBar.paddingLeft, AndroidUtilities.statusBarHeight,
-            topBar.paddingRight, topBar.paddingBottom
-        )
+        YuzTopInset.applyPadding(topBar)
         root.findViewById<View>(R.id.btnKinoDetailBack)?.setOnClickListener { removeSelfFromStack() }
 
         val banner = root.findViewById<ImageView>(R.id.ivKinoBanner)

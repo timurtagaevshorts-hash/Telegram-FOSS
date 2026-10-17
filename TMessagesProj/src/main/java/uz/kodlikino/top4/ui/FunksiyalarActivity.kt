@@ -32,10 +32,8 @@ class FunksiyalarActivity : BaseFragment() {
             YuzGramBarAutoHide.attachTo(root, this)
         }
 
-        // Status bari ostiga tushmasin — ichki ustun tepasiga bo'shliq.
-        (root.getChildAt(0) as? ViewGroup)?.setPadding(
-            0, AndroidUtilities.statusBarHeight, 0, 0
-        )
+        // Status bari bilan tepada "bosh qora joy" qolmasin — haqiqiy inset.
+        YuzTopInset.applyPadding(root.getChildAt(0))
 
         root.findViewById<View>(R.id.cardAi)?.setOnClickListener {
             presentFragment(YuzAiActivity(), false)

@@ -59,9 +59,7 @@ class YuzAiActivity : BaseFragment() {
         fragmentView = root
         actionBar?.visibility = View.GONE
 
-        root.findViewById<View>(R.id.aiTopBar)?.setPadding(
-            0, AndroidUtilities.statusBarHeight, 0, 0
-        )
+        YuzTopInset.applyPadding(root.findViewById<View>(R.id.aiTopBar))
         root.findViewById<View>(R.id.btnAiBack)?.setOnClickListener {
             stopAll()
             removeSelfFromStack()

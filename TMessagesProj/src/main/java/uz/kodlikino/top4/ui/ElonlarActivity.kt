@@ -111,8 +111,8 @@ class ElonlarActivity : BaseFragment() {
         etFilterMaxPrice = root.findViewById(R.id.etFilterMaxPrice)
         etFilterLocation = root.findViewById(R.id.etFilterLocation)
 
-        // Status bari ostiga tushmasligi uchun header'ga tepa bo'shliq.
-        adsAppBar?.setPadding(0, AndroidUtilities.statusBarHeight, 0, 0)
+        // Status bari bilan tepada bo'sh qora joy qolmasin — haqiqiy inset.
+        YuzTopInset.applyPadding(adsAppBar)
 
         rvAds?.apply {
             layoutManager = LinearLayoutManager(context)

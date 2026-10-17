@@ -5,6 +5,7 @@
     <string name="taksi_map_hint">Xaritani siljitib, olish nuqtasini belgilang</string>
     <string name="taksi_recenter">Mening joylashuvim</string>
     <string name="taksi_locating">Joylashuv aniqlanmoqda…</string>
+    <string name="taksi_map_failed">Xarita yuklanmadi — baribir buyurtma berishingiz mumkin</string>
     <string name="taksi_fill_phone">Telefon raqamingizni kiriting</string>
     <string name="taksi_pick_location">Avval xaritadan olish nuqtasini tanlang</string>
     <string name="taksi_phone_hint">Telefon raqamingiz</string>

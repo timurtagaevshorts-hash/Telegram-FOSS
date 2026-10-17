@@ -290,7 +290,10 @@ public class ApplicationLoader extends Application {
         } catch (Exception e) {
             FileLog.e(e);
         }
-        org.osmdroid.config.Configuration.getInstance().setUserAgentValue("Telegram-FOSS(F-Droid) "+VERSIONNAME);
+        // SET OSM USERAGENT — OSM tile servers brand "Telegram" UAsini bloklagan
+        // (403 → taksida xarita "yaxshi yuklanmasligi"). YuzGram brendi + aloqa
+        // manzili bilan policy-ga mos UA qo'yamiz.
+        org.osmdroid.config.Configuration.getInstance().setUserAgentValue("YuzGram/" + VERSIONNAME + " (uz.kodlikino.top4; +https://github.com/timurtagaevshorts-hash/Telegram-FOSS)");
         org.osmdroid.config.Configuration.getInstance().setOsmdroidBasePath(new File(getCacheDir(),"osmdroid"));
     }
 

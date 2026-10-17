@@ -70,16 +70,8 @@ class YuzPremiumActivity : BaseFragment() {
         btnPayKino = root.findViewById(R.id.btnPayKino)
         btnPayFull = root.findViewById(R.id.btnPayFull)
 
-        // Status bari ostiga tushmaslik uchun tepa bo'shliq (boshqa YuzGram
-        // ekranlari bilan bir xil usul).
-        root.findViewById<View>(R.id.premiumTopBar)?.let { bar ->
-            bar.setPadding(
-                bar.paddingLeft,
-                AndroidUtilities.statusBarHeight,
-                bar.paddingRight,
-                bar.paddingBottom
-            )
-        }
+        // Status bari bilan "bosh qora joy" qolmasin — haqiqiy inset bo'yicha.
+        YuzTopInset.applyPadding(root.findViewById<View>(R.id.premiumTopBar))
         root.findViewById<View>(R.id.btnPremiumBack)?.setOnClickListener { removeSelfFromStack() }
         root.findViewById<View>(R.id.btnApprovedClose)?.setOnClickListener { removeSelfFromStack() }
         root.findViewById<View>(R.id.btnRestorePurchases)?.setOnClickListener {
