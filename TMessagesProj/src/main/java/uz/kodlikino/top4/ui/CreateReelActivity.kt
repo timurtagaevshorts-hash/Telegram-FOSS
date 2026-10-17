@@ -30,6 +30,8 @@ import uz.kodlikino.top4.models.Reel
 import uz.kodlikino.top4.utils.ReelStorageHelper
 import uz.kodlikino.top4.utils.ReelsRepository
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
+import uz.kodlikino.top4.utils.YuzPremiumManager
+import uz.kodlikino.top4.utils.YuzReelQuota
 import uz.kodlikino.top4.utils.YuzUploadUi
 
 /**
@@ -47,6 +49,10 @@ import uz.kodlikino.top4.utils.YuzUploadUi
  *
  * Shu sababli rasm poster (thumbnail) YUKLANMAYDI — `user_reels/` yo'li faqat
  * video contentType'ga ruxsat beradi. Feed'da poster o'rniga birinchi kadr kutiladi.
+ *
+ * Haftalik kvot (Faza C, donor `UserReelUploadManager` moslamasi): oddiy
+ * foydalanuvchi 3 ta/hafta · 50 MB, To'liq Premium 30 ta/hafta · 100 MB —
+ * [YuzReelQuota] orqali (Firestore `user_reel_quota/{uid}`).
  */
 class CreateReelActivity : BaseFragment() {
 
@@ -60,6 +66,7 @@ class CreateReelActivity : BaseFragment() {
     private var btnPickVideo: View? = null
     private var tvPickVideoLabel: TextView? = null
     private var tvVideoName: TextView? = null
+    private var tvQuota: TextView? = null
     private var etCaption: TextInputEditText? = null
     private var etHashtags: TextInputEditText? = null
     private var uploadProgress: ProgressBar? = null
@@ -85,6 +92,7 @@ class CreateReelActivity : BaseFragment() {
         btnPickVideo = root.findViewById(R.id.btnPickVideo)
         tvPickVideoLabel = root.findViewById(R.id.tvPickVideoLabel)
         tvVideoName = root.findViewById(R.id.tvVideoName)
+        tvQuota = root.findViewById(R.id.tvQuotaInfo)
         etCaption = root.findViewById(R.id.etCaption)
         etHashtags = root.findViewById(R.id.etHashtags)
         uploadProgress = root.findViewById(R.id.uploadProgress)
@@ -105,7 +113,34 @@ class CreateReelActivity : BaseFragment() {
         btnPublish?.setOnClickListener { publishReel() }
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        refreshQuotaLabel()
         return root
+    }
+
+    /** To'liq Premium — reels uchun haftalik boost (30 ta + 100 MB). */
+    private fun premiumBoost(): Boolean {
+        val ctx = themedContext ?: context ?: return false
+        return YuzPremiumManager.from(ctx).hasReelsBoost(currentAccount)
+    }
+
+    /**
+     * "Haftalik limit: 2/3 ta · 50 MB gacha" — Firestore kvot hujjatini o'qib
+     * ko'rsatadi. Hujjat yo'q/xato bo'lsa 0 ishlatilgan hisoblanadi (limitni
+     * sun'iy qisqartirmaydi).
+     */
+    private fun refreshQuotaLabel() {
+        val s = scope ?: return
+        val uid = YuzGramAdsAuth.expectedUid(currentAccount)
+        if (uid.isBlank()) {
+            tvQuota?.visibility = View.GONE
+            return
+        }
+        val boosted = premiumBoost()
+        s.launch {
+            val remaining = YuzReelQuota.getRemainingUploads(uid, boosted)
+            tvQuota?.text = YuzReelQuota.quotaSummaryLabel(boosted, remaining)
+            tvQuota?.visibility = View.VISIBLE
+        }
     }
 
     private fun pickVideo() {
@@ -136,7 +171,7 @@ class CreateReelActivity : BaseFragment() {
         checkVideoSize(uri)
     }
 
-    /** Firestore/Storage qoidalari 200 MB dan kichik videoni talab qiladi. */
+    /** Storage qoidasi 200 MB, tier limiti 50/100 MB — tanlashda tekshiriladi. */
     private fun checkVideoSize(uri: Uri) {
         val ctx = context ?: return
         val s = scope ?: return
@@ -153,6 +188,16 @@ class CreateReelActivity : BaseFragment() {
                 tvPickVideoLabel?.text = getString(R.string.reels_pick_video)
                 tvVideoName?.visibility = View.GONE
                 toast(getString(R.string.reels_video_too_large))
+                return@launch
+            }
+            // Haftalik kvot (donor UserReelUploadManager): tier bo'yicha hajm
+            // chegarasi — bepul 50 MB, To'liq Premium 100 MB.
+            val maxBytes = YuzReelQuota.maxFileBytes(premiumBoost())
+            if (size > maxBytes) {
+                videoUri = null
+                tvPickVideoLabel?.text = getString(R.string.reels_pick_video)
+                tvVideoName?.visibility = View.GONE
+                toast(YuzReelQuota.sizeLimitMessage(premiumBoost(), size))
             }
         }
     }
@@ -217,8 +262,26 @@ class CreateReelActivity : BaseFragment() {
                 "mov", "mkv", "webm", "3gp", "mp4" -> rawExt!!
                 else -> "mp4"
             }
+            // Slot transaction bilan OLINDI — upload/save xatosida rollback
+            // qilinadi (donor UserReelUploadManager xatti-harakati).
+            var reservedUid: String? = null
             try {
                 val uid = YuzGramAdsAuth.ensureSignedIn(account)
+                val boosted = premiumBoost()
+                val reservation = YuzReelQuota.reserveUploadSlot(uid, boosted)
+                if (reservation.isFailure) {
+                    unlockingAfterFailure()
+                    val msg = reservation.exceptionOrNull()?.message
+                        ?: YuzReelQuota.limitExceededMessage(boosted)
+                    // Limit tugasa QAYTA URINISH foydasiz — dialog shunchaki xabar.
+                    YuzUploadUi.showError(themedContext ?: context, msg, onRetry = null)
+                    if (!boosted) {
+                        // Donor'ning upsell yo'li: premium ekraniga o'tkazamiz.
+                        presentFragment(YuzPremiumActivity(), false)
+                    }
+                    return@launch
+                }
+                reservedUid = uid
                 val url = ReelStorageHelper.uploadVideo(
                     uid, "$id.$ext", uri
                 ) { pct, transferred, total ->
@@ -252,16 +315,22 @@ class CreateReelActivity : BaseFragment() {
                 toast(getString(R.string.reels_published))
                 removeSelfFromStack()
             } catch (e: Exception) {
-                publishing = false
-                btnPublish?.isEnabled = true
-                uploadProgress?.visibility = View.GONE
-                tvUploadStatus?.visibility = View.GONE
-                YuzUploadUi.keepScreenOn(parentActivity, false)
+                reservedUid?.let { YuzReelQuota.releaseUploadSlot(it) }
+                unlockingAfterFailure()
                 val reason = e.message ?: getString(R.string.reels_publish_failed)
                 // Uzun sabab 2 soniyalik toast'da o'qilmaydi — dialog + qayta urinish.
                 YuzUploadUi.showError(themedContext ?: context, reason) { publishReel() }
             }
         }
+    }
+
+    /** UI qulflarini ochish (limit rad etilishi va yuklash xatoda bir xil). */
+    private fun unlockingAfterFailure() {
+        publishing = false
+        btnPublish?.isEnabled = true
+        uploadProgress?.visibility = View.GONE
+        tvUploadStatus?.visibility = View.GONE
+        YuzUploadUi.keepScreenOn(parentActivity, false)
     }
 
     /**
@@ -279,6 +348,8 @@ class CreateReelActivity : BaseFragment() {
     override fun onResume() {
         super.onResume()
         actionBar?.visibility = View.GONE
+        // Premium ekranidan qaytilgan bo'lishi mumkin — limit label'ini yangilaymiz.
+        refreshQuotaLabel()
     }
 
     override fun onFragmentDestroy() {

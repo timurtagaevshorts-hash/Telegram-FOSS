@@ -21,6 +21,7 @@ import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.models.Movie
 import uz.kodlikino.top4.utils.MoviesRepository
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
+import uz.kodlikino.top4.utils.YuzPremiumManager
 
 /** Kino sahifasi — banner, nom, meta, tavsif va "Ko'rish" tugmasi (→ pleyer). */
 class KinoDetailActivity(private val movie: Movie) : BaseFragment() {
@@ -99,6 +100,18 @@ class KinoDetailActivity(private val movie: Movie) : BaseFragment() {
         if (current.videoUrl.isBlank()) {
             toast(R.string.kino_no_url)
             return
+        }
+        // Premium kino — faqat Premium Kino/To'liq Premium obunachilarga
+        // (donor `PremiumManager.hasPremiumMovies` gating'ining fork moslamasi).
+        if (current.isPremium) {
+            val themed = themedContext ?: context
+            val unlocked = themed != null &&
+                YuzPremiumManager.from(themed).hasPremiumMovies(currentAccount)
+            if (!unlocked) {
+                toast(R.string.kino_premium_required)
+                presentFragment(YuzPremiumActivity(), false)
+                return
+            }
         }
         presentFragment(KinoPlayerActivity(current.videoUrl, current.title), false)
     }

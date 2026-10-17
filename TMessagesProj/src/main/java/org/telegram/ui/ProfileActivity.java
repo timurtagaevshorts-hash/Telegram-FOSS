@@ -3884,7 +3884,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             } else if (position == setAvatarRow) {
                 onWriteButtonClick();
             } else if (position == premiumRow) {
-                presentFragment(new PremiumPreviewFragment("settings"));
+                // YuzGram: "Telegram Premium" o'rniga — YuzGram Premium obuna
+                // ekrani (xuddi shu tugma dizayni saqlangan, qarang uz.kodlikino.top4).
+                presentFragment(new uz.kodlikino.top4.ui.YuzPremiumActivity(), false);
             } else if (position == starsRow) {
                 presentFragment(new StarsIntroActivity());
             } else if (position == businessRow) {
@@ -11175,7 +11177,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         textCell.setTextAndIcon(LocaleController.getString("AddToGroupOrChannel", R.string.AddToGroupOrChannel), R.drawable.msg_groups_create, false);
                         textCell.setColors(Theme.key_windowBackgroundWhiteBlueIcon, Theme.key_windowBackgroundWhiteBlueButton);
                     } else if (position == premiumRow) {
-                        textCell.setTextAndIcon(LocaleController.getString(R.string.TelegramPremium), new AnimatedEmojiDrawable.WrapSizeDrawable(PremiumGradient.getInstance().premiumStarMenuDrawable, dp(24), dp(24)), true);
+                        textCell.setTextAndIcon(LocaleController.getString(R.string.YuzGramPremium), new AnimatedEmojiDrawable.WrapSizeDrawable(PremiumGradient.getInstance().premiumStarMenuDrawable, dp(24), dp(24)), true);
                         textCell.setImageLeft(23);
                     } else if (position == starsRow) {
                         StarsController c = StarsController.getInstance(currentAccount);

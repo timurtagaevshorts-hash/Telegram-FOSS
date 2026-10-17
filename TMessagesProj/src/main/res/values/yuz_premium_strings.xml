@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  YuzGram Premium + reels kvotasi matnlari (o'zbekcha, ilova UTC-5 audotoriyasi).
+  Eski KinoTOP4 loyihasidagi hardcode xabarlarning fork versiyasi.
+-->
+<resources>
+    <string name="premium_back">←</string>
+    <string name="premium_screen_title">YuzGram Premium</string>
+    <string name="premium_hero_title">💎 YuzGram Premium</string>
+    <string name="premium_hero_subtitle">Kinolar va reelslar uchun to\'liq imtiyoz — Google Play orqali ulaning</string>
+    <string name="premium_restore">Xaridlarni tiklash</string>
+    <string name="premium_done_close">Yopish</string>
+    <string name="premium_pay_note">To\'lov Google Play orqali · tarif 1 yilga amal qiladi</string>
+    <string name="premium_play_price">Google Play narxi: %1$s</string>
+    <string name="premium_play_unavailable">Bu qurilmada Play orqali sotib olish mavjud emas</string>
+    <string name="premium_billing_off">Google Play Billing ulanmagan</string>
+    <string name="premium_need_sign_in">Avval Telegram orqali kiring</string>
+    <string name="premium_approved_kino">✅ Premium Kino faollashtirildi!</string>
+    <string name="premium_approved_full">✅ To\'liq Premium faollashtirildi!</string>
+    <string name="premium_approved_kino_sub">Endi premium kinolarni ko\'rishingiz mumkin.\nReels limiti oddiy foydalanuvchi kabi (3 ta/hafta).</string>
+    <string name="premium_approved_full_sub">Barcha imtiyozlar ochiq:\n• Premium kinolar\n• Haftasiga 30 tagacha reel\n• 100 MB gacha video</string>
+    <string name="premium_active_kino">Sizda Premium Kino faol!</string>
+    <string name="premium_active_full">Sizda To\'liq Premium faol!</string>
+    <string name="premium_active_kino_sub">Premium kinolar ochiq. To\'liq imkoniyatlar uchun yuqori tarifga o\'ting.</string>
+    <string name="premium_active_full_sub">Barcha premium imkoniyatlar ochiq.</string>
+    <string name="premium_checking_purchases">Xaridlar tekshirilmoqda...</string>
+
+    <!-- Sozlamalar ro'yxatidagi premium qatori (Telegram Premium o'rniga) -->
+    <string name="YuzGramPremium">YuzGram Premium</string>
+
+    <!-- Kino premium gating -->
+    <string name="kino_premium_required">Bu kino faqat Premium obunuchilar uchun 💎</string>
+
+    <!-- Reels kvotasi (CreateReel ekrani) -->
+    <string name="reels_quota_label">Haftalik limit: %1$d/%2$d ta · %3$s gacha</string>
+</resources>

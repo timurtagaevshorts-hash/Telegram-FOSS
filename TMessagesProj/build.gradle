@@ -76,6 +76,9 @@ dependencies {
     implementation "androidx.media3:media3-ui:$media3"
     implementation "androidx.media3:media3-common:$media3"
     implementation "androidx.media3:media3-datasource:$media3"
+    // Google Play Billing — YuzGram Premium to'lovi (donor 8.0.0, lekin u SDK 34
+    // talab qiladi; 5.2.1 = compileSdk 33 bilan yig'iladigan oxirgi qator).
+    implementation 'com.android.billingclient:billing:5.2.1'
     // OkHttp — Instagram resolver va taksi HTTP uchun. 4.12.0 compileSdk 33 / AGP 7.0.3 mos.
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     // Kotlin stdlib pinned to match the 1.8.22 compiler (also satisfies the jdk7/jdk8 constraints above).

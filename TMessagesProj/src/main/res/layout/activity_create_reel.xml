@@ -91,6 +91,18 @@
             android:textSize="12sp"
             android:visibility="gone" />
 
+        <!-- Haftalik kvot: "Haftalik limit: 2/3 ta · 50 MB gacha" (YuzReelQuota) -->
+        <TextView
+            android:id="@+id/tvQuotaInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
