@@ -4370,6 +4370,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             viewPage.itemTouchhelper = new ItemTouchHelper(viewPage.swipeController);
             viewPage.itemTouchhelper.attachToRecyclerView(viewPage.listView);
 
+            // YuzGram: pastki bar skroll yo'nalishiga qarab g'oyib/qaytadi (butun
+            // ilovadagi yagona xulq). Eski offset-ga qaragan mantiq setScrollY'dan
+            // olib tashlandi; nazorat endi shu listener'da.
+            uz.kodlikino.top4.ui.YuzGramBarAutoHide.attachTo(viewPage.listView, this);
+
             viewPage.listView.setOnScrollListener(new RecyclerView.OnScrollListener() {
 
                 private boolean wasManualScroll;
@@ -8888,13 +8893,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (fragmentView == null || value == scrollYOffset) {
             return;
         }
-        // YuzGram: pastki navigatsion bar skroll yo'nalishiga qarab. Ro'yxatni
-        // pastga (kontent yuqoriga) surganda bar yashirinadi; tepaga surganda yoki
-        // tepaga yetganda qayta ko'rinadi. Faqat Asosiy ildiz ekranda ishlaydi.
-        if (getParentActivity() instanceof LaunchActivity && isYuzGramMainRoot() && progressToActionMode == 0) {
-            boolean hideBar = value < 0f && value < scrollYOffset;
-            ((LaunchActivity) getParentActivity()).setYuzGramBarScrollHidden(hideBar);
-        }
+        // YuzGram: pastki bar endi skroll YO'NALISHI bo'yicha g'oyib/qaytadi
+        // (uz.kodlikino.top4.ui.YuzGramBarAutoHide — viewPage.listView'ga ulangan).
+        // Bu yerda header-collapse offset'iga qaragan eski, "tepagacha chiqishni
+        // kutadigan" logika olib tashlandi.
         scrollYOffset = value;
         if (topBulletin != null) {
             topBulletin.updatePosition();

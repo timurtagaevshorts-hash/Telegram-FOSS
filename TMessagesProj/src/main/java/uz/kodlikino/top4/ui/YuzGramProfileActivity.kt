@@ -11,6 +11,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.widget.NestedScrollView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -84,6 +85,14 @@ class YuzGramProfileActivity(
 
     private fun currentUid(): String = YuzGramAdsAuth.expectedUid(currentAccount)
 
+    /**
+     * LaunchActivity'ning pastki bar'i faqat root ekranda ko'rinadi. Bu YuzGram
+     * profili o'zimizniki bo'lsa ([isSelf]=true) — bottom bar'ning "Profil" tab'i
+     * uchun root hisoblanadi; begona profil ochilsa bar yashirilsin.
+     * Kotlin'da private ctor `val` Java'dan ko'rinmaydi, shuning uchun ochiq accessor.
+     */
+    fun isRootProfile(): Boolean = isSelf
+
     override fun createView(context: Context): View {
         val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
         themedContext = themed
@@ -129,6 +138,12 @@ class YuzGramProfileActivity(
             onDelete = { reel -> confirmDeleteReel(reel) })
         rvReels?.layoutManager = GridLayoutManager(themed, 3)
         rvReels?.adapter = reelsAdapter
+
+        // Pastki bar: profil sahifasi pastga surganda g'oyib, tepaga surganda
+        // darhol qaytadi (tepagacha chiqish shart emas).
+        (root.findViewById<View>(R.id.profileScroll) as? NestedScrollView)?.let {
+            YuzGramBarAutoHide.attachTo(it, this)
+        }
 
         if (isSelf) {
             btnSettings?.visibility = View.VISIBLE

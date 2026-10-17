@@ -264,6 +264,10 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     // YuzGram: bar ko'rinishi = (root ekrandamiz) AND (skroll yashirmagan).
     private boolean yuzGramBarEligible;
     private boolean yuzGramBarScrollHidden;
+    // YuzGram: bar'ni yashirgan/yozgan host fragment. Root ekrandan root ekranga
+    // o'tganda (masalan Asosiy→Profil) eski ekranning "yashirilgan" holati yangi
+    // ekrannga o'tib qolmasligi uchun saqlanadi — host o'zgarsa holat tiklanadi.
+    private BaseFragment yuzGramBarOwner;
     private ActionBarLayout layersActionBarLayout;
     private ActionBarLayout rightActionBarLayout;
     private RelativeLayout launchLayout;
@@ -7970,6 +7974,10 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         } else if (top instanceof uz.kodlikino.top4.ui.FunksiyalarActivity) {
             yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ELONLAR, yuzGramBottomBar.isShownBar());
             eligible = true;
+        } else if (top instanceof uz.kodlikino.top4.ui.YuzGramProfileActivity
+                && ((uz.kodlikino.top4.ui.YuzGramProfileActivity) top).isRootProfile()) {
+            yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_PROFIL, yuzGramBottomBar.isShownBar());
+            eligible = true;
         } else if (top instanceof ProfileActivity && ((ProfileActivity) top).myProfile) {
             yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_PROFIL, yuzGramBottomBar.isShownBar());
             eligible = true;
@@ -7979,8 +7987,11 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         } else {
             eligible = false;
         }
-        if (eligible != yuzGramBarEligible) {
-            // yangi ekranga kirdik — skroll yashirinishini tiklaymiz, bar qaytadan ko'rinadi
+        if (top != yuzGramBarOwner) {
+            // Yangi ekran oldinga chiqdi — skroll yashirinishi tiklanadi. Ilgari faqat
+            // eligible bayrog'i o'zgarganda tiklanardi, shuning uchun ikki root ekran
+            // (masalan Reels → Profil) o'rtasida bar yashiringan holatda qolib ketardi.
+            yuzGramBarOwner = top;
             yuzGramBarScrollHidden = false;
         }
         yuzGramBarEligible = eligible;
@@ -7992,16 +8003,28 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     }
 
     /**
-     * YuzGram: DialogsActivity skroll yo'nalishidan keladi.
-     * @param hidden true — ro'yxat pastga surilyapti, bar yashirilsin;
-     *               false — tepaga qaytyapti yoki tepadaman, bar ko'rsatilsin.
+     * YuzGram: skroll yo'nalishidan kelgan buyruq ([uz.kodlikino.top4.ui.YuzGramBarAutoHide]
+     * orqali, butun ilova bo'ylab bir xil xulq).
+     *
+     * @param source barni boshqarayotgan ekran — faqat oldinda turgan ekran ruxsat etiladi,
+     *               aks holda orqa fondagi (stack'dagi) skroll joriy ekranni yashirardi.
+     * @param hidden true — ro'yxat pastga surilyapti, bar g'oyib bo'lsin;
+     *               false — tepaga surilyapti, bar darhol qaytsin (tepagacha chiqish shart emas).
      */
-    public void setYuzGramBarScrollHidden(boolean hidden) {
+    public void setYuzGramBarScrollHidden(BaseFragment source, boolean hidden) {
         if (yuzGramBottomBar == null || !yuzGramBarEligible || yuzGramBarScrollHidden == hidden) {
+            return;
+        }
+        if (source != null && source != getLastFragment()) {
             return;
         }
         yuzGramBarScrollHidden = hidden;
         applyYuzGramBarVisibility();
+    }
+
+    /** Joriy skroll yashirinish holati — controller bu yerda flag saqlamaydi. */
+    public boolean isYuzGramBarScrollHidden() {
+        return yuzGramBarScrollHidden;
     }
 
     public static BaseFragment getLastFragment() {

@@ -161,6 +161,9 @@ class ReelsActivity @JvmOverloads constructor(
                     }
                 }
             })
+            // Pastki bar: keyingi reel'ga o'tganda (pastga) g'oyib, oldingisiga
+            // qaytganda (tepaga) darhol ko'rinadi — butun ilovadagi yagona xulq.
+            YuzGramBarAutoHide.attachTo(list, this)
         }
 
         root.findViewById<View>(R.id.btnPostReel)?.setOnClickListener { openCreate() }

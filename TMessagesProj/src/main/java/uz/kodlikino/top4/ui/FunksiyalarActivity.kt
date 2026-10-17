@@ -5,6 +5,7 @@ import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.widget.NestedScrollView
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.BaseFragment
@@ -24,6 +25,12 @@ class FunksiyalarActivity : BaseFragment() {
         fragmentView = root
 
         actionBar?.visibility = View.GONE
+
+        // Pastki bar: ro'yxatni pastga surganda g'oyib, tepaga surganda darhol
+        // qaytadi (sahifa tepasiga chiqish shart emas).
+        if (root is NestedScrollView) {
+            YuzGramBarAutoHide.attachTo(root, this)
+        }
 
         // Status bari ostiga tushmasin — ichki ustun tepasiga bo'shliq.
         (root.getChildAt(0) as? ViewGroup)?.setPadding(
