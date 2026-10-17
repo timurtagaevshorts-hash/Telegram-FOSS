@@ -17,7 +17,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
-import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,8 +40,8 @@ import java.util.Locale
  *  - avatar + ism + @username + bio (TDLib'dan; telefon raqami ko'rsatilmaydi);
  *  - Reels soni va 3 ustunli reel grid — katak bosilsa [ReelsActivity] scoped
  *      feed'da ochiladi;
- *  - [isSelf]=true → tepada sozlamalar (gear, native profil), pastda "Kontentni
- *      boshqarish" (reel'lar grid'ida ✕ o'chirish rejimi).
+ *  - [isSelf]=true → tepada sozlamalar (gear, native profil). Reel'larni
+ *      o'chirish endi native profilning "Reels" tab'ida (YuzProfileReelsView).
  *
  * Obuna (subscribe) tizimi loyihadan butunlay olib tashlangan — bu ekran faqat
  * profilni ko'rish va o'z reel'larini boshqarish uchun.
@@ -68,8 +67,6 @@ class YuzGramProfileActivity(
     private var tvReelsCount: TextView? = null
     private var rvReels: RecyclerView? = null
     private var emptyReels: TextView? = null
-    private var btnManage: MaterialButton? = null
-    private var tvManageHint: TextView? = null
     private var btnSettings: ImageButton? = null
 
     private var reelsAdapter: ProfileReelsAdapter? = null
@@ -81,7 +78,6 @@ class YuzGramProfileActivity(
     private var bio: String = ""
     private var photoUrl: String = ""
     private var reels: List<Reel> = emptyList()
-    private var manageMode = false
 
     private fun currentUid(): String = YuzGramAdsAuth.expectedUid(currentAccount)
 
@@ -116,8 +112,6 @@ class YuzGramProfileActivity(
         tvReelsCount = root.findViewById(R.id.tvReelsCount)
         rvReels = root.findViewById(R.id.rvProfileReels)
         emptyReels = root.findViewById(R.id.emptyProfileReels)
-        btnManage = root.findViewById(R.id.btnManageContent)
-        tvManageHint = root.findViewById(R.id.tvManageHint)
         btnSettings = root.findViewById(R.id.btnProfileSettings)
 
         root.findViewById<View>(R.id.btnProfileBack)?.setOnClickListener { removeSelfFromStack() }
@@ -148,8 +142,6 @@ class YuzGramProfileActivity(
         if (isSelf) {
             btnSettings?.visibility = View.VISIBLE
             btnSettings?.setOnClickListener { openNativeProfile() }
-            btnManage?.visibility = View.VISIBLE
-            btnManage?.setOnClickListener { toggleManageMode() }
         }
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -247,16 +239,6 @@ class YuzGramProfileActivity(
         if (!about.isNullOrBlank()) bio = about
     }
 
-    private fun toggleManageMode() {
-        manageMode = !manageMode
-        reelsAdapter?.manageMode = manageMode
-        btnManage?.text = getString(
-            if (manageMode) R.string.profile_manage_done else R.string.profile_manage_content
-        )
-        tvManageHint?.visibility = if (manageMode && reels.isNotEmpty()) View.VISIBLE else View.GONE
-        if (manageMode && reels.isNotEmpty()) rvReels?.requestFocus()
-    }
-
     private fun confirmDeleteReel(reel: Reel) {
         val activity = parentActivity ?: return
         val title = reel.title.ifBlank { reel.caption() }.ifBlank { getString(R.string.reels_title) }
@@ -289,7 +271,6 @@ class YuzGramProfileActivity(
                 if (reels.isEmpty()) {
                     emptyReels?.visibility = View.VISIBLE
                     rvReels?.visibility = View.GONE
-                    tvManageHint?.visibility = View.GONE
                 }
             } catch (e: Exception) {
                 if (fragmentView == null) return@launch

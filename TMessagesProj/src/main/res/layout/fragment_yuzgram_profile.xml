@@ -214,35 +214,6 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="14sp"
                 android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/tvManageHint"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="20dp"
-                android:layout_marginTop="12dp"
-                android:layout_marginEnd="20dp"
-                android:gravity="center"
-                android:text="@string/profile_manage_hint"
-                android:textColor="@color/home_accent"
-                android:textSize="12sp"
-                android:visibility="gone" />
-
-            <!-- Kontent boshqarish tugmasi (faqat self, pastda) -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnManageContent"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="20dp"
-                android:layout_marginTop="16dp"
-                android:layout_marginEnd="20dp"
-                android:text="@string/profile_manage_content"
-                android:textAllCaps="false"
-                android:textSize="15sp"
-                android:visibility="gone"
-                app:cornerRadius="14dp"
-                app:strokeColor="@color/modern_border" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </LinearLayout>
