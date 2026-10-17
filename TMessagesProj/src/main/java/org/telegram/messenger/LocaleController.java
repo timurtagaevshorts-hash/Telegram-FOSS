@@ -1335,6 +1335,14 @@ public class LocaleController {
     }
 
     private String getStringInternal(String key, String fallback, int fallbackRes, int res) {
+        // YuzGram brend qulfi: Telegram'ning bulut lokalizatsiyasi "AppName" ni
+        // "Telegram" deb qaytaradi va APK resursidagi "YuzGram" ni bosib ketadi.
+        // Brend nomi uchun doim mahalliy resurs (values/strings.xml) ishlatiladi.
+        if (res != 0 && ("AppName".equals(key) || "AppNameBeta".equals(key))) {
+            try {
+                return ApplicationLoader.applicationContext.getString(res);
+            } catch (Exception ignored) {}
+        }
         String value = BuildVars.USE_CLOUD_STRINGS ? localeValues.get(key) : null;
         if (value == null) {
             if (BuildVars.USE_CLOUD_STRINGS && fallback != null) {
