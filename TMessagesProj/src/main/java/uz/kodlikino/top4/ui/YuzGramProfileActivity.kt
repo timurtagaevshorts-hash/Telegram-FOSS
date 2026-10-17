@@ -2,6 +2,8 @@ package uz.kodlikino.top4.ui
 
 import android.app.AlertDialog
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.ContextThemeWrapper
@@ -12,6 +14,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -25,8 +28,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.telegram.messenger.AndroidUtilities
+import org.telegram.messenger.MessagesController
 import org.telegram.messenger.R
 import org.telegram.messenger.UserConfig
+import org.telegram.tgnet.TLRPC
 import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.models.Reel
 import uz.kodlikino.top4.utils.FollowManager
@@ -70,6 +75,7 @@ class YuzGramProfileActivity(
     private var themedContext: Context? = null
     private var toolbarName: TextView? = null
     private var nameView: TextView? = null
+    private var usernameView: TextView? = null
     private var bioView: TextView? = null
     private var avatarImage: ImageView? = null
     private var avatarInitial: TextView? = null
@@ -90,6 +96,8 @@ class YuzGramProfileActivity(
 
     private var myUid: String = ""
     private var displayName: String = ""
+    private var username: String = ""
+    private var bio: String = ""
     private var photoUrl: String = ""
     private var reels: List<Reel> = emptyList()
     private var isFollowing = false
@@ -97,6 +105,7 @@ class YuzGramProfileActivity(
     private var manageMode = false
     private var isYuzGram = knownYuzGram
     private var followStateResolved = false
+    private var followingReg: ListenerRegistration? = null
 
     private fun currentUid(): String = YuzGramAdsAuth.expectedUid(currentAccount)
 
@@ -116,6 +125,7 @@ class YuzGramProfileActivity(
 
         toolbarName = root.findViewById(R.id.tvProfileToolbarName)
         nameView = root.findViewById(R.id.tvProfileName)
+        usernameView = root.findViewById(R.id.tvProfileUsername)
         bioView = root.findViewById(R.id.tvProfileBio)
         avatarImage = root.findViewById(R.id.ivProfileAvatar)
         avatarInitial = root.findViewById(R.id.tvAvatarInitial)
@@ -193,7 +203,11 @@ class YuzGramProfileActivity(
             if (fragmentView == null) return@launch
             if (signed.isNotBlank()) {
                 myUid = signed
-                if (isSelf) seedSelfProfile(account)
+                if (isSelf) {
+                    seedSelfProfile(account)
+                } else {
+                    startFollowingListener()
+                }
                 loadProfileAndReels()
             } else if (isSelf) {
                 loadProfileAndReels()
@@ -204,6 +218,23 @@ class YuzGramProfileActivity(
             if (fragmentView == null) return@listenFollowStats
             tvFollowersCount?.text = counts.followers.toString()
             tvFollowingCount?.text = counts.following.toString()
+        }
+    }
+
+    /**
+     * O'zimning obunalar ro'yxatiga jonli obuna bo'lamiz — shunda tugma holati
+     * darhol va istalgan joydan (ro'yxatdan bekor qilish ham) to'g'ri yangilanadi.
+     */
+    private fun startFollowingListener() {
+        if (isSelf || myUid.isBlank()) return
+        followingReg?.remove()
+        followingReg = FollowManager.listenFollowingIds(myUid) { ids ->
+            if (fragmentView == null) return@listenFollowingIds
+            val now = ids.contains(uid)
+            if (now != isFollowing) {
+                isFollowing = now
+                if (!followBusy) updateFollowButtonLabel()
+            }
         }
     }
 
@@ -221,17 +252,20 @@ class YuzGramProfileActivity(
     private fun loadProfileAndReels() {
         val s = scope ?: return
         s.launch {
+            // 1) Telegram (TDLib) ma'lumotlari — ism + @username + bio. Telefon
+            //    raqami MAXSADAN olinmaydi (xavfsizlik + begona uchun mavjud emas).
+            applyTelegramInfo()
+
+            // 2) Firestore profili — Telegram'da yo'q maydonlar uchun fallback
+            //    (rasm, bio) va "YuzGram foydalanuvchimi?" aniqlash.
             val profile = YuzGramProfileStore.load(uid)
             if (fragmentView == null) return@launch
             if (profile.exists) isYuzGram = true
-            if (profile.displayName.isNotBlank()) displayName = profile.displayName
-            if (profile.photoUrl.isNotBlank()) photoUrl = profile.photoUrl
-            val bio = profile.bio
+            if (displayName.isBlank() && profile.displayName.isNotBlank()) displayName = profile.displayName
+            if (photoUrl.isBlank() && profile.photoUrl.isNotBlank()) photoUrl = profile.photoUrl
+            if (bio.isBlank()) bio = profile.bio
+
             renderHeader()
-            if (bio.isNotBlank()) {
-                bioView?.text = bio
-                bioView?.visibility = View.VISIBLE
-            }
 
             reels = ReelsRepository.getReelsByUploader(uid)
             if (fragmentView == null) return@launch
@@ -245,6 +279,36 @@ class YuzGramProfileActivity(
         }
     }
 
+    /**
+     * TDLib'dan maqsad foydalanuvchining Telegram ismini, @username'ini va
+     * bio'sini (`about`) oladi. O'z profilimizda [UserConfig.currentUser]
+     * ishonchli; begona profilda foydalanuvchi lokal katalogda bo'lmasa null
+     * qaytadi — unda Firestore/seed ma'lumot qoladi.
+     */
+    private fun applyTelegramInfo() {
+        val account = currentAccount
+        val controller = MessagesController.getInstance(account) ?: return
+        val userId: Long = if (isSelf) {
+            UserConfig.getInstance(account).clientUserId
+        } else {
+            uid.removePrefix("tg_").toLongOrNull() ?: return
+        }
+        if (userId == 0L) return
+        val user: TLRPC.User? = controller.getUser(userId)
+        if (user != null) {
+            val tgName = listOf(user.first_name.orEmpty(), user.last_name.orEmpty())
+                .filter { it.isNotBlank() }.joinToString(" ")
+            if (tgName.isNotBlank()) displayName = tgName
+            if (!user.username.isNullOrBlank()) username = user.username
+        }
+        val about = try {
+            controller.getUserFull(userId)?.about
+        } catch (_: Exception) {
+            null
+        }
+        if (!about.isNullOrBlank()) bio = about
+    }
+
     /** Obuna holatini aniqlaydi va tugma/note ko'rinishini sozlaydi. */
     private suspend fun resolveFollowState() {
         if (isSelf) {
@@ -256,10 +320,17 @@ class YuzGramProfileActivity(
             btnFollow?.visibility = View.GONE
             return
         }
-        isFollowing = try {
-            FollowManager.isFollowing(myUid, uid)
-        } catch (_: Exception) {
-            false
+        // Jonli obunalar ro'yxati mavjud bo'lsa shundan, aks holda Firestore'dan
+        // o'qiymiz — tugma holati birinchi ko'rsatishda ham to'g'ri bo'lsin.
+        val cached = FollowManager.getCachedFollowing(myUid)
+        isFollowing = if (cached.isNotEmpty()) {
+            cached.contains(uid)
+        } else {
+            try {
+                FollowManager.isFollowing(myUid, uid)
+            } catch (_: Exception) {
+                false
+            }
         }
         followStateResolved = true
         if (fragmentView == null) return
@@ -328,9 +399,27 @@ class YuzGramProfileActivity(
     }
 
     private fun updateFollowButtonLabel() {
-        btnFollow?.text = getString(
+        val ctx = themedContext ?: return
+        val btn = btnFollow ?: return
+        btn.text = getString(
             if (isFollowing) R.string.profile_following_active else R.string.profile_follow
         )
+        val accent = ContextCompat.getColor(ctx, R.color.home_accent)
+        val border = ContextCompat.getColor(ctx, R.color.modern_border)
+        val textSecondary = ContextCompat.getColor(ctx, R.color.text_secondary)
+        if (isFollowing) {
+            // Obuna holati — ichki bo'sh, chegara bilan (Instagram "following").
+            btn.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+            btn.setStrokeColor(ColorStateList.valueOf(border))
+            btn.strokeWidth = AndroidUtilities.dp(1.5f)
+            btn.setTextColor(textSecondary)
+        } else {
+            // Obuna emas — to'liq urg'uv rang.
+            btn.backgroundTintList = ColorStateList.valueOf(accent)
+            btn.setStrokeColor(ColorStateList.valueOf(accent))
+            btn.strokeWidth = 0
+            btn.setTextColor(Color.WHITE)
+        }
     }
 
     private fun currentSelfProfile(): uz.kodlikino.top4.models.CommentUserProfile {
@@ -403,9 +492,28 @@ class YuzGramProfileActivity(
     }
 
     private fun renderHeader() {
-        val shown = displayName.ifBlank { "YuzGram" }
+        val shown = displayName.ifBlank { seedName }.ifBlank { "YuzGram" }
         nameView?.text = shown
+        toolbarName?.text = if (isSelf) getString(R.string.profile_app_name) else shown
         avatarInitial?.text = shown.take(1).uppercase(Locale.getDefault())
+
+        // @username — Telegram'dan; bo'lmasa yashirin.
+        if (username.isNotBlank()) {
+            usernameView?.text = "@$username"
+            usernameView?.visibility = View.VISIBLE
+        } else {
+            usernameView?.visibility = View.GONE
+        }
+
+        // bio — Telegram `about` yoki Firestore; bo'lmasa yashirin.
+        if (bio.isNotBlank()) {
+            bioView?.text = bio
+            bioView?.visibility = View.VISIBLE
+        } else {
+            bioView?.text = ""
+            bioView?.visibility = View.GONE
+        }
+
         if (photoUrl.isNotBlank()) {
             avatarImage?.visibility = View.VISIBLE
             Glide.with(avatarImage!!)
@@ -423,11 +531,17 @@ class YuzGramProfileActivity(
     override fun onResume() {
         super.onResume()
         actionBar?.visibility = View.GONE
+        // Telegram katalogi kechikib to'lishi mumkin — qayta urinamiz va
+        // tugma/follow holatini yangilaymiz.
+        applyTelegramInfo()
+        renderHeader()
     }
 
     override fun onFragmentDestroy() {
         statsReg?.remove()
         statsReg = null
+        followingReg?.remove()
+        followingReg = null
         scope?.cancel()
         scope = null
         reelsAdapter = null
