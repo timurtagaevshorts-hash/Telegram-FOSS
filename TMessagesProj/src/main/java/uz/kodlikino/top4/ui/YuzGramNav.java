@@ -41,8 +41,8 @@ public final class YuzGramNav {
                 if (current instanceof YuzGramProfileActivity) {
                     return;
                 }
-                // Instagram uslubidagi YuzGram profili (obunalar/obunachilar soni,
-                // reel grid, kontent boshqaruvi). Tepadagi gear tugmasi orqali
+                // YuzGram profili (Telegram ismi/@username/bio, reel grid,
+                // kontent boshqaruvi). Tepadagi gear tugmasi orqali
                 // Telegram'ning native ProfileActivity'siga o'tish mumkin.
                 int account = current.getCurrentAccount();
                 long clientUserId = UserConfig.getInstance(account).getClientUserId();

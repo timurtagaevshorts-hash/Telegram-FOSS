@@ -270,7 +270,7 @@ class YuzGramProfileActivity(
                 if (idx >= 0) reelsAdapter?.removeAt(idx)
                 reels = reels.filter { it.id != reel.id }
                 tvReelsCount?.text = reels.size.toString()
-                toast(R.string.monet_reel_deleted)
+                toast(R.string.reels_deleted)
                 if (reels.isEmpty()) {
                     emptyReels?.visibility = View.VISIBLE
                     rvReels?.visibility = View.GONE

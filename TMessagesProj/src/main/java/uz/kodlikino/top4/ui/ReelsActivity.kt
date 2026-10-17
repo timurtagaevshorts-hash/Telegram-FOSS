@@ -684,9 +684,8 @@ class ReelsActivity @JvmOverloads constructor(
         authJob = s.launch {
             try {
                 val uid = YuzGramAdsAuth.ensureSignedIn(account)
-                // O'z tab'ida ( umumiy feed ) comment_profiles doc'ini yaratamiz —
-                // shunda boshqa YuzGram foydalanuvchilari bizga obuna bola oladi
-                // (follow() maqsad hujjatiga followerCount+1 yozadi, doc bo'lishi kerak).
+                // O'z tab'ida (umumiy feed) comment_profiles doc'ini yaratamiz —
+                // profil sahifasi (ism/rasm/bio) shu hujjatdan foydalanadi.
                 if (uid.isNotBlank() && filterUid.isBlank()) {
                     val user = UserConfig.getInstance(account).currentUser
                     YuzGramProfileStore.ensureSelfProfile(
