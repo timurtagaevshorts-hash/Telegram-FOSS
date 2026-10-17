@@ -310,35 +310,49 @@ class ReelsActivity @JvmOverloads constructor(
         presentFragment(CreateReelActivity(), false)
     }
 
-    /** Reel muallifining YuzGram profili. Reel YuzGram orqali yuklangan — demak maqsad aniq YuzGram foydalanuvchisi. */
+    /** O'zimizning profili — endi faqat native Telegram profil oynasi. */
+    private fun openOwnNativeProfile() {
+        val args = android.os.Bundle()
+        args.putLong("user_id", UserConfig.getInstance(currentAccount).clientUserId)
+        args.putBoolean("my_profile", true)
+        presentFragment(org.telegram.ui.ProfileActivity(args, null), false)
+    }
+
+    /** Reel muallifining profili: o'zimizniki bo'lsa native, aks holda YuzGram profili. */
     private fun openUploaderProfile(reel: Reel) {
         val uid = reel.uploadedByUid
         if (uid.isBlank()) return
-        val isSelf = uid == currentUid()
+        if (uid == currentUid()) {
+            openOwnNativeProfile()
+            return
+        }
         presentFragment(
             YuzGramProfileActivity(
                 uid = uid,
                 seedName = reel.uploadedByName,
                 seedPhotoUrl = reel.uploadedByPhotoUrl,
-                isSelf = isSelf,
+                isSelf = false,
                 knownYuzGram = true
             ),
             false
         )
     }
 
-    /** Izoh muallifining YuzGram profili (izoh signedIn sessiyada yozilgan → aniq YuzGram foydalanuvchisi). */
+    /** Izoh muallifining profili: o'zimizniki bo'lsa native, aks holda YuzGram profili. */
     private fun openCommentProfile(comment: ReelComment) {
         val uid = comment.userId
         if (uid.isBlank()) return
         if (commentsOpen) closeComments()
-        val isSelf = uid == currentUid()
+        if (uid == currentUid()) {
+            openOwnNativeProfile()
+            return
+        }
         presentFragment(
             YuzGramProfileActivity(
                 uid = uid,
                 seedName = comment.authorName,
                 seedPhotoUrl = comment.authorPhotoUrl,
-                isSelf = isSelf,
+                isSelf = false,
                 knownYuzGram = true
             ),
             false

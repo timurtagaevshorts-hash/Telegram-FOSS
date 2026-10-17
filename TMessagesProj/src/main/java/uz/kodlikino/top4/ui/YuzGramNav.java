@@ -1,5 +1,7 @@
 package uz.kodlikino.top4.ui;
 
+import android.os.Bundle;
+
 import org.telegram.messenger.UserConfig;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.DialogsActivity;
@@ -38,17 +40,17 @@ public final class YuzGramNav {
                 current.presentFragment(new FunksiyalarActivity(), true);
                 break;
             case YuzGramBottomBar.TAB_PROFIL:
-                if (current instanceof YuzGramProfileActivity) {
+                if (current instanceof org.telegram.ui.ProfileActivity
+                        && ((org.telegram.ui.ProfileActivity) current).myProfile) {
                     return;
                 }
-                // YuzGram profili (Telegram ismi/@username/bio, reel grid,
-                // kontent boshqaruvi). Tepadagi gear tugmasi orqali
-                // Telegram'ning native ProfileActivity'siga o'tish mumkin.
-                int account = current.getCurrentAccount();
-                long clientUserId = UserConfig.getInstance(account).getClientUserId();
-                String uid = "tg_" + clientUserId;
-                current.presentFragment(
-                        new YuzGramProfileActivity(uid, "", "", true, false), true);
+                // Faqat native Telegram profil oynasi (o'zimizniki) — Instagram
+                // uslubidagi YuzGramProfileActivity endi o'z profil uchun
+                // ishlatilmaydi; u faqat begona reel mualliflari profili.
+                Bundle profileArgs = new Bundle();
+                profileArgs.putLong("user_id", UserConfig.getInstance(current.getCurrentAccount()).getClientUserId());
+                profileArgs.putBoolean("my_profile", true);
+                current.presentFragment(new org.telegram.ui.ProfileActivity(profileArgs, null), true);
                 break;
         }
     }
