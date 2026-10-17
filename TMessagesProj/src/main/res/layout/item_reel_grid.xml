@@ -26,14 +26,16 @@
         android:layout_gravity="bottom|start"
         android:layout_marginStart="8dp"
         android:layout_marginBottom="8dp"
+        android:drawablePadding="4dp"
+        android:drawableStart="@drawable/ic_yuz_eye"
         android:shadowColor="#80000000"
         android:shadowRadius="4"
-        android:text="👁 0"
+        android:text="0"
         android:textColor="@color/white"
         android:textSize="12sp"
         android:textStyle="bold" />
 
-    <TextView
+    <ImageView
         android:id="@+id/tvReelDelete"
         android:layout_width="30dp"
         android:layout_height="30dp"
@@ -41,10 +43,9 @@
         android:layout_marginTop="6dp"
         android:layout_marginEnd="6dp"
         android:background="@drawable/bg_classified_image_count_badge"
-        android:gravity="center"
-        android:text="✕"
-        android:textColor="@color/white"
-        android:textSize="15sp"
-        android:textStyle="bold"
+        android:contentDescription="@null"
+        android:padding="7dp"
+        android:src="@drawable/ic_yuz_close"
+        android:tint="@color/white"
         android:visibility="gone" />
 </FrameLayout>

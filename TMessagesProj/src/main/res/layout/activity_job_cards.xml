@@ -60,11 +60,13 @@
             android:orientation="vertical"
             android:visibility="gone">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="💼"
-                android:textSize="48sp" />
+            <ImageView
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:alpha="0.8"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_yuz_briefcase"
+                android:tint="#66BFD0EA" />
 
             <TextView
                 android:id="@+id/tvEmpty"

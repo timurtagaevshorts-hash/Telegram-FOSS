@@ -39,7 +39,10 @@
 
             <LinearLayout style="@style/FuncsionCardRow">
 
-                <TextView style="@style/FuncsionCardIcon" android:text="🏷️" />
+                <ImageView
+                    style="@style/FuncsionCardIconImg"
+                    android:background="@drawable/bg_func_blue"
+                    android:src="@drawable/ic_yuz_tag" />
 
                 <LinearLayout style="@style/FuncsionCardText">
                     <TextView style="@style/FuncsionCardTitle" android:text="@string/func_elonlar_title" />
@@ -56,7 +59,10 @@
 
             <LinearLayout style="@style/FuncsionCardRow">
 
-                <TextView style="@style/FuncsionCardIcon" android:text="💼" />
+                <ImageView
+                    style="@style/FuncsionCardIconImg"
+                    android:background="@drawable/bg_func_indigo"
+                    android:src="@drawable/ic_yuz_briefcase" />
 
                 <LinearLayout style="@style/FuncsionCardText">
                     <TextView style="@style/FuncsionCardTitle" android:text="@string/func_ish_title" />
@@ -73,7 +79,10 @@
 
             <LinearLayout style="@style/FuncsionCardRow">
 
-                <TextView style="@style/FuncsionCardIcon" android:text="🚕" />
+                <ImageView
+                    style="@style/FuncsionCardIconImg"
+                    android:background="@drawable/bg_func_gold"
+                    android:src="@drawable/ic_yuz_taxi" />
 
                 <LinearLayout style="@style/FuncsionCardText">
                     <TextView style="@style/FuncsionCardTitle" android:text="@string/func_taksi_title" />
@@ -90,7 +99,10 @@
 
             <LinearLayout style="@style/FuncsionCardRow">
 
-                <TextView style="@style/FuncsionCardIcon" android:text="📥" />
+                <ImageView
+                    style="@style/FuncsionCardIconImg"
+                    android:background="@drawable/bg_func_pink"
+                    android:src="@drawable/ic_yuz_download" />
 
                 <LinearLayout style="@style/FuncsionCardText">
                     <TextView style="@style/FuncsionCardTitle" android:text="@string/func_instagram_title" />
@@ -107,7 +119,10 @@
 
             <LinearLayout style="@style/FuncsionCardRow">
 
-                <TextView style="@style/FuncsionCardIcon" android:text="🎬" />
+                <ImageView
+                    style="@style/FuncsionCardIconImg"
+                    android:background="@drawable/bg_func_teal"
+                    android:src="@drawable/ic_yuz_film" />
 
                 <LinearLayout style="@style/FuncsionCardText">
                     <TextView style="@style/FuncsionCardTitle" android:text="@string/func_kinolar_title" />

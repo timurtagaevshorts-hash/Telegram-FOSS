@@ -41,7 +41,7 @@ public class YuzGramChatRail extends View {
     public static final int WIDTH_DP = 64;
     private static final float ITEM_H_DP = 53f;
     private static final float CIRCLE_DP = 31f;
-    private static final float LABEL_SP = 8.2f;
+    private static final float LABEL_SP = 9.2f;
     private static final float V_PAD_DP = 10f;
     /** Pastki yumaloq chet oxirgi label'ni kesmasligi uchun qo'shimcha joy. */
     private static final float V_PAD_BOTTOM_DP = 26f;
@@ -52,7 +52,7 @@ public class YuzGramChatRail extends View {
     private static final int GLOW = 0x662AABEE;
     private static final int ACTIVE_START = 0xFF38B6FF;
     private static final int ACTIVE_END = 0xFF5B6CF9;
-    private static final int INACTIVE_FILL = 0x40243A5E;
+    private static final int INACTIVE_FILL = 0x4D2A4570;
     private static final int INACTIVE_STROKE = 0x7338B6FF;
     private static final int ICON_ACTIVE = 0xFFFFFFFF;
     private static final int ICON_IDLE = 0xFFBFD0EA;
@@ -143,7 +143,7 @@ public class YuzGramChatRail extends View {
         strokePaint.setColor(BORDER);
         fillPaint.setStyle(Paint.Style.FILL);
         iconPaint.setStyle(Paint.Style.STROKE);
-        iconPaint.setStrokeWidth(dp(1.7f));
+        iconPaint.setStrokeWidth(dp(2f));
         iconPaint.setStrokeCap(Paint.Cap.ROUND);
         iconPaint.setStrokeJoin(Paint.Join.ROUND);
         textPaint.setTextAlign(Paint.Align.CENTER);
@@ -473,6 +473,12 @@ public class YuzGramChatRail extends View {
             textPaint.setColor(0xFFFFFFFF);
             canvas.drawCircle(cx, cy, r, fillPaint);
             fillPaint.setShader(null);
+            // Faol papka atrofidagi neon halqa — tanlov vizual og'irligi.
+            strokePaint.setColor(GLOW);
+            strokePaint.setStrokeWidth(dp(2f));
+            canvas.drawCircle(cx, cy, r + dp(2.5f), strokePaint);
+            strokePaint.setStrokeWidth(dp(1f));
+            strokePaint.setColor(BORDER);
         } else {
             fillPaint.setColor(INACTIVE_FILL);
             canvas.drawCircle(cx, cy, r, fillPaint);

@@ -10,6 +10,7 @@ import android.view.ViewTreeObserver
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
@@ -70,7 +71,7 @@ class ReelsActivity @JvmOverloads constructor(
     private var layoutManager: LinearLayoutManager? = null
     private var snapHelper: PagerSnapHelper? = null
     private var reelsTopBar: View? = null
-    private var muteButton: TextView? = null
+    private var muteButton: ImageView? = null
     private var progressBar: ProgressBar? = null
     private var emptyView: TextView? = null
     private var adapter: ReelsAdapter? = null
@@ -175,9 +176,13 @@ class ReelsActivity @JvmOverloads constructor(
         muteButton?.let { btn ->
             btn.setOnClickListener {
                 val isMuted = reelsAdapter.toggleMute()
-                btn.setText(if (isMuted) R.string.reels_sound_off else R.string.reels_sound_on)
+                btn.setImageResource(
+                    if (isMuted) R.drawable.ic_yuz_volume_off else R.drawable.ic_yuz_volume_on
+                )
             }
-            btn.setText(if (reelsAdapter.isMuted()) R.string.reels_sound_off else R.string.reels_sound_on)
+            btn.setImageResource(
+                if (reelsAdapter.isMuted()) R.drawable.ic_yuz_volume_off else R.drawable.ic_yuz_volume_on
+            )
         }
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)

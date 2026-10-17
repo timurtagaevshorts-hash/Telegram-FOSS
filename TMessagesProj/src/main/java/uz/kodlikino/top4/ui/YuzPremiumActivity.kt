@@ -125,7 +125,12 @@ class YuzPremiumActivity : BaseFragment() {
             val btn = root.findViewById<MaterialButton>(
                 if (isKino) R.id.btnPayKino else R.id.btnPayFull
             )
-            tvTitle?.text = (if (isKino) "💎 " else "👑 ") + plan.title
+            tvTitle?.text = plan.title
+            // Tarif belgisi — matnoldi emoji emas, vektor ikon (diamond/crown).
+            tvTitle?.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                if (isKino) R.drawable.ic_yuz_diamond else R.drawable.ic_yuz_crown, 0, 0, 0
+            )
+            tvTitle?.setCompoundDrawablePadding(AndroidUtilities.dp(8f))
             tvPrice?.text = plan.formattedPrice()
             tvBenefits?.text = plan.benefits.joinToString("\n")
             btn?.text = plan.buttonText

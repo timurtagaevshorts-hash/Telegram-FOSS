@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Izoh yuborish tugmasi — brend-ko'k doira neon tugma. -->
+<!-- Izoh yuborish tugmasi — brend gradienti (ko'k -> binafsha). -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
-    <solid android:color="#2AABEE" />
+    <gradient
+        android:angle="135"
+        android:startColor="#2AABEE"
+        android:endColor="#5B6CF9" />
 </shape>

@@ -89,10 +89,10 @@ class ProfileReelsAdapter(
     inner class Cell(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val thumb: ImageView = itemView.findViewById(R.id.ivReelThumb)
         private val views: TextView = itemView.findViewById(R.id.tvReelViews)
-        private val del: TextView = itemView.findViewById(R.id.tvReelDelete)
+        private val del: ImageView = itemView.findViewById(R.id.tvReelDelete)
 
         fun bind(reel: Reel, position: Int) {
-            views.text = "👁 ${compact(reel.views)}"
+            views.text = compact(reel.views)
             if (reel.thumbnailUrl.isNotBlank()) {
                 Glide.with(thumb)
                     .load(reel.thumbnailUrl)

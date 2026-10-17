@@ -349,26 +349,27 @@ class ReelsAdapter(
         else -> count.toString()
     }
 
-    private fun viewsLabel(count: Int): String = "👁 ${compactCount(count)}"
+    // Ko'z ikonkasi XML tarafda (drawableStart/ImageView) — bu yerda faqat son.
+    private fun viewsLabel(count: Int): String = compactCount(count)
 
     inner class PageHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val playerView: PlayerView = itemView.findViewById(R.id.playerView)
         val ivThumbnail: ImageView = itemView.findViewById(R.id.ivThumbnail)
         val pageProgress: ProgressBar = itemView.findViewById(R.id.pageProgress)
         val playbackBar: ProgressBar = itemView.findViewById(R.id.playbackBar)
-        private val tvPlayPauseBadge: TextView = itemView.findViewById(R.id.tvPlayPauseBadge)
+        private val tvPlayPauseBadge: ImageView = itemView.findViewById(R.id.tvPlayPauseBadge)
         private val tvUploaderName: TextView = itemView.findViewById(R.id.tvUploaderName)
         private val tvAvatarInitial: TextView = itemView.findViewById(R.id.tvAvatarInitial)
         private val uploaderRow: View = itemView.findViewById(R.id.uploaderRow)
         private val tvCaption: TextView = itemView.findViewById(R.id.tvCaption)
-        private val btnLike: TextView = itemView.findViewById(R.id.btnLike)
+        private val btnLike: ImageView = itemView.findViewById(R.id.btnLike)
         private val tvLikeCount: TextView = itemView.findViewById(R.id.tvLikeCount)
-        private val btnComments: TextView = itemView.findViewById(R.id.btnComments)
+        private val btnComments: ImageView = itemView.findViewById(R.id.btnComments)
         private val tvCommentCount: TextView = itemView.findViewById(R.id.tvCommentCount)
         val tvViews: TextView = itemView.findViewById(R.id.tvViews)
-        private val btnShare: TextView = itemView.findViewById(R.id.btnShare)
-        private val btnReelMenu: TextView = itemView.findViewById(R.id.btnReelMenu)
-        private val tvLikeBurst: TextView = itemView.findViewById(R.id.tvLikeBurst)
+        private val btnShare: ImageView = itemView.findViewById(R.id.btnShare)
+        private val btnReelMenu: ImageView = itemView.findViewById(R.id.btnReelMenu)
+        private val tvLikeBurst: ImageView = itemView.findViewById(R.id.tvLikeBurst)
         private val reelCtaRow: LinearLayout = itemView.findViewById(R.id.reelCtaRow)
         private val btnWatchMovie: TextView = itemView.findViewById(R.id.btnWatchMovie)
         private val btnAd: TextView = itemView.findViewById(R.id.btnAd)
@@ -558,8 +559,10 @@ class ReelsAdapter(
             val r = reel ?: return
             val isLiked = liked[r.id] ?: r.isLikedByMe
             val count = likeShown[r.id] ?: r.likeCount
-            btnLike.text = if (isLiked) "♥" else "♡"
-            btnLike.setTextColor(if (isLiked) 0xFFFF4D6D.toInt() else Color.WHITE)
+            btnLike.setImageResource(
+                if (isLiked) R.drawable.ic_yuz_heart_filled else R.drawable.ic_yuz_heart
+            )
+            btnLike.setColorFilter(if (isLiked) 0xFFFF4D6D.toInt() else Color.WHITE)
             tvLikeCount.text = compactCount(count)
         }
 
@@ -567,7 +570,7 @@ class ReelsAdapter(
             if (isPlaying) {
                 tvPlayPauseBadge.visibility = View.GONE
             } else {
-                tvPlayPauseBadge.text = "▶"
+                tvPlayPauseBadge.setImageResource(R.drawable.ic_yuz_play)
                 tvPlayPauseBadge.visibility = View.VISIBLE
                 mainHandler.postDelayed({
                     if (player?.isPlaying != true) tvPlayPauseBadge.visibility = View.GONE
