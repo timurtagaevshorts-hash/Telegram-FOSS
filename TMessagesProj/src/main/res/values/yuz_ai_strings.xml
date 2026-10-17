@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AI yordamchi (ovoz-only) -->
+    <string name="ai_title">AI Yordamchi</string>
+    <string name="ai_greeting">Salom! Men YuzGram AI yordamchisiman. Mikrofon tugmasini bosib, gapiring: xabar yuborish, soat, ob-havo yoki savol-javob. Yozish shart emas.</string>
+    <string name="ai_listening">Eshitaman…</string>
+    <string name="ai_processing">Tekshiryapman…</string>
+    <string name="ai_speaking">Javob beriyapman…</string>
+    <string name="ai_mic_permission">Mikrofon ruxsati kerak. Ruxsat bergach qayta urinib ko\'ring.</string>
+    <string name="ai_no_mic">Mikrofon ochilmadi. Telefon sozlamalarida ruxsatni tekshiring.</string>
+    <string name="ai_network_voice">Ovoz uchun internet kerak.</string>
+    <string name="ai_need_body">%1$s ga qaysi xabarni yuboray?</string>
+    <string name="ai_not_found">%1$s ismli chat topilmadi.</string>
+    <string name="ai_sent">Xabar yubordim: %1$s — «%2$s»</string>
+    <string name="ai_sent_short">Xabar yubordim.</string>
+    <string name="ai_send_failed">Xabar yuborilmadi.</string>
+    <string name="ai_open_chat">Chatni ochyapman: %1$s</string>
+    <string name="ai_goto">Ochilyapti: %1$s</string>
+    <string name="ai_utterance_prefix">Siz: %1$s</string>
+    <!-- Tezkor tugmalar -->
+    <string name="ai_chip_send">Xabar yuborish</string>
+    <string name="ai_chip_time">Soat</string>
+    <string name="ai_chip_weather">Ob-havo</string>
+    <string name="ai_chip_reels">Reels</string>
+    <string name="ai_chip_taxi">Taksi</string>
+    <string name="ai_hint_send">Kimnidir ayting — masalan: «Sardor qalesan bugun kelasanmi»</string>
+    <!-- Funksiyalar hub kartasi -->
+    <string name="func_ai_title">AI Yordamchi</string>
+    <string name="func_ai_desc">Ovoz orqali xabar yuborish, soat, ob-havo va buyruqlar</string>
+    <!-- Bo'lim nomlari (ovoz javoblarida) -->
+    <string name="func_ai_elon_name">Elonlar</string>
+    <string name="func_ai_kino_name">Kinolar</string>
+    <string name="func_ai_taxi_name">Taksi</string>
+    <string name="func_ai_profil_name">Profil</string>
+    <string name="func_ai_chats_name">Xabarlar</string>
+</resources>

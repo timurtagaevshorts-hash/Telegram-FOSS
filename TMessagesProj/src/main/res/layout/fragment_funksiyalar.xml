@@ -34,6 +34,26 @@
             android:textSize="13sp" />
 
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardAi"
+            style="@style/FuncsionCard">
+
+            <LinearLayout style="@style/FuncsionCardRow">
+
+                <ImageView
+                    style="@style/FuncsionCardIconImg"
+                    android:background="@drawable/bg_func_violet"
+                    android:src="@drawable/ic_yuz_mic" />
+
+                <LinearLayout style="@style/FuncsionCardText">
+                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_ai_title" />
+                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_ai_desc" />
+                </LinearLayout>
+
+                <ImageView style="@style/FuncsionCardChevron" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardElonlar"
             style="@style/FuncsionCard">
 

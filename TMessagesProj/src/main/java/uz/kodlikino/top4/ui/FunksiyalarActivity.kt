@@ -37,6 +37,9 @@ class FunksiyalarActivity : BaseFragment() {
             0, AndroidUtilities.statusBarHeight, 0, 0
         )
 
+        root.findViewById<View>(R.id.cardAi)?.setOnClickListener {
+            presentFragment(YuzAiActivity(), false)
+        }
         root.findViewById<View>(R.id.cardElonlar)?.setOnClickListener {
             presentFragment(ElonlarActivity(), false)
         }

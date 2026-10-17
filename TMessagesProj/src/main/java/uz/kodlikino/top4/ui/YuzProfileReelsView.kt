@@ -64,8 +64,8 @@ class YuzProfileReelsView(
         emptyView.gravity = Gravity.CENTER
         emptyView.visibility = View.GONE
         addView(emptyView,
-            LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT,
-                Gravity.LEFT | Gravity.TOP, 20, 72, 20, 0))
+            LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT,
+                LayoutHelper.WRAP_CONTENT.toFloat(), Gravity.LEFT or Gravity.TOP, 20f, 72f, 20f, 0f))
 
         adapter = ProfileReelsAdapter(context,
             onClick = { index -> openFeed(index) },
@@ -74,11 +74,11 @@ class YuzProfileReelsView(
         recyclerView = RecyclerView(context)
         recyclerView.layoutManager = GridLayoutManager(context, 3)
         recyclerView.adapter = adapter
-        recyclerView.setPadding(0, AndroidUtilities.dp(2), 0, 0)
+        recyclerView.setPadding(0, AndroidUtilities.dp(2f), 0, 0)
         recyclerView.clipToPadding = false
         recyclerView.overScrollMode = View.OVER_SCROLL_NEVER
         addView(recyclerView,
-            LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT))
+            LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT.toFloat()))
     }
 
     /** Tab ko'rsatilganda — yangi/nimcha bo'lgan reel'larni qayta yuklaydi. */
