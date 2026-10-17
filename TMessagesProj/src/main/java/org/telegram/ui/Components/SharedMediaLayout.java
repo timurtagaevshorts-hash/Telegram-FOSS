@@ -1413,27 +1413,34 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
 
     private BaseFragment profileActivity;
 
-    // ----- YuzGram: o'z profilida "Archived Posts" o'rniga "Reels" tab -----
+    // ----- YuzGram: profil ekranlarida "Archived Posts" o'rniga "Reels" tab -----
     // Tab tanlanganda media sahifalari ustiga opaque YuzProfileReelsView
-    // qatlami qo'yiladi: o'z reel'lari grid'i, ko'rish + o'chirish.
+    // qatlami qo'yiladi: foydalanuvchining YuzGram reel'lari grid'i.
+    // O'z profilida ko'rish + o'chirish, begona profilida faqat ko'rish.
     private uz.kodlikino.top4.ui.YuzProfileReelsView yuzReelsOverlay;
+
+    private boolean isYuzProfileHost() {
+        return profileActivity instanceof ProfileActivity
+                && DialogObject.isUserDialog(dialog_id) && !DialogObject.isEncryptedDialog(dialog_id);
+    }
 
     private boolean isYuzSelfProfile() {
         return profileActivity instanceof ProfileActivity && ((ProfileActivity) profileActivity).myProfile;
     }
 
     protected String yuzReelsTabLabel() {
-        return isYuzSelfProfile() ? getString(R.string.reels_title) : getString(R.string.ProfileArchivedStories);
+        return isYuzProfileHost() ? getString(R.string.reels_title) : getString(R.string.ProfileArchivedStories);
     }
 
     private void updateYuzReelsOverlay(int tab) {
-        if (profileActivity == null || !isYuzSelfProfile()) {
+        if (!isYuzProfileHost()) {
             return;
         }
         if (tab == TAB_ARCHIVED_STORIES) {
             if (yuzReelsOverlay == null) {
                 yuzReelsOverlay = new uz.kodlikino.top4.ui.YuzProfileReelsView(
-                        getContext(), profileActivity.getCurrentAccount(), profileActivity);
+                        getContext(), profileActivity.getCurrentAccount(), profileActivity,
+                        "tg_" + dialog_id, isYuzSelfProfile());
                 addView(yuzReelsOverlay, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.LEFT | Gravity.TOP, 0, mediaPageTopMargin(), 0, 0));
             } else {
                 yuzReelsOverlay.setVisibility(VISIBLE);
@@ -5938,6 +5945,14 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                         }
                         scrollSlidingTextTabStrip.animationDuration = 420;
                     }
+                }
+            }
+            // YuzGram: har qanday foydalanuvchi profilida (o'zi va begona) "Reels"
+            // tab'ini shartlarsiz ta'minlaymiz — u yuqoridagi storiya shartlariga
+            // bog'liq emas. hasTab duplikatni saqlaydi.
+            if (isYuzProfileHost() && !isStoriesView() && !isArchivedOnlyStoriesView() && !isSearchingStories()) {
+                if (!scrollSlidingTextTabStrip.hasTab(TAB_ARCHIVED_STORIES)) {
+                    scrollSlidingTextTabStrip.addTextTab(TAB_ARCHIVED_STORIES, yuzReelsTabLabel(), idToView);
                 }
             }
             if (!isStoriesView()) {

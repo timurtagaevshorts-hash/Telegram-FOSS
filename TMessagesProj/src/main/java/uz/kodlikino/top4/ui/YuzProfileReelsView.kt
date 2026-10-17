@@ -29,13 +29,16 @@ import uz.kodlikino.top4.utils.YuzGramAdsAuth
  * Native Telegram profilidagi "Reels" tab kontenti (arxiv postlar o'rniga).
  * [SharedMediaLayout] bu view'ni tab tanlanganda media sahifasi ustiga to'siq
  * (opaque) qatlam sifatida qo'yadi — foydalanuvchining o'z reel'lari 3 ustunli
- * grid'da ko'rinadi, katak bosilsa scoped [ReelsActivity] feed ochiladi, ✕ bilan
- * reel o'chiriladi (boshqaruv rejimi doim yoniq — bu faqat o'z profili).
+ * grid'da ko'rinadi, katak bosilsa scoped [ReelsActivity] feed ochiladi.
+ * [isSelf]=true (o'z profili) bo'lgandagina ✕ bilan o'chirish rejimi yonadi;
+ * begona profilida faqat ko'rish.
  */
 class YuzProfileReelsView(
     context: Context,
     private val account: Int,
-    private val host: BaseFragment
+    private val host: BaseFragment,
+    targetUid: String,
+    private val isSelf: Boolean
 ) : FrameLayout(context) {
 
     private val recyclerView: RecyclerView
@@ -44,7 +47,7 @@ class YuzProfileReelsView(
     private val adapter: ProfileReelsAdapter
 
     private var scope: CoroutineScope? = null
-    private var myUid: String = YuzGramAdsAuth.expectedUid(account)
+    private var myUid: String = targetUid
     private var reels: List<Reel> = emptyList()
     private var loading = false
 
@@ -70,7 +73,8 @@ class YuzProfileReelsView(
         adapter = ProfileReelsAdapter(context,
             onClick = { index -> openFeed(index) },
             onDelete = { reel -> confirmDelete(reel) })
-        adapter.manageMode = true
+        // O'chirish faqat o'z profilida; begona profilida grid view-only.
+        adapter.manageMode = isSelf
         recyclerView = RecyclerView(context)
         recyclerView.layoutManager = GridLayoutManager(context, 3)
         recyclerView.adapter = adapter
@@ -98,12 +102,14 @@ class YuzProfileReelsView(
         loading = true
         progressView.visibility = View.VISIBLE
         s.launch {
+            // Firestore o'qish sessiya talab qiladi; o'z profilida haqiqiy
+            // imzo uid'ni qayta tekshiramiz, begona profilida maqsad o'zgarmaydi.
             val uid = try {
                 YuzGramAdsAuth.ensureSignedIn(account)
             } catch (e: Exception) {
                 ""
             }
-            if (uid.isNotBlank()) myUid = uid
+            if (isSelf && uid.isNotBlank()) myUid = uid
             val list = try {
                 ReelsRepository.getReelsByUploader(myUid)
             } catch (e: Exception) {

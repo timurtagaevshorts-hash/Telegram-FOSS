@@ -310,53 +310,33 @@ class ReelsActivity @JvmOverloads constructor(
         presentFragment(CreateReelActivity(), false)
     }
 
-    /** O'zimizning profili — endi faqat native Telegram profil oynasi. */
-    private fun openOwnNativeProfile() {
+    /**
+     * Telegram native profil oynasi — o'zi va begonalar uchun ham. YuzGram uid
+     * formati "tg_<telegram_user_id>", shuning uchun undan to'g'ridan-to'g'ri
+     * user_id olamiz. Reelslar native profilning "Reels" tab'ida ko'rinadi
+     * (SharedMediaLayout -> YuzProfileReelsView).
+     */
+    private fun openNativeProfile(uid: String) {
+        val userId = uid.removePrefix("tg_").toLongOrNull() ?: return
         val args = android.os.Bundle()
-        args.putLong("user_id", UserConfig.getInstance(currentAccount).clientUserId)
-        args.putBoolean("my_profile", true)
+        args.putLong("user_id", userId)
+        args.putBoolean("my_profile", userId == UserConfig.getInstance(currentAccount).clientUserId)
         presentFragment(org.telegram.ui.ProfileActivity(args, null), false)
     }
 
-    /** Reel muallifining profili: o'zimizniki bo'lsa native, aks holda YuzGram profili. */
+    /** Reel muallifining profili — native Telegram oynasida. */
     private fun openUploaderProfile(reel: Reel) {
         val uid = reel.uploadedByUid
         if (uid.isBlank()) return
-        if (uid == currentUid()) {
-            openOwnNativeProfile()
-            return
-        }
-        presentFragment(
-            YuzGramProfileActivity(
-                uid = uid,
-                seedName = reel.uploadedByName,
-                seedPhotoUrl = reel.uploadedByPhotoUrl,
-                isSelf = false,
-                knownYuzGram = true
-            ),
-            false
-        )
+        openNativeProfile(uid)
     }
 
-    /** Izoh muallifining profili: o'zimizniki bo'lsa native, aks holda YuzGram profili. */
+    /** Izoh muallifining profili — native Telegram oynasida. */
     private fun openCommentProfile(comment: ReelComment) {
         val uid = comment.userId
         if (uid.isBlank()) return
         if (commentsOpen) closeComments()
-        if (uid == currentUid()) {
-            openOwnNativeProfile()
-            return
-        }
-        presentFragment(
-            YuzGramProfileActivity(
-                uid = uid,
-                seedName = comment.authorName,
-                seedPhotoUrl = comment.authorPhotoUrl,
-                isSelf = false,
-                knownYuzGram = true
-            ),
-            false
-        )
+        openNativeProfile(uid)
     }
 
     private fun loadReels() {
