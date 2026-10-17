@@ -3,7 +3,6 @@ package uz.kodlikino.top4.utils
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import androidx.media3.common.C
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DataSource
 import kotlinx.coroutines.CoroutineScope
@@ -89,19 +88,22 @@ object YuzReelPreloader {
                     .setPosition(0L)
                     .setLength(WARM_BYTES)
                     .build()
-                var opened = source.open(spec)
                 try {
+                    // media3: open() uzunlik(qaytaradi, o'qish manbai SHU source.
+                    source.open(spec)
                     val buffer = ByteArray(64 * 1024)
                     var transferred = 0L
                     while (transferred < WARM_BYTES) {
                         val chunk = minOf(buffer.size.toLong(), WARM_BYTES - transferred).toInt()
-                        val read = opened.read(buffer, 0, chunk)
-                        if (read == C.RESULT_END_OF_INPUT || read <= 0) break
-                        transferred += read
+                        // read() versiyaniga qarab Int yoki Long qaytadi — ikkalasi ham
+                        // shu kod bilan ishlaydi (EOF/0 == to'xtash).
+                        val n = source.read(buffer, 0, chunk)
+                        if (n <= 0) break
+                        transferred += n
                     }
                 } finally {
                     try {
-                        opened.close()
+                        source.close()
                     } catch (_: Exception) {
                         // close'dagi xato preload'ning muvaffaqiyatiga ta'sir qilmaydi.
                     }

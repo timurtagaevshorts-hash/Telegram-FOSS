@@ -302,8 +302,8 @@ class ReelsAdapter(
         // boshlanadi; (2) [DefaultLoadControl] o'yinni "katta yig'ib" emas,
         // birinchi imkon bo'ladigan joyda boshlaydi (bufferForPlayback ~150ms).
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferForPlaybackUs(150_000L)
-            .setBufferForPlaybackAfterRebufferUs(400_000L)
+            // media3 1.0.2 API: millisecondli variant (Us'li versiyasi 1.1+ dan).
+            .setBufferForPlaybackMs(150, 400)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
         val created = ExoPlayer.Builder(appContext)

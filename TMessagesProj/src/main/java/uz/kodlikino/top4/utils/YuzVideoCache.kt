@@ -1,8 +1,8 @@
 package uz.kodlikino.top4.utils
 
 import android.content.Context
-import android.net.Uri
 import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.CacheKeyFactory
@@ -37,9 +37,10 @@ object YuzVideoCache {
     private var simpleCache: SimpleCache? = null
 
     // `?token=` va boshqa query-larni tashlab, faqat scheme://host/path qoldiramiz.
+    // media3 1.0.2: CacheKeyFactory'dagi yagona abstract metod — buildCacheKey(DataSpec).
     private val cacheKeyFactory = object : CacheKeyFactory {
-        override fun generateCacheKeyForUri(uri: Uri): String =
-            uri.buildUpon().clearQuery().fragment(null).build().toString()
+        override fun buildCacheKey(dataSpec: DataSpec): String =
+            dataSpec.uri.buildUpon().clearQuery().fragment(null).build().toString()
     }
 
     /** Jarayon davomida bir marta ochiladigan [SimpleCache]. */
