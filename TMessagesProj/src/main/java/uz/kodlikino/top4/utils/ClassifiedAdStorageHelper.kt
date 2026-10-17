@@ -6,8 +6,10 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -59,7 +61,12 @@ object ClassifiedAdStorageHelper {
             // kodlash yetarli), oxirida o'chiriladi.
             var lastError: Exception? = null
             var uploaded = false
-            val compressed: File? = YuzImageCompressor.compressForUpload(appContext, uri)
+            // Siqish (decode + resize + JPEG loop) CPU-shog'al — Main thread'ni
+            // bloklamasligi uchun IO'ga o'tkazamiz. Aks holda katta rasmda ekran
+            // bir necha soniya qotib, "juda uzoq saqlamoqda" hissi berardi.
+            val compressed: File? = withContext(Dispatchers.IO) {
+                YuzImageCompressor.compressForUpload(appContext, uri)
+            }
             val payload = compressed?.let { Uri.fromFile(it) } ?: uri
             try {
                 for (attempt in 1..UPLOAD_ATTEMPTS) {
@@ -67,7 +74,14 @@ object ClassifiedAdStorageHelper {
                         YuzUploadWatchdog.awaitWithStall(
                             ref.putFile(payload, metadata),
                             "Rasm ${index + 1}"
-                        )
+                        ) { snap ->
+                            // Jonli progress: baytlar kelganda mebel yangilanadi,
+                            // foydalanuvchi jarayon tirikligini ko'radi.
+                            val tot = snap.totalByteCount.coerceAtLeast(1L)
+                            val frac = (snap.bytesTransferred.toFloat() / tot).coerceIn(0f, 1f)
+                            val pct = (((index + frac) * 100) / files.size).toInt().coerceIn(0, 100)
+                            onProgress(pct, index + 1, files.size)
+                        }
                         urls.add(ref.downloadUrl.await().toString())
                         uploaded = true
                         break
