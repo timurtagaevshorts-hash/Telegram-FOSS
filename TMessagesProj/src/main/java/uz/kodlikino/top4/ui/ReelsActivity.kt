@@ -32,6 +32,8 @@ import uz.kodlikino.top4.utils.ReelStorageHelper
 import uz.kodlikino.top4.utils.ReelsRepository
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzGramProfileStore
+import uz.kodlikino.top4.utils.YuzReelPreloader
+import uz.kodlikino.top4.utils.YuzVideoCache
 
 /**
  * "Reels" bo'limi — YuzGram pastki navigatsiyasining alohida tab'i.
@@ -179,6 +181,17 @@ class ReelsActivity @JvmOverloads constructor(
         }
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        // Disk keshni IO oqimida ochamiz — [uz.kodlikino.top4.utils.YuzVideoCache.cache]
+        // birinchi chaqiruvda SQLite bilan ishlaydi; main thread'da bo'lsa
+        // birinchi video sekinlashadi. Feed tarmoqdan kelguncha bu init
+        // tugaydi, shuning uchun player main thread'da kutib qolmaydi.
+        scope?.launch(Dispatchers.IO) {
+            try {
+                themedContext?.let { YuzVideoCache.cache(it) }
+            } catch (_: Exception) {
+                // Kesh ochilmasa ham feed islaydi — player oddiy network'ga chiqadi.
+            }
+        }
         setupComments(root, themed)
         loadReels()
         warmUpAuth()
@@ -289,6 +302,9 @@ class ReelsActivity @JvmOverloads constructor(
         if (commentsOpen) closeComments()
         adapter?.setActivePosition(position)
         refreshLikeState(currentReels.getOrNull(position)?.id)
+        // Eski loyiha mexanizmi: snap bo'lgach qo'shni reel'larni oldindan
+        // keshga tortamiz — keyingi o'tish deyarli lagsiz bo'ladi.
+        preloadNeighbours(position)
     }
 
     private fun openCreate() {
@@ -331,12 +347,26 @@ class ReelsActivity @JvmOverloads constructor(
     }
 
     private fun loadReels() {
+        // (1) Tez render: in-memory kesh bo'lsa, spinner/o'rnini bosuvchi
+        // "bo'sh ekran" BIRINCHI KADRDA yo'qoladi — eski loyhadagi
+        // ReelsDataCache xulqiyati. Tarmoq javobi (2) bosqichda keladi.
+        if (currentReels.isEmpty()) {
+            val cached = if (filterUid.isNotBlank()) {
+                ReelsRepository.peekReelsByUploader(filterUid)
+            } else {
+                ReelsRepository.peekReels()
+            }
+            if (cached != null && cached.isNotEmpty()) {
+                renderReels(cached, selectedPosition)
+            }
+        }
         if (loading) return
         val s = scope ?: return
         val keepPosition = selectedPosition
         loading = true
         if (currentReels.isEmpty()) progressBar?.visibility = View.VISIBLE
         s.launch {
+            // (2) Fon yangilash: kesh render bo'lsa ham toza ro'yxat so'raladi.
             val reels: List<Reel>? = if (filterUid.isNotBlank()) {
                 // Scoped feed (profil grid'idan): faqat shu muallifning reel'lari.
                 // getReelsByUploader xatoda bo'sh ro'yxat qaytaradi — null bo'lmaydi.
@@ -356,21 +386,50 @@ class ReelsActivity @JvmOverloads constructor(
                 emptyView?.text = getString(R.string.reels_load_failed)
                 return@launch
             }
-            currentReels = reels
-            adapter?.submit(reels)
-            progressBar?.visibility = View.GONE
-            val isEmpty = reels.isEmpty()
-            emptyView?.visibility = if (isEmpty) View.VISIBLE else View.GONE
-            emptyView?.text = getString(R.string.reels_empty)
-            reelsList?.visibility = if (isEmpty) View.GONE else View.VISIBLE
-            if (!isEmpty) {
-                val target = keepPosition.coerceIn(0, reels.size - 1)
-                selectedPosition = target
-                layoutManager?.scrollToPositionWithOffset(target, 0)
-                adapter?.setActivePosition(target)
-                refreshLikeState(reels.getOrNull(target)?.id)
+            // Kesh bilan bir xil tasma (id ketma-ketligi) — qayta submit
+            // playback'ni bekor restart qiladi, shuning uchun o'tkazamiz.
+            if (currentReels.isNotEmpty() && sameFeed(currentReels, reels)) {
+                progressBar?.visibility = View.GONE
+                emptyView?.visibility = View.GONE
+                reelsList?.visibility = View.VISIBLE
+                return@launch
             }
+            renderReels(reels, keepPosition)
         }
+    }
+
+    /** Tasmani ko'rsatadi: [keepPosition] saqlangan holda snap + player + preload. */
+    private fun renderReels(reels: List<Reel>, keepPosition: Int) {
+        currentReels = reels
+        adapter?.submit(reels)
+        progressBar?.visibility = View.GONE
+        val isEmpty = reels.isEmpty()
+        emptyView?.visibility = if (isEmpty) View.VISIBLE else View.GONE
+        emptyView?.text = getString(R.string.reels_empty)
+        reelsList?.visibility = if (isEmpty) View.GONE else View.VISIBLE
+        if (!isEmpty) {
+            val target = keepPosition.coerceIn(0, reels.size - 1)
+            selectedPosition = target
+            layoutManager?.scrollToPositionWithOffset(target, 0)
+            adapter?.setActivePosition(target)
+            refreshLikeState(reels.getOrNull(target)?.id)
+            preloadNeighbours(target)
+        }
+    }
+
+    /** Keyingi/oldingi reel'larni disk keshiga oldindan tortadi. */
+    private fun preloadNeighbours(center: Int) {
+        val ctx = themedContext ?: context ?: return
+        YuzReelPreloader.preloadAround(ctx, currentReels, center)
+    }
+
+    /** id ketma-ketligi bir xilmi — faqat "tasma almashdimi"ni bilamiz. */
+    private fun sameFeed(a: List<Reel>, b: List<Reel>): Boolean {
+        if (a.size != b.size) return false
+        for (i in a.indices) {
+            if (a[i].id != b[i].id) return false
+        }
+        return true
     }
 
     /** Faol reel uchun like holatini Firestore'dan o'qiydi (bitta hujjat get()). */

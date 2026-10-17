@@ -21,13 +21,16 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import org.telegram.messenger.R
 import uz.kodlikino.top4.models.Reel
+import uz.kodlikino.top4.utils.YuzVideoCache
 
 /**
  * Reels feed adapter'i — vertikal [RecyclerView] sahifalari uchun adapter
@@ -294,7 +297,20 @@ class ReelsAdapter(
 
     private fun ensurePlayer(): ExoPlayer {
         player?.let { return it }
+        // Eski loyiha mexanizmi: (1) video [YuzVideoCache] disk keshi orqali
+        // o'qiladi — bir marta yuklangan reel keyingi ko'rishda deyarli darhol
+        // boshlanadi; (2) [DefaultLoadControl] o'yinni "katta yig'ib" emas,
+        // birinchi imkon bo'ladigan joyda boshlaydi (bufferForPlayback ~150ms).
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferForPlaybackUs(150_000L)
+            .setBufferForPlaybackAfterRebufferUs(400_000L)
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
         val created = ExoPlayer.Builder(appContext)
+            .setMediaSourceFactory(
+                ProgressiveMediaSource.Factory(YuzVideoCache.dataSourceFactory(appContext))
+            )
+            .setLoadControl(loadControl)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)

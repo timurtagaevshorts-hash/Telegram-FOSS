@@ -24,6 +24,26 @@ object ReelsRepository {
 
     private val db = FirebaseFirestore.getInstance()
 
+    /**
+     * In-memory feed keshi (oldingi loyihadagi `ReelsDataCache` g'oyasi).
+     * Maqsad: ekronga qaytishda (onResume/tab almashish) 100 hujjatlik
+     * Firestore so'rovi tugashini kutmasdan [peekReels] orqali tasmani
+     * BIRINCHI KADRDA ko'rsatish; tarmoq javobi kelgach ro'yxat yangilanadi.
+     * Faqat muvaffaqiyatli o'qishlar saqlanadi (xato/null holat keshmaydi).
+     */
+    @Volatile
+    private var cachedFeed: List<Reel>? = null
+    private val cachedByUploader = HashMap<String, List<Reel>>()
+
+    /** Oxirgi muvaffaqiyatli umumiy feed — bo'lsa, darhol render qilish uchun. */
+    fun peekReels(): List<Reel>? = cachedFeed
+
+    /** Oxirgi muvaffaqiyatli scoped feed (profil grid'i uchun). */
+    fun peekReelsByUploader(uid: String): List<Reel>? {
+        if (uid.isBlank()) return null
+        return synchronized(cachedByUploader) { cachedByUploader[uid] }
+    }
+
     /** Feed — oxirgi qo'shilgan reelslar (createdAt bo'yicha kamayish tartibida). */
     suspend fun getReels(): List<Reel> = getReelsOrNull() ?: emptyList()
 
@@ -40,7 +60,7 @@ object ReelsRepository {
                 .limit(FEED_LIMIT)
                 .get()
                 .await()
-            snapshot.documents.mapNotNull { doc ->
+            val result = snapshot.documents.mapNotNull { doc ->
                 try {
                     val reel = doc.toObject(Reel::class.java) ?: return@mapNotNull null
                     reel.copy(id = reel.id.ifBlank { doc.id })
@@ -50,6 +70,8 @@ object ReelsRepository {
                     null
                 }
             }
+            cachedFeed = result
+            result
         } catch (e: Exception) {
             Log.e(TAG, "getReels: ${e.message}", e)
             null
@@ -66,7 +88,7 @@ object ReelsRepository {
                 .limit(FEED_LIMIT)
                 .get()
                 .await()
-            snapshot.documents.mapNotNull { doc ->
+            val result = snapshot.documents.mapNotNull { doc ->
                 try {
                     val reel = doc.toObject(Reel::class.java) ?: return@mapNotNull null
                     reel.copy(id = reel.id.ifBlank { doc.id })
@@ -75,6 +97,8 @@ object ReelsRepository {
                     null
                 }
             }
+            synchronized(cachedByUploader) { cachedByUploader[uid] = result }
+            result
         } catch (e: Exception) {
             Log.e(TAG, "getReelsByUploader: ${e.message}", e)
             emptyList()
@@ -105,6 +129,10 @@ object ReelsRepository {
         )
         try {
             db.collection(COLLECTION).document(id).set(data).await()
+            // Kesheski holat qolmasligi uchun: yangi reel keyingi ochilishda
+            // darhol ko'rinishi kerak (network fetch yangi list keshlaydi).
+            cachedFeed = null
+            synchronized(cachedByUploader) { cachedByUploader.remove(reel.uploadedByUid) }
         } catch (e: Exception) {
             val message = e.message.orEmpty()
             if (message.contains("PERMISSION_DENIED", true) || message.contains("permission", true)) {
@@ -260,6 +288,9 @@ object ReelsRepository {
         if (reelId.isBlank()) return
         try {
             db.collection(COLLECTION).document(reelId).delete().await()
+            // O'chirilgan reel keshda qolib keyingi ochilishda "tirilib" qolmasin.
+            cachedFeed = null
+            synchronized(cachedByUploader) { cachedByUploader.clear() }
         } catch (e: Exception) {
             val message = e.message.orEmpty()
             if (message.contains("PERMISSION_DENIED", true) || message.contains("permission", true)) {
