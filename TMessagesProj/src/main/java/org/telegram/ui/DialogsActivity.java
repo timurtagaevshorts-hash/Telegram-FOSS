@@ -3491,7 +3491,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (folderId != 0) {
                 actionBar.setTitle(LocaleController.getString("ArchivedChats", R.string.ArchivedChats));
                 if (yuzBrandMark != null) {
-                    yuzBrandMark.setVisibility(GONE);
+                    yuzBrandMark.setVisibility(View.GONE);
                 }
             } else {
                 statusDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(null, dp(26));
@@ -3501,13 +3501,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     // wordmark ko'rsatiladi (sinxron: syncYuzBrandMark).
                     actionBar.setTitle("", null);
                     if (yuzBrandMark != null) {
-                        yuzBrandMark.setVisibility(VISIBLE);
+                        yuzBrandMark.setVisibility(View.VISIBLE);
                     }
                 } else {
                     // YuzGram: debug (Beta) qurilmalarda ham "Telegram" emas, "YuzGram" ko'rsatiladi.
                     actionBar.setTitle(LocaleController.getString("AppName", R.string.AppName), statusDrawable);
                     if (yuzBrandMark != null) {
-                        yuzBrandMark.setVisibility(GONE);
+                        yuzBrandMark.setVisibility(View.GONE);
                     }
                 }
                 updateStatus(UserConfig.getInstance(currentAccount).getCurrentUser(), false);
