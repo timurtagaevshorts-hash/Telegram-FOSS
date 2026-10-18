@@ -125,6 +125,9 @@ class YuzAiActivity : BaseFragment() {
         statusView.text = ctx.getString(R.string.ai_greeting)
         assistant(ctx.getString(R.string.ai_greeting))
         speakNice("Salom! Mikrofon tugmasini bosib gapiring.")
+        // #79: AI hovuzi faqat yuklangan dialoglardan to'planadi — ro'yxatni
+        // oldindan chuqurroq yuklab, uzoqroqdagi chatlardagi odamlarni ham topiladigan qilamiz.
+        runCatching { MessagesController.getInstance(currentAccount).loadDialogs(0, 0, 200, false) }
         return root
     }
 
@@ -184,7 +187,7 @@ class YuzAiActivity : BaseFragment() {
             }
             if (parentActivity == null) { cloudBusy = false; return@launch }
             statusView.text = ctx.getString(R.string.ai_processing)
-            val names = YuzAiEngine.peers(currentAccount).map { it.name }.take(120)
+            val names = YuzAiEngine.peers(currentAccount).map { it.name }.take(250)
             val res = try {
                 withContext(Dispatchers.IO) { YuzAiCloud.voice(wav, names) }
             } catch (_: Exception) {
@@ -304,37 +307,20 @@ class YuzAiActivity : BaseFragment() {
 
     /** Gemini qaytargan nomni lokal dialog nomlari bilan sillasht (siril->lotin ham). */
     private fun findPeerByName(want: String): YuzAiEngine.Peer? {
-        val w = normName(want)
+        val w = YuzAiEngine.norm(want)
         if (w.length < 3) return null
         var best: YuzAiEngine.Peer? = null
         for (p in YuzAiEngine.peers(currentAccount)) {
+            val uname = YuzAiEngine.norm(p.username ?: "")
+            if (uname.length >= 4 && (uname == w || uname.startsWith(w) || w.startsWith(uname))) return p
             val tokens = p.name.lowercase(Locale.getDefault())
-                .split(Regex("\\s+")).map { normName(it) }.filter { it.length >= 3 }
+                .split(Regex("\\s+")).map { YuzAiEngine.norm(it) }.filter { it.length >= 3 }
             for (t in tokens) {
                 if (t == w) return p
                 if ((t.startsWith(w) || w.startsWith(t) || t.contains(w)) && best == null) best = p
             }
         }
         return best
-    }
-
-    private fun normName(s: String): String {
-        val sb = StringBuilder()
-        for (ch in s.lowercase(Locale.getDefault())) {
-            val t = cyrToLat(ch)
-            for (c in t) if (c in 'a'..'z') sb.append(c)
-        }
-        return sb.toString()
-    }
-
-    private fun cyrToLat(ch: Char): String = when (ch) {
-        'а' -> "a"; 'б' -> "b"; 'в' -> "v"; 'г' -> "g"; 'д' -> "d"; 'е' -> "e"; 'ё' -> "o"
-        'ж' -> "j"; 'з' -> "z"; 'и' -> "i"; 'й' -> "y"; 'к' -> "k"; 'л' -> "l"; 'м' -> "m"
-        'н' -> "n"; 'о' -> "o"; 'п' -> "p"; 'р' -> "r"; 'с' -> "s"; 'т' -> "t"; 'у' -> "u"
-        'ф' -> "f"; 'х' -> "x"; 'ц' -> "ts"; 'ч' -> "ch"; 'ш' -> "sh"; 'щ' -> "sh"
-        'ъ' -> ""; 'ы' -> "i"; 'ь' -> ""; 'э' -> "e"; 'ю' -> "yu"; 'я' -> "ya"
-        'ғ' -> "g"; 'қ' -> "q"; 'ҳ' -> "h"; 'ў' -> "o"; 'Ғ' -> "g"; 'Қ' -> "q"
-        else -> ch.toString()
     }
 
     private fun handleUtterance(raw: String) {
