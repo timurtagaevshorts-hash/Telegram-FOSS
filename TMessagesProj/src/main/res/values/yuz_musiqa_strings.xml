@@ -8,12 +8,12 @@
     <string name="musiqa_empty">Natija topilmadi. Boshqacha yozib ko\'ring.</string>
     <string name="musiqa_loading">Qidirilmoqda…</string>
     <string name="musiqa_error">Aloqa yo\'q yoki xatolik — qayta urinib ko\'ring</string>
-    <string name="musiqa_no_preview">Bu qo\'shiqda audio parcha yo\'q — boshqa natijani tanlang</string>
-    <string name="musiqa_row_hint">Qatorni bosing — qo\'shiq shu yerda ijro etiladi</string>
+    <string name="musiqa_no_preview">Bu qo\'shiq oqimini bo\'lib bo\'lmadi — boshqa natijani tanlang</string>
+    <string name="musiqa_row_hint">Qatorni bosing — qo\'shiq to\'liq, shu yerda ijro etiladi</string>
     <string name="func_ai_musiqa_name">Musiqa</string>
     <string name="ai_chip_musiqa">Musiqa top</string>
     <string name="func_musiqa_title">Musiqa topish</string>
-    <string name="func_musiqa_desc">Qo\'shiq nomini yozing — pleyerda tinglang</string>
+    <string name="func_musiqa_desc">Qo\'shiq nomini yozing — to\'liq tinglang</string>
     <!-- YuzGram #62: ilova ichidagi pleyer + ekvalayzer + kesh -->
     <string name="musiqa_saved_btn">Yuklanganlar</string>
     <string name="musiqa_saved_empty">Hech narsa yuklanmagan. Pleyerdagi yuklab olish tugmasi bilan qo\'shiqni keshga saqlang.</string>
@@ -23,7 +23,7 @@
     <string name="musiqa_dl_exists">Bu qo\'shiq allaqachon keshda</string>
     <string name="musiqa_dl_removed">Keshdan o\'chirildi</string>
     <string name="musiqa_eq_title">Ovoz sozlamalari</string>
-    <string name="musiqa_eq_hint">Eslatma: bepul API 30 soniyalik parchani beradi — tugmasi uni uzluksiz takrorlaydi.</string>
+    <string name="musiqa_eq_hint">Qo\'shiqlar endi to\'liq ijro etiladi. Ekvalayzer preseti va bas kuchi jonli tinglovga darhol ta\'sir qiladi.</string>
     <string name="musiqa_eq_unavailable">Bu qurilmada ekvalayzer mavjud emas</string>
     <string name="musiqa_bass_power">Bas kuchi</string>
     <string name="musiqa_preset_flat">Oddiy (Flat)</string>

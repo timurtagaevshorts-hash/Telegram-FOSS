@@ -6,10 +6,11 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * Musiqa qidiruvi — Deezer och API (kalit TALAB QILMAYDI).
- * Natijada: nom, ijrochi, muqova va 30 soniyalik preview mp3.
- * YuzGram #62: preview ilova ichidagi pleyerda ijro etiladi (YouTube emas),
- * xohlasa keshga yuklab olinadi (YuzMusicCache).
+ * Musiqa qidiruvi — ikki manba:
+ *  1) YuzGram #63: YouTube InnerTube (YuzYouTubeApi) — TO'LIQ qo'shiqlar,
+ *     videoId to'lgan qatorlar pleyerda resolve bo'lib eshitiladi/yuklanadi.
+ *  2) Deezer och API — zaxira (kalit talab qilmaydi, lekin faqat 30s preview).
+ * YuzGram #62: previewlar ham YouTube'ga o'tkazmaydi — ilova ichida ijro etiladi.
  */
 data class YuzTrack(
     val id: Long,
@@ -19,21 +20,34 @@ data class YuzTrack(
     val durationSec: Int,
     val coverUrl: String,
     val previewUrl: String,
-    val link: String
+    val link: String,
+    // YuzGram #63: YouTube videoId — bo'sh bo'lsa preview'li Deezer qatori.
+    val videoId: String = ""
 )
 
 object YuzMusicRepository {
 
     private const val BASE = "https://api.deezer.com"
 
-    /** Qo'shiq nomi/ijrochi bo'yicha qidirish. */
+    /** Qo'shiq nomi/ijrochi bo'yicha qidirish — avval to'liq audio manbasi. */
     fun search(query: String): List<YuzTrack> {
+        val yt = runCatching { YuzYouTubeApi.search(query) }.getOrDefault(emptyList())
+        if (yt.isNotEmpty()) return yt
         val q = URLEncoder.encode(query.trim(), "UTF-8")
         return fetchTracks("$BASE/search?q=$q&limit=25")
     }
 
-    /** Boshlang'ich ekran: ommabop xitlar. */
-    fun chart(): List<YuzTrack> = fetchTracks("$BASE/chart/0/tracks?limit=25")
+    /**
+     * Boshlang'ich ekran: ommabop xitlar.
+     * YuzGram #63: bu ham YouTube'dan — chart qatorlari ham to'liq eshitiladi.
+     */
+    fun chart(): List<YuzTrack> {
+        val yt = runCatching {
+            YuzYouTubeApi.search("o'zbek qo'shiqlari 2026", limit = 25)
+        }.getOrDefault(emptyList())
+        if (yt.isNotEmpty()) return yt
+        return fetchTracks("$BASE/chart/0/tracks?limit=25")
+    }
 
     private fun fetchTracks(url: String): List<YuzTrack> {
         val body = httpGet(url) ?: return emptyList()

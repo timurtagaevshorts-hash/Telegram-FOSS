@@ -22,6 +22,9 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.upstream.DefaultDataSource
+import androidx.media3.exoplayer.upstream.DefaultHttpDataSource
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -38,13 +41,15 @@ import uz.kodlikino.top4.utils.YuzMusicCache
 import uz.kodlikino.top4.utils.YuzMusicEffects
 import uz.kodlikino.top4.utils.YuzMusicRepository
 import uz.kodlikino.top4.utils.YuzTrack
+import uz.kodlikino.top4.utils.YuzYouTubeApi
 
 /**
- * YuzGram #62: musiqa — Deezer qidiruvi natijalari endi YouTube'ga o'tkazmaydi.
- * Qatorni bosish ilova ichidagi pleyerni ishga tushiradi (prev/play/next, seek,
- * takror), ekvalayzer tugmasi ovoz uslubini (Bass/Jazz/Rock/Vocal + bas kuchi)
- * sozlaydi, download tugmasi qo'shiq parchasini keshga saqlaydi; "Yuklanganlar"
- * tugmasi oflayd ro'yxatni ochadi.
+ * YuzGram #62: musiqa natijalari YouTube'ga o'tkazmaydi — qatorni bosish ilova
+ * ichidagi pleyerni ishga tushiradi (prev/play/next, seek, takror), ekvalayzer
+ * ovoz uslubini (Bass/Jazz/Rock/Vocal + bas kuchi) sozlaydi, download tugmasi
+ * qo'shiqni keshga saqlaydi; "Yuklanganlar" tugmasi oflayd ro'yxatni ochadi.
+ * YuzGram #63: endi qo'shiqlar TO'LIQ ijro etiladi — qidiruv YouTube InnerTube
+ * orqali (YuzYouTubeApi), audio oqim bosilganda qurilmada resolve qilinadi.
  */
 class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment() {
 
@@ -74,6 +79,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private var btnLoop: ImageButton? = null
     private var btnDl: ImageButton? = null
     private var seeking = false
+    private var playToken = 0
     private val ui = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
         override fun run() {
@@ -248,7 +254,13 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
 
     private fun ensurePlayer(): ExoPlayer {
         player?.let { return it }
-        val p = ExoPlayer.Builder(ctx).build()
+        // YuzGram #63: googlevideo audio URL'lari youtube UA'sini kutadi.
+        // DefaultDataSource — file:// (kesh) + http (stream) ikkalasini ham yeydi.
+        val http = DefaultHttpDataSource.Factory().setUserAgent(YuzYouTubeApi.UA)
+        val ds = DefaultDataSource.Factory(ctx, http)
+        val p = ExoPlayer.Builder(ctx)
+            .setMediaSourceFactory(ProgressiveMediaSource.Factory(ds))
+            .build()
         p.setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA)
@@ -275,24 +287,66 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private fun playAt(pos: Int) {
         if (pos !in currentList.indices) return
         val track = currentList[pos]
-        val uri = YuzMusicCache.playUri(ctx, track)
+        val p = ensurePlayer()
+        if (pos == currentIndex && p.currentMediaItem != null) {
+            if (p.isPlaying) {
+                p.pause()
+                btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)
+                adapter.setPlaying(-1)
+            } else {
+                p.playWhenReady = true
+                btnPlayPause?.setImageResource(R.drawable.ic_yuz_pause)
+                adapter.setPlaying(pos)
+            }
+            return
+        }
+        // 1) Keshda to'liq fayl bormi? — darhol ijro.
+        val local = YuzMusicCache.localFile(ctx, track.id)
+        if (local != null) {
+            startPlayback(pos, track, local.toURI().toString())
+            return
+        }
+        // 2) YuzGram #63: YouTube qatori — audio oqimni qurilmada resolve qilamiz
+        //    (URL IP'ga bog'langan, shuning uchun server emas, telefon so'raydi).
+        if (track.videoId.isNotBlank()) {
+            val token = ++playToken
+            currentIndex = pos
+            adapter.setPlaying(pos)
+            updateBarTrack(track)
+            tvPlayerTitle?.text = ctx.getString(R.string.musiqa_loading)
+            btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)
+            scope.launch {
+                val stream = try {
+                    withContextIo { YuzYouTubeApi.resolveStream(track.videoId) }
+                } catch (_: Exception) {
+                    null
+                }
+                if (token != playToken) return@launch // foydalanuvchi boshqa qatorni bosdi
+                val uri = stream?.url?.takeIf { it.isNotBlank() } ?: track.previewUrl
+                if (uri.isBlank()) {
+                    Toast.makeText(ctx, R.string.musiqa_no_preview, Toast.LENGTH_SHORT).show()
+                    if (currentIndex == pos) {
+                        currentIndex = -1
+                        adapter.setPlaying(-1)
+                    }
+                    return@launch
+                }
+                startPlayback(pos, track, uri)
+            }
+            return
+        }
+        // 3) Deezer zaxira: 30 soniyalik preview.
+        val uri = track.previewUrl
         if (uri.isBlank()) {
             Toast.makeText(ctx, R.string.musiqa_no_preview, Toast.LENGTH_SHORT).show()
             return
         }
+        startPlayback(pos, track, uri)
+    }
+
+    /** Bar qatorini yuklab, ijroni boshlaydi. */
+    private fun startPlayback(pos: Int, track: YuzTrack, uri: String) {
         val p = ensurePlayer()
-        if (pos == currentIndex && p.isPlaying) {
-            p.pause()
-            btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)
-            adapter.setPlaying(-1)
-            return
-        }
-        if (pos == currentIndex && !p.isPlaying && p.currentMediaItem != null) {
-            p.playWhenReady = true
-            btnPlayPause?.setImageResource(R.drawable.ic_yuz_pause)
-            adapter.setPlaying(pos)
-            return
-        }
         currentIndex = pos
         p.setMediaItem(MediaItem.fromUri(uri))
         p.prepare()
@@ -420,6 +474,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         kotlinx.coroutines.withContext(Dispatchers.IO) { block() }
 
     private fun stopPlayback() {
+        playToken++
         player?.pause()
         adapter.setPlaying(-1)
         btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)

@@ -64,7 +64,8 @@ class YuzMusicAdapter(
             sub.append(t.album)
         }
         holder.artist.text = sub
-        holder.dur.text = String.format("%d:%02d", t.durationSec / 60, t.durationSec % 60)
+        holder.dur.text = if (t.durationSec <= 0) "" else
+            String.format("%d:%02d", t.durationSec / 60, t.durationSec % 60)
         if (t.coverUrl.isNotBlank()) {
             Glide.with(holder.cover).load(t.coverUrl).into(holder.cover)
         } else {
