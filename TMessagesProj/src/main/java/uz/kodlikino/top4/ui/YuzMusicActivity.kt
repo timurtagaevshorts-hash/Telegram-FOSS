@@ -342,21 +342,23 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)
         scope.launch {
             val streams = try {
-                withContextIo { YuzYouTubeApi.resolveStreamCandidates(track, 6) }
+                // #66: tezkor single-shot resolve (faqat ANDROID so'rovi, ~1 ta
+                // HTTP) — bosilgach kezikmaslik uchun; chuqur 8-nomzod ro'yxatni
+                // kesh yuklash o'zi qayta oladi.
+                withContextIo { YuzYouTubeApi.resolveStreamCandidates(track, 2) }
             } catch (_: Exception) {
                 emptyList()
             }
             if (token != playToken) return@launch
-            val preview = track.previewUrl.takeIf { it.isNotBlank() }
-            if (streams.isEmpty() && preview == null) {
-                Toast.makeText(ctx, R.string.musiqa_no_preview, Toast.LENGTH_SHORT).show()
-                if (currentIndex == pos) {
-                    currentIndex = -1
-                    adapter.setPlaying(-1)
-                }
+            // YuzGram #66: streaming'ga FAQAT 1 tezkor urinish (10s) — buffering'da
+            // qotib qolish endi 60s emas, 10sda aniqlanadi; keyin ishonchli rejim:
+            // qo'shiq keshga yuklab olinadi (3-5 MB, 8 nomzod bo'ylab) va local
+            // fayldan ijro etiladi — tarmoq tuzoqlaridan qat'i nalmi ishlaydi.
+            if (streams.isEmpty()) {
+                downloadFallback(Trying(token, pos, track, emptyList(), null, 0))
                 return@launch
             }
-            tryNext(Trying(token, pos, track, streams.take(4), preview, 0))
+            tryNext(Trying(token, pos, track, streams.take(1), null, 0))
         }
     }
 
@@ -382,7 +384,8 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             tvPlayerArtist?.text = ctx.getString(R.string.musiqa_trying, t.idx + 1, total)
         }
         ui.removeCallbacks(streamWatchdog)
-        ui.postDelayed(streamWatchdog, 15000)
+        // #66: 10s — buffering'da qotib qolishni tez aniqlash uchun
+        ui.postDelayed(streamWatchdog, 10000)
     }
 
     /** READY keldi — oqim ishlayapti, watchdog bekor. */
