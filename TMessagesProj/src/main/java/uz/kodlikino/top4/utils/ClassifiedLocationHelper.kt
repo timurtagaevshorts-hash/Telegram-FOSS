@@ -60,7 +60,7 @@ object ClassifiedLocationHelper {
         val parts = q.split(',', ' ', '-').map { it.trim() }
             .filter { it.isNotEmpty() && it !in STOPWORDS }
         if (parts.isEmpty()) return true
-        val hay = fields.filter { !it.isNullOrBlank() }
+        val hay = fields.filterNotNull().filter { it.isNotBlank() }
             .joinToString(" ") { norm(it) }
         if (hay.isEmpty()) return false
         if (parts.all { hay.contains(it) }) return true

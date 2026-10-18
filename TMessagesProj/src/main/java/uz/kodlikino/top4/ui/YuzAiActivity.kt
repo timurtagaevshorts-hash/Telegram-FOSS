@@ -453,9 +453,10 @@ class YuzAiActivity : BaseFragment() {
         try {
             val mc = MessagesController.getInstance(currentAccount)
             val user = mc.getUser(peer.userId) ?: return
+            val userFull = mc.getUserFull(peer.userId)
             VoIPHelper.startCall(
-                user, video, user.video_calls_available, activity,
-                mc.getUserFull(peer.userId), accountInstance
+                user, video, userFull != null && userFull.video_calls_available, activity,
+                userFull, accountInstance
             )
         } catch (_: Exception) {
             val msg = ctx.getString(R.string.ai_call_failed)
