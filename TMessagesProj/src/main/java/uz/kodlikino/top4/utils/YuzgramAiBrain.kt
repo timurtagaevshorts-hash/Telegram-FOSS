@@ -18,6 +18,12 @@ import java.util.Locale
  */
 object YuzgramAiBrain {
 
+    /**
+     * Cloudflare Worker proksi manzili (Gemini kaliti FAKAT worker'da; APK'da yoq).
+     * Bo'sh bo'lsa — LLM qadami o'tkazib yuboriladi, eski Wikipedia zanjiri ishlaydi.
+     */
+    private const val AI_PROXY_URL = "https://yuzgram-ai-proxy.timurtagaevshorts.workers.dev/chat"
+
     suspend fun answer(question: String): String = withContext(Dispatchers.IO) {
         val q = question.trim()
         if (q.isBlank()) return@withContext "Ha, eshitaman. Savolingizni ayting."
@@ -25,7 +31,46 @@ object YuzgramAiBrain {
         if (isWeather(q)) {
             weatherAnswer()?.let { return@withContext it }
         }
+        if (AI_PROXY_URL.isNotBlank()) {
+            llmAnswer(q)?.let { return@withContext it }
+        }
         wikipediaAnswer(q) ?: fallback(q)
+    }
+
+    /**
+     * Worker'ga POST {"q": "..."} → javob {"a": "matn"}. Xato/bo'sh bo'lsa null
+     * (zanjir davom etadi, Wikipedia fallback'ga tushadi).
+     */
+    private fun llmAnswer(question: String): String? {
+        return try {
+            val body = JSONObject().put("q", question).toString()
+            val response = httpPostJson(AI_PROXY_URL, body) ?: return null
+            val text = JSONObject(response).optString("a").trim()
+            if (text.length < 2) null else text
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun httpPostJson(url: String, jsonBody: String): String? {
+        var connection: HttpURLConnection? = null
+        return try {
+            connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 6000
+                readTimeout = 12000
+                requestMethod = "POST"
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("User-Agent", "YuzgramAI/1.0")
+            }
+            connection.outputStream.use { it.write(jsonBody.toByteArray(Charsets.UTF_8)) }
+            if (connection.responseCode !in 200..299) return null
+            connection.inputStream.bufferedReader().use { it.readText() }
+        } catch (_: Exception) {
+            null
+        } finally {
+            connection?.disconnect()
+        }
     }
 
     private fun localAnswer(raw: String): String? {
