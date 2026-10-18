@@ -10,10 +10,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
-import androidx.media3.datasource.okhttp.OkHttpDataSource
 import okhttp3.OkHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
@@ -30,14 +28,14 @@ import java.util.concurrent.TimeUnit
  * #67 403 tuzatishi (telefon logcat + media3 manba kodi bilan isbotlangan):
  *  - media3 DefaultHttpDataSource sukut bo'yicha "Accept-Encoding: gzip"
  *    yuborardi -> googlevideo 403 berardi. Endi barcha HTTP so'rovlar
- *    YuzStreamRequestFactory orqali: "Accept-Encoding: identity" + to'g'ri UA.
+ *    YuzStreamDataSource orqali: "Accept-Encoding: identity" + to'g'ri UA.
  *  - audio URL telefonning O'Z IP'SIDA resolve bo'ladi (googlevideo URL'lari
  *    IP-ga bog'langan; Cloudflare IP'larini YouTube "bot" deb bloklaydi).
  *
  * Arxitektura:
  *  - navbat: qator bosilganda BUTUN ro'yxat ExoPlayer navbati bo'ladi —
- *    qo'shiq tugagach keyingisi avtomatik boshlanadi (URI "yuz://" marker:
- *    resolve media3 loader ipida, kechikishsiz);
+ *    qo'shiq tugagach keyingisi avtomatik boshlanadi (marker URI
+ *    "https://yuz.stream/v/<id>": resolve media3 loader ipida, kechikishsiz);
  *  - radio: navbat oxiriga yaqlashsa — kuylagan qo'shiq bo'yicha o'xshashlar
  *    topilib navbat uzaytiriladi;
  *  - chidamlilik: 15s buffering yoki oqim xatosi — qo'shiq FONDA keshga
@@ -90,11 +88,9 @@ object YuzMusicEngine {
             .readTimeout(30, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build()
-        val http = OkHttpDataSource.Factory(okHttp)
-            .setRequestFactory(YuzStreamRequestFactory())
-        val ds = DefaultDataSource.Factory(appCtx, http)
+        val http = YuzStreamDataSource.Factory(okHttp)
         val p = ExoPlayer.Builder(appCtx)
-            .setMediaSourceFactory(ProgressiveMediaSource.Factory(ds))
+            .setMediaSourceFactory(ProgressiveMediaSource.Factory(http))
             .build()
         p.setAudioAttributes(
             AudioAttributes.Builder()
@@ -184,7 +180,7 @@ object YuzMusicEngine {
         val local = if (::appCtx.isInitialized) YuzMusicCache.localFile(appCtx, t.id) else null
         val uri = when {
             local != null -> local.toURI().toString()
-            t.videoId.isNotBlank() -> YuzStreamRequestFactory.URI_PREFIX + t.videoId
+            t.videoId.isNotBlank() -> YuzStreamDataSource.URI_PREFIX + t.videoId
             else -> t.previewUrl
         }
         return MediaItem.Builder()
