@@ -277,7 +277,9 @@ object YuzMusicEngine {
             Log.i(TAG, "retry#$itemRetries vid=${t.videoId} -> rotate stream candidate")
             YuzYouTubeApi.noteBadStream(t.videoId)
             runCatching {
-                p.seekTo(p.currentMediaItemIndex, p.currentPosition)
+                // +1ms: media3 bir xil seekTo'ni "o'rin yo'q" deb oqimni
+                // qayta ochmaydi — pozitsiyani buzib loader'ni majburlaymiz.
+                p.seekTo(p.currentMediaItemIndex, p.currentPosition + 1)
                 p.prepare()
                 p.playWhenReady = true
             }
