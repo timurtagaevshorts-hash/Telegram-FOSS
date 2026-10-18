@@ -595,6 +595,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     // YuzGram: gorizontal papka chizig'i (FilterTabsView) o'rniga o'ng chetidagi
     // vertikal neon ustun. Ustun ishlatilganda papka tanlash shu yerdan boshqariladi.
     private uz.kodlikino.top4.ui.YuzGramChatRail yuzChatRail;
+    // YuzGram #60: chat tepasidagi brend logotipi — oddiy "YuzGram" matnli
+    // sarlavha o'rniga gradient belgi + wordmark chizadi.
+    private uz.kodlikino.top4.ui.YuzGramBrandMark yuzBrandMark;
 
     private final static int pin = 100;
     private final static int read = 101;
@@ -1284,6 +1287,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     if (child == dialogStoriesCell && dialogStoriesCell.getPremiumHint() != null) {
                         dialogStoriesCell.getPremiumHint().layout(childLeft, childTop - dp(24 + 8 + 22) + height, childLeft + width, childTop - dp(24 + 8 + 22) + height + dialogStoriesCell.getPremiumHint().getMeasuredHeight());
                     }
+                } else if (child == yuzBrandMark) {
+                    // YuzGram: brend action bar maydonining o'zida turadi (status bar
+                    // hisobini view ichida oladi), padding surib yubormasin.
+                    childTop = 0;
                 } else if (child == searchViewPager) {
                     childTop = (onlySelect && initialDialogsType != DIALOGS_TYPE_FORWARD ? 0 : actionBar.getMeasuredHeight()) + topPadding + (searchTabsView == null ? 0 : dp(44));
                 } else if (child instanceof DatabaseMigrationHint) {
@@ -1723,6 +1730,40 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             actionBar.getTitlesContainer().setScaleY(1f);
             actionBar.getTitlesContainer().setScaleX(1f);
             actionBar.getTitlesContainer().setAlpha(1f - progressToActionMode);
+        }
+        syncYuzBrandMark(containersAlpha);
+    }
+
+    /**
+     * YuzGram #60: brend wordmark action bar bilan bir xil harakatlanadi —
+     * yashirinish (translationY), qaytish, izlash va action-mode fade'lari.
+     */
+    private void syncYuzBrandMark(float containersAlpha) {
+        if (yuzBrandMark == null) {
+            return;
+        }
+        yuzBrandMark.setBarHeights(AndroidUtilities.statusBarHeight, actionBar.getMeasuredHeight());
+        if (!isYuzGramMainRoot()) {
+            yuzBrandMark.setAlpha(0f);
+            yuzBrandMark.setClickable(false);
+            return;
+        }
+        yuzBrandMark.setTranslationY(actionBar.getTranslationY());
+        float fade = (1f - progressToActionMode) * (1f - Utilities.clamp(searchAnimationProgress / 0.5f, 1f, 0f));
+        float a = containersAlpha * fade;
+        yuzBrandMark.setAlpha(a);
+        yuzBrandMark.setClickable(a > 0.5f);
+    }
+
+    /** Brendga bosish — sarlavhaga bosish bilan bir xil: tepaga qaytish. */
+    private void onYuzGramBrandClicked() {
+        if (initialDialogsType != DIALOGS_TYPE_WIDGET) {
+            hideFloatingButton(false);
+        }
+        if (hasOnlySlefStories && getStoriesController().hasOnlySelfStories()) {
+            dialogStoriesCell.openSelfStories();
+        } else {
+            scrollToTop(true, true);
         }
     }
 
@@ -3449,11 +3490,26 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             }
             if (folderId != 0) {
                 actionBar.setTitle(LocaleController.getString("ArchivedChats", R.string.ArchivedChats));
+                if (yuzBrandMark != null) {
+                    yuzBrandMark.setVisibility(GONE);
+                }
             } else {
                 statusDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(null, dp(26));
                 statusDrawable.center = true;
-                // YuzGram: debug (Beta) qurilmalarda ham "Telegram" emas, "YuzGram" ko'rsatiladi.
-                actionBar.setTitle(LocaleController.getString("AppName", R.string.AppName), statusDrawable);
+                if (isYuzGramMainRoot()) {
+                    // YuzGram #60: matnli sarlavha o'chiriladi — o'rnida brend
+                    // wordmark ko'rsatiladi (sinxron: syncYuzBrandMark).
+                    actionBar.setTitle("", null);
+                    if (yuzBrandMark != null) {
+                        yuzBrandMark.setVisibility(VISIBLE);
+                    }
+                } else {
+                    // YuzGram: debug (Beta) qurilmalarda ham "Telegram" emas, "YuzGram" ko'rsatiladi.
+                    actionBar.setTitle(LocaleController.getString("AppName", R.string.AppName), statusDrawable);
+                    if (yuzBrandMark != null) {
+                        yuzBrandMark.setVisibility(GONE);
+                    }
+                }
                 updateStatus(UserConfig.getInstance(currentAccount).getCurrentUser(), false);
             }
             if (folderId == 0) {
@@ -5631,6 +5687,18 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         rightSlidingDialogContainer.setOpenProgress(0f);
         contentView.addView(rightSlidingDialogContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         contentView.addView(dialogStoriesCell, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, DialogStoriesCell.HEIGHT_IN_DP));
+        // YuzGram #60: brend wordmark'i — faqat YuzGram root chat ekrani uchun.
+        if (isYuzGramMainRoot()) {
+            yuzBrandMark = new uz.kodlikino.top4.ui.YuzGramBrandMark(context);
+            yuzBrandMark.setBarHeights(AndroidUtilities.statusBarHeight,
+                    AndroidUtilities.statusBarHeight + ActionBar.getCurrentActionBarHeight());
+            yuzBrandMark.setOnClickListener(v -> onYuzGramBrandClicked());
+            yuzBrandMark.setOnLongClickListener(v -> {
+                presentFragment(new FiltersSetupActivity());
+                return true;
+            });
+            contentView.addView(yuzBrandMark, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 0, 0, 0, 0));
+        }
         updateStoriesVisibility(false);
         return fragmentView;
     }
