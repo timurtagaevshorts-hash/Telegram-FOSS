@@ -2,6 +2,7 @@
 <resources>
     <string name="instagram_save_title">Instagram video</string>
     <string name="instagram_save_subtitle">Reels havolasini joylang — video yuklab olinadi va galereyaga saqlanadi.</string>
+    <string name="instagram_save_hero">Havoladan video yuklash</string>
     <string name="instagram_save_link_hint">Instagram havolasi</string>
     <string name="instagram_save_paste">Buferdan olish</string>
     <string name="instagram_save_download">Yuklab olish</string>

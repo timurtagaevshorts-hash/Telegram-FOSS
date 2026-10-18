@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="instagram_grad_start">#F9CE34</color>
+    <color name="instagram_grad_mid">#EE2A7B</color>
+    <color name="instagram_grad_end">#6228D7</color>
+    <color name="instagram_action">#EE2A7B</color>
+    <color name="instagram_progress_bg">#141B26</color>
+</resources>
