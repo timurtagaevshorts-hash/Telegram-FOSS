@@ -34,6 +34,8 @@ object YuzAiCloud {
                 val body = JSONObject()
                     .put("audio_b64", Base64.encodeToString(wav, Base64.NO_WRAP))
                     .put("peers", JSONArray(peers.take(120)))
+                    // Tezlik: /voice ichida TTS kutmaymiz — javob ovozi keyin /speak'dan olinadi.
+                    .put("speak", false)
                 val resp = post("$BASE/voice", body.toString(), 8000, 30000) ?: return@withContext null
                 val j = JSONObject(resp)
                 if (j.has("error") && !j.has("i")) return@withContext null

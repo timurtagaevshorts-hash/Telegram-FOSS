@@ -14,7 +14,7 @@ import java.util.Locale
  */
 object YuzAiEngine {
 
-    data class Peer(val dialogId: Long, val name: String, val username: String?)
+    data class Peer(val dialogId: Long, val name: String, val username: String?, val userId: Long = 0L)
 
     enum class Section { REELS, ELONLAR, KINOLAR, PROFIL, CHATS, MUSIQA }
 
@@ -23,11 +23,13 @@ object YuzAiEngine {
         data class NeedBody(val peer: Peer) : Intent()
         data class NotFound(val name: String) : Intent()
         data class OpenChat(val peer: Peer) : Intent()
+        data class Call(val peer: Peer, val video: Boolean) : Intent()
         data class Goto(val section: Section) : Intent()
         data class Ask(val question: String) : Intent()
     }
 
     private val SEND_WORDS = listOf("yubor", "yubordim", "jo'nat", "jonat", "yoz", "olibsana", "xabar")
+    private val CALL_WORDS = listOf("qo'ng'iroq", "qong'iroq", "qo'ngiroq", "qongiroq", "qoingiroq", "telefon", "zvonit", "qo'ng'iroqni")
     private val NAV_MAP = listOf(
         "reels" to Section.REELS,
         "reka" to Section.REELS,
@@ -61,7 +63,7 @@ object YuzAiEngine {
             val name = peerName(controller, peer) ?: continue
             if (name.isBlank()) continue
             val username = peerNameLower(controller, peer, true)
-            result.add(Peer(id, name, username))
+            result.add(Peer(id, name, username, peer.user_id))
         }
         return result
     }
@@ -110,6 +112,15 @@ object YuzAiEngine {
         val hasSend = SEND_WORDS.any { w -> tokens.any { it.contains(w) } } ||
             normalized.contains("xabar yubor") || normalized.contains("msg")
         val openChat = tokens.any { it == "och" || it == "ochqol" || it.startsWith("ochib") }
+        val hasCall = CALL_WORDS.any { w -> tokens.any { it.contains(w) } }
+
+        // 0) Qo'ng'iroq: "Islomga telefon qil" -> Call (video so'zi bo'lsa video).
+        if (hasCall) {
+            val match = findPeer(tokens, account)
+            if (match != null) return Intent.Call(match.peer, normalized.contains("video"))
+            val guessed = guessNameToken(tokens)
+            if (guessed != null) return Intent.NotFound(guessed)
+        }
 
         // 1) Aniq yuborish buyrug'i yoki chat ochish — nomni qidir.
         if (hasSend || openChat) {
@@ -150,6 +161,7 @@ object YuzAiEngine {
             val token = stripPunct(tokens[i])
             if (token.length < 3) continue
             if (SEND_WORDS.any { token.contains(it) }) continue
+            if (CALL_WORDS.any { token.contains(it) }) continue
             if (NAV_MAP.any { token.startsWith(it.first) }) continue
             for (peer in list) {
                 val nameToken = firstTokenLower(peer.name)
@@ -182,8 +194,9 @@ object YuzAiEngine {
             val t = stripPunct(token)
             if (t.length < 3) continue
             if (SEND_WORDS.any { t.contains(it) }) continue
+            if (CALL_WORDS.any { t.contains(it) }) continue
             if (NAV_MAP.any { t.startsWith(it.first) }) continue
-            if (t == "xabar" || t == "msg" || t == "deb" || t == "men" || t == "menga") continue
+            if (t == "xabar" || t == "msg" || t == "deb" || t == "men" || t == "menga" || t == "qil" || t == "video") continue
             return t
         }
         return null

@@ -29,6 +29,7 @@ import org.telegram.messenger.R
 import org.telegram.messenger.SendMessagesHelper
 import org.telegram.ui.ActionBar.BaseFragment
 import org.telegram.ui.ChatActivity
+import org.telegram.ui.Components.voip.VoIPHelper
 import uz.kodlikino.top4.ai.YuzAiCloud
 import uz.kodlikino.top4.ai.YuzAiEngine
 import uz.kodlikino.top4.ai.YuzAiRecorder
@@ -128,20 +129,16 @@ class YuzAiActivity : BaseFragment() {
     }
 
     private fun onMicTapped() {
-        val activity = parentActivity
-        if (activity == null && !cloudBusy) {
-            voice?.stopSpeaking()
-            startCloudFlow()
-            return
-        }
-        val granted = activity == null || ContextCompat.checkSelfPermission(
+        val activity = parentActivity ?: return
+        val granted = ContextCompat.checkSelfPermission(
             activity, Manifest.permission.RECORD_AUDIO
         ) == PackageManager.PERMISSION_GRANTED
         if (!granted) {
             ActivityCompat.requestPermissions(
-                activity!!, arrayOf(Manifest.permission.RECORD_AUDIO), 501
+                activity, arrayOf(Manifest.permission.RECORD_AUDIO), 501
             )
-            toast(ctx.getString(R.string.ai_mic_permission))
+            statusView.text = ctx.getString(R.string.ai_mic_permission)
+            assistant(ctx.getString(R.string.ai_mic_permission))
             return
         }
         val v = voice ?: return
@@ -195,7 +192,16 @@ class YuzAiActivity : BaseFragment() {
             }
             cloudBusy = false
             if (parentActivity == null) return@launch
-            if (res == null || res.transcript.isBlank()) {
+            if (res == null) {
+                // Muloqot uzildi — tizim mikrofoni (offline STT) zaxirasiga o'tamiz.
+                val msg = ctx.getString(R.string.ai_cloud_fallback)
+                statusView.text = msg
+                assistant(msg)
+                voice?.stopSpeaking()
+                voice?.startListening()
+                return@launch
+            }
+            if (res.transcript.isBlank()) {
                 statusView.text = ctx.getString(R.string.ai_voice_slow)
                 assistant(ctx.getString(R.string.ai_voice_slow))
                 return@launch
@@ -221,6 +227,16 @@ class YuzAiActivity : BaseFragment() {
                     say(ctx.getString(R.string.ai_need_body, peer.name), res.audio)
                 }
                 else -> sendTo(peer, res.message, res)
+            }
+            "call" -> when {
+                peer == null -> say(ctx.getString(R.string.ai_not_found, res.peerName), res.audio)
+                peer.userId == 0L -> say(ctx.getString(R.string.ai_call_no_user, peer.name), res.audio)
+                else -> {
+                    val video = res.message.trim().equals("video", ignoreCase = true) ||
+                        res.transcript.contains("video")
+                    makeCall(peer, video)
+                    say(ctx.getString(R.string.ai_call_start, peer.name), res.audio)
+                }
             }
             "open" -> if (peer != null) {
                 say(ctx.getString(R.string.ai_open_chat, peer.name), res.audio)
@@ -258,11 +274,12 @@ class YuzAiActivity : BaseFragment() {
 
     private fun sayOut(text: String, audio: ByteArray?) {
         val v = voice ?: return
-        if (audio != null && audio.size > 2000) v.playCloudAudio(audio, text) else v.speak(text)
+        if (audio != null && audio.size > 2000) v.playCloudAudio(audio, text) else speakNice(text)
     }
 
-    /** Cloud inson ovozi bilan gapirish (bo'lmasa tizim TTS). */
+    /** Cloud inson ovozi bilan gapirish: /speak async; bo'lmasa darhol tizim TTS. */
     private fun speakNice(text: String) {
+        val v = voice ?: return
         val s = scope
         s.launch {
             val b = try {
@@ -271,7 +288,7 @@ class YuzAiActivity : BaseFragment() {
                 null
             }
             if (parentActivity == null) return@launch
-            sayOut(text, b)
+            if (b != null && b.size > 2000) v.playCloudAudio(b, text) else v.speak(text)
         }
     }
 
@@ -350,6 +367,19 @@ class YuzAiActivity : BaseFragment() {
                 assistant(ctx.getString(R.string.ai_open_chat, intent.peer.name))
                 openChat(intent.peer)
             }
+            is YuzAiEngine.Intent.Call -> {
+                if (intent.peer.userId == 0L) {
+                    val q = ctx.getString(R.string.ai_call_no_user, intent.peer.name)
+                    statusView.text = q
+                    assistant(q)
+                    voice?.speak(q)
+                } else {
+                    val q = ctx.getString(R.string.ai_call_start, intent.peer.name)
+                    statusView.text = q
+                    assistant(q)
+                    makeCall(intent.peer, intent.video)
+                }
+            }
             is YuzAiEngine.Intent.Goto -> {
                 val name = sectionName(intent.section)
                 assistant(ctx.getString(R.string.ai_goto, name))
@@ -414,6 +444,25 @@ class YuzAiActivity : BaseFragment() {
         val args = Bundle()
         args.putLong("dialog_id", peer.dialogId)
         presentFragment(ChatActivity(args), false)
+    }
+
+    /** Telefon qo'ng'irog'i — faqat shaxsiy odam chatlari uchun ishlaydi. */
+    private fun makeCall(peer: YuzAiEngine.Peer, video: Boolean) {
+        val activity = parentActivity ?: return
+        if (peer.userId == 0L) return
+        try {
+            val mc = MessagesController.getInstance(currentAccount)
+            val user = mc.getUser(peer.userId) ?: return
+            VoIPHelper.startCall(
+                user, video, user.video_calls_available, activity,
+                mc.getUserFull(peer.userId), accountInstance
+            )
+        } catch (_: Exception) {
+            val msg = ctx.getString(R.string.ai_call_failed)
+            statusView.text = msg
+            assistant(msg)
+            voice?.speak(msg)
+        }
     }
 
     private fun gotoSection(section: YuzAiEngine.Section) {

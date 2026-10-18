@@ -2,7 +2,7 @@
 <resources>
     <!-- AI yordamchi (ovoz-only) -->
     <string name="ai_title">AI Yordamchi</string>
-    <string name="ai_greeting">Salom! Men YuzGram AI yordamchisiman. Mikrofon tugmasini bosib, gapiring: xabar yuborish, soat, ob-havo yoki savol-javob. Yozish shart emas.</string>
+    <string name="ai_greeting">Salom! Men YuzGram AI yordamchisiman. Mikrofon tugmasini bosib gapiring: «Sardorga salom deb yubor», «Islomga telefon qil», «Yigla qo\'shigini top», soat yoki savol. Yozish shart emas.</string>
     <string name="ai_listening">Eshitaman…</string>
     <string name="ai_processing">Tekshiryapman…</string>
     <string name="ai_speaking">Javob beriyapman…</string>
@@ -33,4 +33,8 @@
     <string name="func_ai_chats_name">Xabarlar</string>
     <string name="ai_heard_none">Eshitilmadi. Yaqqinroq, ravon gapirib, qayta urinib ko\'ring.</string>
     <string name="ai_voice_slow">Aloqa sekin bo\'ldi. Yana bir marta urining.</string>
+    <string name="ai_cloud_fallback">Internet sekin — tizim mikrofoniga o\'tdim. Qayta gapiring.</string>
+    <string name="ai_call_start">%1$s ga qo\'ng\'iroq qilyapman.</string>
+    <string name="ai_call_no_user">%1$s — bu guruh yoki kanal, unga qo\'ng\'iroq qilib bo\'lmaydi. Faqat odamga telefon qilish mumkin.</string>
+    <string name="ai_call_failed">Qo\'ng\'iroq ochilmadi. Internet yoki imkoniyatni tekshiring.</string>
 </resources>
