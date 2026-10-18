@@ -5699,7 +5699,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         // storylar+sarlavha ya to'liq ko'rinadi, ya to'liq yuqoriga g'oyib bo'ladi.
         if (isYuzGramMainRoot() && hasStories && progressToActionMode == 0f && !searching
                 && (rightSlidingDialogContainer == null || !rightSlidingDialogContainer.hasFragment())) {
-            float max = dp(DialogStoriesCell.HEIGHT_IN_DP) + getActionBarFullHeight();
+            float max = dp(DialogStoriesCell.HEIGHT_IN_DP) + yuzHeaderBarHeight();
             float cur = scrollYOffset;
             if (cur == 0f || cur == -max || viewPages == null || viewPages[0] == null) {
                 return false;
@@ -8955,13 +8955,24 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
      *                  tepaga surilganda qaytarish uchun shart)
      * @return true — offset o'zgardi
      */
+    /**
+     * YuzGram #59: action bar to'liq balandligi (status bar bilan). Vanilla'dagi
+     * getActionBarFullHeight() faqat ichki SizeNotifierFrameLayout'da mavjud,
+     * shuning uchun tashqi metodlardan shu formuladan foydalanamiz — onMeasure
+     * (DialogsRecyclerView) padding hisobi bilan bir xil.
+     */
+    private int yuzHeaderBarHeight() {
+        return ActionBar.getCurrentActionBarHeight()
+                + (actionBar != null && actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0);
+    }
+
     private boolean yuzHeaderScroll(int dy, boolean listAtTop) {
         if (dy == 0 || !hasStories || progressToActionMode != 0f || searching
                 || rightSlidingDialogContainer != null && rightSlidingDialogContainer.hasFragment()
                 || actionBar != null && actionBar.isActionModeShowed()) {
             return false;
         }
-        float max = dp(DialogStoriesCell.HEIGHT_IN_DP) + getActionBarFullHeight();
+        float max = dp(DialogStoriesCell.HEIGHT_IN_DP) + yuzHeaderBarHeight();
         float n = scrollYOffset;
         if (dy > 0) {
             n -= dy;
