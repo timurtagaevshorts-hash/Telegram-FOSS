@@ -5695,6 +5695,31 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     private boolean checkAutoscrollToStories(ViewPage viewPage) {
+        // YuzGram: asosiy ekranda yarim holat qoldirmaymiz — skroll to'xtaganda
+        // storylar+sarlavha ya to'liq ko'rinadi, ya to'liq yuqoriga g'oyib bo'ladi.
+        if (isYuzGramMainRoot() && hasStories && progressToActionMode == 0f && !searching
+                && (rightSlidingDialogContainer == null || !rightSlidingDialogContainer.hasFragment())) {
+            float max = dp(DialogStoriesCell.HEIGHT_IN_DP) + getActionBarFullHeight();
+            float cur = scrollYOffset;
+            if (cur == 0f || cur == -max || viewPages == null || viewPages[0] == null) {
+                return false;
+            }
+            float target = (-cur < max / 2f) ? 0f : -max;
+            AnimatorSet yuzSnap = new AnimatorSet();
+            yuzSnap.playTogether(ObjectAnimator.ofFloat(this, SCROLL_Y, target));
+            yuzSnap.setInterpolator(CubicBezierInterpolator.DEFAULT);
+            yuzSnap.setDuration(180);
+            yuzSnap.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    if (viewPages != null && viewPages[0] != null && viewPages[0].listView != null) {
+                        viewPages[0].listView.requestLayout();
+                    }
+                }
+            });
+            yuzSnap.start();
+            return true;
+        }
         if ((hasStories || (filterTabsView != null && filterTabsView.getVisibility() == View.VISIBLE)) && !rightSlidingDialogContainer.hasFragment()) {
             int scrollY = (int) -scrollYOffset;
             int actionBarHeight = getMaxScrollYOffset();
@@ -8972,6 +8997,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         // Bu yerda header-collapse offset'iga qaragan eski, "tepagacha chiqishni
         // kutadigan" logika olib tashlandi.
         scrollYOffset = value;
+        // YuzGram: padding storylar+sarlavha bilan birga yumshta qisqarishi uchun
+        // har kadrda ro'yxatni qayta o'lchatamiz (faqat asosiy ekranda).
+        if (isYuzGramMainRoot() && hasStories && viewPages != null && viewPages[0] != null && viewPages[0].listView != null) {
+            viewPages[0].listView.requestLayout();
+        }
         if (topBulletin != null) {
             topBulletin.updatePosition();
         }
