@@ -64,6 +64,10 @@ object YuzYouTubeApi {
 
     /** videoId bo'yicha eng sifatli sof audio oqimini topadi (mijozlar zanjiri). */
     fun resolveStream(videoId: String): YuzAudioStream? {
+        // YuzGram #68: avval NewPipeExtractor — u doimiy yangilanadi va
+        // Google'ning bot-qo'riqlariga bizning qo'lda yozilgan zanjirdan
+        // ko'ra chidamli. U sinса o'z ANDROID/IOS zanjirimizga o'tamiz.
+        YuzNpeExtractor.audioStreams(videoId, 1).firstOrNull()?.let { return it }
         val out = ArrayList<YuzAudioStream>()
         val seen = HashSet<String>()
         for (c in PLAYERS) collectFromVideo(videoId, c, out, seen, 1)
@@ -81,6 +85,12 @@ object YuzYouTubeApi {
         val out = ArrayList<YuzAudioStream>()
         val seen = HashSet<String>()
         if (track.videoId.isNotBlank()) {
+            // YuzGram #68: NewPipeExtractor nomzodlari eng avval (doimiy
+            // yangilanadigan kutubxona), keyin o'z InnerTube zanjirimiz.
+            for (s in YuzNpeExtractor.audioStreams(track.videoId, 2)) {
+                if (out.size >= max) break
+                if (seen.add(s.url)) out.add(s)
+            }
             collectFromVideo(track.videoId, PLAYERS[0], out, seen, 2)
             collectFromVideo(track.videoId, PLAYERS[1], out, seen, 4)
             collectFromVideo(track.videoId, PLAYERS[0], out, seen, max)

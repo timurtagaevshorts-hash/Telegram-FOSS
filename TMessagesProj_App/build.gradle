@@ -4,6 +4,8 @@ apply plugin: 'com.google.gms.google-services'
 repositories {
     mavenCentral()
     google()
+    // YuzGram #68: NewPipeExtractor jitpack'da turadi.
+    maven { url 'https://jitpack.io' }
 }
 
 configurations {

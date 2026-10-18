@@ -108,3 +108,12 @@
 -dontwarn org.osmdroid.tileprovider.modules.NetworkAvailabliltyCheck
 # Osmdroid
 -dontwarn org.osmdroid.**
+
+# YuzGram #68: NewPipeExtractor + Rhino (YouTube JS dekodlash)
+-keep class org.schabi.newpipe.extractor.** { *; }
+-keep class org.mozilla.javascript.** { *; }
+-keep class org.mozilla.classfile.ClassFileWriter
+-dontwarn org.mozilla.javascript.tools.**
+-dontwarn org.schabi.newpipe.extractor.**
+-dontwarn java.nio.file.**
+-dontwarn javax.script.**

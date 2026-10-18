@@ -117,7 +117,9 @@ object YuzMusicEngine {
                     }
                     Player.STATE_BUFFERING -> {
                         ui.removeCallbacks(bufferingWatchdog)
-                        ui.postDelayed(bufferingWatchdog, 15000)
+                        // #68: NewPipeExtractor birinchi ochilishda player JS'ni
+                        // ham yuklab oladi — 15s yetmaydi, 30s.
+                        ui.postDelayed(bufferingWatchdog, 30000)
                     }
                     Player.STATE_ENDED -> postStatus(null)
                 }
