@@ -16,7 +16,7 @@ object YuzAiEngine {
 
     data class Peer(val dialogId: Long, val name: String, val username: String?)
 
-    enum class Section { REELS, ELONLAR, KINOLAR, TAKSI, PROFIL, CHATS }
+    enum class Section { REELS, ELONLAR, KINOLAR, PROFIL, CHATS }
 
     sealed class Intent {
         data class SendText(val peer: Peer, val text: String) : Intent()
@@ -35,8 +35,6 @@ object YuzAiEngine {
         "elon" to Section.ELONLAR,
         "kino" to Section.KINOLAR,
         "kinolar" to Section.KINOLAR,
-        "taksi" to Section.TAKSI,
-        "haydovchi" to Section.TAKSI,
         "profil" to Section.PROFIL,
         "sozlam" to Section.PROFIL,
         "chat" to Section.CHATS,

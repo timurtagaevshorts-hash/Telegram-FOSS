@@ -36,8 +36,6 @@
     <string name="func_elonlar_desc">Sotish va xarid uchun e\'lonlar</string>
     <string name="func_ish_title">Ish kartasi</string>
     <string name="func_ish_desc">Ish topish va ishchi qidirish</string>
-    <string name="func_taksi_title">Taksi chaqirish</string>
-    <string name="func_taksi_desc">Manzil belgilab taksi yuborish</string>
     <string name="func_instagram_title">Instagram video</string>
     <string name="func_instagram_desc">Instagram relsni yuklab olish</string>
 </resources>

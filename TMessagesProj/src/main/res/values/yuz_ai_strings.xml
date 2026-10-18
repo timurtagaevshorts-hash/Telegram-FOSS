@@ -22,7 +22,6 @@
     <string name="ai_chip_time">Soat</string>
     <string name="ai_chip_weather">Ob-havo</string>
     <string name="ai_chip_reels">Reels</string>
-    <string name="ai_chip_taxi">Taksi</string>
     <string name="ai_hint_send">Kimnidir ayting — masalan: «Sardor qalesan bugun kelasanmi»</string>
     <!-- Funksiyalar hub kartasi -->
     <string name="func_ai_title">AI Yordamchi</string>
@@ -30,7 +29,6 @@
     <!-- Bo'lim nomlari (ovoz javoblarida) -->
     <string name="func_ai_elon_name">Elonlar</string>
     <string name="func_ai_kino_name">Kinolar</string>
-    <string name="func_ai_taxi_name">Taksi</string>
     <string name="func_ai_profil_name">Profil</string>
     <string name="func_ai_chats_name">Xabarlar</string>
 </resources>

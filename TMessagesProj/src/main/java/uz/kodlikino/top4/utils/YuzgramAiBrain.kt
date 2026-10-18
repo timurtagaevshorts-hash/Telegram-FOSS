@@ -86,13 +86,11 @@ object YuzgramAiBrain {
                 "Bugun $date."
             }
             n.contains("yuzgram") && (n.contains("nima") || n.contains("kim") || n.contains("qanday")) ->
-                "YuzGram — kinolar, reels, chat va AI yordamchi bor ilova. Men sizga xabar yuborish, taksi chaqirish va savollarga javob berishda yordam beraman."
-            n.contains("taksi") && (n.contains("qanday") || n.contains("qayer")) ->
-                "Taksi chaqirish uchun «taksi chaqir» deng. Men oynani ochaman, kerak bo'lsa manzilni ham yuboraman."
+                "YuzGram — kinolar, reels, chat va AI yordamchi bor ilova. Men sizga xabar yuborish, soatni aytish va savollarga javob berishda yordam beraman."
             n.contains("xabar") && (n.contains("qanday") || n.contains("qanday yubor")) ->
                 "Ismni va xabarni ayting. Masalan: «Sardor qayerdasan». Men kontakt yoki chatdan topib yuboraman."
             n.contains("sen kimsan") || n.contains("kim san") || n == "ai" || n.contains("isming") ->
-                "Men YuzGram AI yordamchisiman. Siz bilan ovozda suhbatlashaman, savollarga javob beraman, xabar yuboraman va taksi chaqiraman."
+                "Men YuzGram AI yordamchisiman. Siz bilan ovozda suhbatlashaman, savollarga javob beraman, xabar yuboraman."
             n.contains("ob-havo") || n.contains("ob havo") || n.contains("havo qanday") -> null
             else -> null
         }
@@ -170,7 +168,7 @@ object YuzgramAiBrain {
     }
 
     private fun fallback(query: String): String =
-        "Bu haqida aniq manba topa olmadim. Savolni boshqacha ayting, yoki xabar yuborish, taksi chaqirish kabi buyruq bering."
+        "Bu haqida aniq manba topa olmadim. Savolni boshqacha ayting, yoki xabar yuborish kabi buyruq bering."
 
     private fun httpGet(url: String): String? {
         var connection: HttpURLConnection? = null

@@ -94,26 +94,6 @@
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardTaksi"
-            style="@style/FuncsionCard">
-
-            <LinearLayout style="@style/FuncsionCardRow">
-
-                <ImageView
-                    style="@style/FuncsionCardIconImg"
-                    android:background="@drawable/bg_func_gold"
-                    android:src="@drawable/ic_yuz_taxi" />
-
-                <LinearLayout style="@style/FuncsionCardText">
-                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_taksi_title" />
-                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_taksi_desc" />
-                </LinearLayout>
-
-                <ImageView style="@style/FuncsionCardChevron" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardInstagram"
             style="@style/FuncsionCard">
 

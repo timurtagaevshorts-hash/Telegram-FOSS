@@ -12,7 +12,7 @@ import org.telegram.ui.ActionBar.BaseFragment
 
 /**
  * "Funksiyalar" hub — YuzGram pastki navigatsiyasining 3-tab'i (sobiq "Elonlar").
- * Bir ekrandan ichki bo'limlarga kiradi: Elonlar, Ish kartasi, Taksi, Instagram video.
+ * Bir ekrandan ichki bo'limlarga kiradi: Elonlar, Ish kartasi, Instagram video.
  * Har bir bo'lim alohida [BaseFragment] sifatida ustga qo'yiladi (presentFragment),
  * orqaga qaytish hub'ga olib keladi. Pastki bar LaunchActivity darajasida doimiy.
  */
@@ -44,9 +44,6 @@ class FunksiyalarActivity : BaseFragment() {
         }
         root.findViewById<View>(R.id.cardIsh)?.setOnClickListener {
             presentFragment(JobCardsActivity(), false)
-        }
-        root.findViewById<View>(R.id.cardTaksi)?.setOnClickListener {
-            presentFragment(TaxiCallActivity(), false)
         }
         root.findViewById<View>(R.id.cardInstagram)?.setOnClickListener {
             presentFragment(InstagramSaveActivity(), false)
