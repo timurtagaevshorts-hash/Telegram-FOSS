@@ -47,14 +47,13 @@ class YuzAiRecorder {
         }
         val pcm = ByteArrayOutputStream()
         val chunk = ShortArray(320) // 20 ms
-        var ok: ByteArray? = null
+        var voiceSeen = false
         try {
             cancelled = false
             rec.startRecording()
             recording = true
             var startedAt = 0L
             var lastVoiceAt = 0L
-            var voiceSeen = false
             while (!cancelled) {
                 val n = rec.read(chunk, 0, chunk.size)
                 if (n <= 0) break
@@ -93,8 +92,7 @@ class YuzAiRecorder {
         if (!voiceSeen) return null
         val bytes = pcm.toByteArray()
         if (bytes.size < 3200) return null // <0.1 s — keraksiz
-        ok = wavOf(bytes, rate)
-        return ok
+        return wavOf(bytes, rate)
     }
 
     private fun wavOf(pcm: ByteArray, rate: Int): ByteArray {

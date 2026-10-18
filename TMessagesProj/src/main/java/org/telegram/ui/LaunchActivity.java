@@ -7989,6 +7989,11 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             // (masalan Reels → Profil) o'rtasida bar yashiringan holatda qolib ketardi.
             yuzGramBarOwner = top;
             yuzGramBarScrollHidden = false;
+        } else if (eligible && !yuzGramBarEligible) {
+            // YuzGram: host fragment O'ZGARMAY ineligible→eligible bo'lsa ham (masalan
+            // drawer yopilganda) bar'ni majburan qaytaramiz — aks holda "g'oyib bo'lib,
+            // qayta chiqmay qolish" holati yuzaga kelardi.
+            yuzGramBarScrollHidden = false;
         }
         yuzGramBarEligible = eligible;
         applyYuzGramBarVisibility();

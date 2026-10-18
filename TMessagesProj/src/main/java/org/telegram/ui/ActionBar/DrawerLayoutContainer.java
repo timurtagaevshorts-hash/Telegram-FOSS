@@ -84,7 +84,9 @@ public class DrawerLayoutContainer extends FrameLayout {
     private float scrimOpacity;
     private Drawable shadowLeft;
     private boolean allowOpenDrawer;
-    private boolean allowOpenDrawerBySwipe = true;
+    // YuzGram: drawer swipe orqali HECH QACHON ochilmasligi uchun default false
+    // (setter' ham doim false'ga majburlaydi — birgalikda to'liq blok).
+    private boolean allowOpenDrawerBySwipe = false;
 
     private float drawerPosition;
     private boolean drawerOpened;
@@ -457,7 +459,9 @@ public class DrawerLayoutContainer extends FrameLayout {
                 return true;
             }
 
-            if ((allowOpenDrawerBySwipe || drawerOpened) && allowOpenDrawer && parentActionBarLayout.getFragmentStack().size() == 1 && (parentActionBarLayout.getLastFragment().getLastSheet() == null || !parentActionBarLayout.getLastFragment().getLastSheet().attachedToParent())) {
+            // YuzGram: faqat ochiq drawer'ni yopish uchun surf (swipe) ishlaydi;
+            // yangi ochish uchun hech qachon ruxsat berilmaydi.
+            if (drawerOpened && allowOpenDrawer && parentActionBarLayout.getFragmentStack().size() == 1 && (parentActionBarLayout.getLastFragment().getLastSheet() == null || !parentActionBarLayout.getLastFragment().getLastSheet().attachedToParent())) {
                 if (ev != null && (ev.getAction() == MotionEvent.ACTION_DOWN || ev.getAction() == MotionEvent.ACTION_MOVE) && !startedTracking && !maybeStartTracking) {
                    View scrollingChild = findScrollingChild(this, ev.getX(),ev.getY());
                    if (scrollingChild != null) {

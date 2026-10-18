@@ -840,7 +840,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
         @Override
         protected void dispatchDraw(Canvas canvas) {
-            if (invalidateScrollY && !rightSlidingDialogContainer.hasFragment() && hasStories && progressToActionMode == 0) {
+            // YuzGram: asosiy ekranda storylar/sarlavha yashirinishini o'z
+            // yuzHeaderScroll() drayverimiz boshqaradi — eski item-pozitsiya
+            // drayveri bilan raqobat bo'lmasligi uchun bu yerda o'chirilgan.
+            if (invalidateScrollY && !rightSlidingDialogContainer.hasFragment() && hasStories && progressToActionMode == 0 && !isYuzGramMainRoot()) {
                 invalidateScrollY = false;
                 int firstItemPosition = hasHiddenArchive() && viewPages[0].dialogsType == DIALOGS_TYPE_DEFAULT ? 1 : 0;
                 DialogsRecyclerView recyclerView = viewPages[0].listView;
@@ -1692,7 +1695,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     containersAlpha = (1f - pHalf);
                 }
             }
-            actionBar.setTranslationY(0);
+            // YuzGram: storylar to'liq chiqib ketgach, "YuzGram" yozuvi (action bar)
+            // ham birga yuqoriga surilib g'oyib bo'ladi; tepaga qaytishda chiqadi.
+            if (isYuzGramMainRoot()) {
+                actionBar.setTranslationY(Math.min(0f, scrollYOffset + dp(DialogStoriesCell.HEIGHT_IN_DP)));
+            } else {
+                actionBar.setTranslationY(0);
+            }
         } else {
             if (hasOnlySlefStories) {
                 dialogStoriesCell.setTranslationY(-dp(DialogStoriesCell.HEIGHT_IN_DP) + scrollYOffset - dp(8));
@@ -2076,7 +2085,17 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     t = inPreviewMode && Build.VERSION.SDK_INT >= 21 ? AndroidUtilities.statusBarHeight : 0;
                 }
                 if (hasStories && !actionModeFullyShowed) {
-                    t += dp(DialogStoriesCell.HEIGHT_IN_DP);
+                    if (isYuzGramMainRoot()) {
+                        // YuzGram: storylar + sarlavha yuqoriga surilganda ro'yxat
+                        // tepasidagi bo'sh joy ham shu qadar qisqaradi — chatlar
+                        // butun ekranni egallaydi (Instagram uslubidagi collapse).
+                        t += dp(DialogStoriesCell.HEIGHT_IN_DP) + (int) scrollYOffset;
+                        if (t < 0) {
+                            t = 0;
+                        }
+                    } else {
+                        t += dp(DialogStoriesCell.HEIGHT_IN_DP);
+                    }
                 }
                 additionalPadding = 0;
                 if (authHintCell != null && authHintCellProgress != 0 && !authHintCellAnimating) {
@@ -2089,7 +2108,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     setTopGlowOffset(t);
                     setPadding(0, t, yuzRailPad, yuzBottomPad);
                     if (hasStories) {
-                        parentPage.progressView.setPaddingTop(t - dp(DialogStoriesCell.HEIGHT_IN_DP));
+                        parentPage.progressView.setPaddingTop(Math.max(0, t - dp(DialogStoriesCell.HEIGHT_IN_DP)));
                     } else {
                         parentPage.progressView.setPaddingTop(t);
                     }
@@ -4425,6 +4444,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         }
                     }
                     checkListLoad(viewPage);
+                    // YuzGram: asosiy chat ekranida storylar + "YuzGram" sarlavhasi
+                    // skroll yo'nalishi bo'yicha yuqoriga surilib g'oyib bo'ladi;
+                    // ro'yxat o'z tepasida tepaga surilsa qaytadi.
+                    if (recyclerView == viewPages[0].listView && isYuzGramMainRoot()) {
+                        int yuzAnchorPos = hasHiddenArchive() && viewPage.dialogsType == DIALOGS_TYPE_DEFAULT ? 1 : 0;
+                        View yuzFirstChild = recyclerView.getChildCount() > 0 ? recyclerView.getChildAt(0) : null;
+                        boolean yuzListAtTop = (firstVisiblePosition == -1 || firstVisiblePosition <= yuzAnchorPos)
+                                && (yuzFirstChild == null || yuzFirstChild.getTop() >= recyclerView.getPaddingTop() - dp(2));
+                        yuzHeaderScroll(dy, yuzListAtTop);
+                    }
                     if (hasStories) {
                         invalidateScrollY = true;
                         if (fragmentView != null) {
@@ -6988,6 +7017,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     @Override
     public void onResume() {
         super.onResume();
+        // YuzGram: ekranga qaytishda storylar + "YuzGram" sarlavhasi yana ko'rinishi
+        // kerak — yashiringan holatda qolmasin.
+        if (isYuzGramMainRoot() && scrollYOffset != 0 && progressToActionMode == 0f) {
+            setScrollY(0);
+            if (viewPages != null && viewPages[0] != null && viewPages[0].listView != null) {
+                viewPages[0].listView.requestLayout();
+            }
+        }
         if (dialogStoriesCell != null) {
             dialogStoriesCell.onResume();
         }
@@ -8881,6 +8918,43 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             setDialogsListFrozen(false);
             updateDialogIndices();
         }, 300);
+    }
+
+    /**
+     * YuzGram #59: storylar qatori + "YuzGram" sarlavhasini ro'yxat skrolli bilan
+     * yuqoriga suruvchi yagona drayver. scrollYOffset holat sifatida ishlatiladi:
+     * 0 = hammasi ko'rinadi, -(stories + bar) = hammasi yuqorida g'oyib.
+     *
+     * @param dy        RecyclerView skroll o'zgarishi (piksel, musbat = pastga)
+     * @param listAtTop ro'yxat o'zining eng tepasidami (yashirinishdan keyin
+     *                  tepaga surilganda qaytarish uchun shart)
+     * @return true — offset o'zgardi
+     */
+    private boolean yuzHeaderScroll(int dy, boolean listAtTop) {
+        if (dy == 0 || !hasStories || progressToActionMode != 0f || searching
+                || rightSlidingDialogContainer != null && rightSlidingDialogContainer.hasFragment()
+                || actionBar != null && actionBar.isActionModeShowed()) {
+            return false;
+        }
+        float max = dp(DialogStoriesCell.HEIGHT_IN_DP) + getActionBarFullHeight();
+        float n = scrollYOffset;
+        if (dy > 0) {
+            n -= dy;
+        } else if (listAtTop) {
+            n -= dy;
+        } else {
+            return false;
+        }
+        n = Utilities.clamp(n, 0f, -max);
+        if (n != scrollYOffset) {
+            setScrollY(n);
+            if (viewPages != null && viewPages[0] != null && viewPages[0].listView != null) {
+                // Padding qisqarishi/sharishi uchun ro'yxatni qayta o'lchatamiz.
+                viewPages[0].listView.requestLayout();
+            }
+            return true;
+        }
+        return false;
     }
 
     private void setScrollY(float value) {
