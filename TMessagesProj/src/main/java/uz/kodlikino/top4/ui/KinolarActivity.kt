@@ -49,9 +49,7 @@ class KinolarActivity : BaseFragment() {
         val topBar = root.findViewById<View>(R.id.kinoTopBar)
         YuzTopInset.applyPadding(topBar)
         root.findViewById<View>(R.id.btnKinoBack)?.setOnClickListener { removeSelfFromStack() }
-        root.findViewById<View>(R.id.btnKinoAdmin)?.setOnClickListener {
-            presentFragment(KinoAdminActivity(), false)
-        }
+        // #77: admin panel tugmasi Sozlamalar ro'yxatiga ko'chirildi (ProfileActivity).
 
         rv = root.findViewById(R.id.rvKinolars)
         empty = root.findViewById(R.id.tvKinoEmpty)

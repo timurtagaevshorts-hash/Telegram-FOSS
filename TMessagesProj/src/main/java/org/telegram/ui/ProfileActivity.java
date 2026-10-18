@@ -591,7 +591,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private int premiumRow;
     private int starsRow;
     private int businessRow;
-    private int premiumGiftingRow;
+    private int adminPanelRow;
     private int premiumSectionsRow;
 
     private int settingsTimerRow;
@@ -3908,8 +3908,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 presentFragment(new StarsIntroActivity());
             } else if (position == businessRow) {
                 presentFragment(new PremiumPreviewFragment(PremiumPreviewFragment.FEATURES_BUSINESS, "settings"));
-            } else if (position == premiumGiftingRow) {
-                UserSelectorBottomSheet.open(0, BirthdayController.getInstance(currentAccount).getState());
+            } else if (position == adminPanelRow) {
+                // #77: admin paneli endi Sozlamalar'da (Kinolar ekrani tugmasi o'rniga).
+                presentFragment(new uz.kodlikino.top4.ui.KinoAdminActivity(), false);
             } else if (position == bizHoursRow) {
                 hoursExpanded = !hoursExpanded;
                 saveScrollPosition();
@@ -8501,7 +8502,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         premiumRow = -1;
         starsRow = -1;
         businessRow = -1;
-        premiumGiftingRow = -1;
+        adminPanelRow = -1;
         premiumSectionsRow = -1;
         privacyRow = -1;
         dataRow = -1;
@@ -8645,10 +8646,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 if (!getMessagesController().premiumFeaturesBlocked()) {
                     businessRow = rowCount++;
                 }
-                if (!getMessagesController().premiumPurchaseBlocked()) {
-                    premiumGiftingRow = rowCount++;
-                }
-                if (premiumRow >= 0 || starsRow >= 0 || businessRow >= 0 || premiumGiftingRow >= 0) {
+                adminPanelRow = rowCount++;
+                if (premiumRow >= 0 || starsRow >= 0 || businessRow >= 0 || adminPanelRow >= 0) {
                     premiumSectionsRow = rowCount++;
                 }
                 helpHeaderRow = rowCount++;
@@ -11204,8 +11203,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     } else if (position == businessRow) {
                         textCell.setTextAndIcon(TextCell.applyNewSpan(LocaleController.getString(R.string.TelegramBusiness)), R.drawable.menu_shop, true);
                         textCell.setImageLeft(23);
-                    } else if (position == premiumGiftingRow) {
-                        textCell.setTextAndIcon(LocaleController.getString("GiftPremiumGifting", R.string.GiftPremiumGifting), R.drawable.menu_gift, false);
+                    } else if (position == adminPanelRow) {
+                        textCell.setTextAndIcon(LocaleController.getString(R.string.yuz_admin_title), R.drawable.menu_yuz_admin, false);
                         textCell.setImageLeft(23);
                     }
                     textCell.valueTextView.setTextColor(applyPeerColor(getThemedColor(Theme.key_windowBackgroundWhiteValueText), false));
@@ -11484,7 +11483,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         position == questionRow || position == devicesRow || position == filtersRow || position == stickersRow ||
                         position == faqRow || position == policyRow || position == sendLogsRow || position == sendLastLogsRow ||
                         position == clearLogsRow || position == switchBackendRow || position == setAvatarRow ||
-                        position == addToGroupButtonRow || position == premiumRow || position == premiumGiftingRow ||
+                        position == addToGroupButtonRow || position == premiumRow || position == adminPanelRow ||
                         position == businessRow || position == liteModeRow || position == birthdayRow || position == channelRow ||
                         position == starsRow;
             }
@@ -11528,7 +11527,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     position == questionRow || position == devicesRow || position == filtersRow || position == stickersRow ||
                     position == faqRow || position == policyRow || position == sendLogsRow || position == sendLastLogsRow ||
                     position == clearLogsRow || position == switchBackendRow || position == setAvatarRow || position == addToGroupButtonRow ||
-                    position == addToContactsRow || position == liteModeRow || position == premiumGiftingRow || position == businessRow) {
+                    position == addToContactsRow || position == liteModeRow || position == adminPanelRow || position == businessRow) {
                 return VIEW_TYPE_TEXT;
             } else if (position == notificationsDividerRow) {
                 return VIEW_TYPE_DIVIDER;
@@ -12807,7 +12806,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             put(++pointer, starsRow, sparseIntArray);
             put(++pointer, businessRow, sparseIntArray);
             put(++pointer, premiumSectionsRow, sparseIntArray);
-            put(++pointer, premiumGiftingRow, sparseIntArray);
+            put(++pointer, adminPanelRow, sparseIntArray);
             put(++pointer, privacyRow, sparseIntArray);
             put(++pointer, dataRow, sparseIntArray);
             put(++pointer, liteModeRow, sparseIntArray);

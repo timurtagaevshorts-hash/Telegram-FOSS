@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  YuzGram admin paneli (#77) — login/parol (claimAdminSession) dan so'ng uch tab:
+  Dashboard (haqiqiy statistika: comment_profiles.lastActiveAt + reels + movies),
+  Kinolar (CRUD), Reels (ko'rish/hujjat holati + o'chirish).
+  Kinolar ekrani kirish tugmasi bu yerga ko'chirildi: endi ochilish joyi —
+  Sozlamalar ro'yxatidagi "Admin panel" qatori (ProfileActivity).
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -118,49 +125,273 @@
                 app:cornerRadius="14dp" />
         </LinearLayout>
 
-        <FrameLayout
+        <LinearLayout
             android:id="@+id/managePanel"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:orientation="vertical"
             android:visibility="gone">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvAdminMovies"
+            <!-- Tab chiplari -->
+            <HorizontalScrollView
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:clipToPadding="false"
+                android:layout_height="wrap_content"
                 android:paddingStart="16dp"
-                android:paddingTop="8dp"
                 android:paddingEnd="16dp"
-                android:paddingBottom="96dp" />
+                android:scrollbars="none">
 
-            <TextView
-                android:id="@+id/tvAdminEmpty"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:text="@string/kino_empty"
-                android:textColor="@color/text_secondary"
-                android:textSize="15sp"
-                android:visibility="gone" />
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
 
-            <ProgressBar
-                android:id="@+id/progressAdminMovies"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:indeterminateTint="@color/home_accent" />
+                    <TextView
+                        android:id="@+id/btnTabDash"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/bg_classified_category_badge"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:paddingStart="16dp"
+                        android:paddingTop="8dp"
+                        android:paddingEnd="16dp"
+                        android:paddingBottom="8dp"
+                        android:text="@string/yuz_admin_tab_dash"
+                        android:textColor="@color/home_accent"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
 
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/btnAddKino"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="bottom|end"
-                android:layout_margin="20dp"
-                android:contentDescription="@string/kino_admin_add"
-                app:backgroundTint="@color/home_accent"
-                app:srcCompat="@drawable/ic_add"
-                app:tint="@color/white" />
-        </FrameLayout>
+                    <TextView
+                        android:id="@+id/btnTabMovies"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/bg_yuz_chip"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:paddingStart="16dp"
+                        android:paddingTop="8dp"
+                        android:paddingEnd="16dp"
+                        android:paddingBottom="8dp"
+                        android:text="@string/yuz_admin_tab_movies"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/btnTabReels"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_yuz_chip"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:paddingStart="16dp"
+                        android:paddingTop="8dp"
+                        android:paddingEnd="16dp"
+                        android:paddingBottom="8dp"
+                        android:text="@string/yuz_admin_tab_reels"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+            </HorizontalScrollView>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <!-- ─── Dashboard ─── -->
+                <androidx.core.widget.NestedScrollView
+                    android:id="@+id/dashPanel"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingStart="12dp"
+                    android:paddingTop="10dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="24dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:layout_marginEnd="4dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/tvStatsUpdated"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:textColor="@color/text_hint"
+                                android:textSize="11sp" />
+
+                            <TextView
+                                android:id="@+id/btnRefreshStats"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:background="@drawable/bg_yuz_chip"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:paddingStart="12dp"
+                                android:paddingTop="6dp"
+                                android:paddingEnd="12dp"
+                                android:paddingBottom="6dp"
+                                android:text="@string/yuz_admin_refresh"
+                                android:textColor="@color/home_accent"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <ProgressBar
+                            android:id="@+id/progressDash"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:layout_gravity="center"
+                            android:layout_marginTop="24dp"
+                            android:indeterminateTint="@color/home_accent"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:layout_marginTop="10dp"
+                            android:text="@string/yuz_admin_group_users"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <GridLayout
+                            android:id="@+id/gridUsersStats"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:columnCount="2" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/yuz_admin_group_content"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <GridLayout
+                            android:id="@+id/gridContentStats"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:columnCount="2" />
+
+                        <TextView
+                            android:id="@+id/tvRecentTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/yuz_admin_recent"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+
+                        <LinearLayout
+                            android:id="@+id/llRecentUsers"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical" />
+                    </LinearLayout>
+                </androidx.core.widget.NestedScrollView>
+
+                <!-- ─── Kinolar ─── -->
+                <FrameLayout
+                    android:id="@+id/moviesPanel"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvAdminMovies"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:clipToPadding="false"
+                        android:paddingStart="16dp"
+                        android:paddingTop="8dp"
+                        android:paddingEnd="16dp"
+                        android:paddingBottom="96dp" />
+
+                    <TextView
+                        android:id="@+id/tvAdminEmpty"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="@string/kino_empty"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="15sp"
+                        android:visibility="gone" />
+
+                    <ProgressBar
+                        android:id="@+id/progressAdminMovies"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:indeterminateTint="@color/home_accent" />
+
+                    <com.google.android.material.floatingactionbutton.FloatingActionButton
+                        android:id="@+id/btnAddKino"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom|end"
+                        android:layout_margin="20dp"
+                        android:contentDescription="@string/kino_admin_add"
+                        app:backgroundTint="@color/home_accent"
+                        app:srcCompat="@drawable/ic_add"
+                        app:tint="@color/white" />
+                </FrameLayout>
+
+                <!-- ─── Reels ─── -->
+                <FrameLayout
+                    android:id="@+id/reelsPanel"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvAdminReels"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:clipToPadding="false"
+                        android:paddingStart="16dp"
+                        android:paddingTop="8dp"
+                        android:paddingEnd="16dp"
+                        android:paddingBottom="24dp" />
+
+                    <TextView
+                        android:id="@+id/tvReelsEmpty"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="@string/reels_empty"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="15sp"
+                        android:visibility="gone" />
+
+                    <ProgressBar
+                        android:id="@+id/progressAdminReels"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:indeterminateTint="@color/home_accent"
+                        android:visibility="gone" />
+                </FrameLayout>
+            </FrameLayout>
+        </LinearLayout>
     </FrameLayout>
 </LinearLayout>

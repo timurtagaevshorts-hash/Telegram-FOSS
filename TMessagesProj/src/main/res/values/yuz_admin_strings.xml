@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="yuz_admin_title">Admin panel</string>
+    <string name="yuz_admin_tab_dash">Dashboard</string>
+    <string name="yuz_admin_tab_movies">Kinolar</string>
+    <string name="yuz_admin_tab_reels">Reels</string>
+    <string name="yuz_admin_refresh">Yangilash</string>
+    <string name="yuz_admin_updated">Yangilangan: %1$s</string>
+    <string name="yuz_admin_loading">Statistika yig\'ilmoqda…</string>
+    <string name="yuz_admin_group_users">Foydalanuvchilar va faollik</string>
+    <string name="yuz_admin_group_content">Kontent va yuklashlar</string>
+    <string name="yuz_admin_recent">So\'nggi faol foydalanuvchilar</string>
+    <string name="yuz_admin_no_recent">Hozircha faollik izi yo\'q</string>
+    <string name="yuz_admin_stats_failed">Statistika yuklanmadi. Internetni tekshiring</string>
+
+    <string name="yuz_stat_today_active">Bugun faol</string>
+    <string name="yuz_stat_week_active">7 kunda faol</string>
+    <string name="yuz_stat_month_active">30 kunda faol</string>
+    <string name="yuz_stat_total_users">Jami foydalanuvchi</string>
+    <string name="yuz_stat_new_month">Shu oy yangi</string>
+    <string name="yuz_stat_premium">Premium obunachi</string>
+
+    <string name="yuz_stat_reels">Reels soni</string>
+    <string name="yuz_stat_movies">Kinolar soni</string>
+    <string name="yuz_stat_views">Jami ko\'rishlar</string>
+    <string name="yuz_stat_likes">Jami layk</string>
+    <string name="yuz_stat_comments">Jami izoh</string>
+    <string name="yuz_stat_uploads_today">Bugun joylangan reels</string>
+    <string name="yuz_stat_uploads_week">Bu hafta joylangan</string>
+
+    <string name="yuz_admin_reel_untitled">Reel</string>
+    <string name="yuz_admin_reel_delete_confirm">"%1$s" o\'chirilsinmi? Bu amal qaytarilmaydi.</string>
+    <string name="yuz_admin_ago_now">hozir</string>
+    <string name="yuz_admin_ago_min">%1$d daqiqa oldin</string>
+    <string name="yuz_admin_ago_hour">%1$d soat oldin</string>
+    <string name="yuz_admin_ago_day">%1$d kun oldin</string>
+    <string name="yuz_stat_short_views">ko\'rish</string>
+    <string name="yuz_stat_short_likes">layk</string>
+    <string name="yuz_stat_short_comments">izoh</string>
+</resources>

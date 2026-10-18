@@ -21,6 +21,8 @@ import org.telegram.messenger.UserConfig
  */
 object YuzGramAdsAuth {
 
+    private val auth = FirebaseAuth.getInstance()
+
     fun currentTelegramId(account: Int): Long =
         UserConfig.getInstance(account).clientUserId
 
@@ -39,13 +41,15 @@ object YuzGramAdsAuth {
             throw IllegalStateException("Telegram'da ro'yxatdan o'tmagan ekansiz")
         }
         val uid = "tg_$id"
-        val auth = FirebaseAuth.getInstance()
-        if (auth.currentUser?.uid == uid) return uid
+        val user = UserConfig.getInstance(account).currentUser
+        if (auth.currentUser?.uid == uid) {
+            touchPresence(uid, user)
+            return uid
+        }
 
         // Boshqa uid bilan eski sessiya bo'lsa — chiqamiz.
         auth.signOut()
 
-        val user = UserConfig.getInstance(account).currentUser
         val params = hashMapOf<String, Any>(
             "telegramId" to id,
             "firstName" to (user?.first_name ?: ""),
@@ -69,7 +73,20 @@ object YuzGramAdsAuth {
         if (signedUid != uid) {
             throw IllegalStateException("Firebase sessiya yaratilmadi (${signedUid ?: "yo'q"})")
         }
+        touchPresence(uid, user)
         return uid
+    }
+
+    /**
+     * Faollik izi — admin dashboard statistikasi shu yozuvlardan sanaladi.
+     * Throttle [YuzPresence] ichida; any xato suhbatni to'xtatmasligi kerak.
+     */
+    private suspend fun touchPresence(uid: String, user: org.telegram.tgnet.TLRPC.User?) {
+        val ctx = org.telegram.messenger.ApplicationLoader.applicationContext ?: return
+        try {
+            YuzPresence.touch(ctx, uid, user?.first_name ?: "", user?.last_name ?: "")
+        } catch (_: Exception) {
+        }
     }
 
     private fun extractToken(data: Any?): String? {

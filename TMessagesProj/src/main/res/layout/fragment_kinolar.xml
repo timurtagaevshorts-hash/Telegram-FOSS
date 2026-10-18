@@ -32,22 +32,7 @@
             android:textColor="@color/text_primary"
             android:textSize="20sp"
             android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btnKinoAdmin"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/taksi_addr_bg"
-            android:clickable="true"
-            android:focusable="true"
-            android:paddingStart="14dp"
-            android:paddingTop="7dp"
-            android:paddingEnd="14dp"
-            android:paddingBottom="7dp"
-            android:text="@string/kino_admin"
-            android:textColor="@color/home_accent"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+        <!-- #77: admin panelga kirish Sozlamalar'ga ko'chirildi (btnKinoAdmin olib tashlandi) -->
     </LinearLayout>
 
     <FrameLayout
