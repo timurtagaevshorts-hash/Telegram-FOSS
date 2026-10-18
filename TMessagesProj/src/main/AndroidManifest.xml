@@ -382,6 +382,14 @@
                   android:taskAffinity="${applicationId}.voip"
                   android:excludeFromRecents="true"
                 android:theme="@style/Theme.TMessages.Transparent"/>
+        <!-- YuzGram #69: bildirdi-chnyochi/qulf ekranidagi tugma bosilganda
+            to'liq ekranli music plerini ochadigan shaffof host. -->
+        <activity
+            android:name="uz.kodlikino.top4.ui.YuzPlayerHostActivity"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|uiMode"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Theme.TMessages.Transparent"/>
         <activity android:name="org.telegram.ui.VoIPFeedbackActivity"
                   android:configChanges="keyboard|keyboardHidden|orientation|screenSize|uiMode"
 				  android:taskAffinity="${applicationId}.voip_feedback"

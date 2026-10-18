@@ -1,6 +1,8 @@
 package uz.kodlikino.top4.utils
 
+import android.app.Application
 import android.content.Context
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -10,6 +12,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import okhttp3.OkHttpClient
@@ -59,6 +62,8 @@ object YuzMusicEngine {
     @Volatile
     private var player: ExoPlayer? = null
     private lateinit var appCtx: Context
+    private var miniInstalled = false
+    private var sleepRunnable: Runnable? = null
 
     var queueTracks: List<YuzTrack> = emptyList()
         private set
@@ -83,14 +88,28 @@ object YuzMusicEngine {
     fun ensurePlayer(context: Context): ExoPlayer {
         player?.let { return it }
         appCtx = context.applicationContext
+        // #69: mini-pleyer butun ilova bo'ylab ko'rinishi uchun LaunchActivity
+        // lifecycle'ini kuzatamiz (bir marta).
+        if (!miniInstalled) {
+            miniInstalled = true
+            (appCtx as? Application)?.registerActivityLifecycleCallbacks(
+                uz.kodlikino.top4.ui.YuzMiniPlayer
+            )
+        }
         val okHttp = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build()
         val http = YuzStreamDataSource.Factory(okHttp)
+        val load = DefaultLoadControl.Builder()
+            // #69 tezlik: audio uchun kichik buffer — ijro deyarli darhol
+            // boshlanadi (sukut 2.5s o'rniga 0.9s yetadi).
+            .setBufferDurationsMs(15000, 45000, 900, 1500)
+            .build()
         val p = ExoPlayer.Builder(appCtx)
             .setMediaSourceFactory(ProgressiveMediaSource.Factory(http))
+            .setLoadControl(load)
             .build()
         p.setAudioAttributes(
             AudioAttributes.Builder()
@@ -105,6 +124,7 @@ object YuzMusicEngine {
                 postStatus(null)
                 Log.i(TAG, "transition idx=${p.currentMediaItemIndex} vid=${tagOf(item)?.videoId}")
                 notifyItemChanged(item)
+                prefetchNext(p, p.currentMediaItemIndex)
                 if (radio && p.currentMediaItemIndex >= queueTracks.size - 2) extendQueue()
             }
 
@@ -114,6 +134,7 @@ object YuzMusicEngine {
                         ui.removeCallbacks(bufferingWatchdog)
                         postStatus(null)
                         notifyItemChanged(p.currentMediaItem)
+                        prefetchNext(p, p.currentMediaItemIndex)
                     }
                     Player.STATE_BUFFERING -> {
                         ui.removeCallbacks(bufferingWatchdog)
@@ -151,11 +172,13 @@ object YuzMusicEngine {
         queueTracks = bounded
         seenIds.clear()
         for (t in bounded) seenIds.add(t.id)
+        YuzYouTubeApi.resetRotation()
         Log.i(TAG, "playQueue n=${bounded.size} start=$idx vid=${bounded.getOrNull(idx)?.videoId}")
         p.setMediaItems(bounded.map { buildItem(it) }, idx, C.TIME_UNSET)
         p.prepare()
         p.playWhenReady = true
         notifyItemChanged(p.currentMediaItem)
+        prefetchNext(p, idx)
     }
 
     /** Qo'shiqni navbat oxiriga qo'shadi; hozir bo'sh bo'lsa — shu bilan boshlaydi. */
@@ -185,13 +208,50 @@ object YuzMusicEngine {
             t.videoId.isNotBlank() -> YuzStreamDataSource.URI_PREFIX + t.videoId
             else -> t.previewUrl
         }
-        return MediaItem.Builder()
-            .setUri(uri)
-            .setTag(t)
-            .setMediaMetadata(
-                MediaMetadata.Builder().setTitle(t.title).setArtist(t.artist).build()
-            )
+        val md = MediaMetadata.Builder()
+            .setTitle(t.title)
+            .setArtist(t.artist)
+            .apply {
+                // #69: rasm endi media3'ning O'ZI yuklaydi — bildirishnoma va
+                // qulf ekranidagi pleyer muqovani ko'rsatadi.
+                if (t.coverUrl.isNotBlank()) setArtUri(Uri.parse(t.coverUrl))
+            }
             .build()
+        return MediaItem.Builder().setUri(uri).setTag(t).setMediaMetadata(md).build()
+    }
+
+    /** #69: ijro boshlanishi bilan 1-2 keyingi qo'shiq URL'ini oldindan ochamiz. */
+    private fun prefetchNext(p: ExoPlayer, from: Int) {
+        for (i in 1..2) {
+            queueTracks.getOrNull(from + i)?.videoId?.let { YuzYouTubeApi.prefetch(it) }
+        }
+    }
+
+    /** Navbatdagi [index]-qo'shiqqa sakrash (keyingi o'tishda prefetch bo'ladi). */
+    fun playAt(index: Int) {
+        val p = player ?: return
+        if (index in 0 until p.mediaItemCount) {
+            p.seekTo(index, 0L)
+            p.playWhenReady = true
+            prefetchNext(p, index)
+        }
+    }
+
+    /** #69 uyqu taymeri: ms'dan keyin ijroni to'xtatadi; 0 = bekor qilish. */
+    fun scheduleSleep(ms: Long) {
+        sleepRunnable?.let { ui.removeCallbacks(it) }
+        sleepRunnable = null
+        if (ms <= 0L) {
+            postStatus(null)
+            return
+        }
+        val r = Runnable {
+            player?.pause()
+            postStatus(null)
+            Log.i(TAG, "sleep timer fired")
+        }
+        sleepRunnable = r
+        ui.postDelayed(r, ms)
     }
 
     // ------------------------------------------------------- failure paths

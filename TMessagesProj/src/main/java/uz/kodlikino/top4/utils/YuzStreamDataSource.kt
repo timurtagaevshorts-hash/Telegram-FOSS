@@ -77,8 +77,10 @@ class YuzStreamDataSource(private val http: OkHttpClient) : DataSource {
     }
 
     private fun openHttp(dataSpec: DataSpec, raw: String): Long {
+        var markerVid: String? = null
         val (url, ua) = if (raw.startsWith(URI_PREFIX)) {
             val vid = raw.substring(URI_PREFIX.length)
+            markerVid = vid
             val stream = YuzYouTubeApi.resolveStream(vid)
                 ?: run {
                     Log.i(TAG, "resolve EMPTY vid=$vid")
@@ -106,12 +108,16 @@ class YuzStreamDataSource(private val http: OkHttpClient) : DataSource {
         val resp = try {
             http.newCall(builder.build()).execute()
         } catch (e: IOException) {
+            // #69: tarmoq xatosida ham nomzod aylanadi — keyingi open()
+            // boshqa URL'ni oladi (prefetch cache yangilanadi).
+            markerVid?.let { YuzYouTubeApi.noteBadStream(it) }
             throw e
         }
         if (!resp.isSuccessful) {
             val code = resp.code
             resp.close()
             Log.i(TAG, "stream HTTP $code url=${url.take(70)}")
+            markerVid?.let { YuzYouTubeApi.noteBadStream(it) }
             throw IOException("HTTP $code")
         }
         response = resp

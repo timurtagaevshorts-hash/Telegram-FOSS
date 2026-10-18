@@ -208,6 +208,11 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             YuzMusicEngine.currentTrack()?.let { downloadTrack(it) }
         }
         bar.findViewById<View>(R.id.btnPlayerEq)?.setOnClickListener { showEqDialog() }
+        // #69: bar qovuriga bosish ham to'liq plerni ochadi.
+        val openPl = View.OnClickListener { openPlayer() }
+        ivPlayerCover?.setOnClickListener(openPl)
+        tvPlayerTitle?.setOnClickListener(openPl)
+        tvPlayerArtist?.setOnClickListener(openPl)
     }
 
     // ------------------------------------------------------------ playback
@@ -230,6 +235,13 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         YuzMusicEngine.playQueue(ctx, currentList, pos)
         ensureService()
         updateBarTrack(track)
+        // #69: qo'shiq boshlanganda to'liq ekranli pler ochiladi.
+        openPlayer()
+    }
+
+    /** #69: professional to'liq ekranli plerga o'tadi. */
+    private fun openPlayer() {
+        runCatching { presentFragment(YuzPlayerActivity()) }
     }
 
     private fun ensureService() {
@@ -558,10 +570,14 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         // #67: ijro FONDA davom etadi — bu yerda to'xtatmaymiz.
         super.onPause()
         ui.removeCallbacks(tick)
+        // #69: bu ekrandan chiqqanda global mini bar qayta ko'rinadi.
+        YuzMiniPlayer.setSuppressed(this, false)
     }
 
     override fun onResume() {
         super.onResume()
+        // #69: pastda o'z player bari bor — ustidagi mini bar ortiqcha.
+        YuzMiniPlayer.setSuppressed(this, true)
         ui.post(tick)
         syncFromPlayer()
     }

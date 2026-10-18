@@ -25,13 +25,16 @@ class YuzMusicService : MediaSessionService() {
         super.onCreate()
         val player = YuzMusicEngine.ensurePlayer(applicationContext)
         enginePlayer = player
-        val launcher = packageManager.getLaunchIntentForPackage(packageName)
+        // #69: bildirdi-chnyochi/qulf ekranidagi artwork tugmasi to'liq
+        // ekranli plerni ochadi (shaffof host orqali).
         val builder = MediaSession.Builder(this, player)
-        if (launcher != null) {
-            builder.setSessionActivity(
-                PendingIntent.getActivity(this, 0, launcher, PendingIntent.FLAG_IMMUTABLE)
+        builder.setSessionActivity(
+            PendingIntent.getActivity(
+                this, 42,
+                Intent(this, YuzPlayerHostActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE
             )
-        }
+        )
         session = builder.build()
     }
 

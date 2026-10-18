@@ -62,40 +62,20 @@ object YuzYouTubeApi {
         return out
     }
 
-    /** videoId bo'yicha eng sifatli sof audio oqimini topadi (mijozlar zanjiri). */
+    /** videoId bo'yicha eng sifatli sof audio oqimini topadi. */
     fun resolveStream(videoId: String): YuzAudioStream? {
-        // YuzGram #68: avval NewPipeExtractor — u doimiy yangilanadi va
-        // Google'ning bot-qo'riqlariga bizning qo'lda yozilgan zanjirdan
-        // ko'ra chidamli. U sinса o'z ANDROID/IOS zanjirimizga o'tamiz.
-        YuzNpeExtractor.audioStreams(videoId, 1).firstOrNull()?.let { return it }
-        val out = ArrayList<YuzAudioStream>()
-        val seen = HashSet<String>()
-        for (c in PLAYERS) collectFromVideo(videoId, c, out, seen, 1)
-        return out.firstOrNull()
+        val l = streamsFor(videoId)
+        if (l.isEmpty()) return null
+        return l[(attempt[videoId] ?: 0) % l.size]
     }
 
     /**
-     * YuzGram #65: bitta emas — BIR NECHTA oqim nomzodi.
-     * ANDROID/IOS mijozlari, sifat bo'yicha saralangan; har URL'ga "n"
-     * throttling parametrsiz variant ham qo'shiladi (Google sekinlashtirsa
-     * yoki 403 qilsa — keyingisini sinash uchun). video'da umuman audio
-     * bo'lmasa — qo'shiq nomidan qayta qidirib 3 ta muqobil videoni sinaydi.
+     * YuzGram #65/#69: bir nechta oqim nomzodi — avval cache'dan (tez),
+     * bo'sh bo'lsa to'liq zanjir. Video'da umuman audio bo'lmasa — qo'shiq
+     * nomidan qayta qidirib 3 ta muqobil videoni sinaydi.
      */
     fun resolveStreamCandidates(track: YuzTrack, max: Int = 6): List<YuzAudioStream> {
-        val out = ArrayList<YuzAudioStream>()
-        val seen = HashSet<String>()
-        if (track.videoId.isNotBlank()) {
-            // YuzGram #68: NewPipeExtractor nomzodlari eng avval (doimiy
-            // yangilanadigan kutubxona), keyin o'z InnerTube zanjirimiz.
-            for (s in YuzNpeExtractor.audioStreams(track.videoId, 2)) {
-                if (out.size >= max) break
-                if (seen.add(s.url)) out.add(s)
-            }
-            collectFromVideo(track.videoId, PLAYERS[0], out, seen, 2)
-            collectFromVideo(track.videoId, PLAYERS[1], out, seen, 4)
-            collectFromVideo(track.videoId, PLAYERS[0], out, seen, max)
-            collectFromVideo(track.videoId, PLAYERS[1], out, seen, max)
-        }
+        val out = ArrayList(streamsFor(track.videoId))
         if (out.size < 2) {
             val query = (track.artist + " " + track.title).trim()
             if (query.isNotEmpty()) {
@@ -104,12 +84,60 @@ object YuzYouTubeApi {
                 for (c in cands) {
                     if (c.videoId == track.videoId) continue
                     if (++tried > 3) break
-                    collectFromVideo(c.videoId, PLAYERS[0], out, seen, max)
+                    for (s in streamsFor(c.videoId)) {
+                        if (out.size >= max) break
+                        if (out.none { it.url == s.url }) out.add(s)
+                    }
                     if (out.size >= max) break
                 }
             }
         }
         return out
+    }
+
+    // ------------------------------------------------------ stream cache #69
+    // #69 tezlik: resolve qilingan oqimlar 5 daqiqa saqlanadi — dvigatel
+    // qo'shiq ijrosi boshlanishida KEYINGisini prefetch qiladi, shunda
+    // YuzStreamDataSource.open() URL'ni cache'dan olib LOADER ipida bir
+    // lahza ichida ochadi (ijro keskin tez boshlanadi).
+    // Rotatsiya: bir URL 403 berisa noteBadStream() keyingi nomzodga o'tadi.
+
+    private const val CACHE_TTL = 5 * 60 * 1000L
+    private val streamCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<YuzAudioStream>>>()
+    private val attempt = java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+    private fun cached(videoId: String): List<YuzAudioStream> {
+        val e = streamCache[videoId] ?: return emptyList()
+        return if (System.currentTimeMillis() - e.first < CACHE_TTL) e.second else emptyList()
+    }
+
+    /** Yagona resolve zanjiri: NewPipeExtractor -> ANDROID -> IOS; natija cache. */
+    fun streamsFor(videoId: String): List<YuzAudioStream> {
+        if (videoId.isBlank()) return emptyList()
+        cached(videoId).let { if (it.isNotEmpty()) return it }
+        val out = ArrayList<YuzAudioStream>()
+        val seen = HashSet<String>()
+        for (s in YuzNpeExtractor.audioStreams(videoId, 2)) if (seen.add(s.url)) out.add(s)
+        for (c in PLAYERS) collectFromVideo(videoId, c, out, seen, 6)
+        streamCache[videoId] = System.currentTimeMillis() to out
+        return out
+    }
+
+    /** Dvigatel prefetch'i: navbatdagi qo'shiq URL'ini oldinden ochib qo'yamiz. */
+    fun prefetch(videoId: String) {
+        if (videoId.isBlank() || cached(videoId).isNotEmpty()) return
+        Thread { runCatching { streamsFor(videoId) } }.start()
+    }
+
+    /** Oqim xatosi (403/throttle) — navbatdagi nomzodga o'tamiz va yangilaymiz. */
+    fun noteBadStream(videoId: String) {
+        attempt[videoId] = (attempt[videoId] ?: 0) + 1
+        streamCache.remove(videoId)
+    }
+
+    /** Yangi navbat boshlanganda rotatsiyani tozalash. */
+    fun resetRotation() {
+        attempt.clear()
     }
 
     private fun collectFromVideo(

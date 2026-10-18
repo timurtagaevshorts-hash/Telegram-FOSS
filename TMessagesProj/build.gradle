@@ -84,7 +84,11 @@ dependencies {
     // YuzGram #68: NewPipeExtractor (TeamNewPipe) — YouTube audio oqim
     // URL'larini ochishning eng ishonchli ochiq manba yo'li (NewPipe/
     // LibreTube har oy yangilaydi). Faqat resolve uchun, arxitektura bizniki.
-    implementation 'com.github.TeamNewPipe.NewPipeExtractor:extractor:v0.24.6'
+    // org.mozilla (rhino 1.8.0) ni chiqaramiz: AGP 7.0.3 D8 uni joylashtira
+    // olmaydi (NPE), bizga JS deciphering kerak emas — InnerTube o'zimizniki.
+    implementation('com.github.TeamNewPipe.NewPipeExtractor:extractor:v0.24.6') {
+        exclude group: 'org.mozilla'
+    }
     // Google Play Billing — YuzGram Premium to'lovi (donor 8.0.0, lekin u SDK 34
     // talab qiladi; 5.2.1 = compileSdk 33 bilan yig'iladigan oxirgi qator).
     implementation 'com.android.billingclient:billing:5.2.1'
