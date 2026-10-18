@@ -67,17 +67,15 @@ object YuzMusicCache {
     /**
      * IO ipida chaqiladigan blokiy yuklab olish.
      * YuzGram #63: YouTube qatori avval resolve qilinadi — keshga TO'LIQ
-     * qo'shiq (m4a/webm) tushadi; Deezer qatori eski mp3 preview bo'lib qoladi.
+     * qo'shiq (m4a/webm) tushadi.
+     * YuzGram #64: Deezer qatorlari ham YouTube'dan to'liq audio qilib
+     * yuklashga urinadi (nomdan qayta qidirish); bo'lmasa mp3 preview.
      */
     fun downloadBlocking(context: Context, track: YuzTrack): Boolean {
         if (isDownloaded(context, track.id)) return true
-        val src = when {
-            track.videoId.isNotBlank() ->
-                YuzYouTubeApi.resolveStream(track.videoId)?.let { it.url to it.ext }
-            track.previewUrl.isNotBlank() -> track.previewUrl to "mp3"
-            else -> null
-        } ?: return false
-        val (url, ext) = src
+        val src = YuzYouTubeApi.resolveStreamForTrack(track)?.let { it.url to it.ext }
+            ?: if (track.previewUrl.isNotBlank()) track.previewUrl to "mp3" else null
+        val (url, ext) = src ?: return false
         var conn: HttpURLConnection? = null
         return try {
             conn = (URL(url).openConnection() as HttpURLConnection).apply {

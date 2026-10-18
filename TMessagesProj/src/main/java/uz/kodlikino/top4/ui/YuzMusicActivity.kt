@@ -306,42 +306,34 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             startPlayback(pos, track, local.toURI().toString())
             return
         }
-        // 2) YuzGram #63: YouTube qatori — audio oqimni qurilmada resolve qilamiz
-        //    (URL IP'ga bog'langan, shuning uchun server emas, telefon so'raydi).
-        if (track.videoId.isNotBlank()) {
-            val token = ++playToken
-            currentIndex = pos
-            adapter.setPlaying(pos)
-            updateBarTrack(track)
-            tvPlayerTitle?.text = ctx.getString(R.string.musiqa_loading)
-            btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)
-            scope.launch {
-                val stream = try {
-                    withContextIo { YuzYouTubeApi.resolveStream(track.videoId) }
-                } catch (_: Exception) {
-                    null
-                }
-                if (token != playToken) return@launch // foydalanuvchi boshqa qatorni bosdi
-                val uri = stream?.url?.takeIf { it.isNotBlank() } ?: track.previewUrl
-                if (uri.isBlank()) {
-                    Toast.makeText(ctx, R.string.musiqa_no_preview, Toast.LENGTH_SHORT).show()
-                    if (currentIndex == pos) {
-                        currentIndex = -1
-                        adapter.setPlaying(-1)
-                    }
-                    return@launch
-                }
-                startPlayback(pos, track, uri)
+        // YuzGram #64: barcha qatorlar uchun bitta yo'l — qurilmada resolve.
+        // YouTube qatori o'z videoId'si bilan, Deezer qatori nomdan qayta qidirib
+        // to'liq audio topishga urinadi; bo'lmasa 30s preview'ga qaytadi.
+        // (URL IP'ga bog'langan, shuning uchun server emas, telefon so'raydi.)
+        val token = ++playToken
+        currentIndex = pos
+        adapter.setPlaying(pos)
+        updateBarTrack(track)
+        tvPlayerTitle?.text = ctx.getString(R.string.musiqa_loading)
+        btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)
+        scope.launch {
+            val stream = try {
+                withContextIo { YuzYouTubeApi.resolveStreamForTrack(track) }
+            } catch (_: Exception) {
+                null
             }
-            return
+            if (token != playToken) return@launch // foydalanuvchi boshqa qatorni bosdi
+            val uri = stream?.url?.takeIf { it.isNotBlank() } ?: track.previewUrl
+            if (uri.isBlank()) {
+                Toast.makeText(ctx, R.string.musiqa_no_preview, Toast.LENGTH_SHORT).show()
+                if (currentIndex == pos) {
+                    currentIndex = -1
+                    adapter.setPlaying(-1)
+                }
+                return@launch
+            }
+            startPlayback(pos, track, uri)
         }
-        // 3) Deezer zaxira: 30 soniyalik preview.
-        val uri = track.previewUrl
-        if (uri.isBlank()) {
-            Toast.makeText(ctx, R.string.musiqa_no_preview, Toast.LENGTH_SHORT).show()
-            return
-        }
-        startPlayback(pos, track, uri)
     }
 
     /** Bar qatorini yuklab, ijroni boshlaydi. */
