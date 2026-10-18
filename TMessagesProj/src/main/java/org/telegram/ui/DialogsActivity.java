@@ -12871,7 +12871,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         // parent'ga ulanmagan. Butun ko'rinish/padding logikasini shu yerda
         // to'xtatamiz (hasStories doim false qoladi, tepada joy ajratilmaydi).
         if (dialogStoriesCell != null && dialogStoriesCell.getParent() == null) {
-            dialogStoriesCell.setVisibility(GONE);
+            dialogStoriesCell.setVisibility(View.GONE);
             dialogStoriesCellVisible = false;
             hasStories = false;
             animateToHasStories = false;

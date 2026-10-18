@@ -1,6 +1,7 @@
 package uz.kodlikino.top4.ui;
 
-import android.animation.OvershootInterpolator;
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
@@ -13,6 +14,7 @@ import android.graphics.Typeface;
 import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.animation.OvershootInterpolator;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
@@ -250,7 +252,7 @@ public class YuzGramChatWheel extends View {
             return false;
         }
         float cx = wheelCx(), cy = wheelCy(), R = dp(RADIUS_DP);
-        float f = Math.abs(th) / Math.toRadians(66f);
+        float f = (float) (Math.abs(th) / Math.toRadians(66f));
         out[0] = cx - (float) Math.cos(th) * R;
         out[1] = cy + (float) Math.sin(th) * R;
         out[2] = 1f - 0.5f * f;                 // masshtab
@@ -322,8 +324,8 @@ public class YuzGramChatWheel extends View {
         r *= focus ? (1f + 0.10f * (1f - pulseT)) : 1f;
 
         canvas.save();
-        canvas.saveLayerAlpha(rect.set(x - r - dp(20), y - r - dp(20), x + r + dp(20), y + r + dp(20)),
-                (int) (255 * alpha));
+        rect.set(x - r - dp(20), y - r - dp(20), x + r + dp(20), y + r + dp(20));
+        canvas.saveLayerAlpha(rect, (int) (255 * alpha));
 
         if (focus) {
             if (activeShader == null || shaderCx != x || shaderCy != y || shaderR != r) {
@@ -397,7 +399,7 @@ public class YuzGramChatWheel extends View {
         if (focus) {
             String label = type == ITEM_FILTER ? labelFor(filter)
                     : type == ITEM_COMPOSE
-                    ? LocaleController.getString("ActionNewMessage", R.string.NewMessage)
+                    ? getContext().getString(R.string.yuz_wheel_new_msg)
                     : LocaleController.getString("Add", R.string.Add);
             if (label.length() > 11) {
                 label = label.substring(0, 10) + "…";
@@ -586,9 +588,12 @@ public class YuzGramChatWheel extends View {
             pos = (float) a.getAnimatedValue();
             invalidate();
         });
-        animator.addEndListener(a -> {
-            animator = null;
-            settle(true);
+        animator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                animator = null;
+                settle(true);
+            }
         });
         animator.start();
     }
