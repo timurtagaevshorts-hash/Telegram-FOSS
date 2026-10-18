@@ -4,15 +4,19 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.widget.Toolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
@@ -48,7 +52,9 @@ import uz.kodlikino.top4.utils.YuzUploadUi
  *    create qoidasi aynan shu indifikatorni talab qiladi.
  *
  * Shu sababli rasm poster (thumbnail) YUKLANMAYDI — `user_reels/` yo'li faqat
- * video contentType'ga ruxsat beradi. Feed'da poster o'rniga birinchi kadr kutiladi.
+ * video contentType'ga ruxsat beradi. Upload ekranida tanlangan videoning
+ * BIRINCHI KADRI LOCAL'ga ko'rsatiladi (MediaMetadataRetriever), feed'da esa
+ * poster o'rniga video kadr kutiladi.
  *
  * Haftalik kvot (Faza C, donor `UserReelUploadManager` moslamasi): oddiy
  * foydalanuvchi 3 ta/hafta · 50 MB, To'liq Premium 30 ta/hafta · 100 MB —
@@ -59,11 +65,20 @@ class CreateReelActivity : BaseFragment() {
     companion object {
         private const val REQ_PICK_VIDEO = 4481
         private const val MAX_VIDEO_BYTES = 200L * 1024L * 1024L
+
+        /** Preview kadri ekranda chiqishi yetarli — memory uchun kichraytiriladi. */
+        private const val MAX_PREVIEW_PX = 540
     }
 
     private var themedContext: Context? = null
     private var toolbar: Toolbar? = null
     private var btnPickVideo: View? = null
+    private var llPickPrompt: View? = null
+    private var ivVideoPreview: ImageView? = null
+    private var btnPickOverlay: TextView? = null
+    private var tvVideoDuration: TextView? = null
+    private var tvVideoMeta: TextView? = null
+    private var switchMonetization: SwitchCompat? = null
     private var tvPickVideoLabel: TextView? = null
     private var tvVideoName: TextView? = null
     private var tvQuota: TextView? = null
@@ -75,6 +90,7 @@ class CreateReelActivity : BaseFragment() {
 
     private var videoUri: Uri? = null
     private var videoDisplayName: String = ""
+    private var videoSizeBytes: Long = -1L
 
     private var scope: CoroutineScope? = null
     private var publishing = false
@@ -91,6 +107,12 @@ class CreateReelActivity : BaseFragment() {
 
         toolbar = root.findViewById(R.id.toolbar)
         btnPickVideo = root.findViewById(R.id.btnPickVideo)
+        llPickPrompt = root.findViewById(R.id.llPickPrompt)
+        ivVideoPreview = root.findViewById(R.id.ivVideoPreview)
+        btnPickOverlay = root.findViewById(R.id.btnPickOverlay)
+        tvVideoDuration = root.findViewById(R.id.tvVideoDuration)
+        tvVideoMeta = root.findViewById(R.id.tvVideoMeta)
+        switchMonetization = root.findViewById(R.id.switchMonetization)
         tvPickVideoLabel = root.findViewById(R.id.tvPickVideoLabel)
         tvVideoName = root.findViewById(R.id.tvVideoName)
         tvQuota = root.findViewById(R.id.tvQuotaInfo)
@@ -161,41 +183,125 @@ class CreateReelActivity : BaseFragment() {
         val uri = data.data ?: return
         videoUri = uri
         videoDisplayName = queryDisplayName(uri)
-        tvPickVideoLabel?.text = getString(R.string.reels_change_video)
         tvVideoName?.text = videoDisplayName
         tvVideoName?.visibility = View.VISIBLE
-        checkVideoSize(uri)
+        analyzeVideo(uri)
     }
 
-    /** Storage qoidasi 200 MB, tier limiti 50/100 MB — tanlashda tekshiriladi. */
-    private fun checkVideoSize(uri: Uri) {
+    /**
+     * Bir IO o'tida: hajm (Storage 200 MB + tier limiti), davomiylik va LOCAL
+     * preview kadri (MediaMetadataRetriever). Rasm poster yuklanmaydi — rules
+     * `user_reels/` ostida faqat video contentType'ni yozishga qo'yadi.
+     */
+    private fun analyzeVideo(uri: Uri) {
         val ctx = context ?: return
         val s = scope ?: return
         s.launch {
-            val size = withContext(Dispatchers.IO) {
-                try {
+            val info = withContext(Dispatchers.IO) {
+                val size = try {
                     ctx.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
                 } catch (e: Exception) {
                     -1L
                 }
+                var durationMs = 0L
+                var frame: Bitmap? = null
+                try {
+                    val mmr = MediaMetadataRetriever()
+                    try {
+                        mmr.setDataSource(ctx, uri)
+                        durationMs = mmr.extractMetadata(
+                            MediaMetadataRetriever.METADATA_KEY_DURATION
+                        )?.toLongOrNull() ?: 0L
+                        // Qisqa videoda 1/3, uzun videoda ~1s belgidagi kadr
+                        val usec = minOf(durationMs / 3, 1000L) * 1000L
+                        frame = mmr.getFrameAtTime(usec)?.let { bmp ->
+                            val maxSide = maxOf(bmp.width, bmp.height)
+                            if (maxSide <= MAX_PREVIEW_PX) bmp else {
+                                val ratio = MAX_PREVIEW_PX.toFloat() / maxSide
+                                Bitmap.createScaledBitmap(
+                                    bmp,
+                                    (bmp.width * ratio).toInt().coerceAtLeast(1),
+                                    (bmp.height * ratio).toInt().coerceAtLeast(1),
+                                    true
+                                )
+                            }
+                        }
+                    } finally {
+                        try {
+                            mmr.release()
+                        } catch (_: Exception) {
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Preview topolmasa ham davom etamiz — yuklash islayveradi.
+                }
+                Triple(size, durationMs, frame)
             }
+            val size = info.first
+            // Storage qoidasi 200 MB, tier limiti 50/100 MB — tanlashda tekshiriladi.
             if (size > MAX_VIDEO_BYTES) {
-                videoUri = null
-                tvPickVideoLabel?.text = getString(R.string.reels_pick_video)
-                tvVideoName?.visibility = View.GONE
-                toast(getString(R.string.reels_video_too_large))
+                rejectVideo(getString(R.string.reels_video_too_large))
                 return@launch
             }
-            // Haftalik kvot (donor UserReelUploadManager): tier bo'yicha hajm
-            // chegarasi — bepul 50 MB, To'liq Premium 100 MB.
+            // Haftalik kvot (donor UserReelUploadManager): bepul 50 MB, premium 100 MB.
             val maxBytes = YuzReelQuota.maxFileBytes(premiumBoost())
             if (size > maxBytes) {
-                videoUri = null
-                tvPickVideoLabel?.text = getString(R.string.reels_pick_video)
-                tvVideoName?.visibility = View.GONE
-                toast(YuzReelQuota.sizeLimitMessage(premiumBoost(), size))
+                rejectVideo(YuzReelQuota.sizeLimitMessage(premiumBoost(), size))
+                return@launch
             }
+            videoSizeBytes = size
+            val frame = info.third
+            if (frame != null) {
+                ivVideoPreview?.setImageBitmap(frame)
+                ivVideoPreview?.visibility = View.VISIBLE
+                btnPickOverlay?.visibility = View.VISIBLE
+                llPickPrompt?.visibility = View.GONE
+            }
+            val durMs = info.second
+            if (durMs > 0L) {
+                tvVideoDuration?.text = humanDuration(durMs)
+                tvVideoDuration?.visibility = View.VISIBLE
+            }
+            val ext = videoDisplayName.substringAfterLast('.', "").uppercase()
+            tvVideoMeta?.text = listOfNotNull(
+                if (durMs > 0L) humanDuration(durMs) else null,
+                if (size > 0L) YuzUploadUi.humanBytes(size) else null,
+                ext.takeIf { it.length in 2..4 && it.all { c -> c.isLetterOrDigit() } }
+            ).joinToString(" · ")
+            tvVideoMeta?.visibility = View.VISIBLE
         }
+    }
+
+    /** Video rad etilganda maydonni bo'sh holatga qaytaradi. */
+    private fun rejectVideo(message: String) {
+        videoUri = null
+        videoSizeBytes = -1L
+        ivVideoPreview?.setImageDrawable(null)
+        ivVideoPreview?.visibility = View.GONE
+        btnPickOverlay?.visibility = View.GONE
+        tvVideoDuration?.visibility = View.GONE
+        tvVideoMeta?.visibility = View.GONE
+        llPickPrompt?.visibility = View.VISIBLE
+        tvPickVideoLabel?.text = getString(R.string.reels_pick_video)
+        tvVideoName?.visibility = View.GONE
+        toast(message)
+    }
+
+    private fun humanDuration(ms: Long): String {
+        val total = ms / 1000
+        val h = total / 3600
+        val m = (total % 3600) / 60
+        val sec = total % 60
+        return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
+    }
+
+    /** "kino, #top" → "#kino #top" — tartib saqlanadi, duplikatlar o'chadi. */
+    private fun normalizeHashtags(raw: String): String {
+        return raw.split(Regex("[,;\\s]+"))
+            .map { it.trim().removePrefix("#") }
+            .filter { it.isNotBlank() }
+            .distinctBy { it.lowercase() }
+            .joinToString(" ") { "#$it" }
     }
 
     private fun queryDisplayName(uri: Uri): String {
@@ -225,7 +331,7 @@ class CreateReelActivity : BaseFragment() {
             etCaption?.error = getString(R.string.reels_caption_required)
             return
         }
-        val hashtags = etHashtags?.text?.toString()?.trim().orEmpty()
+        val hashtags = normalizeHashtags(etHashtags?.text?.toString().orEmpty())
         val account = currentAccount
         if (YuzGramAdsAuth.expectedUid(account).isBlank()) {
             toast(R.string.reels_sign_in_required)
@@ -297,7 +403,7 @@ class CreateReelActivity : BaseFragment() {
                     views = 0,
                     title = caption,
                     hashtags = hashtags,
-                    monetizationEnabled = true,
+                    monetizationEnabled = switchMonetization?.isChecked == true,
                     commentCount = 0,
                     likeCount = 0,
                     createdAt = System.currentTimeMillis(),

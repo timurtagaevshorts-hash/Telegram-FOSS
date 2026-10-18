@@ -164,8 +164,9 @@ object ReelsRepository {
      * Like qo'yish / olish. `likeCount` maydoni faqat 3 ta ruxsat etilgan
      * (`views`, `likeCount`, `commentCount`) dan biri — shuning uchun increment
      * oddiy `update()` orqali o'tadi (hasOnly([likeCount]) qoidasiga mos).
+     * Muvaffaqiyatli LIKE'dan so'ng reel egasiga bildirishnoma fan-out qilinadi.
      */
-    suspend fun setLiked(reelId: String, uid: String, liked: Boolean) {
+    suspend fun setLiked(reelId: String, uid: String, liked: Boolean, actorName: String = "", actorPhoto: String = "") {
         if (reelId.isBlank() || uid.isBlank()) return
         val likeRef = db.collection(COLLECTION).document(reelId)
             .collection(LIKES).document(uid)
@@ -181,6 +182,24 @@ object ReelsRepository {
                 .update(mapOf("likeCount" to FieldValue.increment(delta))).await()
         } catch (e: Exception) {
             Log.e(TAG, "likeCount $reelId: ${e.message}", e)
+        }
+        if (liked) {
+            try {
+                val reel = reelMeta(reelId)
+                if (reel != null && reel.uploadedByUid.isNotBlank() && reel.uploadedByUid != uid) {
+                    ReelNotificationManager.pushLike(
+                        ownerUid = reel.uploadedByUid,
+                        actorUid = uid,
+                        actorName = actorName,
+                        actorPhoto = actorPhoto,
+                        reelId = reelId,
+                        reelTitle = reel.title,
+                        reelThumbUrl = reel.thumbnailUrl
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "pushLike $reelId: ${e.message}", e)
+            }
         }
     }
 
@@ -276,7 +295,94 @@ object ReelsRepository {
             // Hisob yozuvi muvaffaqiyatli bo'lsa, izoh baribir ko'rinadi.
             Log.e(TAG, "commentCount $reelId: ${e.message}", e)
         }
+        try {
+            notifyCommentAdded(saved)
+        } catch (e: Exception) {
+            Log.e(TAG, "notifyCommentAdded $reelId: ${e.message}", e)
+        }
         return saved
+    }
+
+    /**
+     * Izoh fan-out (donor `notifyReelCommentAdded` mantig'i):
+     *  - javob (replyToCommentId bor) → asosiy izoh egasiga TYPE_REPLY,
+     *    reel egasi izohchidan va javob berilgan egadan boshqa bo'lsa TYPE_COMMENT;
+     *  - oddiy izoh → reel egasiga TYPE_COMMENT (o'ziga yozsa — yo'q).
+     */
+    private suspend fun notifyCommentAdded(comment: ReelComment) {
+        val reel = reelMeta(comment.reelId) ?: return
+        val ownerUid = reel.uploadedByUid
+        if (comment.replyToCommentId.isNotBlank()) {
+            val parent = getReelComment(comment.reelId, comment.replyToCommentId)
+            val parentOwner = parent?.userId?.takeIf { it.isNotBlank() } ?: comment.replyToUserId
+            if (parentOwner.isNotBlank() && parentOwner != comment.userId) {
+                ReelNotificationManager.pushReply(
+                    commentOwnerUid = parentOwner,
+                    actorUid = comment.userId,
+                    actorName = comment.authorName,
+                    actorPhoto = comment.authorPhotoUrl,
+                    reelId = comment.reelId,
+                    reelTitle = reel.title,
+                    reelThumbUrl = reel.thumbnailUrl,
+                    commentId = comment.replyToCommentId,
+                    commentText = comment.text
+                )
+            }
+            if (ownerUid.isNotBlank() && ownerUid != comment.userId && ownerUid != parentOwner) {
+                ReelNotificationManager.pushComment(
+                    ownerUid = ownerUid,
+                    actorUid = comment.userId,
+                    actorName = comment.authorName,
+                    actorPhoto = comment.authorPhotoUrl,
+                    reelId = comment.reelId,
+                    reelTitle = reel.title,
+                    reelThumbUrl = reel.thumbnailUrl,
+                    commentId = comment.id,
+                    commentText = comment.text
+                )
+            }
+        } else if (ownerUid.isNotBlank() && ownerUid != comment.userId) {
+            ReelNotificationManager.pushComment(
+                ownerUid = ownerUid,
+                actorUid = comment.userId,
+                actorName = comment.authorName,
+                actorPhoto = comment.authorPhotoUrl,
+                reelId = comment.reelId,
+                reelTitle = reel.title,
+                reelThumbUrl = reel.thumbnailUrl,
+                commentId = comment.id,
+                commentText = comment.text
+            )
+        }
+    }
+
+    /** Bitta izoh hujjatini o'qiydi (reply'langan otani topish uchun). */
+    suspend fun getReelComment(reelId: String, commentId: String): ReelComment? {
+        if (reelId.isBlank() || commentId.isBlank()) return null
+        return try {
+            db.collection(COLLECTION).document(reelId)
+                .collection(COMMENTS).document(commentId).get().await()
+                .let { doc ->
+                    if (!doc.exists()) return null
+                    val c = doc.toObject(ReelComment::class.java) ?: return null
+                    c.copy(id = c.id.ifBlank { doc.id }, reelId = c.reelId.ifBlank { reelId })
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "getReelComment $commentId: ${e.message}", e)
+            null
+        }
+    }
+
+    /** Reel'ning bildirishnoma uchun kerakli maydonlari (title/thumb/ega). */
+    private suspend fun reelMeta(reelId: String): Reel? {
+        if (reelId.isBlank()) return null
+        return try {
+            db.collection(COLLECTION).document(reelId).get().await()
+                .let { doc -> if (doc.exists()) doc.toObject(Reel::class.java) else null }
+        } catch (e: Exception) {
+            Log.e(TAG, "reelMeta $reelId: ${e.message}", e)
+            null
+        }
     }
 
     /**

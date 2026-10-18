@@ -381,6 +381,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private ActionBarMenuItem videoCallItem;
     private ActionBarMenuItem editItem;
     private ActionBarMenuItem settingsItem;
+    private ActionBarMenuItem notificationsItem;
+    private View yuzNotifDot;
+    private com.google.firebase.firestore.ListenerRegistration yuzNotifListener;
     private ActionBarMenuItem otherItem;
     private ActionBarMenuItem searchItem;
     private ActionBarMenuSubItem editColorItem;
@@ -517,6 +520,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private final static int copy_link_profile = 42;
     private final static int set_username = 43;
     private final static int open_settings = 44;
+    private final static int open_reel_notifications = 45;
 
     private Rect rect = new Rect();
 
@@ -1957,6 +1961,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
+        uz.kodlikino.top4.utils.YuzReelNotifBadge.detach(yuzNotifListener);
+        yuzNotifListener = null;
         if (sharedMediaLayout != null) {
             sharedMediaLayout.onDestroy();
         }
@@ -2287,6 +2293,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     Bundle sargs = new Bundle();
                     sargs.putLong("user_id", UserConfig.getInstance(currentAccount).clientUserId);
                     presentFragment(new ProfileActivity(sargs));
+                } else if (id == open_reel_notifications) {
+                    // YuzGram #76: Reels bildirishnomalari ekrani (qo'ng'iroq).
+                    presentFragment(new uz.kodlikino.top4.ui.ReelNotificationsActivity(), false);
                 } else if (id == invite_to_group) {
                     final TLRPC.User user = getMessagesController().getUser(userId);
                     if (user == null) {
@@ -3299,6 +3308,14 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (myProfile) {
             editItem = menu.addItem(edit_profile, R.drawable.group_edit_profile);
             editItem.setContentDescription(LocaleController.getString("Edit", R.string.Edit));
+            // YuzGram #76: Reels bildirishnomalari qo'ng'irog'i — sozlamalar oldida.
+            notificationsItem = menu.addItem(open_reel_notifications, R.drawable.ic_yuz_bell, resourcesProvider);
+            notificationsItem.setContentDescription(LocaleController.getString("Bildirishnomalar", R.string.yuz_notif_title));
+            yuzNotifDot = new View(context);
+            yuzNotifDot.setBackgroundResource(R.drawable.bg_yuz_unread_dot);
+            yuzNotifDot.setVisibility(View.GONE);
+            notificationsItem.addView(yuzNotifDot, LayoutHelper.createFrame(9, 9, Gravity.TOP | Gravity.RIGHT, 0, 7, 6, 0));
+            yuzNotifListener = uz.kodlikino.top4.utils.YuzReelNotifBadge.attach(yuzNotifDot, "tg_" + getUserConfig().clientUserId);
             // YuzGram: drawer'dan olib tashlangan "Sozlamalar"ni profil tepasiga, qalamcha yoniga qo'ydik.
             settingsItem = menu.addItem(open_settings, R.drawable.msg_settings, resourcesProvider);
             settingsItem.setContentDescription(LocaleController.getString("Settings", R.string.Settings));

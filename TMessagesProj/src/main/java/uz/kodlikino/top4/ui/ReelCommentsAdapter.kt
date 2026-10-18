@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
+import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import uz.kodlikino.top4.models.ReelComment
 import java.util.Locale
@@ -21,6 +22,10 @@ import java.util.Locale
  *  - avtor nom, matn, nisbiy vaqt;
  *  - javob izohlarida "… javob: @name" ko'rsatiladi;
  *  - izohni bosish (yoki uzun bosish) javob berish rejimini yoqadi.
+ *
+ * #76 — daraxt ko'rinishi: javoblar o'z ASOSIY izohi ostiga chekinib
+ * joylashadi (flat-thread: reply doim root'ga bog'langan bo'ladi), shuning
+ * uchun o'qish tartibi tabiiy suhbat kabi.
  *
  * Telegram'ning ichida (AAR emas, manba kodi) ishlaydigan yagona RecyclerView
  * versiyasi saqlanadi — shuning uchun faqat `adapterPosition` kabi eski API'lar
@@ -35,25 +40,73 @@ class ReelCommentsAdapter(
 
     private val items = ArrayList<ReelComment>()
 
+    /** Javob (child) izoh id'lari — chetga surish uchun. */
+    private val childIds = HashSet<String>()
+
     fun submit(list: List<ReelComment>) {
         items.clear()
-        items.addAll(list)
+        items.addAll(groupByRoot(list))
         notifyDataSetChanged()
     }
 
-    /** Yangi yozilgan izohni oxiriga qo'shadi (qayta yuklashni talab qilmaydi). */
+    /** Root'lar ASC + har root ostida uning javoblari (kelish tartibida). */
+    private fun groupByRoot(list: List<ReelComment>): List<ReelComment> {
+        childIds.clear()
+        val ids = list.mapTo(HashSet()) { it.id }
+        val roots = ArrayList<ReelComment>()
+        val kidsByRoot = HashMap<String, ArrayList<ReelComment>>()
+        for (c in list) {
+            val rootId = c.replyToCommentId
+            if (c.isReply && rootId.isNotBlank() && ids.contains(rootId)) {
+                kidsByRoot.getOrPut(rootId) { ArrayList() }.add(c)
+                childIds.add(c.id)
+            } else {
+                // replyToCommentId yo'qolgan root'ga ishora qilsa — oddiy izoh.
+                roots.add(c)
+            }
+        }
+        val out = ArrayList<ReelComment>(list.size)
+        for (r in roots) {
+            out.add(r)
+            kidsByRoot.remove(r.id)?.let { out.addAll(it) }
+        }
+        // root'i topilmagan beva javoblar oxiriga (amalda bo'lmaydi).
+        kidsByRoot.values.forEach { out.addAll(it) }
+        return out
+    }
+
+    /** Yangi yozilgan izohni to'g'ri o'ringa qo'yadi (javob — root ostiga). */
     fun append(comment: ReelComment) {
         if (items.any { it.id == comment.id }) return
+        if (comment.isReply) {
+            val rootIdx = items.indexOfFirst { it.id == comment.replyToCommentId }
+            if (rootIdx >= 0) {
+                var idx = rootIdx
+                while (idx + 1 < items.size &&
+                    items[idx + 1].replyToCommentId == comment.replyToCommentId
+                ) {
+                    idx++
+                }
+                items.add(idx + 1, comment)
+                childIds.add(comment.id)
+                notifyItemInserted(idx + 1)
+                return
+            }
+        }
         items.add(comment)
         notifyItemInserted(items.size - 1)
     }
 
     fun clear() {
         items.clear()
+        childIds.clear()
         notifyDataSetChanged()
     }
 
     fun lastId(): String = items.lastOrNull()?.id.orEmpty()
+
+    /** Yangi append qilingan izohning pozitsiyasi (scroll uchun). */
+    fun positionOf(id: String): Int = items.indexOfFirst { it.id == id }
 
     override fun getItemCount(): Int = items.size
 
@@ -76,6 +129,11 @@ class ReelCommentsAdapter(
         private val tvReplyHint: TextView = itemView.findViewById(R.id.tvCommentReplyHint)
 
         fun bind(comment: ReelComment) {
+            // Javoblar root ostiga chekinib ko'rinadi (daraxt vizuali).
+            val isChild = childIds.contains(comment.id)
+            val padStart = AndroidUtilities.dp(if (isChild) 34f else 14f)
+            itemView.setPadding(padStart, AndroidUtilities.dp(9f), AndroidUtilities.dp(14f), AndroidUtilities.dp(9f))
+
             val name = comment.authorName.ifBlank { "YuzGram" }
             tvAuthor.text = name
             tvText.text = comment.text

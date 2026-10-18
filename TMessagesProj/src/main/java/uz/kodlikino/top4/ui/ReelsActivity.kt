@@ -65,7 +65,11 @@ import uz.kodlikino.top4.utils.YuzVideoCache
  */
 class ReelsActivity @JvmOverloads constructor(
     private val filterUid: String = "",
-    private val startIndex: Int = 0
+    private val startIndex: Int = 0,
+    /** #76: bildirishnomadan ochilganda — shu reel'ga scrolleymiz. */
+    private val targetReelId: String = "",
+    /** Target reel izoh/reply bildirishnomasi bo'lsa — izohlar panelini ham ochamiz. */
+    private val openTargetComments: Boolean = false
 ) : BaseFragment() {
 
     private var themedContext: Context? = null
@@ -109,6 +113,7 @@ class ReelsActivity @JvmOverloads constructor(
     private var authJob: Job? = null
     private var currentReels: List<Reel> = emptyList()
     private var selectedPosition = startIndex.coerceAtLeast(0)
+    private var pendingTargetId = targetReelId
 
     /** #70: reel to'liq ekranda ochilganmi (sarlavha/storiya qatori yashirin). */
     private var reelFullscreen = false
@@ -463,12 +468,23 @@ class ReelsActivity @JvmOverloads constructor(
         emptyView?.text = getString(R.string.reels_empty)
         reelsList?.visibility = if (isEmpty) View.GONE else View.VISIBLE
         if (!isEmpty) {
-            val target = keepPosition.coerceIn(0, reels.size - 1)
-            selectedPosition = target
-            layoutManager?.scrollToPositionWithOffset(target, 0)
-            adapter?.setActivePosition(target)
-            refreshLikeState(reels.getOrNull(target)?.id)
-            preloadNeighbours(target)
+            var target = keepPosition.coerceIn(0, reels.size - 1)
+            var fromNotification = ""
+            if (pendingTargetId.isNotBlank()) {
+                val idx = reels.indexOfFirst { it.id == pendingTargetId }
+                if (idx >= 0) {
+                    target = idx
+                    fromNotification = pendingTargetId
+                    pendingTargetId = ""
+                }
+            }
+            val finalTarget = target
+            selectedPosition = finalTarget
+            layoutManager?.scrollToPositionWithOffset(finalTarget, 0)
+            adapter?.setActivePosition(finalTarget)
+            refreshLikeState(reels.getOrNull(finalTarget)?.id)
+            preloadNeighbours(finalTarget)
+            if (fromNotification.isNotEmpty() && openTargetComments) openComments(fromNotification)
         }
     }
 
@@ -513,7 +529,12 @@ class ReelsActivity @JvmOverloads constructor(
                 // sessiyasida o'tadi (`request.auth.uid == userId`).
                 awaitAuth()
                 YuzGramAdsAuth.ensureSignedIn(account)
-                ReelsRepository.setLiked(reelId, uid, likedNow)
+                // Bildirishnoma kartochkasi uchun ism+rasm (profile store'adan).
+                var photo = ""
+                if (likedNow) {
+                    try { photo = YuzGramProfileStore.load(uid).photoUrl } catch (_: Exception) {}
+                }
+                ReelsRepository.setLiked(reelId, uid, likedNow, authorName(account), photo)
             } catch (e: Exception) {
                 // Ekran yopilsa (scope bekor qilinsa) foydachiga xabar ko'rsatmaymiz.
                 if (fragmentView == null) return@launch
@@ -675,13 +696,17 @@ class ReelsActivity @JvmOverloads constructor(
         }
         val account = currentAccount
         val reply = replyTarget
+        // Flat-thread (donor uslubida): javob doim ASOSIY izohga bog'lanadi —
+        // reply-javobga javob berilsa ham root id qoladi, lekin "kimga" nomi
+        // bevosita javob berilayotgan izoh bo'yicha ko'rinadi.
+        val rootId = if (reply != null) reply.replyToCommentId.ifBlank { reply.id } else ""
         val draft = ReelComment(
             text = text,
             authorName = authorName(account),
             userId = uid,
             deviceId = uid,
             createdAt = System.currentTimeMillis(),
-            replyToCommentId = reply?.id.orEmpty(),
+            replyToCommentId = rootId,
             replyToUserId = reply?.userId.orEmpty(),
             replyToAuthorName = reply?.authorName.orEmpty()
         )
@@ -692,7 +717,12 @@ class ReelsActivity @JvmOverloads constructor(
             val saved = try {
                 awaitAuth()
                 val signedUid = YuzGramAdsAuth.ensureSignedIn(account)
-                ReelsRepository.addComment(reelId, draft.copy(userId = signedUid))
+                var photo = ""
+                try { photo = YuzGramProfileStore.load(signedUid).photoUrl } catch (_: Exception) {}
+                ReelsRepository.addComment(
+                    reelId,
+                    draft.copy(userId = signedUid, authorPhotoUrl = photo)
+                )
             } catch (e: Exception) {
                 sendingComment = false
                 sendButton?.alpha = 1f
@@ -711,9 +741,10 @@ class ReelsActivity @JvmOverloads constructor(
             loadedCommentCount += 1
             commentsList?.visibility = View.VISIBLE
             commentsEmpty?.visibility = View.GONE
-            commentsLayoutManager?.scrollToPositionWithOffset(
-                (commentsAdapter?.itemCount ?: 1) - 1, 0
-            )
+            // Javob root ostiga qo'yilishi mumkin — yangi izoh pozitsiyasiga scroll.
+            val pos = commentsAdapter?.positionOf(saved.id)?.takeIf { it >= 0 }
+                ?: ((commentsAdapter?.itemCount ?: 1) - 1)
+            commentsLayoutManager?.scrollToPositionWithOffset(pos, 0)
             updateCommentsTitle()
             adapter?.addCommentCount(reelId, 1)
         }

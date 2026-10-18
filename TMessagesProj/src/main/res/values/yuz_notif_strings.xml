@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="yuz_notif_title" translatable="false">Bildirishnomalar</string>
+    <string name="yuz_notif_empty" translatable="false">Hozircha bildirishnomalar yo\'q. Reels\'ingizga layk yoki izoh kelganda shu yerda ko\'rinadi.</string>
+    <string name="yuz_notif_sound_title" translatable="false">Bildirishnoma ovozi</string>
+    <string name="yuz_notif_sound_subtitle" translatable="false">Layk, izoh va javoblarda ovozli signal va tebranish</string>
+    <string name="yuz_notif_sound_on" translatable="false">Bildirishnoma ovozi yoqildi</string>
+    <string name="yuz_notif_sound_off" translatable="false">Bildirishnoma ovozi o\'chirildi</string>
+    <string name="yuz_notif_delete_all" translatable="false">Barchasini tozalash</string>
+    <string name="yuz_notif_delete_all_confirm" translatable="false">Barcha bildirishnomalar o\'chirilsinmi?</string>
+    <string name="yuz_notif_deleted" translatable="false">Bildirishnoma o\'chirildi</string>
+    <string name="yuz_notif_delete_failed" translatable="false">O\'chirib bo\'lmadi</string>
+    <string name="yuz_notif_cleared" translatable="false">Bildirishnomalar tozalandi</string>
+    <string name="yuz_notif_liked" translatable="false">%1$s reelsingizni yoqtirdi</string>
+    <string name="yuz_notif_commented" translatable="false">%1$s izoh qoldirdi</string>
+    <string name="yuz_notif_replied" translatable="false">%1$s izohingizga javob berdi</string>
+    <string name="yuz_notif_reel_label" translatable="false">Reels: %1$s</string>
+    <string name="yuz_notif_untitled_reel" translatable="false">Reels</string>
+</resources>

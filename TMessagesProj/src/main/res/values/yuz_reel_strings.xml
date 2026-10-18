@@ -33,6 +33,10 @@
     <string name="reels_uploading_video">Video yuklanmoqda…</string>
     <string name="reels_saving">Reel saqlanmoqda…</string>
 
+    <!-- #76 professional upload: monetizatsiya tugmasi -->
+    <string name="reels_monetization_title">Daromadga ulash</string>
+    <string name="reels_monetization_subtitle">Reel ko\'rishlari daromad hisobiga qo\'shiladi</string>
+
     <!-- Ovoz tugmasi belgilari (feed yuqorisida) -->
     <string name="reels_sound_on">🔊</string>
     <string name="reels_sound_off">🔇</string>

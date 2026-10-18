@@ -30,6 +30,7 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import org.telegram.messenger.R
 import uz.kodlikino.top4.models.Reel
+import uz.kodlikino.top4.utils.YuzViewedReels
 import uz.kodlikino.top4.utils.YuzVideoCache
 
 /**
@@ -70,7 +71,6 @@ class ReelsAdapter(
     private val liked = HashMap<String, Boolean>()
     private val viewsShown = HashMap<String, Int>()
     private val commentShown = HashMap<String, Int>()
-    private val viewedOnce = HashSet<String>()
 
     private var player: ExoPlayer? = null
     private var recyclerView: RecyclerView? = null
@@ -123,7 +123,9 @@ class ReelsAdapter(
                     holder.pageProgress.visibility = View.GONE
                     holder.ivThumbnail.visibility = View.GONE
                     val reel = holder.reel
-                    if (reel != null && viewedOnce.add(reel.id)) {
+                    // Dedup SharedPreferences'da saqlanadi — ilova/qayta ochishda
+                    // ham har reel BIR marta hisoblanadi (haqiqiy ko'rishlar).
+                    if (reel != null && YuzViewedReels.markViewed(appContext, reel.id)) {
                         val next = (viewsShown[reel.id] ?: reel.views) + 1
                         viewsShown[reel.id] = next
                         holder.tvViews.text = viewsLabel(next)
@@ -142,8 +144,9 @@ class ReelsAdapter(
         liked.clear()
         viewsShown.clear()
         commentShown.clear()
-        // viewedOnce SAQLANADI — aks holda har bir refresh (onResume) ko'rishni
-        // qaytadan hisoblab, sun'iy ravishda ko'rishlar sonini oshirardi.
+        // viewedOnce SAQLANADI (prefs) — aks holda har refresh ko'rishni
+        // qaytadan hisoblardi. O'chirilgan reel id'lari tozalanadi.
+        YuzViewedReels.prune(appContext, list.map { it.id })
         activePos = -1
         activeHolder = null
         notifyDataSetChanged()
@@ -453,14 +456,25 @@ class ReelsAdapter(
                 .start()
         }
 
-        /** Reel'ni tizim ulashish menyusiga chiqaradi (video URL + sarlavha). */
+        /** Reel'ni tizim ulashish menyusiga chiqaradi (sarlavha + hashtag + URL). */
         private fun shareReel() {
             val r = reel ?: return
             if (r.videoUrl.isBlank()) return
             val header = r.title.ifBlank { appContext.getString(R.string.reels_title) }
+            val body = buildString {
+                append(header)
+                if (r.hashtags.isNotBlank()) {
+                    append("\n"); append(r.hashtags)
+                }
+                val by = r.uploadedByName.takeIf { it.isNotBlank() }
+                if (by != null) {
+                    append("\n"); append("— ").append(by)
+                }
+                append("\n"); append(r.videoUrl)
+            }
             val send = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, "$header\n${r.videoUrl}")
+                putExtra(Intent.EXTRA_TEXT, body)
             }
             try {
                 appContext.startActivity(
