@@ -111,7 +111,14 @@ class KinoDetailActivity(private val movie: Movie) : BaseFragment() {
                 return
             }
         }
-        presentFragment(KinoPlayerActivity(current.videoUrl, current.title), false)
+        // #72: ko'rish avvalgi kabi ALOHIDA fullscreen Activity'da ochiladi —
+        // LaunchActivity ichidagi fragment WebView landscape/immersive holatini
+        // to'g'ri ololmas edi.
+        val act = parentActivity ?: return
+        android.content.Intent(act, YuzKinoPlayerActivity::class.java).apply {
+            putExtra(YuzKinoPlayerActivity.EXTRA_URL, current.videoUrl)
+            putExtra(YuzKinoPlayerActivity.EXTRA_TITLE, current.title)
+        }.let { act.startActivity(it) }
     }
 
     private fun bumpViews() {

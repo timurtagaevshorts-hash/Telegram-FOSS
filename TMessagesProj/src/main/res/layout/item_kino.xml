@@ -1,84 +1,137 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- #72: kino kartasi — donor KinoTOP4 `item_movie.xml` uslubiga qaytarildi:
+     chapda poster, o'ngda nom/janr/yil•davomiylik•reyting/tavsif va KO'RISH
+     tugmasi; vertual ro'yxat (LinearLayoutManager) uchun. -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="6dp"
+    android:layout_margin="8dp"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground"
-    app:cardBackgroundColor="@color/classified_card_default_bg"
+    app:cardBackgroundColor="#1A1A1A"
     app:cardCornerRadius="16dp"
-    app:cardElevation="0dp">
+    app:cardElevation="4dp"
+    app:strokeColor="#333333"
+    app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="horizontal"
+        android:padding="12dp">
 
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="170dp">
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="120dp"
+            android:layout_height="160dp"
+            app:cardBackgroundColor="#2A2A2A"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp">
 
-            <ImageView
-                android:id="@+id/ivKinoPoster"
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@drawable/bg_classified_image_placeholder"
-                android:contentDescription="@string/kino_title"
-                android:scaleType="centerCrop" />
+                android:layout_height="match_parent">
 
-            <TextView
-                android:id="@+id/tvKinoAdult"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="top|end"
-                android:layout_margin="8dp"
-                android:background="@drawable/kino_badge_18"
-                android:paddingStart="7dp"
-                android:paddingTop="2dp"
-                android:paddingEnd="7dp"
-                android:paddingBottom="2dp"
-                android:text="18+"
-                android:textColor="@color/white"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-        </FrameLayout>
+                <ImageView
+                    android:id="@+id/ivKinoPoster"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@string/kino_title"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_yuz_kino" />
+
+                <TextView
+                    android:id="@+id/tvKinoAdult"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top|end"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/kino_badge_18"
+                    android:paddingStart="7dp"
+                    android:paddingTop="2dp"
+                    android:paddingEnd="7dp"
+                    android:paddingBottom="2dp"
+                    android:text="18+"
+                    android:textColor="@color/white"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="12dp">
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
 
             <TextView
                 android:id="@+id/tvKinoTitle"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp"
+                android:maxLines="2"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
                 android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/tvKinoMeta"
-                android:layout_width="match_parent"
+                android:id="@+id/tvKinoGenre"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="6dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
+                android:textColor="#FF9800"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvKinoMeta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="#AAAAAA"
+                android:textSize="13sp" />
 
             <TextView
                 android:id="@+id/tvKinoRating"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="@color/home_accent"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="2dp"
+                android:textColor="#FFD700"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvKinoDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:ellipsize="end"
+                android:maxLines="3"
+                android:textColor="#CCCCCC"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnKinoCardWatch"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginTop="10dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:text="@string/kino_watch_cta"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                app:backgroundTint="#FF9800"
+                app:cornerRadius="18dp"
+                app:icon="@drawable/ic_yuz_kino"
+                app:iconSize="18dp"
+                app:iconTint="#FFFFFF" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

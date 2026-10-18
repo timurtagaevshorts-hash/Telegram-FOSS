@@ -8,7 +8,7 @@ import android.view.ViewGroup
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
-import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -60,7 +60,8 @@ class KinolarActivity : BaseFragment() {
         adapter = KinolarAdapter(themed, emptyList()) { movie ->
             presentFragment(KinoDetailActivity(movie), false)
         }
-        rv?.layoutManager = GridLayoutManager(themed, 2)
+        // #72: donor MoviesActivity kabi vertual katta kartalar ro'yxati.
+        rv?.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(themed)
         rv?.adapter = adapter
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)

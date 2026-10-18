@@ -390,6 +390,14 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:theme="@style/Theme.TMessages.Transparent"/>
+        <!-- YuzGram #72: kino ko'rish — avvalgi mustaqil landshaft fullscreen
+            pleyer (donor VideoPlayerActivity o'rniga). -->
+        <activity
+            android:name="uz.kodlikino.top4.ui.YuzKinoPlayerActivity"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape"
+            android:theme="@style/Theme.YuzGramAds"/>
         <activity android:name="org.telegram.ui.VoIPFeedbackActivity"
                   android:configChanges="keyboard|keyboardHidden|orientation|screenSize|uiMode"
 				  android:taskAffinity="${applicationId}.voip_feedback"
