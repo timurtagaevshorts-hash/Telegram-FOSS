@@ -75,6 +75,7 @@ object YuzMusicEngine {
     private var extending = false
     private var dlInFlight = false
     private var lastStatus: String? = null
+    private var itemRetries = 0
 
     // ---------------------------------------------------------------- setup
 
@@ -122,6 +123,7 @@ object YuzMusicEngine {
             override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
                 ui.removeCallbacks(bufferingWatchdog)
                 postStatus(null)
+                itemRetries = 0
                 Log.i(TAG, "transition idx=${p.currentMediaItemIndex} vid=${tagOf(item)?.videoId}")
                 notifyItemChanged(item)
                 prefetchNext(p, p.currentMediaItemIndex)
@@ -268,6 +270,20 @@ object YuzMusicEngine {
     private fun handleItemFailure(item: MediaItem?) {
         val t = tagOf(item) ?: return
         val p = player ?: return
+        // #78: bir qo'shiq uchun avval 2 marta boshqa oqim nomzodini aylantir
+        // (npe/ANDROID/IOS zanjirlari) — darrov keyingi qo'shiqqa o'tmaymiz.
+        if (t.videoId.isNotBlank() && itemRetries < 2) {
+            itemRetries++
+            Log.i(TAG, "retry#$itemRetries vid=${t.videoId} -> rotate stream candidate")
+            YuzYouTubeApi.noteBadStream(t.videoId)
+            runCatching {
+                p.seekTo(p.currentMediaItemIndex, p.currentPosition)
+                p.prepare()
+                p.playWhenReady = true
+            }
+            return
+        }
+        itemRetries = 0
         Log.i(TAG, "give-up vid=${t.videoId} -> silent download + skip")
         p.playWhenReady = false
         silentDownload(t)
@@ -330,6 +346,17 @@ object YuzMusicEngine {
     }
 
     private fun notifyPlaying(playing: Boolean) {
+        // #78: ijro boshlanishi bilan MediaSessionService'ni ham yoqamiz —
+        // shunda ilovadan chiqib ketganda bildirishnomadagi MediaStyle
+        // pleyer (sarlavha/bajarguvchi/rasm + tugmalar) har doim chiqadi,
+        // qaysi oynadan boshlanganiga qaramay (mini pleyer, pler, ro'yxat).
+        if (playing && ::appCtx.isInitialized) {
+            runCatching {
+                appCtx.startService(
+                    android.content.Intent(appCtx, uz.kodlikino.top4.ui.YuzMusicService::class.java)
+                )
+            }
+        }
         for (o in observers) runCatching { o.onPlayingChanged(playing) }
     }
 
