@@ -94,6 +94,26 @@
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardMusiqa"
+            style="@style/FuncsionCard">
+
+            <LinearLayout style="@style/FuncsionCardRow">
+
+                <ImageView
+                    style="@style/FuncsionCardIconImg"
+                    android:background="@drawable/bg_func_teal"
+                    android:src="@drawable/ic_yuz_music" />
+
+                <LinearLayout style="@style/FuncsionCardText">
+                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_musiqa_title" />
+                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_musiqa_desc" />
+                </LinearLayout>
+
+                <ImageView style="@style/FuncsionCardChevron" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardInstagram"
             style="@style/FuncsionCard">
 

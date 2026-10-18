@@ -255,6 +255,8 @@ class YuzAiActivity : BaseFragment() {
                 presentFragment(ElonlarActivity(), false)
             YuzAiEngine.Section.KINOLAR ->
                 presentFragment(KinolarActivity(), false)
+            YuzAiEngine.Section.MUSIQA ->
+                presentFragment(YuzMusicActivity(), false)
         }
     }
 
@@ -262,6 +264,7 @@ class YuzAiActivity : BaseFragment() {
         YuzAiEngine.Section.REELS -> "Reels"
         YuzAiEngine.Section.ELONLAR -> ctx.getString(R.string.func_ai_elon_name)
         YuzAiEngine.Section.KINOLAR -> ctx.getString(R.string.func_ai_kino_name)
+        YuzAiEngine.Section.MUSIQA -> ctx.getString(R.string.func_ai_musiqa_name)
         YuzAiEngine.Section.PROFIL -> ctx.getString(R.string.func_ai_profil_name)
         YuzAiEngine.Section.CHATS -> ctx.getString(R.string.func_ai_chats_name)
     }
@@ -274,6 +277,7 @@ class YuzAiActivity : BaseFragment() {
         addChip(R.string.ai_chip_time) { askQuestion("hozir soat nechchi") }
         addChip(R.string.ai_chip_weather) { askQuestion("ob-havo qanday") }
         addChip(R.string.ai_chip_reels) { gotoSection(YuzAiEngine.Section.REELS) }
+        addChip(R.string.ai_chip_musiqa) { gotoSection(YuzAiEngine.Section.MUSIQA) }
     }
 
     private fun addChip(labelRes: Int, onClick: () -> Unit) {

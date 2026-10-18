@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="musiqa_title">Musiqa</string>
+    <string name="musiqa_search_hint">Qo\'shiq nomi yoki ijrochi</string>
+    <string name="musiqa_search">Qidirish</string>
+    <string name="musiqa_trending">Ommabop xitlar</string>
+    <string name="musiqa_results">Natijalar</string>
+    <string name="musiqa_empty">Natija topilmadi. Boshqacha yozib ko\'ring.</string>
+    <string name="musiqa_loading">Qidirilmoqda…</string>
+    <string name="musiqa_error">Aloqa yo\'q yoki xatolik — qayta urinib ko\'ring</string>
+    <string name="musiqa_no_preview">Bu qo\'shiqda qisqa parcha yo\'q — YouTube\'da tinglang</string>
+    <string name="musiqa_row_hint">Qatorni bosing — YouTube\'da ochiladi</string>
+    <string name="func_ai_musiqa_name">Musiqa</string>
+    <string name="ai_chip_musiqa">Musiqa top</string>
+    <string name="func_musiqa_title">Musiqa topish</string>
+    <string name="func_musiqa_desc">Qo\'shiq nomini yozing — preview tinglang</string>
+</resources>

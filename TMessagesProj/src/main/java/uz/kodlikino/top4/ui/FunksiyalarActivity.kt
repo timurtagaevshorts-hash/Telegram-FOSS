@@ -45,6 +45,9 @@ class FunksiyalarActivity : BaseFragment() {
         root.findViewById<View>(R.id.cardIsh)?.setOnClickListener {
             presentFragment(JobCardsActivity(), false)
         }
+        root.findViewById<View>(R.id.cardMusiqa)?.setOnClickListener {
+            presentFragment(YuzMusicActivity(), false)
+        }
         root.findViewById<View>(R.id.cardInstagram)?.setOnClickListener {
             presentFragment(InstagramSaveActivity(), false)
         }
