@@ -58,7 +58,9 @@ class ReelsAdapter(
     private val myUid: String,
     private val onDelete: (Reel) -> Unit,
     /** Muallif ustuni bosilganda — reel egasining YuzGram profilini ochadi. */
-    private val onOpenProfile: (Reel) -> Unit
+    private val onOpenProfile: (Reel) -> Unit,
+    /** Sahifa kichik holatda bosilganda — ovozni ochish + to'liq ekran (chaqiruvchi ochadi). */
+    private val onExpandTap: () -> Unit
 ) : RecyclerView.Adapter<ReelsAdapter.PageHolder>() {
 
     private val items = ArrayList<Reel>()
@@ -76,7 +78,13 @@ class ReelsAdapter(
     private var activeHolder: PageHolder? = null
 
     /** Ovoz holati — sahifalar orasida saqlanadi (yangi videoda qayta qo'llanadi). */
-    private var muted = false
+    private var muted = true
+
+    /**
+     * Reel hozir to'liq ekranda ochilganmi. Kichik holatda bosish =/unmute +
+     * fullscreen; fullscreen holatda bosish = play/pause (eski xulqiyat).
+     */
+    var fullscreen = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -377,14 +385,18 @@ class ReelsAdapter(
         var reel: Reel? = null
 
         /**
-         * Bir bosish = play/pause, ikki bosish = like (KinoTOP4 xulqiyati).
-         * `onSingleTapUp` darhol ishga tushadi (kechikishsiz), ikkinchi bosishda
-         * play/pause ikki marta almashib asl holatiga qaytadi — like esa qo'shimcha
-         * ravishda amalga oshadi, xuddi Instagram/oldingi loyihadagi kabi.
+         * To'liq ekranda: bir bosish = play/pause, ikki bosish = like.
+         * Kichik ko'rinishda: bir bosish = ovozni ochish + fullscreen rejimiga
+         * o'tish (foydalanuvchi videosiz "shinqillab" qolmasin).
          */
         private val tapDetector = GestureDetector(appContext, object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapUp(e: MotionEvent): Boolean {
-                togglePlay()
+                if (fullscreen) {
+                    togglePlay()
+                } else {
+                    if (muted) toggleMute()
+                    onExpandTap()
+                }
                 return true
             }
 

@@ -10,6 +10,7 @@ import android.view.ViewTreeObserver
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -27,6 +28,7 @@ import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import org.telegram.messenger.UserConfig
 import org.telegram.ui.ActionBar.BaseFragment
+import org.telegram.ui.LaunchActivity
 import uz.kodlikino.top4.models.Reel
 import uz.kodlikino.top4.models.ReelComment
 import uz.kodlikino.top4.utils.ReelStorageHelper
@@ -71,6 +73,9 @@ class ReelsActivity @JvmOverloads constructor(
     private var layoutManager: LinearLayoutManager? = null
     private var snapHelper: PagerSnapHelper? = null
     private var reelsTopBar: View? = null
+    private var reelsHeader: View? = null
+    private var storyFab: FrameLayout? = null
+    private var fsClose: View? = null
     private var muteButton: ImageView? = null
     private var progressBar: ProgressBar? = null
     private var emptyView: TextView? = null
@@ -105,6 +110,10 @@ class ReelsActivity @JvmOverloads constructor(
     private var currentReels: List<Reel> = emptyList()
     private var selectedPosition = startIndex.coerceAtLeast(0)
 
+    /** #70: reel to'liq ekranda ochilganmi (sarlavha/storiya qatori yashirin). */
+    private var reelFullscreen = false
+    private var savedSystemUi = -1
+
     private fun currentUid(): String {
         val id = UserConfig.getInstance(currentAccount).clientUserId
         return if (id > 0L) "tg_$id" else ""
@@ -122,6 +131,9 @@ class ReelsActivity @JvmOverloads constructor(
 
         reelsList = root.findViewById(R.id.rvReels)
         reelsTopBar = root.findViewById(R.id.reelsTopBar)
+        reelsHeader = root.findViewById(R.id.reelsHeader)
+        storyFab = root.findViewById(R.id.storyFab)
+        fsClose = root.findViewById(R.id.btnFsClose)
         muteButton = root.findViewById(R.id.btnMute)
         progressBar = root.findViewById(R.id.progressReels)
         emptyView = root.findViewById(R.id.emptyReels)
@@ -139,7 +151,8 @@ class ReelsActivity @JvmOverloads constructor(
             onOpenComments = { reelId -> openComments(reelId) },
             myUid = currentUid(),
             onDelete = { reel -> confirmDelete(reel) },
-            onOpenProfile = { reel -> openUploaderProfile(reel) }
+            onOpenProfile = { reel -> openUploaderProfile(reel) },
+            onExpandTap = { enterReelFullscreen() }
         )
         adapter = reelsAdapter
 
@@ -165,6 +178,15 @@ class ReelsActivity @JvmOverloads constructor(
         }
 
         root.findViewById<View>(R.id.btnPostReel)?.setOnClickListener { openCreate() }
+
+        // #70: storiya kirish nuqtalari — chatdan Reels tepasiga ko'chirildi.
+        root.findViewById<View>(R.id.btnStoryPost)?.setOnClickListener {
+            YuzStories.openRecorder(this@ReelsActivity, storyFab)
+        }
+        root.findViewById<View>(R.id.btnStoryView)?.setOnClickListener {
+            if (!YuzStories.viewAll(this@ReelsActivity)) toast(R.string.story_none)
+        }
+        fsClose?.setOnClickListener { exitReelFullscreen() }
 
         // Ovoz tugmasi — feed davomida bitta player ishlatilgani uchun holat
         // [ReelsAdapter]da saqlanadi (sahifa almashganda ham yo'qolmaydi).
@@ -309,6 +331,45 @@ class ReelsActivity @JvmOverloads constructor(
 
     private fun openCreate() {
         presentFragment(CreateReelActivity(), false)
+    }
+
+    /**
+     * #70: reel'ni to'liq ekranga ochish — sarlavha+storiya qatori va pastki
+     * bar yashirinadi, system bar'lar pasaytiriladi. Videoning o'zi allaqachon
+     * butun RecyclerView'ni egallagan, shuning uchun bu faqat "kchrani tozalash".
+     */
+    private fun enterReelFullscreen() {
+        if (reelFullscreen) return
+        reelFullscreen = true
+        adapter?.fullscreen = true
+        reelsHeader?.visibility = View.GONE
+        fsClose?.visibility = View.VISIBLE
+        (parentActivity as? LaunchActivity)?.setYuzGramBarScrollHidden(this, true)
+        val decor = parentActivity?.window?.decorView
+        if (decor != null) {
+            savedSystemUi = decor.systemUiVisibility
+            decor.systemUiVisibility = savedSystemUi or
+                View.SYSTEM_UI_FLAG_LOW_PROFILE or View.SYSTEM_UI_FLAG_FULLSCREEN
+        }
+    }
+
+    /** Fullscreen'dan chiqish — har narsa tiklanadi (orqa tugma, ✕, pause, destroy). */
+    private fun exitReelFullscreen() {
+        if (!reelFullscreen) return
+        reelFullscreen = false
+        adapter?.fullscreen = false
+        reelsHeader?.visibility = View.VISIBLE
+        fsClose?.visibility = View.GONE
+        (parentActivity as? LaunchActivity)?.setYuzGramBarScrollHidden(this, false)
+        val decor = parentActivity?.window?.decorView
+        if (decor != null && savedSystemUi >= 0) {
+            decor.systemUiVisibility = savedSystemUi
+            savedSystemUi = -1
+        }
+        // Tap bilan ovoz ochilgan bo'lishi mumkin — tugma ikonkasini sinxronlaymiz.
+        muteButton?.setImageResource(
+            if (adapter?.isMuted() == true) R.drawable.ic_yuz_volume_off else R.drawable.ic_yuz_volume_on
+        )
     }
 
     /**
@@ -718,6 +779,10 @@ class ReelsActivity @JvmOverloads constructor(
      * closeLastFragment() chaqiriladi).
      */
     override fun onBackPressed(): Boolean {
+        if (reelFullscreen) {
+            exitReelFullscreen()
+            return false
+        }
         if (commentsOpen) {
             closeComments()
             return false
@@ -775,11 +840,14 @@ class ReelsActivity @JvmOverloads constructor(
     }
 
     override fun onPause() {
+        // Fullscreen holida qolib ketmasin: system bar'lar va bar tiklanadi.
+        exitReelFullscreen()
         adapter?.pausePlayback()
         super.onPause()
     }
 
     override fun onFragmentDestroy() {
+        exitReelFullscreen()
         adapter?.release()
         adapter = null
         keyboardListener?.let { listener ->

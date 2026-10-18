@@ -67,4 +67,10 @@
     <string name="reels_delete_confirm">\"%1$s\" o\'chirilsinmi? Bu amalni qaytarib bo\'lmaydi.</string>
     <string name="reels_deleted">Reel o\'chirildi</string>
     <string name="reels_delete_failed">Reel o\'chirilmadi</string>
+
+    <!-- #70: storiyalar Reels tepasiga ko'chirildi -->
+    <string name="story_post">Hikoya joylash</string>
+    <string name="story_view">Hikoyalar</string>
+    <string name="story_none">Hozircha hikoyalar yo\'q</string>
+    <string name="story_back">Yopish</string>
 </resources>
