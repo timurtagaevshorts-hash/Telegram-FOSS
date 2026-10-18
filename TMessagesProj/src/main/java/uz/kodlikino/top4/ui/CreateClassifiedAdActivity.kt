@@ -33,6 +33,7 @@ import uz.kodlikino.top4.models.ClassifiedAdCardThemes
 import uz.kodlikino.top4.models.ClassifiedAdCategories
 import uz.kodlikino.top4.utils.ClassifiedAdRepository
 import uz.kodlikino.top4.utils.ClassifiedAdStorageHelper
+import uz.kodlikino.top4.utils.ClassifiedLocationHelper
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzUploadUi
 
@@ -68,6 +69,8 @@ class CreateClassifiedAdActivity(
     private var etTitle: TextInputEditText? = null
     private var etPrice: TextInputEditText? = null
     private var etAddress: TextInputEditText? = null
+    private var btnPickRegion: MaterialButton? = null
+    private var selectedRegion = ""
     private var etPhone: TextInputEditText? = null
     private var etDescription: TextInputEditText? = null
     private var uploadProgress: ProgressBar? = null
@@ -103,6 +106,7 @@ class CreateClassifiedAdActivity(
         etTitle = root.findViewById(R.id.etTitle)
         etPrice = root.findViewById(R.id.etPrice)
         etAddress = root.findViewById(R.id.etAddress)
+        btnPickRegion = root.findViewById(R.id.btnPickRegion)
         etPhone = root.findViewById(R.id.etPhone)
         etDescription = root.findViewById(R.id.etDescription)
         uploadProgress = root.findViewById(R.id.uploadProgress)
@@ -125,6 +129,15 @@ class CreateClassifiedAdActivity(
             isFocusableInTouchMode = true
             isClickable = true
             isLongClickable = true
+        }
+
+        // #75: viloyat/tuman tanlagichi — filtr qidiruvi uchun region maydoni to'lsin.
+        btnPickRegion?.setOnClickListener {
+            val ctx = themedContext ?: return@setOnClickListener
+            ClassifiedLocationHelper.showLocationPicker(ctx) { loc ->
+                selectedRegion = loc
+                btnPickRegion?.text = loc
+            }
         }
 
         val categoryLabels = ClassifiedAdCategories.all.map { "${it.emoji} ${it.label}" }
@@ -184,6 +197,8 @@ class CreateClassifiedAdActivity(
             etTitle?.setText(ad.title)
             etPrice?.setText(if (ad.price > 0L) ad.price.toString() else "")
             etAddress?.setText(ad.address)
+            selectedRegion = ad.region
+            if (ad.region.isNotBlank()) btnPickRegion?.text = ad.region
             etPhone?.setText(ad.phone)
             etDescription?.setText(ad.description)
 
@@ -331,7 +346,8 @@ class CreateClassifiedAdActivity(
                     ownerPhotoUrl = "",
                     createdAt = existingCreatedAt,
                     isActive = true,
-                    cardTheme = ClassifiedAdCardThemes.BLACK
+                    cardTheme = ClassifiedAdCardThemes.BLACK,
+                    region = selectedRegion
                 )
                 ClassifiedAdRepository.saveAd(ad)
                 if (removedRemoteUrls.isNotEmpty()) {

@@ -34,6 +34,7 @@ import uz.kodlikino.top4.models.ClassifiedAdCardThemes
 import uz.kodlikino.top4.models.JobCard
 import uz.kodlikino.top4.models.JobCardListingTypes
 import uz.kodlikino.top4.models.JobCardSalaryTypes
+import uz.kodlikino.top4.utils.ClassifiedLocationHelper
 import uz.kodlikino.top4.utils.JobCardRepository
 import uz.kodlikino.top4.utils.JobCardStorageHelper
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
@@ -71,6 +72,8 @@ class CreateJobCardActivity(
     private var spinnerSalaryType: Spinner? = null
     private var etPhone: TextInputEditText? = null
     private var etLocation: TextInputEditText? = null
+    private var btnPickRegion: MaterialButton? = null
+    private var selectedRegion = ""
     private var uploadProgress: ProgressBar? = null
     private var btnPublish: MaterialButton? = null
 
@@ -104,6 +107,7 @@ class CreateJobCardActivity(
         spinnerSalaryType = root.findViewById(R.id.spinnerSalaryType)
         etPhone = root.findViewById(R.id.etPhone)
         etLocation = root.findViewById(R.id.etLocation)
+        btnPickRegion = root.findViewById(R.id.btnJobPickRegion)
         uploadProgress = root.findViewById(R.id.uploadProgress)
         btnPublish = root.findViewById(R.id.btnPublish)
 
@@ -118,6 +122,15 @@ class CreateJobCardActivity(
             isFocusableInTouchMode = true
             isClickable = true
             isLongClickable = true
+        }
+
+        // #75: viloyat/tuman tanlagichi — filtr qidiruvi uchun region maydoni to'lsin.
+        btnPickRegion?.setOnClickListener {
+            val ctx = themedContext ?: return@setOnClickListener
+            ClassifiedLocationHelper.showLocationPicker(ctx) { loc ->
+                selectedRegion = loc
+                btnPickRegion?.text = loc
+            }
         }
 
         val typeLabels = listOf(
@@ -286,7 +299,7 @@ class CreateJobCardActivity(
                     ownerUid = uid,
                     ownerName = ownerName,
                     ownerPhotoUrl = "",
-                    region = ""
+                    region = selectedRegion
                 )
                 JobCardRepository.saveCard(card)
                 keepScreenOn(false)

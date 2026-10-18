@@ -34,6 +34,7 @@ import uz.kodlikino.top4.ClassifiedAdsAdapter
 import uz.kodlikino.top4.models.ClassifiedAd
 import uz.kodlikino.top4.models.ClassifiedAdCategories
 import uz.kodlikino.top4.utils.ClassifiedAdRepository
+import uz.kodlikino.top4.utils.ClassifiedLocationHelper
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 
 /**
@@ -61,6 +62,9 @@ class ElonlarActivity : BaseFragment() {
     private var etFilterMinPrice: TextInputEditText? = null
     private var etFilterMaxPrice: TextInputEditText? = null
     private var etFilterLocation: TextInputEditText? = null
+    private var btnRegionPicker: MaterialButton? = null
+    private var chipGroupDate: ChipGroup? = null
+    private var chipGroupSort: ChipGroup? = null
 
     private val adapter = ClassifiedAdsAdapter(
         onAdClick = { openDetail(it) },
@@ -77,6 +81,8 @@ class ElonlarActivity : BaseFragment() {
     private var filterMinPrice: Long? = null
     private var filterMaxPrice: Long? = null
     private var filterLocation = ""
+    private var filterDays = 0
+    private var sortMode = 0
     private val feedShuffleSeed = System.currentTimeMillis()
     private var scope: CoroutineScope? = null
 
@@ -111,6 +117,9 @@ class ElonlarActivity : BaseFragment() {
         etFilterMinPrice = root.findViewById(R.id.etFilterMinPrice)
         etFilterMaxPrice = root.findViewById(R.id.etFilterMaxPrice)
         etFilterLocation = root.findViewById(R.id.etFilterLocation)
+        btnRegionPicker = root.findViewById(R.id.btnFilterRegionPicker)
+        chipGroupDate = root.findViewById(R.id.chipGroupAdsDate)
+        chipGroupSort = root.findViewById(R.id.chipGroupAdsSort)
 
         // Status bari bilan tepada bo'sh qora joy qolmasin — haqiqiy inset.
         YuzTopInset.applyPadding(adsAppBar)
@@ -132,6 +141,19 @@ class ElonlarActivity : BaseFragment() {
             filterPanel?.visibility =
                 if (filterPanel?.visibility == View.VISIBLE) View.GONE else View.VISIBLE
         }
+        // #75: viloyat/tuman tanlagichi + sana/saralash chiplari.
+        btnRegionPicker?.setOnClickListener {
+            val ctx = themedContext ?: return@setOnClickListener
+            ClassifiedLocationHelper.showLocationPicker(ctx) { loc ->
+                filterLocation = loc
+                etFilterLocation?.setText(loc)
+                etSearchAddress?.setText(loc)
+                btnRegionPicker?.text = ClassifiedLocationHelper.pickerLabel(loc)
+                applyFilter()
+            }
+        }
+        setupDateChips()
+        setupSortChips()
         etSearchKeyword?.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, c: Int, a: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, b: Int, c: Int) = Unit
@@ -163,6 +185,7 @@ class ElonlarActivity : BaseFragment() {
             if (etSearchAddress?.text?.toString()?.trim() != filterLocation) {
                 etSearchAddress?.setText(filterLocation)
             }
+            btnRegionPicker?.text = ClassifiedLocationHelper.pickerLabel(filterLocation)
             filterPanel?.visibility = View.GONE
             applyFilter()
         }
@@ -174,6 +197,11 @@ class ElonlarActivity : BaseFragment() {
             filterMinPrice = null
             filterMaxPrice = null
             filterLocation = ""
+            filterDays = 0
+            sortMode = 0
+            btnRegionPicker?.text = ClassifiedLocationHelper.pickerLabel("")
+            setupDateChips()
+            setupSortChips()
             applyFilter()
         }
 
@@ -296,6 +324,63 @@ class ElonlarActivity : BaseFragment() {
         ClassifiedAdCategories.all.forEach { addPill("${it.emoji} ${it.label}", it.id, selectedCategory == it.id) }
     }
 
+    /** #75: filtr panelidagi chip qatorlari — kategoriya chiplari bilan bir xil uslub. */
+    private fun buildFilterChips(
+        group: ChipGroup?,
+        labels: List<String>,
+        selectedIndex: Int,
+        onSelect: (Int) -> Unit
+    ) {
+        val g = group ?: return
+        val ctx = themedContext ?: return
+        g.removeAllViews()
+        val accent = androidx.core.content.ContextCompat.getColor(ctx, R.color.primary)
+        val surface = androidx.core.content.ContextCompat.getColor(ctx, R.color.home_card)
+        val muted = androidx.core.content.ContextCompat.getColor(ctx, R.color.text_secondary)
+        val density = ctx.resources.displayMetrics.density
+        labels.forEachIndexed { index, label ->
+            val checked = index == selectedIndex
+            val chip = Chip(ctx).apply {
+                text = label
+                isCheckable = true
+                isChecked = checked
+                setTextColor(
+                    android.content.res.ColorStateList.valueOf(
+                        if (checked) android.graphics.Color.WHITE else muted
+                    )
+                )
+                chipBackgroundColor = android.content.res.ColorStateList.valueOf(
+                    if (checked) accent else surface
+                )
+                chipStrokeWidth = 1f * density
+                chipStrokeColor = android.content.res.ColorStateList.valueOf(
+                    if (checked) 0x00FFFFFF else 0x1AFFFFFF
+                )
+                chipCornerRadius = 18f * density
+                setOnClickListener { onSelect(index) }
+            }
+            g.addView(chip)
+        }
+    }
+
+    private fun setupDateChips() {
+        val values = listOf(1, 7, 30, 0)
+        val selected = values.indexOf(filterDays).coerceAtLeast(0)
+        buildFilterChips(chipGroupDate, listOf("Bugun", "7 kun", "30 kun", "Barchasi"), selected) { i ->
+            filterDays = values.getOrElse(i) { 0 }
+            setupDateChips()
+            applyFilter()
+        }
+    }
+
+    private fun setupSortChips() {
+        buildFilterChips(chipGroupSort, listOf("Standart", "Yangi", "Arzon", "Qimmat"), sortMode) { i ->
+            sortMode = i
+            setupSortChips()
+            applyFilter()
+        }
+    }
+
     private fun startAdsListener() {
         adsListener?.remove()
         progressBar?.visibility = View.VISIBLE
@@ -344,14 +429,29 @@ class ElonlarActivity : BaseFragment() {
             }
         }
         if (filterLocation.isNotBlank()) {
-            filtered = filtered.filter { it.address.contains(filterLocation, true) }
+            // #75: "Viloyat, Tuman" satrlari ham, erkin yozilgan shahar nomlari ham
+            // tushishi uchun region+address maydonlariga bo'sh (loose) moslik.
+            filtered = filtered.filter {
+                ClassifiedLocationHelper.matches(filterLocation, it.region, it.address)
+            }
         }
         filterMinPrice?.let { min -> filtered = filtered.filter { it.price <= 0L || it.price >= min } }
         filterMaxPrice?.let { max -> filtered = filtered.filter { it.price <= 0L || it.price <= max } }
+        if (filterDays > 0) {
+            val cutoff = System.currentTimeMillis() - filterDays * 86_400_000L
+            filtered = filtered.filter { it.createdAt >= cutoff }
+        }
 
         filtered = ClassifiedAdRepository.orderForFeed(
             filtered, uid, feedShuffleSeed xor ClassifiedAdRepository.feedOrderSeed(filtered)
         )
+        filtered = when (sortMode) {
+            1 -> filtered.sortedByDescending { it.createdAt }
+            // Narx bo'yicha saralashda narxi noma'lum (0) e'lonlar oxirga qolsin.
+            2 -> filtered.sortedWith(compareBy({ it.price <= 0L }, { it.price }))
+            3 -> filtered.sortedByDescending { it.price }
+            else -> filtered
+        }
         adapter.setMyUid(uid)
         adapter.submit(filtered)
         emptyState?.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
