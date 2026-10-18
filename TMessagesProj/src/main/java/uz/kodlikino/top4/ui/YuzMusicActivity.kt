@@ -20,6 +20,7 @@ import android.widget.Toast
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -40,6 +41,7 @@ import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.utils.YuzMusicCache
 import uz.kodlikino.top4.utils.YuzMusicEffects
 import uz.kodlikino.top4.utils.YuzMusicRepository
+import uz.kodlikino.top4.utils.YuzAudioStream
 import uz.kodlikino.top4.utils.YuzTrack
 import uz.kodlikino.top4.utils.YuzYouTubeApi
 
@@ -80,6 +82,20 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private var btnDl: ImageButton? = null
     private var seeking = false
     private var playToken = 0
+    // YuzGram #65: oqim nomzodlari navbati. "Xato chiqmay, shunchaki
+    // boshlanmaydi" holati endi o'zi keyingi manbaga o'tadi (error yoki
+    // 15s watchdog), hammasi tugasa — keshga yuklab local ijro.
+    private data class Trying(
+        val token: Int,
+        val pos: Int,
+        val track: YuzTrack,
+        val streams: List<YuzAudioStream>,
+        val preview: String?,
+        val idx: Int
+    )
+    private var trying: Trying? = null
+    private val streamWatchdog = Runnable { onStreamStall() }
+    private var httpFactory: DefaultHttpDataSource.Factory? = null
     private val ui = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
         override fun run() {
@@ -257,6 +273,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         // YuzGram #63: googlevideo audio URL'lari youtube UA'sini kutadi.
         // DefaultDataSource — file:// (kesh) + http (stream) ikkalasini ham yeydi.
         val http = DefaultHttpDataSource.Factory().setUserAgent(YuzYouTubeApi.UA)
+        httpFactory = http
         val ds = DefaultDataSource.Factory(ctx, http)
         val p = ExoPlayer.Builder(ctx)
             .setMediaSourceFactory(ProgressiveMediaSource.Factory(ds))
@@ -272,12 +289,19 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         p.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) {
+                    onStreamOk()
                     effects.ensureSession(p.audioSessionId)
                     updateProgress()
                 } else if (state == Player.STATE_ENDED && p.repeatMode == Player.REPEAT_MODE_OFF) {
                     adapter.setPlaying(-1)
                     btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)
                 }
+            }
+
+            // YuzGram #65: oqim xatosi endi ko'rinadigan xabarga aylanadi —
+            // darhol keyingi nomzodga o'tamiz.
+            override fun onPlayerError(error: PlaybackException) {
+                onStreamStall()
             }
         })
         player = p
@@ -306,10 +330,10 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             startPlayback(pos, track, local.toURI().toString())
             return
         }
-        // YuzGram #64: barcha qatorlar uchun bitta yo'l — qurilmada resolve.
-        // YouTube qatori o'z videoId'si bilan, Deezer qatori nomdan qayta qidirib
-        // to'liq audio topishga urinadi; bo'lmasa 30s preview'ga qaytadi.
-        // (URL IP'ga bog'langan, shuning uchun server emas, telefon so'raydi.)
+        // YuzGram #65: resolve + ijro NAVBATI — bir nechta YouTube oqim
+        // nomzodi (ANDROID/IOS, "n"siz variantlar). Boshlanmasa yoki xato
+        // bo'lsa avtomatik keyingisiga o'tamiz; hammasi tugasa — keshga
+        // yuklab, local fayldan ijro etamiz.
         val token = ++playToken
         currentIndex = pos
         adapter.setPlaying(pos)
@@ -317,14 +341,14 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         tvPlayerTitle?.text = ctx.getString(R.string.musiqa_loading)
         btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)
         scope.launch {
-            val stream = try {
-                withContextIo { YuzYouTubeApi.resolveStreamForTrack(track) }
+            val streams = try {
+                withContextIo { YuzYouTubeApi.resolveStreamCandidates(track, 6) }
             } catch (_: Exception) {
-                null
+                emptyList()
             }
-            if (token != playToken) return@launch // foydalanuvchi boshqa qatorni bosdi
-            val uri = stream?.url?.takeIf { it.isNotBlank() } ?: track.previewUrl
-            if (uri.isBlank()) {
+            if (token != playToken) return@launch
+            val preview = track.previewUrl.takeIf { it.isNotBlank() }
+            if (streams.isEmpty() && preview == null) {
                 Toast.makeText(ctx, R.string.musiqa_no_preview, Toast.LENGTH_SHORT).show()
                 if (currentIndex == pos) {
                     currentIndex = -1
@@ -332,7 +356,70 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
                 }
                 return@launch
             }
-            startPlayback(pos, track, uri)
+            tryNext(Trying(token, pos, track, streams.take(4), preview, 0))
+        }
+    }
+
+    /** Navbatdagi oqim nomzodini ijroga urinish. */
+    private fun tryNext(t: Trying) {
+        if (t.token != playToken) return
+        val total = t.streams.size + (if (t.preview != null) 1 else 0)
+        if (t.idx >= total) {
+            trying = null
+            ui.removeCallbacks(streamWatchdog)
+            downloadFallback(t)
+            return
+        }
+        trying = t
+        val usePreview = t.idx >= t.streams.size
+        if (!usePreview) {
+            // googlevideo URL'lari o'z mijozining UA'sini talab qiladi.
+            httpFactory?.setUserAgent(t.streams[t.idx].ua)
+        }
+        val uri = if (usePreview) t.preview!! else t.streams[t.idx].url
+        startPlayback(t.pos, t.track, uri)
+        if (t.idx > 0) {
+            tvPlayerArtist?.text = ctx.getString(R.string.musiqa_trying, t.idx + 1, total)
+        }
+        ui.removeCallbacks(streamWatchdog)
+        ui.postDelayed(streamWatchdog, 15000)
+    }
+
+    /** READY keldi — oqim ishlayapti, watchdog bekor. */
+    private fun onStreamOk() {
+        ui.removeCallbacks(streamWatchdog)
+        val t = trying ?: return
+        trying = null
+        tvPlayerTitle?.text = t.track.title
+        tvPlayerArtist?.text = t.track.artist
+    }
+
+    /** Xato yoki watchdog: keyingi nomzodga o'tish. */
+    private fun onStreamStall() {
+        val t = trying ?: return
+        trying = null
+        ui.removeCallbacks(streamWatchdog)
+        if (t.token == playToken) tryNext(t.copy(idx = t.idx + 1))
+    }
+
+    /** Oxirgi chora: to'liq qo'shiqni keshga yuklab, local fayldan ijro. */
+    private fun downloadFallback(t: Trying) {
+        if (t.token != playToken) return
+        tvPlayerTitle?.text = ctx.getString(R.string.musiqa_dl_started)
+        YuzMusicCache.download(ctx, t.track) { ok ->
+            if (t.token != playToken) return@download
+            val f = if (ok) YuzMusicCache.localFile(ctx, t.track.id) else null
+            if (f != null) {
+                adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
+                Toast.makeText(ctx, R.string.musiqa_dl_done, Toast.LENGTH_SHORT).show()
+                startPlayback(t.pos, t.track, f.toURI().toString())
+            } else {
+                Toast.makeText(ctx, R.string.musiqa_play_failed, Toast.LENGTH_SHORT).show()
+                if (currentIndex == t.pos) {
+                    currentIndex = -1
+                    adapter.setPlaying(-1)
+                }
+            }
         }
     }
 
@@ -467,6 +554,8 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
 
     private fun stopPlayback() {
         playToken++
+        trying = null
+        ui.removeCallbacks(streamWatchdog)
         player?.pause()
         adapter.setPlaying(-1)
         btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)

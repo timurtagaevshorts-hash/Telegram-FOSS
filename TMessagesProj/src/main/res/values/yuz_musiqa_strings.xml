@@ -22,6 +22,9 @@
     <string name="musiqa_dl_fail">Yuklab bo\'lmadi — aloqani tekshiring</string>
     <string name="musiqa_dl_exists">Bu qo\'shiq allaqachon keshda</string>
     <string name="musiqa_dl_removed">Keshdan o\'chirildi</string>
+    <!-- YuzGram #65: oqim nomzodlari navbati ko\'rinsa-tuzatiladigan holatlar -->
+    <string name="musiqa_trying">Boshlanmadi — keyingi manba (%1$d/%2$d)…</string>
+    <string name="musiqa_play_failed">Bu qo\'shiqni ijro etib bo\'lmadi — aloqani tekshiring yoki boshqa natijani tanlang</string>
     <string name="musiqa_eq_title">Ovoz sozlamalari</string>
     <string name="musiqa_eq_hint">Qo\'shiqlar endi to\'liq ijro etiladi. Ekvalayzer preseti va bas kuchi jonli tinglovga darhol ta\'sir qiladi.</string>
     <string name="musiqa_eq_unavailable">Bu qurilmada ekvalayzer mavjud emas</string>

@@ -68,34 +68,51 @@ object YuzMusicCache {
      * IO ipida chaqiladigan blokiy yuklab olish.
      * YuzGram #63: YouTube qatori avval resolve qilinadi — keshga TO'LIQ
      * qo'shiq (m4a/webm) tushadi.
-     * YuzGram #64: Deezer qatorlari ham YouTube'dan to'liq audio qilib
-     * yuklashga urinadi (nomdan qayta qidirish); bo'lmasa mp3 preview.
+     * YuzGram #65: bitta URL emas — resolveStreamCandidates nomzodlari
+     * ketma-ket sinaladi (ANDROID/IOS, "n"siz variantlar); oxirgi chora
+     * Deezer mp3 preview.
      */
     fun downloadBlocking(context: Context, track: YuzTrack): Boolean {
         if (isDownloaded(context, track.id)) return true
-        val src = YuzYouTubeApi.resolveStreamForTrack(track)?.let { it.url to it.ext }
-            ?: if (track.previewUrl.isNotBlank()) track.previewUrl to "mp3" else null
-        val (url, ext) = src ?: return false
+        val streams = try {
+            YuzYouTubeApi.resolveStreamCandidates(track, 8)
+        } catch (_: Exception) {
+            emptyList()
+        }
+        val attempts = ArrayList<Pair<YuzAudioStream, String>>()
+        for (s in streams) attempts.add(s to s.url)
+        if (track.previewUrl.isNotBlank()) {
+            attempts.add(YuzAudioStream(track.previewUrl, "mp3", 0, "") to track.previewUrl)
+        }
+        for ((stream, url) in attempts) {
+            if (fetchTo(context, track.id, url, stream.ext, stream.ua)) {
+                addToIndex(context, track)
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun fetchTo(context: Context, id: Long, url: String, ext: String, ua: String): Boolean {
         var conn: HttpURLConnection? = null
         return try {
             conn = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 8000
                 readTimeout = 30000
                 requestMethod = "GET"
-                setRequestProperty("User-Agent", YuzYouTubeApi.UA)
+                if (ua.isNotBlank()) setRequestProperty("User-Agent", ua)
                 instanceFollowRedirects = true
             }
             if (conn.responseCode !in 200..299) return false
-            val tmp = File(dir(context), "${track.id}.tmp")
+            val tmp = File(dir(context), "$id.tmp")
             conn.inputStream.use { input ->
                 tmp.outputStream().use { out -> input.copyTo(out) }
             }
-            val dst = File(dir(context), "${track.id}.$ext")
+            val dst = File(dir(context), "$id.$ext")
             if (!tmp.renameTo(dst)) {
                 tmp.delete()
                 return false
             }
-            addToIndex(context, track)
             true
         } catch (_: Exception) {
             false

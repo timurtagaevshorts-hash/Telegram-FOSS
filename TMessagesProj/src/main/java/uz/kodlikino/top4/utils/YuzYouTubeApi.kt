@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit
  *  - ANDROID klienti bloklandi deb faqat IOS player'ni qaytaradi (IOS search=0),
  *    shuning uchun resolve zanjir: ANDROID -> IOS.
  *  - videoId o'lsa (boshqa holat) — qo'shiq nomidan qayta qidirib 3 ta
- *    muqobil videoni sinaymiz (resolveStreamForTrack).
+ *    muqobil videoni sinaymiz (resolveStreamCandidates, #65).
  *
  * @see https://github.com/TeamNewPipe/NewPipeExtractor (xuddi shu yo'l)
  */
@@ -64,56 +64,93 @@ object YuzYouTubeApi {
 
     /** videoId bo'yicha eng sifatli sof audio oqimini topadi (mijozlar zanjiri). */
     fun resolveStream(videoId: String): YuzAudioStream? {
-        for (c in PLAYERS) {
-            val p = post(PLAYER_URL, baseBody(c).put("videoId", videoId), c.ua) ?: continue
-            if (p.optJSONObject("playabilityStatus")?.optString("status") != "OK") continue
-            pickAudio(p)?.let { return it }
-        }
-        return null
+        val out = ArrayList<YuzAudioStream>()
+        val seen = HashSet<String>()
+        for (c in PLAYERS) collectFromVideo(videoId, c, out, seen, 1)
+        return out.firstOrNull()
     }
 
     /**
-     * YuzGram #64: qator uchun audio oqim — avval o'z videoId'si, bo'lmasa
-     * qo'shiq nomi bilan qayta qidirib 3 ta muqobil videoni sinaydi.
+     * YuzGram #65: bitta emas — BIR NECHTA oqim nomzodi.
+     * ANDROID/IOS mijozlari, sifat bo'yicha saralangan; har URL'ga "n"
+     * throttling parametrsiz variant ham qo'shiladi (Google sekinlashtirsa
+     * yoki 403 qilsa — keyingisini sinash uchun). video'da umuman audio
+     * bo'lmasa — qo'shiq nomidan qayta qidirib 3 ta muqobil videoni sinaydi.
      */
-    fun resolveStreamForTrack(track: YuzTrack): YuzAudioStream? {
+    fun resolveStreamCandidates(track: YuzTrack, max: Int = 6): List<YuzAudioStream> {
+        val out = ArrayList<YuzAudioStream>()
+        val seen = HashSet<String>()
         if (track.videoId.isNotBlank()) {
-            resolveStream(track.videoId)?.let { return it }
+            collectFromVideo(track.videoId, PLAYERS[0], out, seen, 2)
+            collectFromVideo(track.videoId, PLAYERS[1], out, seen, 4)
+            collectFromVideo(track.videoId, PLAYERS[0], out, seen, max)
+            collectFromVideo(track.videoId, PLAYERS[1], out, seen, max)
         }
-        val query = (track.artist + " " + track.title).trim()
-        if (query.isNotEmpty()) {
-            val cands = runCatching { search(query, limit = 5) }.getOrDefault(emptyList())
-            var tried = 0
-            for (c in cands) {
-                if (c.videoId == track.videoId) continue
-                if (++tried > 3) break
-                resolveStream(c.videoId)?.let { return it }
+        if (out.size < 2) {
+            val query = (track.artist + " " + track.title).trim()
+            if (query.isNotEmpty()) {
+                val cands = runCatching { search(query, limit = 5) }.getOrDefault(emptyList())
+                var tried = 0
+                for (c in cands) {
+                    if (c.videoId == track.videoId) continue
+                    if (++tried > 3) break
+                    collectFromVideo(c.videoId, PLAYERS[0], out, seen, max)
+                    if (out.size >= max) break
+                }
             }
         }
-        return null
+        return out
     }
 
-    private fun pickAudio(playerJson: JSONObject): YuzAudioStream? {
-        val sd = playerJson.optJSONObject("streamingData") ?: return null
-        val arrs = listOfNotNull(sd.optJSONArray("adaptiveFormats"), sd.optJSONArray("formats"))
-        var best: YuzAudioStream? = null
-        var bestScore = -1
-        for (arr in arrs) {
+    private fun collectFromVideo(
+        videoId: String,
+        c: Client,
+        out: MutableList<YuzAudioStream>,
+        seen: MutableSet<String>,
+        max: Int
+    ) {
+        if (out.size >= max) return
+        val p = post(PLAYER_URL, baseBody(c).put("videoId", videoId), c.ua) ?: return
+        if (p.optJSONObject("playabilityStatus")?.optString("status") != "OK") return
+        for (s in audioFormats(p, c.ua)) {
+            if (out.size >= max) return
+            if (seen.add(s.url)) out.add(s)
+            val clean = stripN(s.url)
+            if (clean != s.url && out.size < max && seen.add(clean)) {
+                out.add(YuzAudioStream(clean, s.ext, s.approxBytes, c.ua))
+            }
+        }
+    }
+
+    /** streamingData'dagi barcha sof audio formatlar, sifat bo'yicha saralangan. */
+    private fun audioFormats(p: JSONObject, ua: String): List<YuzAudioStream> {
+        val sd = p.optJSONObject("streamingData") ?: return emptyList()
+        val pairs = ArrayList<Pair<YuzAudioStream, Int>>()
+        val local = HashSet<String>()
+        for (arr in listOfNotNull(sd.optJSONArray("adaptiveFormats"), sd.optJSONArray("formats"))) {
             for (i in 0 until arr.length()) {
                 val f = arr.optJSONObject(i) ?: continue
                 val mime = f.optString("mimeType")
                 if (!mime.startsWith("audio")) continue
                 val url = f.optString("url")
-                if (url.isBlank()) continue
+                if (url.isBlank() || !local.add(url)) continue
                 val mp4 = mime.contains("mp4")
-                val score = f.optInt("bitrate") + if (mp4) 1_000_000 else 0
-                if (score > bestScore) {
-                    bestScore = score
-                    best = YuzAudioStream(url, if (mp4) "m4a" else "webm", f.optLong("contentLength"))
-                }
+                pairs.add(
+                    YuzAudioStream(url, if (mp4) "m4a" else "webm", f.optLong("contentLength"), ua) to
+                        (f.optInt("bitrate") + if (mp4) 1_000_000 else 0)
+                )
             }
         }
-        return best
+        pairs.sortByDescending { it.second }
+        return pairs.map { it.first }
+    }
+
+    /** "n" throttling parametrini olib tashlangan URL varianti. */
+    private fun stripN(url: String): String {
+        val r = url.replace(Regex("[&?]n=[^&]*"), "").replace("&&", "&")
+            .trimEnd('&', '?')
+        if (r == url || r.isBlank()) return url
+        return if (r.startsWith("&")) "?" + r.substring(1) else r
     }
 
     private fun baseBody(c: Client): JSONObject {
@@ -229,5 +266,10 @@ object YuzYouTubeApi {
     }
 }
 
-/** Resolve qilingan audio oqim: to'liq URL + fayl kengaytmasi + taxminiy hajm. */
-data class YuzAudioStream(val url: String, val ext: String, val approxBytes: Long)
+/** Resolve qilingan audio oqim: to'liq URL + fayl kengaytmasi + hajm + kerakli UA. */
+data class YuzAudioStream(
+    val url: String,
+    val ext: String,
+    val approxBytes: Long,
+    val ua: String = YuzYouTubeApi.UA
+)
