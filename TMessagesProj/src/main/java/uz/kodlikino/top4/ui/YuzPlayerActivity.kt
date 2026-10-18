@@ -116,6 +116,13 @@ class YuzPlayerActivity : BaseFragment() {
         speedPanel = root.findViewById(R.id.plSpeedPanel)
         queuePanel = root.findViewById(R.id.plQueuePanel)
         queueRv = root.findViewById(R.id.plQueueRv)
+        // Navbat paneli balandligi — ekraning ~46% (XML foizni FrameLayout
+        // farzandida qo'llamaydi, shuning uchun kodda o'rnatamiz).
+        queuePanel?.let { p ->
+            val lp = p.layoutParams
+            lp.height = (org.telegram.messenger.AndroidUtilities.displaySize.y * 0.46f).toInt()
+            p.layoutParams = lp
+        }
 
         tvTitle?.isSelected = true
 

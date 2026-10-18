@@ -2,7 +2,7 @@ package uz.kodlikino.top4.ui
 
 import android.app.Activity
 import android.os.Bundle
-import org.telegram.ui.Components.LaunchActivity
+import org.telegram.ui.LaunchActivity
 
 /**
  * YuzGram #69: shaffof host — bildirdi-chnyochi yoki qulf ekranidagi

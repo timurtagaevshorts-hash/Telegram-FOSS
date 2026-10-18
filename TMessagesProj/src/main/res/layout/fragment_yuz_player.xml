@@ -376,11 +376,12 @@
         android:padding="8dp"
         android:visibility="gone" />
 
-    <!-- Navbat paneli -->
+    <!-- Navbat paneli (balandlik kodda: ekranning ~46% — XML foizni
+         FrameLayout farzandida qo'llab-quvvatlamaydi) -->
     <LinearLayout
         android:id="@+id/plQueuePanel"
         android:layout_width="match_parent"
-        android:layout_height="46%"
+        android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:background="@drawable/bg_yuz_sheet"
         android:elevation="14dp"

@@ -214,7 +214,7 @@ object YuzMusicEngine {
             .apply {
                 // #69: rasm endi media3'ning O'ZI yuklaydi — bildirishnoma va
                 // qulf ekranidagi pleyer muqovani ko'rsatadi.
-                if (t.coverUrl.isNotBlank()) setArtUri(Uri.parse(t.coverUrl))
+                if (t.coverUrl.isNotBlank()) setArtworkUri(Uri.parse(t.coverUrl))
             }
             .build()
         return MediaItem.Builder().setUri(uri).setTag(t).setMediaMetadata(md).build()
