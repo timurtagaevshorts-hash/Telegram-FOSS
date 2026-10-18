@@ -79,6 +79,7 @@ object YuzMusicCache {
         } catch (_: Exception) {
             emptyList()
         }
+        android.util.Log.i("YuzMusic", "downloadBlocking ${track.videoId} candidates=${streams.size}")
         val attempts = ArrayList<Pair<YuzAudioStream, String>>()
         for (s in streams) attempts.add(s to s.url)
         if (track.previewUrl.isNotBlank()) {
@@ -101,9 +102,15 @@ object YuzMusicCache {
                 readTimeout = 30000
                 requestMethod = "GET"
                 if (ua.isNotBlank()) setRequestProperty("User-Agent", ua)
+                // #67: googlevideo "gzip" Accept-Encoding'ni 403 bilan rad etadi.
+                setRequestProperty("Accept-Encoding", "identity")
                 instanceFollowRedirects = true
             }
-            if (conn.responseCode !in 200..299) return false
+            val code = conn.responseCode
+            if (code !in 200..299) {
+                android.util.Log.i("YuzMusic", "download HTTP $code ext=$ext ua=${ua.take(18)} url=${url.take(60)}")
+                return false
+            }
             val tmp = File(dir(context), "$id.tmp")
             conn.inputStream.use { input ->
                 tmp.outputStream().use { out -> input.copyTo(out) }
@@ -113,8 +120,10 @@ object YuzMusicCache {
                 tmp.delete()
                 return false
             }
+            android.util.Log.i("YuzMusic", "download OK ${dst.length()}B -> ${dst.name}")
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            android.util.Log.i("YuzMusic", "download ERR ${e.javaClass.simpleName} ${url.take(60)}")
             false
         } finally {
             conn?.disconnect()
@@ -186,6 +195,7 @@ object YuzMusicCache {
         o.put("cover", track.coverUrl)
         o.put("preview", track.previewUrl)
         o.put("link", track.link)
+        o.put("yt", track.videoId)
         arr.put(o)
         saveIndex(context, arr)
     }

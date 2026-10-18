@@ -31,6 +31,9 @@ object YuzMusicRepository {
 
     /** Qo'shiq nomi/ijrochi bo'yicha qidirish — avval to'liq audio manbasi. */
     fun search(query: String): List<YuzTrack> {
+        // YuzGram #67: avval worker /search (tez), keyin to'g'ridan-to'g'ri YT, Deezer.
+        val gw = runCatching { YuzMusicGateway.search(query) }.getOrDefault(emptyList())
+        if (gw.isNotEmpty()) return gw
         val yt = runCatching { YuzYouTubeApi.search(query) }.getOrDefault(emptyList())
         if (yt.isNotEmpty()) return yt
         val q = URLEncoder.encode(query.trim(), "UTF-8")
@@ -42,8 +45,11 @@ object YuzMusicRepository {
      * YuzGram #63: bu ham YouTube'dan — chart qatorlari ham to'liq eshitiladi.
      */
     fun chart(): List<YuzTrack> {
+        val q = "o'zbek qo'shiqlari 2026"
+        val gw = runCatching { YuzMusicGateway.search(q) }.getOrDefault(emptyList())
+        if (gw.isNotEmpty()) return gw
         val yt = runCatching {
-            YuzYouTubeApi.search("o'zbek qo'shiqlari 2026", limit = 25)
+            YuzYouTubeApi.search(q, limit = 25)
         }.getOrDefault(emptyList())
         if (yt.isNotEmpty()) return yt
         return fetchTracks("$BASE/chart/0/tracks?limit=25")

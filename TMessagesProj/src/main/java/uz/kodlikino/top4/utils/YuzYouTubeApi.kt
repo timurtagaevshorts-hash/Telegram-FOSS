@@ -111,7 +111,11 @@ object YuzYouTubeApi {
     ) {
         if (out.size >= max) return
         val p = post(PLAYER_URL, baseBody(c).put("videoId", videoId), c.ua) ?: return
-        if (p.optJSONObject("playabilityStatus")?.optString("status") != "OK") return
+        val st = p.optJSONObject("playabilityStatus")?.optString("status")
+        if (st != "OK") {
+            android.util.Log.i("YuzMusic", "player $videoId ${c.name} -> $st")
+            return
+        }
         for (s in audioFormats(p, c.ua)) {
             if (out.size >= max) return
             if (seen.add(s.url)) out.add(s)

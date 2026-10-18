@@ -18,7 +18,9 @@ import uz.kodlikino.top4.utils.YuzTrack
  */
 class YuzMusicAdapter(
     private val onPlay: (YuzTrack, Int) -> Unit,
-    private val onDownload: (YuzTrack, Int) -> Unit
+    private val onDownload: (YuzTrack, Int) -> Unit,
+    // YuzGram #67: qatorni bosib turish — playlist/navbat menyusi.
+    private val onLongPress: (YuzTrack, Int) -> Unit
 ) : RecyclerView.Adapter<YuzMusicAdapter.Vh>() {
 
     private val items = ArrayList<YuzTrack>()
@@ -78,6 +80,10 @@ class YuzMusicAdapter(
         holder.dl.alpha = if (has) 1.0f else 0.55f
         holder.dl.setOnClickListener { onDownload(t, holder.adapterPosition) }
         holder.itemView.setOnClickListener { onPlay(t, holder.adapterPosition) }
+        holder.itemView.setOnLongClickListener {
+            onLongPress(t, holder.adapterPosition)
+            true
+        }
     }
 
     class Vh(v: View) : RecyclerView.ViewHolder(v) {

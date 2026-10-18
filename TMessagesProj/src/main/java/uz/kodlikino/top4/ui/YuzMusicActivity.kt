@@ -1,6 +1,7 @@
 package uz.kodlikino.top4.ui
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -17,15 +18,8 @@ import android.widget.RadioGroup
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -40,18 +34,20 @@ import org.telegram.ui.ActionBar.AlertDialog
 import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.utils.YuzMusicCache
 import uz.kodlikino.top4.utils.YuzMusicEffects
+import uz.kodlikino.top4.utils.YuzMusicEngine
 import uz.kodlikino.top4.utils.YuzMusicRepository
-import uz.kodlikino.top4.utils.YuzAudioStream
 import uz.kodlikino.top4.utils.YuzTrack
-import uz.kodlikino.top4.utils.YuzYouTubeApi
 
 /**
- * YuzGram #62: musiqa natijalari YouTube'ga o'tkazmaydi — qatorni bosish ilova
- * ichidagi pleyerni ishga tushiradi (prev/play/next, seek, takror), ekvalayzer
- * ovoz uslubini (Bass/Jazz/Rock/Vocal + bas kuchi) sozlaydi, download tugmasi
- * qo'shiqni keshga saqlaydi; "Yuklanganlar" tugmasi oflayd ro'yxatni ochadi.
- * YuzGram #63: endi qo'shiqlar TO'LIQ ijro etiladi — qidiruv YouTube InnerTube
- * orqali (YuzYouTubeApi), audio oqim bosilganda qurilmada resolve qilinadi.
+ * YuzGram #62/#63: ilova ichidagi musiqa pleyeri — qidiruv YouTube InnerTube
+ * orqali, qatorni bosish o'z pleyerimizda to'liq qo'shiqni boshlaydi.
+ *
+ * YuzGram #67: ijro endi YuzMusicEngine'da (yuzgram xizmati YuzMusicService) —
+ * ekran bloklanganda va ilovadan chiqqanda ham musiqa to'xtamaydi; butun
+ * ro'yxat navbat bo'ladi (qo'shiq tugasa — keyingisi avtomatik), navbat
+ * tugasa radio o'xshash qo'shiqlarni topib davom ettiradi; qatorni bosib
+ * turib playlist/navbatga qo'shish mumkin; "Kolleksiyalar" yuklanganlar va
+ * playlist'larni ochadi.
  */
 class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment() {
 
@@ -60,15 +56,13 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private lateinit var statusView: TextView
     private lateinit var adapter: YuzMusicAdapter
 
-    private var player: ExoPlayer? = null
     private val effects by lazy { YuzMusicEffects(ctx) }
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var busy = false
 
     private var currentList: List<YuzTrack> = emptyList()
-    private var currentIndex = -1
-    private var looping = true
     private var offlineMode = false
+    private var statusLabel = ""
 
     private var playerBar: View? = null
     private var ivPlayerCover: ImageView? = null
@@ -81,26 +75,30 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private var btnLoop: ImageButton? = null
     private var btnDl: ImageButton? = null
     private var seeking = false
-    private var playToken = 0
-    // YuzGram #65: oqim nomzodlari navbati. "Xato chiqmay, shunchaki
-    // boshlanmaydi" holati endi o'zi keyingi manbaga o'tadi (error yoki
-    // 15s watchdog), hammasi tugasa — keshga yuklab local ijro.
-    private data class Trying(
-        val token: Int,
-        val pos: Int,
-        val track: YuzTrack,
-        val streams: List<YuzAudioStream>,
-        val preview: String?,
-        val idx: Int
-    )
-    private var trying: Trying? = null
-    private val streamWatchdog = Runnable { onStreamStall() }
-    private var httpFactory: DefaultHttpDataSource.Factory? = null
+    private var looping = false
     private val ui = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
         override fun run() {
             updateProgress()
             ui.postDelayed(this, 500)
+        }
+    }
+
+    private val observer = object : YuzMusicEngine.Observer {
+        override fun onItemChanged(item: MediaItem?) {
+            val track = item?.localConfiguration?.tag as? YuzTrack
+            if (track != null) updateBarTrack(track)
+            syncPlayingMark()
+        }
+
+        override fun onPlayingChanged(playing: Boolean) {
+            btnPlayPause?.setImageResource(if (playing) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play)
+            syncPlayingMark()
+        }
+
+        override fun onStatus(text: String?) {
+            val cur = YuzMusicEngine.currentTrack()
+            tvPlayerArtist?.text = text ?: cur?.artist ?: ""
         }
     }
 
@@ -115,7 +113,6 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         YuzTopInset.applyPadding(root.findViewById<View>(R.id.musiqaTopBar))
 
         root.findViewById<View>(R.id.btnMusiqaBack)?.setOnClickListener {
-            stopPlayback()
             removeSelfFromStack()
         }
 
@@ -125,8 +122,9 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         val rv = root.findViewById<RecyclerView>(R.id.rvMusiqa)
         rv.layoutManager = LinearLayoutManager(ctx)
         adapter = YuzMusicAdapter(
-            onPlay = { track, pos -> playAt(pos) },
-            onDownload = { track, _ -> downloadTrack(track) }
+            onPlay = { _, pos -> rowPlay(pos) },
+            onDownload = { track, _ -> downloadTrack(track) },
+            onLongPress = { track, _ -> rowMenu(track) }
         )
         rv.adapter = adapter
         adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
@@ -138,9 +136,20 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
                 true
             } else false
         }
-        root.findViewById<View>(R.id.btnMusiqaSaved)?.setOnClickListener { showOfflineList() }
+        root.findViewById<View>(R.id.btnMusiqaSaved)?.setOnClickListener { showCollections() }
 
         setupPlayerBar(root)
+
+        YuzMusicEngine.ensurePlayer(ctx).apply {
+            addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(state: Int) {
+                    if (state == Player.STATE_READY) attachEffects()
+                }
+            })
+            if (playbackState == Player.STATE_READY) attachEffects()
+        }
+        YuzMusicEngine.addObserver(observer)
+        syncFromPlayer()
 
         val q = initialQuery?.trim().orEmpty()
         if (q.isNotEmpty()) {
@@ -168,9 +177,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         bar.visibility = View.GONE
         seek?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    seeking = true
-                }
+                if (fromUser) seeking = true
             }
 
             override fun onStartTrackingTouch(sb: SeekBar?) {
@@ -179,24 +186,124 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
 
             override fun onStopTrackingTouch(sb: SeekBar?) {
                 seeking = false
-                val p = player ?: return
+                val p = YuzMusicEngine.playerOrNull() ?: return
                 val d = p.duration
                 if (d > 0) p.seekTo((sb?.progress ?: 0) * 1000L)
             }
         })
         btnPlayPause?.setOnClickListener { togglePlayPause() }
-        bar.findViewById<View>(R.id.btnPlayerPrev)?.setOnClickListener { playAt(currentIndex - 1) }
-        bar.findViewById<View>(R.id.btnPlayerNext)?.setOnClickListener { playAt(currentIndex + 1) }
+        bar.findViewById<View>(R.id.btnPlayerPrev)?.setOnClickListener {
+            YuzMusicEngine.playerOrNull()?.seekToPrevious()
+        }
+        bar.findViewById<View>(R.id.btnPlayerNext)?.setOnClickListener {
+            YuzMusicEngine.playerOrNull()?.seekToNextMediaItem()
+        }
         btnLoop?.setOnClickListener {
             looping = !looping
-            player?.repeatMode = if (looping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+            YuzMusicEngine.playerOrNull()?.repeatMode =
+                if (looping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
             btnLoop?.alpha = if (looping) 1.0f else 0.45f
         }
         btnDl?.setOnClickListener {
-            currentList.getOrNull(currentIndex)?.let { downloadTrack(it) }
+            YuzMusicEngine.currentTrack()?.let { downloadTrack(it) }
         }
         bar.findViewById<View>(R.id.btnPlayerEq)?.setOnClickListener { showEqDialog() }
     }
+
+    // ------------------------------------------------------------ playback
+
+    private fun rowPlay(pos: Int) {
+        if (pos !in currentList.indices) return
+        val track = currentList[pos]
+        val p = YuzMusicEngine.ensurePlayer(ctx)
+        val playing = YuzMusicEngine.currentTrack()
+        if (playing != null && playing.id == track.id) {
+            if (p.isPlaying) p.pause() else p.playWhenReady = true
+            return
+        }
+        if (YuzMusicCache.localFile(ctx, track.id) == null && track.videoId.isBlank() &&
+            track.previewUrl.isBlank()
+        ) {
+            Toast.makeText(ctx, R.string.musiqa_play_failed, Toast.LENGTH_SHORT).show()
+            return
+        }
+        YuzMusicEngine.playQueue(ctx, currentList, pos)
+        ensureService()
+        updateBarTrack(track)
+    }
+
+    private fun ensureService() {
+        runCatching { ctx.startService(Intent(ctx, YuzMusicService::class.java)) }
+    }
+
+    private fun togglePlayPause() {
+        val p = YuzMusicEngine.playerOrNull()
+        if (p == null || p.currentMediaItem == null) {
+            if (currentList.isNotEmpty()) rowPlay(0)
+            return
+        }
+        if (p.isPlaying) p.pause() else p.playWhenReady = true
+    }
+
+    private fun attachEffects() {
+        val p = YuzMusicEngine.playerOrNull() ?: return
+        effects.ensureSession(p.audioSessionId)
+    }
+
+    /** Dvigatel holatini ekranga qaytaradi (qayta kirganda fon ijroini ko'rsatadi). */
+    private fun syncFromPlayer() {
+        val p = YuzMusicEngine.playerOrNull() ?: return
+        val track = YuzMusicEngine.currentTrack()
+        if (track != null) {
+            updateBarTrack(track)
+            btnPlayPause?.setImageResource(if (p.isPlaying) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play)
+        } else {
+            playerBar?.visibility = View.GONE
+        }
+        looping = p.repeatMode == Player.REPEAT_MODE_ONE
+        btnLoop?.alpha = if (looping) 1.0f else 0.45f
+        syncPlayingMark()
+        updateProgress()
+    }
+
+    private fun syncPlayingMark() {
+        val cur = YuzMusicEngine.currentTrack() ?: run {
+            adapter.setPlaying(-1)
+            return
+        }
+        val pos = currentList.indexOfFirst { it.id == cur.id }
+        adapter.setPlaying(pos)
+        btnDl?.alpha = if (YuzMusicCache.isDownloaded(ctx, cur.id)) 1.0f else 0.6f
+    }
+
+    private fun updateBarTrack(track: YuzTrack) {
+        playerBar?.visibility = View.VISIBLE
+        tvPlayerTitle?.text = track.title
+        tvPlayerArtist?.text = YuzMusicEngine.lastStatusText() ?: track.artist
+        tvPlayerDur?.text = String.format("%d:%02d", track.durationSec / 60, track.durationSec % 60)
+        seek?.progress = 0
+        tvPlayerPos?.text = "0:00"
+        btnDl?.alpha = if (YuzMusicCache.isDownloaded(ctx, track.id)) 1.0f else 0.6f
+        btnLoop?.alpha = if (looping) 1.0f else 0.45f
+        if (track.coverUrl.isNotBlank()) {
+            ivPlayerCover?.let { Glide.with(it).load(track.coverUrl).into(it) }
+        } else {
+            ivPlayerCover?.setImageDrawable(null)
+        }
+    }
+
+    private fun updateProgress() {
+        val p = YuzMusicEngine.playerOrNull() ?: return
+        if (seeking || p.duration <= 0) return
+        val d = (p.duration / 1000).toInt()
+        val pos = (p.currentPosition / 1000).toInt()
+        seek?.max = d
+        seek?.progress = pos
+        tvPlayerPos?.text = String.format("%d:%02d", pos / 60, pos % 60)
+        tvPlayerDur?.text = String.format("%d:%02d", d / 60, d % 60)
+    }
+
+    // -------------------------------------------------------------- search
 
     private fun runSearch() {
         val q = etQuery.text.toString().trim()
@@ -213,10 +320,10 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             }
             busy = false
             when {
-                list == null -> statusView.text = ctx.getString(R.string.musiqa_error)
-                list.isEmpty() -> statusView.text = ctx.getString(R.string.musiqa_empty)
+                list == null -> setStatus(R.string.musiqa_error)
+                list.isEmpty() -> setStatus(R.string.musiqa_empty)
                 else -> {
-                    statusView.text = ctx.getString(R.string.musiqa_results)
+                    setStatus(R.string.musiqa_results)
                     applyList(list)
                 }
             }
@@ -235,260 +342,147 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             }
             busy = false
             if (list != null && list.isNotEmpty()) {
-                statusView.text = ctx.getString(R.string.musiqa_trending)
+                setStatus(R.string.musiqa_trending)
                 applyList(list)
             } else {
-                statusView.text = ctx.getString(R.string.musiqa_error)
+                setStatus(R.string.musiqa_error)
             }
         }
     }
 
-    private fun showOfflineList() {
-        val list = YuzMusicCache.downloadedTracks(ctx)
-        offlineMode = true
-        if (list.isEmpty()) {
-            statusView.text = ctx.getString(R.string.musiqa_saved_empty)
-        } else {
-            statusView.text = ctx.getString(R.string.musiqa_saved_btn)
-        }
-        applyList(list)
+    private fun setStatus(res: Int) {
+        statusLabel = ctx.getString(res)
+        statusView.text = statusLabel
     }
 
     private fun applyList(list: List<YuzTrack>) {
-        if (!playingTrackMatches(list)) stopPlayback()
+        // #67: fon ijrosi qat'iy to'xtamaydi — faqat belgilash yangilanadi.
         currentList = list
-        currentIndex = -1
         adapter.submit(list)
+        syncPlayingMark()
     }
 
-    private fun playingTrackMatches(list: List<YuzTrack>): Boolean {
-        val p = player ?: return false
-        if (currentIndex !in currentList.indices) return false
-        val playing = currentList[currentIndex]
-        return list.any { it.id == playing.id }
+    // ------------------------------------------------------- collections UI
+
+    /** "Kolleksiyalar": yuklanganlar + playlistlar + radio kaliti. */
+    private fun showCollections() {
+        val playlists = YuzMusicEngine.playlists(ctx)
+        val downloaded = YuzMusicCache.downloadedTracks(ctx)
+        val labels = ArrayList<String>()
+        labels.add(ctx.getString(R.string.musiqa_saved_btn) + " (${downloaded.size})")
+        for (pl in playlists) labels.add("${pl.name} (${pl.tracks.size})")
+        labels.add(ctx.getString(R.string.musiqa_radio_toggle,
+            if (YuzMusicEngine.radio) "OFF" else "ON"))
+        val dlg = AlertDialog.Builder(ctx, getResourceProvider())
+            .setTitle(ctx.getString(R.string.musiqa_collections))
+            .setItems(labels.toTypedArray()) { _, which ->
+                when {
+                    which == 0 -> {
+                        offlineMode = true
+                        setStatus(if (downloaded.isEmpty()) R.string.musiqa_saved_empty
+                        else R.string.musiqa_saved_btn)
+                        applyList(downloaded)
+                    }
+                    which <= playlists.size -> {
+                        val pl = playlists[which - 1]
+                        offlineMode = false
+                        statusLabel = pl.name
+                        statusView.text = "${pl.name} (${pl.tracks.size})"
+                        applyList(pl.tracks)
+                    }
+                    else -> {
+                        YuzMusicEngine.radio = !YuzMusicEngine.radio
+                        Toast.makeText(ctx,
+                            if (YuzMusicEngine.radio) R.string.musiqa_radio_on
+                            else R.string.musiqa_radio_off, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton(ctx.getString(android.R.string.cancel), null)
+            .create()
+        showDialog(dlg)
     }
 
-    private fun ensurePlayer(): ExoPlayer {
-        player?.let { return it }
-        // YuzGram #63: googlevideo audio URL'lari youtube UA'sini kutadi.
-        // DefaultDataSource — file:// (kesh) + http (stream) ikkalasini ham yeydi.
-        val http = DefaultHttpDataSource.Factory().setUserAgent(YuzYouTubeApi.UA)
-        httpFactory = http
-        val ds = DefaultDataSource.Factory(ctx, http)
-        val p = ExoPlayer.Builder(ctx)
-            .setMediaSourceFactory(ProgressiveMediaSource.Factory(ds))
-            .build()
-        p.setAudioAttributes(
-            AudioAttributes.Builder()
-                .setUsage(C.USAGE_MEDIA)
-                .setContentType(C.CONTENT_TYPE_MUSIC)
-                .build(),
-            true
+    /** Qatorni bosib turish menyusi. */
+    private fun rowMenu(track: YuzTrack) {
+        val downloaded = YuzMusicCache.isDownloaded(ctx, track.id)
+        val labels = arrayOf(
+            ctx.getString(R.string.musiqa_menu_add_queue),
+            ctx.getString(R.string.musiqa_menu_add_playlist),
+            ctx.getString(if (downloaded) R.string.musiqa_dl_removed else R.string.musiqa_menu_dl)
         )
-        p.repeatMode = if (looping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
-        p.addListener(object : Player.Listener {
-            override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_READY) {
-                    onStreamOk()
-                    effects.ensureSession(p.audioSessionId)
-                    updateProgress()
-                } else if (state == Player.STATE_ENDED && p.repeatMode == Player.REPEAT_MODE_OFF) {
-                    adapter.setPlaying(-1)
-                    btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)
+        val dlg = AlertDialog.Builder(ctx, getResourceProvider())
+            .setTitle(track.title)
+            .setItems(labels) { _, which ->
+                when (which) {
+                    0 -> {
+                        YuzMusicEngine.enqueue(ctx, track)
+                        ensureService()
+                        Toast.makeText(ctx, R.string.musiqa_queue_added, Toast.LENGTH_SHORT).show()
+                    }
+                    1 -> playlistPicker(track)
+                    2 -> downloadTrack(track)
                 }
             }
-
-            // YuzGram #65: oqim xatosi endi ko'rinadigan xabarga aylanadi —
-            // darhol keyingi nomzodga o'tamiz.
-            override fun onPlayerError(error: PlaybackException) {
-                onStreamStall()
-            }
-        })
-        player = p
-        return p
+            .setNegativeButton(ctx.getString(android.R.string.cancel), null)
+            .create()
+        showDialog(dlg)
     }
 
-    private fun playAt(pos: Int) {
-        if (pos !in currentList.indices) return
-        val track = currentList[pos]
-        val p = ensurePlayer()
-        if (pos == currentIndex && p.currentMediaItem != null) {
-            if (p.isPlaying) {
-                p.pause()
-                btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)
-                adapter.setPlaying(-1)
-            } else {
-                p.playWhenReady = true
-                btnPlayPause?.setImageResource(R.drawable.ic_yuz_pause)
-                adapter.setPlaying(pos)
-            }
-            return
-        }
-        // 1) Keshda to'liq fayl bormi? — darhol ijro.
-        val local = YuzMusicCache.localFile(ctx, track.id)
-        if (local != null) {
-            startPlayback(pos, track, local.toURI().toString())
-            return
-        }
-        // YuzGram #65: resolve + ijro NAVBATI — bir nechta YouTube oqim
-        // nomzodi (ANDROID/IOS, "n"siz variantlar). Boshlanmasa yoki xato
-        // bo'lsa avtomatik keyingisiga o'tamiz; hammasi tugasa — keshga
-        // yuklab, local fayldan ijro etamiz.
-        val token = ++playToken
-        currentIndex = pos
-        adapter.setPlaying(pos)
-        updateBarTrack(track)
-        tvPlayerTitle?.text = ctx.getString(R.string.musiqa_loading)
-        btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)
-        scope.launch {
-            val streams = try {
-                // #66: tezkor single-shot resolve (faqat ANDROID so'rovi, ~1 ta
-                // HTTP) — bosilgach kezikmaslik uchun; chuqur 8-nomzod ro'yxatni
-                // kesh yuklash o'zi qayta oladi.
-                withContextIo { YuzYouTubeApi.resolveStreamCandidates(track, 2) }
-            } catch (_: Exception) {
-                emptyList()
-            }
-            if (token != playToken) return@launch
-            // YuzGram #66: streaming'ga FAQAT 1 tezkor urinish (10s) — buffering'da
-            // qotib qolish endi 60s emas, 10sda aniqlanadi; keyin ishonchli rejim:
-            // qo'shiq keshga yuklab olinadi (3-5 MB, 8 nomzod bo'ylab) va local
-            // fayldan ijro etiladi — tarmoq tuzoqlaridan qat'i nalmi ishlaydi.
-            if (streams.isEmpty()) {
-                downloadFallback(Trying(token, pos, track, emptyList(), null, 0))
-                return@launch
-            }
-            tryNext(Trying(token, pos, track, streams.take(1), null, 0))
-        }
-    }
-
-    /** Navbatdagi oqim nomzodini ijroga urinish. */
-    private fun tryNext(t: Trying) {
-        if (t.token != playToken) return
-        val total = t.streams.size + (if (t.preview != null) 1 else 0)
-        if (t.idx >= total) {
-            trying = null
-            ui.removeCallbacks(streamWatchdog)
-            downloadFallback(t)
-            return
-        }
-        trying = t
-        val usePreview = t.idx >= t.streams.size
-        if (!usePreview) {
-            // googlevideo URL'lari o'z mijozining UA'sini talab qiladi.
-            httpFactory?.setUserAgent(t.streams[t.idx].ua)
-        }
-        val uri = if (usePreview) t.preview!! else t.streams[t.idx].url
-        startPlayback(t.pos, t.track, uri)
-        if (t.idx > 0) {
-            tvPlayerArtist?.text = ctx.getString(R.string.musiqa_trying, t.idx + 1, total)
-        }
-        ui.removeCallbacks(streamWatchdog)
-        // #66: 10s — buffering'da qotib qolishni tez aniqlash uchun
-        ui.postDelayed(streamWatchdog, 10000)
-    }
-
-    /** READY keldi — oqim ishlayapti, watchdog bekor. */
-    private fun onStreamOk() {
-        ui.removeCallbacks(streamWatchdog)
-        val t = trying ?: return
-        trying = null
-        tvPlayerTitle?.text = t.track.title
-        tvPlayerArtist?.text = t.track.artist
-    }
-
-    /** Xato yoki watchdog: keyingi nomzodga o'tish. */
-    private fun onStreamStall() {
-        val t = trying ?: return
-        trying = null
-        ui.removeCallbacks(streamWatchdog)
-        if (t.token == playToken) tryNext(t.copy(idx = t.idx + 1))
-    }
-
-    /** Oxirgi chora: to'liq qo'shiqni keshga yuklab, local fayldan ijro. */
-    private fun downloadFallback(t: Trying) {
-        if (t.token != playToken) return
-        tvPlayerTitle?.text = ctx.getString(R.string.musiqa_dl_started)
-        YuzMusicCache.download(ctx, t.track) { ok ->
-            if (t.token != playToken) return@download
-            val f = if (ok) YuzMusicCache.localFile(ctx, t.track.id) else null
-            if (f != null) {
-                adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
-                Toast.makeText(ctx, R.string.musiqa_dl_done, Toast.LENGTH_SHORT).show()
-                startPlayback(t.pos, t.track, f.toURI().toString())
-            } else {
-                Toast.makeText(ctx, R.string.musiqa_play_failed, Toast.LENGTH_SHORT).show()
-                if (currentIndex == t.pos) {
-                    currentIndex = -1
-                    adapter.setPlaying(-1)
+    private fun playlistPicker(track: YuzTrack) {
+        val playlists = YuzMusicEngine.playlists(ctx)
+        val labels = ArrayList<String>()
+        for (pl in playlists) labels.add(pl.name)
+        labels.add(ctx.getString(R.string.musiqa_new_playlist))
+        val dlg = AlertDialog.Builder(ctx, getResourceProvider())
+            .setTitle(ctx.getString(R.string.musiqa_menu_add_playlist))
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which < playlists.size) {
+                    addToPlaylist(playlists[which].name, track)
+                } else {
+                    askPlaylistName(track)
                 }
             }
-        }
+            .setNegativeButton(ctx.getString(android.R.string.cancel), null)
+            .create()
+        showDialog(dlg)
     }
 
-    /** Bar qatorini yuklab, ijroni boshlaydi. */
-    private fun startPlayback(pos: Int, track: YuzTrack, uri: String) {
-        val p = ensurePlayer()
-        currentIndex = pos
-        p.setMediaItem(MediaItem.fromUri(uri))
-        p.prepare()
-        p.playWhenReady = true
-        btnPlayPause?.setImageResource(R.drawable.ic_yuz_pause)
-        adapter.setPlaying(pos)
-        updateBarTrack(track)
-        ui.post { effects.ensureSession(p.audioSessionId) }
-        ui.postDelayed({ effects.ensureSession(p.audioSessionId) }, 400)
-        ui.removeCallbacks(tick)
-        ui.post(tick)
+    private fun askPlaylistName(track: YuzTrack) {
+        val input = EditText(ctx)
+        input.hint = ctx.getString(R.string.musiqa_playlist_hint)
+        input.setPadding(AndroidUtilities.dp(20), AndroidUtilities.dp(8),
+            AndroidUtilities.dp(20), AndroidUtilities.dp(8))
+        val pad = AndroidUtilities.dp(10)
+        val wrap = android.widget.FrameLayout(ctx)
+        wrap.addView(input, android.widget.FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { setMargins(pad, pad, pad, pad) })
+        val dlg = AlertDialog.Builder(ctx, getResourceProvider())
+            .setTitle(ctx.getString(R.string.musiqa_new_playlist))
+            .setView(wrap)
+            .setPositiveButton(ctx.getString(R.string.musiqa_ok)) { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isNotEmpty()) addToPlaylist(name, track)
+            }
+            .setNegativeButton(ctx.getString(android.R.string.cancel), null)
+            .create()
+        showDialog(dlg)
     }
 
-    private fun togglePlayPause() {
-        val p = player ?: run {
-            if (currentList.isNotEmpty()) playAt(0)
-            return
-        }
-        if (p.isPlaying) {
-            p.pause()
-            btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)
-        } else {
-            p.playWhenReady = true
-            btnPlayPause?.setImageResource(R.drawable.ic_yuz_pause)
-        }
+    private fun addToPlaylist(name: String, track: YuzTrack) {
+        YuzMusicEngine.playlistAdd(ctx, name, track)
+        Toast.makeText(ctx, ctx.getString(R.string.musiqa_added_playlist, name),
+            Toast.LENGTH_SHORT).show()
     }
 
-    private fun updateBarTrack(track: YuzTrack) {
-        playerBar?.visibility = View.VISIBLE
-        tvPlayerTitle?.text = track.title
-        tvPlayerArtist?.text = track.artist
-        tvPlayerDur?.text = String.format("%d:%02d", track.durationSec / 60, track.durationSec % 60)
-        seek?.progress = 0
-        tvPlayerPos?.text = "0:00"
-        btnDl?.alpha = if (track.id in YuzMusicCache.downloadedIds(ctx)) 1.0f else 0.6f
-        btnLoop?.alpha = if (looping) 1.0f else 0.45f
-        if (track.coverUrl.isNotBlank()) {
-            ivPlayerCover?.let { Glide.with(it).load(track.coverUrl).into(it) }
-        } else {
-            ivPlayerCover?.setImageDrawable(null)
-        }
-    }
-
-    private fun updateProgress() {
-        val p = player ?: return
-        if (seeking || p.duration <= 0) return
-        val d = (p.duration / 1000).toInt()
-        val pos = (p.currentPosition / 1000).toInt()
-        seek?.max = d
-        seek?.progress = pos
-        tvPlayerPos?.text = String.format("%d:%02d", pos / 60, pos % 60)
-        tvPlayerDur?.text = String.format("%d:%02d", d / 60, d % 60)
-    }
+    // -------------------------------------------------------------- download
 
     private fun downloadTrack(track: YuzTrack) {
         if (offlineMode) {
             YuzMusicCache.remove(ctx, track.id)
             adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
             Toast.makeText(ctx, R.string.musiqa_dl_removed, Toast.LENGTH_SHORT).show()
-            showOfflineList()
             return
         }
         if (YuzMusicCache.isDownloaded(ctx, track.id)) {
@@ -498,11 +492,14 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         Toast.makeText(ctx, R.string.musiqa_dl_started, Toast.LENGTH_SHORT).show()
         YuzMusicCache.download(ctx, track) { ok ->
             adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
-            btnDl?.alpha = if (ok) 1.0f else 0.6f
-            Toast.makeText(ctx, if (ok) R.string.musiqa_dl_done else R.string.musiqa_dl_fail,
+            syncPlayingMark()
+            Toast.makeText(ctx,
+                if (ok) R.string.musiqa_dl_done else R.string.musiqa_dl_fail,
                 Toast.LENGTH_SHORT).show()
         }
     }
+
+    // -------------------------------------------------------------------- eq
 
     private fun showEqDialog() {
         val act = parentActivity ?: return
@@ -547,6 +544,8 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         showDialog(dlg)
     }
 
+    // ----------------------------------------------------------------- misc
+
     private fun hideKeyboard() {
         val imm = ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.hideSoftInputFromWindow(etQuery.windowToken, 0)
@@ -555,32 +554,24 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private suspend fun <T> withContextIo(block: suspend () -> T): T =
         kotlinx.coroutines.withContext(Dispatchers.IO) { block() }
 
-    private fun stopPlayback() {
-        playToken++
-        trying = null
-        ui.removeCallbacks(streamWatchdog)
-        player?.pause()
-        adapter.setPlaying(-1)
-        btnPlayPause?.setImageResource(R.drawable.ic_yuz_play)
-    }
-
     override fun onPause() {
+        // #67: ijro FONDA davom etadi — bu yerda to'xtatmaymiz.
         super.onPause()
-        stopPlayback()
         ui.removeCallbacks(tick)
     }
 
     override fun onResume() {
         super.onResume()
         ui.post(tick)
+        syncFromPlayer()
     }
 
     override fun onFragmentDestroy() {
         super.onFragmentDestroy()
         ui.removeCallbacks(tick)
         scope.cancel()
-        runCatching { effects.release() }
-        runCatching { player?.release() }
-        player = null
+        YuzMusicEngine.removeObserver(observer)
+        // Player va ekvalayzer ENGINE'da qoladi — fon ijrosi uzilmasligi uchun
+        // bu yerda release QILINMAYDI.
     }
 }
