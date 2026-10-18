@@ -476,7 +476,9 @@
                 <action android:name="org.telegram.android.musicplayer.next" />
                 <action android:name="org.telegram.android.musicplayer.play" />
                 <action android:name="org.telegram.android.musicplayer.previous" />
-                <action android:name="android.intent.action.MEDIA_BUTTON" />
+                <!-- #67: MEDIA_BUTTON ni olib tashladik — media3 MediaSession
+                     manifestda 1 tadan ko'p MEDIA_BUTTON receiver bo'lsa
+                     FATAL crash qiladi (IllegalStateException) -->
                 <action android:name="android.media.AUDIO_BECOMING_NOISY" />
             </intent-filter>
         </receiver>
