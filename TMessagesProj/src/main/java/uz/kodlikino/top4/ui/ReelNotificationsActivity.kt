@@ -76,15 +76,14 @@ class ReelNotificationsActivity : BaseFragment() {
         progress = root.findViewById(R.id.notificationsProgress)
         switchSound = root.findViewById(R.id.switchReelNotifSound)
 
-        val recycler = rv ?: root
         val listAdapter = ReelNotificationsAdapter(
             appContext = themed,
             onClick = { openNotification(it) },
             onDelete = { deleteNotification(it) }
         )
         adapter = listAdapter
-        recycler.layoutManager = LinearLayoutManager(themed)
-        recycler.adapter = listAdapter
+        rv?.layoutManager = LinearLayoutManager(themed)
+        rv?.adapter = listAdapter
 
         root.findViewById<ImageButton>(R.id.btnNotifBack).setOnClickListener { removeSelfFromStack() }
         root.findViewById<ImageButton>(R.id.btnDeleteAllNotifications).setOnClickListener { confirmDeleteAll() }
