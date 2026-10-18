@@ -19,9 +19,9 @@ import java.util.Calendar
  *    yig'indilari va `createdAt` bo'yicha bugungi/haftalik yuklashlar);
  *  - Kinolar: `movies` soni.
  *
- * Sahifalash: har kolleksiyadan `select()` bilan faqat kerakli maydonlar,
- * 200'lik bloklarda o'qiladi (limit [MAX_DOCS] — o'n minglab hujjatda ham
- * telefoni qotirib qo'ymaydi; natijalar "≈" emas, sanalgan qism aniq).
+ * Sahifalash: har kolleksiyadan 200'lik bloklarda o'qiladi (limit [MAX_DOCS] —
+ * o'n minglab hujjatda ham telefoni qotirib qo'ymaydi; natijalar "≈" emas,
+ * sanalgan qism aniq).
  */
 object YuzAdminStats {
 
@@ -61,8 +61,8 @@ object YuzAdminStats {
         val recent = ArrayList<Pair<String, Long>>()
         var last: com.google.firebase.firestore.DocumentSnapshot? = null
         while (users < MAX_DOCS) {
+            // DIQQAT: bu SDK yig'indisida Query.select() yo'q — hujjatlar to'liq o'qiladi.
             var q = db.collection("comment_profiles")
-                .select("lastActiveAt", "createdAt", "isPremium", "firstName", "lastName")
                 .limit(PAGE.toLong())
             if (last != null) q = q.startAfter(last)
             val snap: QuerySnapshot = q.get().await()
@@ -96,7 +96,6 @@ object YuzAdminStats {
         last = null
         while (reels < MAX_DOCS) {
             var q = db.collection("reels")
-                .select("views", "likeCount", "commentCount", "createdAt")
                 .limit(PAGE.toLong())
             if (last != null) q = q.startAfter(last)
             val snap: QuerySnapshot = q.get().await()
