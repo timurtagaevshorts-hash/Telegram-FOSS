@@ -31,4 +31,6 @@
     <string name="func_ai_kino_name">Kinolar</string>
     <string name="func_ai_profil_name">Profil</string>
     <string name="func_ai_chats_name">Xabarlar</string>
+    <string name="ai_heard_none">Eshitilmadi. Yaqqinroq, ravon gapirib, qayta urinib ko\'ring.</string>
+    <string name="ai_voice_slow">Aloqa sekin bo\'ldi. Yana bir marta urining.</string>
 </resources>

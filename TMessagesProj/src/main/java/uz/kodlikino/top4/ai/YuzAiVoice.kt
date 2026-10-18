@@ -2,7 +2,9 @@ package uz.kodlikino.top4.ai
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.MediaPlayer
 import android.media.ToneGenerator
 import android.os.Bundle
 import android.os.Handler
@@ -13,6 +15,7 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import java.io.File
 import java.util.Locale
 
 /**
@@ -42,6 +45,59 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
     private var ignoreNextError = false
     private var released = false
     private var lastSpeakId = "yuz_ai_0"
+    private var cloudPlayer: MediaPlayer? = null
+    private var cloudFile: File? = null
+
+    /**
+     * Worker'dan kelgan WAV (inson ovozi) bilan gapirish. Xato bo'lsa — tizim TTS'ga tushadi.
+     */
+    fun playCloudAudio(bytes: ByteArray, fallback: String) {
+        stopListening()
+        stopSpeakingInternal()
+        val spoken = speakable(fallback)
+        if (bytes.size < 2000 || spoken.isBlank()) {
+            if (bytes.size < 2000) speak(fallback) else callbacks.onSpeakFinished()
+            return
+        }
+        speaking = true
+        try {
+            cloudFile?.delete()
+            val f = File(appContext.cacheDir, "ai_tts_" + System.currentTimeMillis() + ".wav")
+            f.writeBytes(bytes)
+            cloudFile = f
+            val p = MediaPlayer()
+            cloudPlayer = p
+            p.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            )
+            p.setOnCompletionListener { finishCloud(p, null) }
+            p.setOnErrorListener { _, _, _ -> finishCloud(p, fallback); true }
+            p.setDataSource(f.absolutePath)
+            p.setOnPreparedListener { it.start() }
+            p.prepareAsync()
+        } catch (e: Exception) {
+            Log.w(TAG, "playCloudAudio: " + e.message)
+            finishCloud(cloudPlayer, fallback)
+        }
+    }
+
+    private fun finishCloud(p: MediaPlayer?, fallback: String?) {
+        try { p?.release() } catch (_: Exception) { }
+        if (cloudPlayer === p) cloudPlayer = null
+        cloudFile?.delete()
+        cloudFile = null
+        if (!speaking && fallback == null) return
+        speaking = false
+        mainHandler.post {
+            if (!released) callbacks.onSpeakFinished()
+        }
+        if (!fallback.isNullOrBlank() && !released) {
+            mainHandler.post { speak(fallback) }
+        }
+    }
 
     init {
         tts = TextToSpeech(appContext) { status ->
@@ -151,17 +207,37 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
 
     fun stopSpeaking() {
         pendingSpeak = null
+        stopSpeakingInternal()
+    }
+
+    private fun stopSpeakingInternal() {
         speaking = false
         try {
             tts?.stop()
         } catch (_: Exception) {
         }
+        cloudPlayer?.let {
+            try {
+                it.stop()
+            } catch (_: Exception) {
+            }
+            try {
+                it.release()
+            } catch (_: Exception) {
+            }
+        }
+        cloudPlayer = null
+        try {
+            cloudFile?.delete()
+        } catch (_: Exception) {
+        }
+        cloudFile = null
     }
 
     fun release() {
         released = true
         listening = false
-        speaking = false
+        stopSpeakingInternal()
         mainHandler.removeCallbacksAndMessages(null)
         try {
             recognizer?.destroy()

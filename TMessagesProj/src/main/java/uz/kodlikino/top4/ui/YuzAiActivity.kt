@@ -22,15 +22,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.MessagesController
 import org.telegram.messenger.R
 import org.telegram.messenger.SendMessagesHelper
 import org.telegram.ui.ActionBar.BaseFragment
 import org.telegram.ui.ChatActivity
+import uz.kodlikino.top4.ai.YuzAiCloud
 import uz.kodlikino.top4.ai.YuzAiEngine
+import uz.kodlikino.top4.ai.YuzAiRecorder
 import uz.kodlikino.top4.ai.YuzAiVoice
+import uz.kodlikino.top4.ai.YuzVoiceResult
 import uz.kodlikino.top4.utils.YuzgramAiBrain
+import java.util.Locale
 
 /**
  * AI Yordamchi — faqat OVOZLI yordamchi (yozmatni kiritish maydoni yo'q).
@@ -51,6 +56,8 @@ class YuzAiActivity : BaseFragment() {
     private var ringAnim: ValueAnimator? = null
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var pendingPeer: YuzAiEngine.Peer? = null
+    private val recorder = YuzAiRecorder()
+    private var cloudBusy = false
 
     override fun createView(context: Context): View {
         ctx = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
@@ -116,35 +123,201 @@ class YuzAiActivity : BaseFragment() {
         // Salom — ko'rsatamiz va aytamiz.
         statusView.text = ctx.getString(R.string.ai_greeting)
         assistant(ctx.getString(R.string.ai_greeting))
-        v.speak("Salom! Mikrofon tugmasini bosib gapiring.")
+        speakNice("Salom! Mikrofon tugmasini bosib gapiring.")
         return root
     }
 
     private fun onMicTapped() {
         val activity = parentActivity
-        if (activity == null) {
-            voice?.stopListening()
-            voice?.startListening()
+        if (activity == null && !cloudBusy) {
+            voice?.stopSpeaking()
+            startCloudFlow()
             return
         }
-        val granted = ContextCompat.checkSelfPermission(
+        val granted = activity == null || ContextCompat.checkSelfPermission(
             activity, Manifest.permission.RECORD_AUDIO
         ) == PackageManager.PERMISSION_GRANTED
         if (!granted) {
             ActivityCompat.requestPermissions(
-                activity, arrayOf(Manifest.permission.RECORD_AUDIO), 501
+                activity!!, arrayOf(Manifest.permission.RECORD_AUDIO), 501
             )
             toast(ctx.getString(R.string.ai_mic_permission))
             return
         }
         val v = voice ?: return
+        if (cloudBusy) return
+        if (recorder.isRecording()) {
+            recorder.cancel()
+            statusView.text = ctx.getString(R.string.ai_processing)
+            return
+        }
         if (v.isListening()) {
             v.stopListening()
             statusView.text = ctx.getString(R.string.ai_processing)
         } else {
-            voice?.stopSpeaking()
-            v.startListening()
+            v.stopSpeaking()
+            startCloudFlow()
         }
+    }
+
+    /**
+     * Yangi ovozli oqim: AudioRecord+VAD -> worker /voice (Gemini STT+niyat+javob)
+     * -> inson ovozi WAV playback. Tizim mikrofoni faqat zaxira (legacy handleUtterance).
+     */
+    private fun startCloudFlow() {
+        val v = voice ?: return
+        if (cloudBusy) return
+        cloudBusy = true
+        statusView.text = ctx.getString(R.string.ai_listening)
+        startRing()
+        val s = scope
+        s.launch {
+            val wav = try {
+                withContext(Dispatchers.IO) { recorder.recordBlocking() }
+            } catch (_: Exception) {
+                null
+            }
+            stopRing()
+            if (wav == null) {
+                cloudBusy = false
+                if (parentActivity == null) return@launch
+                statusView.text = ctx.getString(R.string.ai_heard_none)
+                assistant(ctx.getString(R.string.ai_heard_none))
+                return@launch
+            }
+            if (parentActivity == null) { cloudBusy = false; return@launch }
+            statusView.text = ctx.getString(R.string.ai_processing)
+            val names = YuzAiEngine.peers(currentAccount).map { it.name }.take(120)
+            val res = try {
+                withContext(Dispatchers.IO) { YuzAiCloud.voice(wav, names) }
+            } catch (_: Exception) {
+                null
+            }
+            cloudBusy = false
+            if (parentActivity == null) return@launch
+            if (res == null || res.transcript.isBlank()) {
+                statusView.text = ctx.getString(R.string.ai_voice_slow)
+                assistant(ctx.getString(R.string.ai_voice_slow))
+                return@launch
+            }
+            handleCloudResult(res)
+        }
+    }
+
+    private fun handleCloudResult(res: YuzVoiceResult) {
+        if (res.transcript.isNotBlank()) user(res.transcript)
+        val pending = pendingPeer
+        if (pending != null) {
+            pendingPeer = null
+            sendTo(pending, res.transcript, res)
+            return
+        }
+        val peer = if (res.peerName.isNotBlank()) findPeerByName(res.peerName) else null
+        when (res.intent) {
+            "send" -> when {
+                peer == null -> say(ctx.getString(R.string.ai_not_found, res.peerName), res.audio)
+                res.message.isBlank() -> {
+                    pendingPeer = peer
+                    say(ctx.getString(R.string.ai_need_body, peer.name), res.audio)
+                }
+                else -> sendTo(peer, res.message, res)
+            }
+            "open" -> if (peer != null) {
+                say(ctx.getString(R.string.ai_open_chat, peer.name), res.audio)
+                openChat(peer)
+            } else {
+                say(ctx.getString(R.string.ai_not_found, res.peerName), res.audio)
+            }
+            "goto" -> {
+                val sec = mapGoto(res.goto)
+                if (sec != null) {
+                    say(ctx.getString(R.string.ai_goto, sectionName(sec)), res.audio)
+                    if (sec == YuzAiEngine.Section.MUSIQA && res.message.isNotBlank()) {
+                        presentFragment(YuzMusicActivity(res.message), false)
+                    } else {
+                        gotoSection(sec)
+                    }
+                } else {
+                    cloudAsk(res)
+                }
+            }
+            else -> cloudAsk(res)
+        }
+    }
+
+    private fun cloudAsk(res: YuzVoiceResult) {
+        val a = if (res.answer.isNotBlank()) res.answer else ctx.getString(R.string.ai_heard_none)
+        say(a, res.audio)
+    }
+
+    private fun say(text: String, audio: ByteArray?) {
+        statusView.text = text
+        assistant(text)
+        sayOut(text, audio)
+    }
+
+    private fun sayOut(text: String, audio: ByteArray?) {
+        val v = voice ?: return
+        if (audio != null && audio.size > 2000) v.playCloudAudio(audio, text) else v.speak(text)
+    }
+
+    /** Cloud inson ovozi bilan gapirish (bo'lmasa tizim TTS). */
+    private fun speakNice(text: String) {
+        val s = scope
+        s.launch {
+            val b = try {
+                withContext(Dispatchers.IO) { YuzAiCloud.speakText(text) }
+            } catch (_: Exception) {
+                null
+            }
+            if (parentActivity == null) return@launch
+            sayOut(text, b)
+        }
+    }
+
+    private fun mapGoto(tag: String): YuzAiEngine.Section? = when (tag) {
+        "reels" -> YuzAiEngine.Section.REELS
+        "kinolar" -> YuzAiEngine.Section.KINOLAR
+        "musiqa" -> YuzAiEngine.Section.MUSIQA
+        "elonlar" -> YuzAiEngine.Section.ELONLAR
+        "profil" -> YuzAiEngine.Section.PROFIL
+        "chats" -> YuzAiEngine.Section.CHATS
+        else -> null
+    }
+
+    /** Gemini qaytargan nomni lokal dialog nomlari bilan sillasht (siril->lotin ham). */
+    private fun findPeerByName(want: String): YuzAiEngine.Peer? {
+        val w = normName(want)
+        if (w.length < 3) return null
+        var best: YuzAiEngine.Peer? = null
+        for (p in YuzAiEngine.peers(currentAccount)) {
+            val tokens = p.name.lowercase(Locale.getDefault())
+                .split(Regex("\\s+")).map { normName(it) }.filter { it.length >= 3 }
+            for (t in tokens) {
+                if (t == w) return p
+                if ((t.startsWith(w) || w.startsWith(t) || t.contains(w)) && best == null) best = p
+            }
+        }
+        return best
+    }
+
+    private fun normName(s: String): String {
+        val sb = StringBuilder()
+        for (ch in s.lowercase(Locale.getDefault())) {
+            val t = cyrToLat(ch)
+            for (c in t) if (c in 'a'..'z') sb.append(c)
+        }
+        return sb.toString()
+    }
+
+    private fun cyrToLat(ch: Char): String = when (ch) {
+        'а' -> "a"; 'б' -> "b"; 'в' -> "v"; 'г' -> "g"; 'д' -> "d"; 'е' -> "e"; 'ё' -> "o"
+        'ж' -> "j"; 'з' -> "z"; 'и' -> "i"; 'й' -> "y"; 'к' -> "k"; 'л' -> "l"; 'м' -> "m"
+        'н' -> "n"; 'о' -> "o"; 'п' -> "p"; 'р' -> "r"; 'с' -> "s"; 'т' -> "t"; 'у' -> "u"
+        'ф' -> "f"; 'х' -> "x"; 'ц' -> "ts"; 'ч' -> "ch"; 'ш' -> "sh"; 'щ' -> "sh"
+        'ъ' -> ""; 'ы' -> "i"; 'ь' -> ""; 'э' -> "e"; 'ю' -> "yu"; 'я' -> "ya"
+        'ғ' -> "g"; 'қ' -> "q"; 'ҳ' -> "h"; 'ў' -> "o"; 'Ғ' -> "g"; 'Қ' -> "q"
+        else -> ch.toString()
     }
 
     private fun handleUtterance(raw: String) {
@@ -199,11 +372,11 @@ class YuzAiActivity : BaseFragment() {
             if (parentActivity == null) return@launch
             statusView.text = answer
             assistant(answer)
-            voice?.speak(answer)
+            speakNice(answer)
         }
     }
 
-    private fun sendTo(peer: YuzAiEngine.Peer, text: String) {
+    private fun sendTo(peer: YuzAiEngine.Peer, text: String, res: YuzVoiceResult? = null) {
         val body = text.trim()
         if (body.isBlank()) {
             val q = ctx.getString(R.string.ai_need_body, peer.name)
@@ -227,7 +400,7 @@ class YuzAiActivity : BaseFragment() {
             val msg = ctx.getString(R.string.ai_sent, peer.name, body)
             statusView.text = msg
             assistant(msg)
-            voice?.speak(ctx.getString(R.string.ai_sent_short))
+            sayOut(ctx.getString(R.string.ai_sent_short), res?.audio)
         } else {
             val msg = ctx.getString(R.string.ai_send_failed)
             statusView.text = msg
@@ -341,6 +514,7 @@ class YuzAiActivity : BaseFragment() {
     private fun stopAll() {
         stopRing()
         try {
+            recorder.cancel()
             voice?.stopListening()
             voice?.stopSpeaking()
         } catch (_: Exception) {
