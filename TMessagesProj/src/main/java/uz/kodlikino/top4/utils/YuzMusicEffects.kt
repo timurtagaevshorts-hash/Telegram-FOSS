@@ -77,13 +77,15 @@ class YuzMusicEffects(private val context: Context) {
         release()
         sessionId = newSessionId
         try {
-            val e = Equalizer(0.toShort(), newSessionId)
+            // API 31+ konstruktor priority parametri int (short versiyasi olib
+            // tashlangan); eski qurilmalarda try/catch jim ushlaydi.
+            val e = Equalizer(0, newSessionId)
             e.enabled = true
             eq = e
         } catch (_: Exception) {
         }
         try {
-            val b = BassBoost(0.toShort(), newSessionId)
+            val b = BassBoost(0, newSessionId)
             b.enabled = true
             applyBass(b)
             bass = b
@@ -105,10 +107,18 @@ class YuzMusicEffects(private val context: Context) {
     }
 
     private fun applyBass(b: BassBoost) {
+        // Compile stub'da eski setBassBoostStrength(short) yo'q, yangi
+        //yangi setStrength(int) ham har xil SDK'da farq qiladi — ikkalasini
+        //refleksiya bilan, ketma-ket uramiz (ximichan, compile-xatosiz).
         try {
-            @Suppress("DEPRECATION")
-            b.setBassBoostStrength(bassStrength * 10) // 0..1000
+            b.javaClass.getMethod("setStrength", Int::class.javaPrimitiveType)
+                .invoke(b, bassStrength * 10) // 0..1000
         } catch (_: Exception) {
+            try {
+                b.javaClass.getMethod("setBassBoostStrength", Short::class.javaPrimitiveType)
+                    .invoke(b, (bassStrength * 10).toShort())
+            } catch (_: Exception) {
+            }
         }
     }
 

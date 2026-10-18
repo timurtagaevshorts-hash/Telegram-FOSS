@@ -404,9 +404,9 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             hint.setText(R.string.musiqa_eq_unavailable)
         }
         val dlg = AlertDialog.Builder(act, getResourceProvider())
-            .setTitle(R.string.musiqa_eq_title)
+            .setTitle(ctx.getString(R.string.musiqa_eq_title))
             .setView(v)
-            .setPositiveButton(android.R.string.ok, null)
+            .setPositiveButton(ctx.getString(android.R.string.ok), null)
             .create()
         showDialog(dlg)
     }
