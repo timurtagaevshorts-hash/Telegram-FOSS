@@ -135,7 +135,7 @@ class YuzStreamDataSource(private val http: OkHttpClient) : DataSource {
         val rf = raf
         if (rf != null) {
             if (bytesRemaining <= 0L) return C.RESULT_END_OF_INPUT
-            val cap = readLength.toLong.coerceAtMost(bytesRemaining).toInt()
+            val cap = readLength.toLong().coerceAtMost(bytesRemaining).toInt()
             val n = runCatching { rf.read(buffer, offset, cap) }.getOrDefault(-1)
             if (n <= 0) return C.RESULT_END_OF_INPUT
             bytesRemaining -= n
@@ -144,7 +144,7 @@ class YuzStreamDataSource(private val http: OkHttpClient) : DataSource {
         }
         val stream = body ?: throw IOException("closed")
         if (bytesRemaining <= 0L) return C.RESULT_END_OF_INPUT
-        val cap = readLength.toLong.coerceAtMost(bytesRemaining).toInt()
+        val cap = readLength.toLong().coerceAtMost(bytesRemaining).toInt()
         val n = stream.read(buffer, offset, cap)
         if (n <= 0) return C.RESULT_END_OF_INPUT
         bytesRemaining -= n

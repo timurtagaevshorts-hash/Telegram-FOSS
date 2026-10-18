@@ -451,9 +451,9 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private fun askPlaylistName(track: YuzTrack) {
         val input = EditText(ctx)
         input.hint = ctx.getString(R.string.musiqa_playlist_hint)
-        input.setPadding(AndroidUtilities.dp(20), AndroidUtilities.dp(8),
-            AndroidUtilities.dp(20), AndroidUtilities.dp(8))
-        val pad = AndroidUtilities.dp(10)
+        input.setPadding(AndroidUtilities.dp(20f), AndroidUtilities.dp(8f),
+            AndroidUtilities.dp(20f), AndroidUtilities.dp(8f))
+        val pad = AndroidUtilities.dp(10f)
         val wrap = android.widget.FrameLayout(ctx)
         wrap.addView(input, android.widget.FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
