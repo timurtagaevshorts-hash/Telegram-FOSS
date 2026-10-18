@@ -47,7 +47,7 @@ class YuzMusicAdapter(
     }
 
     override fun onBindViewHolder(holder: Vh, position: Int) {
-        val t = items[holder.bindingAdapterPosition.coerceAtLeast(0)]
+        val t = items[position.coerceIn(0, items.size - 1)]
         holder.title.text = t.title
         val sub = StringBuilder()
         if (t.artist.isNotBlank()) sub.append(t.artist)
@@ -63,10 +63,10 @@ class YuzMusicAdapter(
             holder.cover.setImageDrawable(null)
         }
         holder.play.setImageResource(
-            if (holder.bindingAdapterPosition == playingPos) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
+            if (position == playingPos) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
         )
         holder.play.setOnClickListener {
-            onPlay(t, holder.bindingAdapterPosition)
+            onPlay(t, holder.adapterPosition)
         }
         holder.itemView.setOnClickListener { onOpenYouTube(t) }
     }

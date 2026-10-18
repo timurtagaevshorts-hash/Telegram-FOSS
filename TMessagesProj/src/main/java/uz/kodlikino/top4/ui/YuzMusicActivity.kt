@@ -170,11 +170,12 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         val query = (track.title + " " + track.artist).trim()
         val url = "https://www.youtube.com/results?search_query=" +
             URLEncoder.encode(query, "UTF-8")
+        val from = parentActivity ?: ctx
         try {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            from.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         } catch (_: ActivityNotFoundException) {
             try {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(track.link)))
+                from.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(track.link)))
             } catch (_: Exception) {
                 Toast.makeText(ctx, R.string.musiqa_error, Toast.LENGTH_SHORT).show()
             }
