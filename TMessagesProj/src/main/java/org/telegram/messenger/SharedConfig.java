@@ -612,7 +612,11 @@ public class SharedConfig {
             noSoundHintShowed = preferences.getBoolean("noSoundHintShowed", false);
             directShareHash = preferences.getString("directShareHash2", null);
             useThreeLinesLayout = preferences.getBoolean("useThreeLinesLayout", false);
-            archiveHidden = preferences.getBoolean("archiveHidden", false);
+            // YuzGram #61: arxiv qatori doim chatlar ro'yxati tepasida ko'rinadi.
+            // Saqlangan qiymat (pull-to-reveal rejimi) qasddan yoki tasodifan
+            // true bo'lib qolgach "arxiv umuman ko'rinmayapti" degan shikoyat
+            // kelgan — YuzGram'da bu rejim o'chirilgan.
+            archiveHidden = false;
             distanceSystemType = preferences.getInt("distanceSystemType", 0);
             keepMedia = preferences.getInt("keep_media", CacheByChatsController.KEEP_MEDIA_ONE_MONTH);
             debugWebView = preferences.getBoolean("debugWebView", false);

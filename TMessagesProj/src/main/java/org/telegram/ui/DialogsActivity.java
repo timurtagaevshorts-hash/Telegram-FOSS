@@ -2197,6 +2197,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         private void toggleArchiveHidden(boolean action, DialogCell dialogCell) {
+            // YuzGram #61: asosiy ro'yxatda arxiv rejimi doim "pin'langan qator" —
+            // pull-to-reveal'ga o'tish o'chirilgan, aks holda qator yo'qoladi.
+            if (parentPage.dialogsType == DIALOGS_TYPE_DEFAULT && isYuzGramMainRoot()) {
+                return;
+            }
             SharedConfig.toggleArchiveHidden();
             final UndoView undoView = getUndoView();
             if (SharedConfig.archiveHidden) {
@@ -2227,7 +2232,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         private void updatePullState() {
-            parentPage.archivePullViewState = SharedConfig.archiveHidden ? ARCHIVE_ITEM_STATE_HIDDEN : ARCHIVE_ITEM_STATE_PINNED;
+            // YuzGram #61: asosiy chat ekranida arxiv qatori DOIM ko'rinadi —
+            // HIDDEN holatda "Arxiv" qatori yashirin bo'lib, uni ochish uchun
+            // tepadan tortish kerak edi; foydalanuvchi arxivni yo'q deb o'ylardi.
+            parentPage.archivePullViewState = SharedConfig.archiveHidden && !isYuzGramMainRoot()
+                    ? ARCHIVE_ITEM_STATE_HIDDEN : ARCHIVE_ITEM_STATE_PINNED;
             if (parentPage.pullForegroundDrawable != null) {
                 parentPage.pullForegroundDrawable.setWillDraw(parentPage.archivePullViewState != ARCHIVE_ITEM_STATE_PINNED);
             }
@@ -4509,6 +4518,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         boolean yuzListAtTop = (firstVisiblePosition == -1 || firstVisiblePosition <= yuzAnchorPos)
                                 && (yuzFirstChild == null || yuzFirstChild.getTop() >= recyclerView.getPaddingTop() - dp(2));
                         yuzHeaderScroll(dy, yuzListAtTop);
+                        // YuzGram #61: ro'yxat tepasiga yetgan bo'lsa, header DARHOL
+                        // to'liq qaytadi — oxirgi kadrda dy bir necha px bo'lib,
+                        // yarim holatda "qotib" qolmasligi uchun animatsiya qilamiz.
+                        if (yuzListAtTop && scrollYOffset < 0f && yuzRestoreAnim == null) {
+                            yuzHeaderRestoreToTop();
+                        }
                     }
                     if (hasStories) {
                         invalidateScrollY = true;
@@ -4594,7 +4609,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 }
             });
 
-            viewPage.archivePullViewState = SharedConfig.archiveHidden ? ARCHIVE_ITEM_STATE_HIDDEN : ARCHIVE_ITEM_STATE_PINNED;
+            // YuzGram #61: pull-mode holati YuzGram asosiy ro'yxatida doim PINNED —
+            // arxiv qatori skroll yuqoriga yetganda ham tepada ko'rinib turadi.
+            viewPage.archivePullViewState = SharedConfig.archiveHidden && !isYuzGramMainRoot()
+                    ? ARCHIVE_ITEM_STATE_HIDDEN : ARCHIVE_ITEM_STATE_PINNED;
             if (viewPage.pullForegroundDrawable == null && folderId == 0) {
                 viewPage.pullForegroundDrawable = new PullForegroundDrawable(LocaleController.getString("AccSwipeForArchive", R.string.AccSwipeForArchive), LocaleController.getString("AccReleaseForArchive", R.string.AccReleaseForArchive)) {
                     @Override
@@ -5772,7 +5790,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (cur == 0f || cur == -max || viewPages == null || viewPages[0] == null) {
                 return false;
             }
-            float target = (-cur < max / 2f) ? 0f : -max;
+            // YuzGram #61: ro'yxat tepada bo'lsa yarim-olcham mezoni yo'q — faqat 0.
+            boolean yuzAtTop = viewPages[0].listView == null || !viewPages[0].listView.canScrollVertically(-1);
+            float target = (yuzAtTop || -cur < max / 2f) ? 0f : -max;
             AnimatorSet yuzSnap = new AnimatorSet();
             yuzSnap.playTogether(ObjectAnimator.ofFloat(this, SCROLL_Y, target));
             yuzSnap.setInterpolator(CubicBezierInterpolator.DEFAULT);
@@ -8566,11 +8586,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
         int[] icons = new int[]{
                 hasUnread ? R.drawable.msg_markread : 0,
-                SharedConfig.archiveHidden ? R.drawable.chats_pin : R.drawable.chats_unpin,
+                0, // YuzGram #61: "HideAboveTheList" opsiyasi o'chirilgan
         };
         CharSequence[] items = new CharSequence[]{
                 hasUnread ? LocaleController.getString("MarkAllAsRead", R.string.MarkAllAsRead) : null,
-                SharedConfig.archiveHidden ? LocaleController.getString("PinInTheList", R.string.PinInTheList) : LocaleController.getString("HideAboveTheList", R.string.HideAboveTheList)
+                null, // YuzGram #61: arxiv qatori doim ro'yxat tepasida turadi
         };
         builder.setItems(items, icons, (d, which) -> {
             if (which == 0) {
@@ -9040,6 +9060,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 || actionBar != null && actionBar.isActionModeShowed()) {
             return false;
         }
+        // YuzGram #61: yashirinish yo'nalishida ketayotgan bo'lsak, tepaga-qaytarish
+        // animatsiyasi bilan kurashmaslik uchun uni bekor qilamiz.
+        if (dy > 0 && yuzRestoreAnim != null) {
+            yuzRestoreAnim.cancel();
+        }
         float max = dp(DialogStoriesCell.HEIGHT_IN_DP) + yuzHeaderBarHeight();
         float n = scrollYOffset;
         if (dy > 0) {
@@ -9059,6 +9084,32 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             return true;
         }
         return false;
+    }
+
+    private AnimatorSet yuzRestoreAnim;
+
+    /**
+     * YuzGram #61: ro'yxat tepasiga yetganda header'ni (storylar + sarlavha +
+     * brend) majburan to'liq ko'rsatish holatiga animatsiya qiladi.
+     */
+    private void yuzHeaderRestoreToTop() {
+        if (viewPages == null || viewPages[0] == null) {
+            return;
+        }
+        yuzRestoreAnim = new AnimatorSet();
+        yuzRestoreAnim.playTogether(ObjectAnimator.ofFloat(this, SCROLL_Y, 0f));
+        yuzRestoreAnim.setInterpolator(CubicBezierInterpolator.EASE_OUT);
+        yuzRestoreAnim.setDuration(150);
+        yuzRestoreAnim.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                yuzRestoreAnim = null;
+                if (viewPages != null && viewPages[0] != null && viewPages[0].listView != null) {
+                    viewPages[0].listView.requestLayout();
+                }
+            }
+        });
+        yuzRestoreAnim.start();
     }
 
     private void setScrollY(float value) {
