@@ -8,7 +8,8 @@ import java.net.URLEncoder
 /**
  * Musiqa qidiruvi — Deezer och API (kalit TALAB QILMAYDI).
  * Natijada: nom, ijrochi, muqova va 30 soniyalik preview mp3.
- * To'liq tinglash YouTube orqali (o'zbek qo'shiqlari asosan YouTube'da).
+ * YuzGram #62: preview ilova ichidagi pleyerda ijro etiladi (YouTube emas),
+ * xohlasa keshga yuklab olinadi (YuzMusicCache).
  */
 data class YuzTrack(
     val id: Long,

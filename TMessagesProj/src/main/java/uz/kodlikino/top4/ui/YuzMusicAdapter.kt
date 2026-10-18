@@ -12,15 +12,18 @@ import org.telegram.messenger.R
 import uz.kodlikino.top4.utils.YuzTrack
 
 /**
- * Musiqa natijalari ro'yxati. Qatorni bosish — YouTube; play tugmasi — 30s preview.
+ * YuzGram #62: musiqiy natijalar ro'yxati. Qatorni bosish — qo'shiqni ilova
+ * ichidagi pleyerda ijro etadi (YouTube endi ochilmaydi); download tugmasi —
+ * keshga saqlash (yoki yuklanganlar ro'yxatida — o'chirish).
  */
 class YuzMusicAdapter(
     private val onPlay: (YuzTrack, Int) -> Unit,
-    private val onOpenYouTube: (YuzTrack) -> Unit
+    private val onDownload: (YuzTrack, Int) -> Unit
 ) : RecyclerView.Adapter<YuzMusicAdapter.Vh>() {
 
     private val items = ArrayList<YuzTrack>()
     private var playingPos = -1
+    private var downloadedIds: Set<Long> = emptySet()
 
     fun submit(list: List<YuzTrack>) {
         items.clear()
@@ -37,6 +40,11 @@ class YuzMusicAdapter(
     }
 
     fun playingPosition(): Int = playingPos
+
+    fun setDownloaded(ids: Set<Long>) {
+        downloadedIds = ids
+        notifyDataSetChanged()
+    }
 
     override fun getItemCount(): Int = items.size
 
@@ -65,10 +73,10 @@ class YuzMusicAdapter(
         holder.play.setImageResource(
             if (position == playingPos) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
         )
-        holder.play.setOnClickListener {
-            onPlay(t, holder.adapterPosition)
-        }
-        holder.itemView.setOnClickListener { onOpenYouTube(t) }
+        val has = t.id in downloadedIds
+        holder.dl.alpha = if (has) 1.0f else 0.55f
+        holder.dl.setOnClickListener { onDownload(t, holder.adapterPosition) }
+        holder.itemView.setOnClickListener { onPlay(t, holder.adapterPosition) }
     }
 
     class Vh(v: View) : RecyclerView.ViewHolder(v) {
@@ -76,6 +84,7 @@ class YuzMusicAdapter(
         val title: TextView = v.findViewById(R.id.tvMusiqaTitle)
         val artist: TextView = v.findViewById(R.id.tvMusiqaArtist)
         val dur: TextView = v.findViewById(R.id.tvMusiqaDur)
+        val dl: ImageButton = v.findViewById(R.id.btnMusiqaDl)
         val play: ImageButton = v.findViewById(R.id.btnMusiqaPlay)
     }
 }

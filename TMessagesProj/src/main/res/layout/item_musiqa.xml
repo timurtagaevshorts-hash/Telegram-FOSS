@@ -54,6 +54,17 @@
         android:textColor="@color/text_secondary"
         android:textSize="12sp" />
 
+    <!-- YuzGram #62: qo'shiqni keshga yuklab olish -->
+    <ImageButton
+        android:id="@+id/btnMusiqaDl"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="4dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@null"
+        android:src="@drawable/ic_yuz_download"
+        app:tint="@color/text_secondary" />
+
     <ImageButton
         android:id="@+id/btnMusiqaPlay"
         android:layout_width="44dp"

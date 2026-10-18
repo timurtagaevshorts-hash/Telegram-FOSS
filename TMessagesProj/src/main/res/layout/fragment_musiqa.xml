@@ -42,6 +42,16 @@
             android:textColor="@color/text_primary"
             android:textSize="18sp"
             android:textStyle="bold" />
+
+        <!-- YuzGram #62: keshdagi qo'shiqlar ro'yxatiga o'tish tugmasi -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnMusiqaSaved"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:text="@string/musiqa_saved_btn"
+            android:textSize="13sp" />
     </LinearLayout>
 
     <!-- Qidiruv qatori -->
@@ -99,5 +109,8 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:clipToPadding="false"
-        android:paddingBottom="100dp" />
+        android:paddingBottom="16dp" />
+
+    <!-- YuzGram #62: pastdagi ijochi panel (gone; kuylash boshlanganda ko'rinadi) -->
+    <include layout="@layout/layout_yuz_music_player" />
 </LinearLayout>
