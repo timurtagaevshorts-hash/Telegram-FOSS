@@ -28,6 +28,19 @@ object YuzMusicCache {
     private val main = Handler(Looper.getMainLooper())
     private val EXT = arrayOf("m4a", "mp3", "webm")
 
+    // fetchRanges natijalari (foydalanuvchi xatosi / bekor qilish ajraladi).
+    private const val FAIL = 0
+    private const val OK = 1
+    private const val CANCELED = 2
+
+    /**
+     * #86: keshning hajm chegarasi. Yuqorisida ENG KCHNA ishlatilgan
+     * qo'shiqlar o'chiriladi — aks holda "barchasi yuklandi" degan
+     * foydalanuvchi telefon xotirasini tugatadi va yuklashlar chiqib
+     * ketishga (write fail) yo'l qo'yadi.
+     */
+    private const val MAX_BYTES = 220L * 1024 * 1024
+
     private val http = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(45, TimeUnit.SECONDS)
@@ -83,12 +96,13 @@ object YuzMusicCache {
      * ketma-ket sinaladi (ANDROID/IOS, "n"siz variantlar); oxirgi chora
      * Deezer mp3 preview.
      * YuzGram #84: googlevideo nomzodlari endi YuzRangeReader bilan — kichik
-     * Range oynalari, uzilgan joydan davom etish va MAJBURIY to'liqlik
-     * tekshiruvi. Oldin bitta Range'siz GET butun faylni so'raytigan, Google
-     * esa ~1 MB'dan keyin 403 berib yarim fayl qoldirgan edi (yarim fayl =
-     * "1 daqiqalik qo'shiq" alomati).
+     * Range oynalari ketma-ketligi + to'liqlik tekshiruvi (yarim fayl
+     * qabul qilinmaydi).
+     * YuzGram #86: [gate] — FON yuklashini ijro uchun to'xtatib turish
+     * imkoni (masalan keyingi trek jim yuklanayotganda ijro buffering'ga
+     * kirsa). null = to'siqsiz (foydalanuvchi bosgan "yuklab olish").
      */
-    fun downloadBlocking(context: Context, track: YuzTrack): Boolean {
+    fun downloadBlocking(context: Context, track: YuzTrack, gate: (() -> Long)? = null): Boolean {
         if (isDownloaded(context, track.id)) return true
         val streams = try {
             YuzYouTubeApi.resolveStreamCandidates(track, 8)
@@ -102,12 +116,17 @@ object YuzMusicCache {
             attempts.add(YuzAudioStream(track.previewUrl, "mp3", 0L, ""))
         }
         for (s in attempts) {
-            val ok = if (s.url.contains("googlevideo")) {
-                fetchRanges(context, track.id, s, track.videoId)
-            } else {
-                fetchPlain(context, track.id, s)
-            }
-            if (ok) {
+            if (s.url.contains("googlevideo")) {
+                val r = fetchRanges(context, track.id, s, track.videoId, gate)
+                if (r == CANCELED) {
+                    Log.i(TAG, "download canceled ${track.videoId} (ijro yo'l so'radi)")
+                    return false
+                }
+                if (r == OK) {
+                    addToIndex(context, track)
+                    return true
+                }
+            } else if (fetchPlain(context, track.id, s)) {
                 addToIndex(context, track)
                 return true
             }
@@ -120,14 +139,23 @@ object YuzMusicCache {
         { at: Long, cur: String -> YuzYouTubeApi.refreshStream(videoId, at, cur) }
 
     /** googlevideo: kichik Range oynalari + rad etilsa shu baytga yangi URL. */
-    private fun fetchRanges(context: Context, id: Long, stream: YuzAudioStream, videoId: String): Boolean {
+    private fun fetchRanges(
+        context: Context,
+        id: Long,
+        stream: YuzAudioStream,
+        videoId: String,
+        gate: (() -> Long)?
+    ): Int {
         val tmp = File(dir(context), "$id.tmp")
         runCatching { if (tmp.exists()) tmp.delete() }
         // refresh FAQAT shu videoId uchun: muqobil videoning baytlari
         // yarim faylga aralashib ketmasligi kerak.
         val refresh: ((Long, String) -> YuzAudioStream?)? =
             if (videoId.isNotBlank()) sameVideo(videoId) else null
-        val reader = YuzRangeReader(http, stream.url, stream.ua, 0L, -1L, stream.approxBytes, refresh)
+        val reader = YuzRangeReader(
+            http, stream.url, stream.ua, 0L, -1L, stream.approxBytes, refresh,
+            windows = true, gate = gate
+        )
         var complete = false
         try {
             reader.open()
@@ -141,6 +169,9 @@ object YuzMusicCache {
                     if (n <= 0) break
                     out.write(buf, 0, n)
                     got += n
+                    // #86: fon yuklashi ham taroq tezligini o'lchaydi —
+                    // oyna/deadline/format shundan hisoblanadi.
+                    YuzNetPulse.add(n)
                 }
             }
             complete = got > 0L && (expect < 0L || got >= expect)
@@ -150,9 +181,15 @@ object YuzMusicCache {
         } finally {
             reader.close()
         }
-        return if (complete) promote(context, tmp, id, stream.ext) else {
+        if (reader.canceled) {
             runCatching { tmp.delete() }
-            false
+            return CANCELED
+        }
+        return if (complete) {
+            if (promote(context, tmp, id, stream.ext)) OK else FAIL
+        } else {
+            runCatching { tmp.delete() }
+            FAIL
         }
     }
 
@@ -176,7 +213,15 @@ object YuzMusicCache {
                 return false
             }
             conn.inputStream.use { input ->
-                tmp.outputStream().use { out -> input.copyTo(out) }
+                tmp.outputStream().use { out ->
+                    val buf = ByteArray(32 * 1024)
+                    while (true) {
+                        val n = input.read(buf)
+                        if (n <= 0) break
+                        out.write(buf, 0, n)
+                        YuzNetPulse.add(n)
+                    }
+                }
             }
             Log.i(TAG, "download plain ${tmp.length()}B ext=${stream.ext}")
             promote(context, tmp, id, stream.ext)
@@ -200,13 +245,8 @@ object YuzMusicCache {
     }
 
     fun remove(context: Context, id: Long) {
-        val d = dir(context)
-        for (e in EXT) runCatching { File(d, "$id.$e").delete() }
-        val arr = index(context)
-        for (i in arr.length() - 1 downTo 0) {
-            if (arr.optJSONObject(i)?.optLong("id") == id) arr.remove(i)
-        }
-        saveIndex(context, arr)
+        removeFiles(dir(context), id)
+        removeIndex(context, id)
     }
 
     /** Saqlangan ro'yxat (eng yangi tepada). */
@@ -265,7 +305,68 @@ object YuzMusicCache {
         o.put("preview", track.previewUrl)
         o.put("link", track.link)
         o.put("yt", track.videoId)
+        o.put("at", System.currentTimeMillis())
         arr.put(o)
+        saveIndex(context, arr)
+        evict(context, track.id)
+    }
+
+    /**
+     * #86: qo'shiq ijro etila boshlaganda "ishlatilgan" vaqtini yangilaymiz —
+     * LRU shu son bo'yicha qaror qiladi (eng kam eshitilgan birinchi ketadi).
+     * Har trek boshlanishida bitta async prefs yozuvi — arzon.
+     */
+    fun touch(context: Context, id: Long) {
+        val arr = index(context)
+        var changed = false
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            if (o.optLong("id") != id) continue
+            if (System.currentTimeMillis() - o.optLong("at") < 60_000L) return
+            o.put("at", System.currentTimeMillis())
+            changed = true
+            break
+        }
+        if (changed) saveIndex(context, arr)
+    }
+
+    /** [MAX_BYTES]'dan chiqib ketsa — eng eski ishlatilganlarni o'chiramiz. */
+    private fun evict(context: Context, keepId: Long) {
+        val d = dir(context)
+        val arr = index(context)
+        val entries = ArrayList<JSONObject>()
+        for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { entries.add(it) }
+        var size = 0L
+        d.listFiles()?.forEach { size += it.length() }
+        if (size <= MAX_BYTES) return
+        entries.sortBy { it.optLong("at") }
+        for (o in entries) {
+            if (size <= MAX_BYTES) break
+            val id = o.optLong("id")
+            if (id == keepId) continue
+            size -= removeFiles(d, id)
+            removeIndex(context, id)
+            Log.i(TAG, "evict LRU id=$id")
+        }
+    }
+
+    private fun removeFiles(d: File, id: Long): Long {
+        var freed = 0L
+        for (e in EXT) {
+            val f = File(d, "$id.$e")
+            if (f.exists()) {
+                freed += f.length()
+                runCatching { f.delete() }
+            }
+        }
+        return freed
+    }
+
+    private fun removeIndex(context: Context, id: Long) {
+        val arr = index(context)
+        for (i in arr.length() - 1 downTo 0) {
+            if (arr.optJSONObject(i)?.optLong("id") == id) arr.remove(i)
+        }
         saveIndex(context, arr)
     }
 }

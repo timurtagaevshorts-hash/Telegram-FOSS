@@ -33,10 +33,16 @@ import java.io.InputStream
  *
  * Escalatiq: til (header -> query) -> [refresh] bilan yangi URL (shu itag)
  * -> uzunroq "cooldown" bilan qayta urinish. Rad etilgan oyna hajmi kamayadi
- * (1MB -> 512KB -> 128KB), 3 ta toza oynadan keyin ko'tariladi, lekin bir
- * bor rad etilgan hajmga qaytmaydi (badMask). O'rganilgan hajm butun pleyer
- * uchun umumiy (learnedStep) — har qo'shiq boshida 2 ta behuda 403
- * sarflanmaydi.
+ * (3 zina), 3 ta toza oynadan keyin ko'tariladi, lekin bir bor rad etilgan
+ * hajmga qaytmaydi (badMask). O'rganilgan hajm butun pleyer uchun umumiy
+ * (learnedStep) — har qo'shiq boshida 2 ta behuda 403 sarflanmaydi.
+ *
+ * YuzGram #86: oyna HAJMI va DEADLINE'i endi o'lchangan tezlikdan
+ * hisoblanadi (YuzNetPulse). Oldin 1MB + 12s qat'iy edi: 8 kB/s'lik
+ * taroqda 1 MB 2 daqiqada yuklanadi, deadline esa 12s'da o'ldirardi —
+ * past internetda qo'shiq shu sababga ham umuman boshlanmasdi. Endi
+ * oyna ~3 sekundda sig'adigan hajmga tushadi, deadline shunga mos
+ * uzayadi, va [gate] orqali fon yuklashi ijroga yo'l beradi.
  *
  * Jism Range'ni buzsa (0'dan kelgan baytlar o'rtaga aralashib ketmasin)
  * javob rad etiladi: 206'da Content-Range boshi, 200'da Content-Length
@@ -53,6 +59,10 @@ import java.io.InputStream
  *        yangi URL; null = yo'q
  * @param windows false = bitta so'rov, oynalar yo'q (Range'ni
  *        qo'llamaydigan serverlar, masalan Deezer preview)
+ * @param gate fon yuklashi uchun "yo'l berish" eshigi: har oyna ochishdan
+ *        oldin chaqiriladi. Qaytargan son = shuncha ms kutish; 0 = darhol;
+ *        manfiy = yuklashni BEKOR qil (ijro tarmoqni kerak qildi).
+ *        Ijro mana shu o'qiyotgan bo'lsa null bo'ladi.
  */
 class YuzRangeReader(
     private val http: OkHttpClient,
@@ -62,25 +72,28 @@ class YuzRangeReader(
     private val limit: Long,
     expectedTotal: Long,
     private val refresh: ((Long, String) -> YuzAudioStream?)? = null,
-    private val windows: Boolean = true
+    private val windows: Boolean = true,
+    private val gate: (() -> Long)? = null
 ) {
 
     companion object {
         private const val TAG = "YuzMusic"
 
-        // Probe: 1MB -> 206, 2/4/8MB -> 403; throttled IP'da 512KB ham
-        // 403 bo'ldi, 128KB ishladi. Rad etilsa shu zina bo'ylab kamayamiz.
-        private val LADDER = longArrayOf(1L shl 20, 512L shl 10, 128L shl 10)
+        // #86: oynaning YUQORI chegarasi adaptive (tezlikdan hisoblanadi),
+        // lekin PROVEN zinasidan oshmaydi — 1MB/512KB/128KB telefonda
+        // sinab ko'rilgan: katta range'larni googlevideo 403 bilan rad
+        // etadi, 128KB esa throttling bo'lgan IP'da ham ishlaydi.
+        // Sekin taroqda chegara kichrayadi va butun zina kichrayadi.
+        private val PROVEN = longArrayOf(1L shl 20, 512L shl 10, 128L shl 10)
+        private const val CEIL_MAX = 1L shl 20
+        private const val STEP_MIN = 16L shl 10
+        private const val STEPS = 3
         private const val MAX_TRIES = 9
         // Yangi URL ko'pincha ishlaydi — 2 tadan ko'p resolve trekni
         // sekinlashtiradi, lekin bittasi yetmaydi.
         private const val MAX_REFRESHES = 2
         // Hammasi rad etilsa: cooldown bilan qayta urinishlar soni.
         private const val MAX_STALL_RETRIES = 2
-        // Bitta oynani ochishga ko'p vaqt sarflamaslik: deadline o'tgach
-        // darhol IOException — dvigatel keyingi nomzodga/lokal faylga
-        // o'tsin, foydalanuvchi qotib qolmasin.
-        private const val MAX_WINDOW_MS = 12_000L
 
         /**
          * Butun pleyer uchun umumiy o'rganilgan oyna hajmi. Birinchi trek
@@ -96,8 +109,10 @@ class YuzRangeReader(
     private var pos = start
     private var total = if (expectedTotal > 0L) expectedTotal else -1L
     private var windowEnd = -1L
-    private var windowStep = learnedStep.coerceIn(0, LADDER.size - 1)
-    private var window = LADDER[windowStep]
+    private var windowStep = learnedStep.coerceIn(0, STEPS - 1)
+    // #86: hajm har oyna ochishda tezlikdan qayta hisoblanadi.
+    private var ceiling = CEIL_MAX
+    private var window = stepBytes(windowStep)
     private var sizeFails = 0
     private var badMask = 0
     private var cleanWindows = 0
@@ -110,6 +125,36 @@ class YuzRangeReader(
     private var refreshes = 0
     private var response: Response? = null
     private var stream: InputStream? = null
+
+    /** [gate] yuklashni bekor qildi — chaqiruvchi qayta urinishmasligi kerak. */
+    @Volatile
+    var canceled = false
+        private set
+
+    /** Zina qiymati: 0 = joriy chegara, keyinigi yarmi/choragi. */
+    private fun stepBytes(step: Int): Long {
+        val s = step.coerceIn(0, STEPS - 1)
+        return minOf(ceiling shr s, PROVEN[s]).coerceAtLeast(STEP_MIN)
+    }
+
+    /** Joriy oyna hajmi uchun ruxsat etilgan vaqt (tezlikdan kelib chiqadi). */
+    private fun budgetMs(): Long = YuzNetPulse.windowDeadlineMs(window)
+
+    /**
+     * Eshik javobi: >0 = shuncha ms kutdik, 0 = davom, -1 = bekor.
+     * Bekor qilish [canceled] belgisini qo'yadi — yarim fayl keyingi
+     * urinishda ishlatilmaydi.
+     */
+    private fun holdForGate(): Boolean {
+        val g = gate ?: return false
+        val wait = runCatching { g() }.getOrDefault(0L)
+        if (wait < 0L) {
+            canceled = true
+            return true
+        }
+        if (wait > 0L) runCatching { Thread.sleep(wait.coerceAtMost(3000L)) }
+        return false
+    }
 
     /** start'dan qolgan jami bayt; -1 = hali aniq emas. */
     val length: Long
@@ -188,19 +233,24 @@ class YuzRangeReader(
             finished = true
             return
         }
+        if (holdForGate()) throw IOException("gated @$pos")
+        // #86: chegara va deadline har oyni ochishda tezlikdan qayta
+        // hisoblanadi — sekin taroqda kichik oyna, lekin yetarli vaqt.
+        ceiling = YuzNetPulse.windowCeiling(CEIL_MAX)
+        window = stepBytes(windowStep)
         var last: Exception? = null
         var attempt = 0
         var stalls = 0
         val t0 = System.nanoTime() / 1_000_000L
         val tried = HashSet<String>()
-        while (attempt < MAX_TRIES && elapsedMs(t0) < MAX_WINDOW_MS) {
+        while (attempt < MAX_TRIES && elapsedMs(t0) < budgetMs()) {
             var move: Move? = nextMove(tried)
             if (move == null) {
                 // Barcha til/URL variantlari rad etildi. Google throttle'i
                 // ko'pincha bir necha soniyada bo'shashadi — qisqa damlar
                 // bilan qayta uritamiz, lekin deadline'dan oshmaydi.
                 if (stalls >= MAX_STALL_RETRIES ||
-                    elapsedMs(t0) + stallMs(stalls + 1) > MAX_WINDOW_MS
+                    elapsedMs(t0) + stallMs(stalls + 1) > budgetMs()
                 ) break
                 stalls++
                 tried.clear()
@@ -283,10 +333,10 @@ class YuzRangeReader(
             if (move.query) queryFailed = true else headerFailed = true
             if (!netErr) {
                 sizeFails++
-                if (sizeFails >= 2 && windowStep < LADDER.size - 1) {
+                if (sizeFails >= 2 && windowStep < STEPS - 1) {
                     badMask = badMask or (1 shl windowStep)
                     windowStep++
-                    window = LADDER[windowStep]
+                    window = stepBytes(windowStep)
                     sizeFails = 0
                     cleanWindows = 0
                     learnedStep = windowStep
@@ -330,7 +380,7 @@ class YuzRangeReader(
             val up = windowStep - 1
             if (badMask and (1 shl up) == 0) {
                 windowStep = up
-                window = LADDER[windowStep]
+                window = stepBytes(windowStep)
                 learnedStep = windowStep
                 Log.i(TAG, "range window back to ${window / 1024}KB")
             }

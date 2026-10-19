@@ -62,11 +62,34 @@ object YuzYouTubeApi {
         return out
     }
 
-    /** videoId bo'yicha eng sifatli sof audio oqimini topadi. */
+    /** videoId bo'yicha ijroga MOS eng sifatli sof audio oqimini topadi. */
     fun resolveStream(videoId: String): YuzAudioStream? {
         val l = streamsFor(videoId)
         if (l.isEmpty()) return null
-        return l[(attempt[videoId] ?: 0) % l.size]
+        val i = attempt[videoId] ?: 0
+        // Rotatsiya rejimida (oldingisi 403 berdi) tartib bo'yicha keyingisi.
+        if (i > 0) return l[i % l.size]
+        return fitThroughput(l)
+    }
+
+    /**
+     * YuzGram #86: ro'yxatdan taroq tezligiga SIG'ADIGAN eng yuqori
+     * sifatli nomzodni tanlaymiz.
+     *
+     * Nima uchun: list doim "eng yaxshisi tepada" — past internetda shu
+     * nomzod sekin yuklanib buffering'ni yutqazardi (sifat yaxshi, lekin
+     * qo'shiq umuman boshlanmasdi). Endi o'lchangan tezlikdan ~15% past
+     * bitreytli format tanlanadi: uzluks ijro + iloji boricha yuqori ovoz.
+     * Bitreyt noma'lum (0) yoki tezlik hali o'lchanmagan bo'lsa — eski
+     * xatti-harakat: eng yaxshisi.
+     */
+    private fun fitThroughput(list: List<YuzAudioStream>): YuzAudioStream {
+        val r = YuzNetPulse.rate()
+        if (r <= 0.0) return list.first()
+        val budget = r * 8.0 * 0.85
+        return list.firstOrNull { it.bitrate <= 0 || it.bitrate <= budget }
+            ?: list.minByOrNull { if (it.bitrate > 0) it.bitrate else Int.MAX_VALUE }
+            ?: list.last()
     }
 
     /**
@@ -220,7 +243,7 @@ object YuzYouTubeApi {
             if (seen.add(s.url)) out.add(s)
             val clean = stripN(s.url)
             if (clean != s.url && out.size < max && seen.add(clean)) {
-                out.add(YuzAudioStream(clean, s.ext, s.approxBytes, c.ua))
+                out.add(YuzAudioStream(clean, s.ext, s.approxBytes, c.ua, s.bitrate))
             }
         }
     }
@@ -238,9 +261,14 @@ object YuzYouTubeApi {
                 val url = f.optString("url")
                 if (url.isBlank() || !local.add(url)) continue
                 val mp4 = mime.contains("mp4")
+                // #86: bitreytni SAQLAYMIZ — oldin faqat saralash uchun
+                // ishlatilib, keyin tashlab yuborilardi; tezlikka mos format
+                // tanlash shu songa bog'liq.
+                val br = f.optInt("bitrate").takeIf { it > 0 }
+                    ?: f.optInt("averageBitrate")
                 pairs.add(
-                    YuzAudioStream(url, if (mp4) "m4a" else "webm", f.optLong("contentLength"), ua) to
-                        (f.optInt("bitrate") + if (mp4) 1_000_000 else 0)
+                    YuzAudioStream(url, if (mp4) "m4a" else "webm", f.optLong("contentLength"), ua, br) to
+                        (br + if (mp4) 1_000_000 else 0)
                 )
             }
         }
@@ -374,5 +402,11 @@ data class YuzAudioStream(
     val url: String,
     val ext: String,
     val approxBytes: Long,
-    val ua: String = YuzYouTubeApi.UA
+    val ua: String = YuzYouTubeApi.UA,
+    /**
+     * #86: YouTube'ning e'lon qilgan bitreyti (bit/sekund; 0 = noma'lum).
+     * Shu son orqali tezlikka MOS format tanlanadi — past internetda
+     * 128 kbit/s'lik oqim 256 kbit/s'likdan tezroq va uzluksiz yetib boradi.
+     */
+    val bitrate: Int = 0
 )

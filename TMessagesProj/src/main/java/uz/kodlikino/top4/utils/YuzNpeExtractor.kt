@@ -109,7 +109,8 @@ object YuzNpeExtractor {
                         url = url,
                         ext = s.format?.name?.lowercase() ?: "m4a",
                         approxBytes = clenOf(url),
-                        ua = WEB_UA
+                        ua = WEB_UA,
+                        bitrate = s.averageBitrate
                     )
                 )
             }

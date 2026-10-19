@@ -146,6 +146,9 @@ class YuzStreamDataSource(private val http: OkHttpClient) : DataSource {
         }
         if (n <= 0) return C.RESULT_END_OF_INPUT
         bytesRemaining -= n
+        // #86: o'qilgan baytlar taroq o'lchagichiga tushadi — shu songa
+        // qarab oyna hajmi, deadline va format tanlanadi.
+        YuzNetPulse.add(n)
         notifyBytes(n)
         return n
     }

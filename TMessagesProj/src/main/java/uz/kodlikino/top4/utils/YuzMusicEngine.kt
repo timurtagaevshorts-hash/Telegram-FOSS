@@ -41,9 +41,12 @@ import java.util.concurrent.TimeUnit
  *    "https://yuz.stream/v/<id>": resolve media3 loader ipida, kechikishsiz);
  *  - radio: navbat oxiriga yaqlashsa — kuylagan qo'shiq bo'yicha o'xshashlar
  *    topilib navbat uzaytiriladi;
- *  - chidamlilik: 15s buffering yoki oqim xatosi — qo'shiq FONDA keshga
- *    yuklab olinadi (keyingi safar local ochiladi) va navbat keyingisiga
- *    o'tadi;
+ *  - chidamlilik: buffering tugasa — qo'shiq FONDA keshga yuklab olinadi
+ *    (keyingi safar local ochiladi) va navbat keyingisiga o'tadi;
+ *  - #86: har bir chekara (buffer vaqti, oyna hajmi, nomzod tanlash)
+ *    YuzNetPulse o'lchagan TAROQ TEZLIGIDAN hisoblanadi — past internetda
+ *    ham sifatli va tez ishlaydi; ijro boshlangach keyingi trek to'liq
+ *    keshga yuklanadi (ijro xohlasa yo'l beradi).
  *  - har qadam Log.i("YuzMusic") — logcat'dan masofaviy tashxis mumkin.
  */
 object YuzMusicEngine {
@@ -68,10 +71,15 @@ object YuzMusicEngine {
                 stallMark = now
             }
             // #84: yumaloq 30s o'rniga PROGRESS kuzatuvi — uzun qo'shiq
-            // buffer'i sekin ham bo'lsa o'saver ekan to'xtatmaymiz, lekin
-            // 20s umuma jilmimasa yoki 2 daqiqa davomida tayyor bo'lmasa
-            // qo'shiq nomzodini almashtiramiz.
-            if (now - stallMark > 20000L || now - bufferingStarted > 120000L) {
+            // buffer'i sekin ham bo'lsa o'saver ekan to'xtatmaymiz.
+            // #86: chegaralar QATIY SON EMAS — YuzNetPulse tezligidan
+            // hisoblanadi. 8 kB/s'lik taroqda 20s ichida buffer o'sishi
+            // uchun keyingi Range oynasi yetib kelmasligi mumkin edi va
+            // 120s'lik umumiy limit ishlayotgan yuklashni o'ldirardi;
+            // endi sekin internetda ruxsat etilgan vaqt ham katta.
+            if (now - stallMark > YuzNetPulse.stallLimitMs() ||
+                now - bufferingStarted > YuzNetPulse.bufferingCapMs()
+            ) {
                 onBufferingStall()
             } else {
                 ui.postDelayed(this, 2000L)
@@ -96,9 +104,45 @@ object YuzMusicEngine {
 
     private val seenIds = HashSet<Long>()
     private var extending = false
+    @Volatile
     private var dlInFlight = false
     private var lastStatus: String? = null
     private var itemRetries = 0
+    // #86: ketma-ket boshlanmagan qo'shiqlar — 4 tadan keyin navbatni
+    // aylantirishni to'xtatamiz (tarmoq o'lgan joyda cheksiz urinish
+    // batareyani ham, taroqni ham yeydi).
+    private var consecutiveSkips = 0
+    @Volatile private var prebufferId = -1L
+    @Volatile private var prebufferTryAt = 0L
+
+    // #86: [backgroundGate] FON YUKLASH ipidan chaqiriladi. ExoPlayer'ning
+    // holatini shu ipdan o'qish MUMKIN EMAS (player faqat application
+    // thread'da ruxsat beradi), shuning uchun holatni asosiy ipdan
+    // ko'z-nukta (volatile) maydonlarga ko'chirib turamiz.
+    @Volatile private var gateBuffering = false
+    @Volatile private var gatePlaying = false
+    @Volatile private var gateAhead = 0L
+    private var gateTickerOn = false
+    private val gateTicker = object : Runnable {
+        override fun run() {
+            val p = player
+            if (p == null) {
+                gateTickerOn = false
+                return
+            }
+            gateBuffering = p.playbackState == Player.STATE_BUFFERING
+            gatePlaying = p.playWhenReady
+            gateAhead = (p.bufferedPosition - p.currentPosition).coerceAtLeast(0L)
+            if (gatePlaying) ui.postDelayed(this, 2000L) else gateTickerOn = false
+        }
+    }
+
+    /** Ijro boshlanganda eshik holatini yangilashni davom ettiramiz. */
+    private fun ensureGateTicker() {
+        if (gateTickerOn) return
+        gateTickerOn = true
+        ui.post(gateTicker)
+    }
 
     // ---------------------------------------------------------------- setup
 
@@ -127,9 +171,12 @@ object YuzMusicEngine {
             .build()
         val http = YuzStreamDataSource.Factory(okHttp)
         val load = DefaultLoadControl.Builder()
-            // #69 tezlik: audio uchun kichik buffer — ijro deyarli darhol
-            // boshlanadi (sukut 2.5s o'rniga 0.9s yetadi).
-            .setBufferDurationsMs(15000, 45000, 900, 1500)
+            // #86 sekin internet: buffer maqsadi kengaytirildi — 20s'lik
+            // zaxira (sukut 15s) va 60s'gacha oldindan yuklash taroq
+            // uzilib qolsa ham ijro davom etishini ta'minlaydi. Boshlanish
+            // uchun 2s yetadi (eski 0.9s juda erta edi: o'yin boshlanib,
+            // birinchi oyna tugamay tinch holatga qaytardi).
+            .setBufferDurationsMs(20000, 60000, 2000, 4000)
             .build()
         val p = ExoPlayer.Builder(appCtx)
             .setMediaSourceFactory(ProgressiveMediaSource.Factory(http))
@@ -150,6 +197,8 @@ object YuzMusicEngine {
                 Log.i(TAG, "transition idx=${p.currentMediaItemIndex} vid=${tagOf(item)?.videoId}")
                 notifyItemChanged(item)
                 prefetchNext(p, p.currentMediaItemIndex)
+                markPlayed(item)
+                prebufferNext(p, p.currentMediaItemIndex)
                 if (radio && p.currentMediaItemIndex >= queueTracks.size - 2) extendQueue()
             }
 
@@ -158,8 +207,12 @@ object YuzMusicEngine {
                     Player.STATE_READY -> {
                         ui.removeCallbacks(bufferingWatchdog)
                         postStatus(null)
+                        // #86: qo'shiq o'ynala boshladi demak tarmoq tirik —
+                        // skip-bo'ron tozaladi, keyingisini yuklashni boshlaydi.
+                        consecutiveSkips = 0
                         notifyItemChanged(p.currentMediaItem)
                         prefetchNext(p, p.currentMediaItemIndex)
+                        prebufferNext(p, p.currentMediaItemIndex)
                     }
                     Player.STATE_BUFFERING -> {
                         ui.removeCallbacks(bufferingWatchdog)
@@ -242,8 +295,9 @@ object YuzMusicEngine {
             .setTitle(t.title)
             .setArtist(t.artist)
             .apply {
-                // #69: rasm endi media3'ning O'ZI yuklaydi — bildirishnoma va
-                // qulf ekranidagi pleyer muqovani ko'rsatadi.
+                // #87: 1.0.2'da metadata'da bitmap maydoni yo'q — muqova URI
+                // orqali beriladi va uni YuzMusicService'ning BitmapLoader'i
+                // yuklaydi (bildirishnoma + qulf ekrani shu rasmni ko'rsatadi).
                 if (t.coverUrl.isNotBlank()) setArtworkUri(Uri.parse(t.coverUrl))
             }
             .build()
@@ -255,6 +309,88 @@ object YuzMusicEngine {
         for (i in 1..2) {
             queueTracks.getOrNull(from + i)?.videoId?.let { YuzYouTubeApi.prefetch(it) }
         }
+        // #87: muqovalarni ham isitamiz — bildirishnoma/qulf ekrani birinchi
+        // qurilishdayoq rasmga ega bo'lsin (tarmoqqa chiqish vaqti bor).
+        if (::appCtx.isInitialized) {
+            for (i in 0..2) {
+                YuzArtwork.prefetch(appCtx, queueTracks.getOrNull(from + i)?.coverUrl)
+            }
+        }
+    }
+
+    /** #86: ijro etila boshlagan qo'shiq — LRU "ishlatilgan" vaqti. */
+    private fun markPlayed(item: MediaItem?) {
+        val t = tagOf(item) ?: return
+        if (::appCtx.isInitialized) YuzMusicCache.touch(appCtx, t.id)
+    }
+
+    /**
+     * YuzGram #86: qo'shiq O'YNALAYOTGAN paytning o'zida keyingisini to'liq
+     * keshga yuklaymiz.
+     *
+     * Nima uchun: past internetda muammo — har yangi trek avval YouTube
+     * URL'ini ochib, sekin taroqdan 3-4 MB'ni oqim bo'yicha tortadi;
+     * biror oyna kechiksa qo'shiq boshlanmaydi. Fayl oldindan to'liq
+     * tushib qolsa, navbatdagi qo'shiq LOCAL ochiladi: tarmoq bilan
+     * aloqa umuman bo'lmaydi, 403/throttle bu qo'shiqqa tegizilmaydi.
+     * Yuklash [backgroundGate] orqali ijroga yo'l beradi — buffering
+     * boshlansa darhol to'xtaydi.
+     */
+    private fun prebufferNext(p: ExoPlayer, from: Int) {
+        if (!::appCtx.isInitialized || dlInFlight) return
+        val t = queueTracks.getOrNull(from + 1) ?: return
+        if (t.videoId.isBlank()) return
+        if (YuzMusicCache.isDownloaded(appCtx, t.id)) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (prebufferId == t.id && now - prebufferTryAt < 30_000L) return
+        prebufferId = t.id
+        prebufferTryAt = now
+        dlInFlight = true
+        val index = from + 1
+        Thread {
+            val ok = runCatching {
+                YuzMusicCache.downloadBlocking(appCtx, t, ::backgroundGate)
+            }.getOrDefault(false)
+            Log.i(
+                TAG, "prebuffer vid=${t.videoId} ok=$ok " +
+                    "rate=${YuzNetPulse.rate().toInt()}B/s"
+            )
+            dlInFlight = false
+            if (!ok) {
+                prebufferId = -1L
+            } else {
+                ui.post { swapToLocal(index, t) }
+            }
+        }.start()
+    }
+
+    /** Yuklangan fayl tayyor — navbatdagi ITEM'ni lokal URI'ga almashtiramiz. */
+    private fun swapToLocal(index: Int, t: YuzTrack) {
+        val p = player ?: return
+        // media3 1.0.2'da replaceMediaItem yo'q — o'chir + joyiga qo'yish.
+        // Ikkalasi ham UI ipida ketma-ket: orada hech qanday callback
+        // ishga tushmaydi, shuning uchun navbat bir lahza "tushib" qoladi.
+        if (index <= p.currentMediaItemIndex || index >= p.mediaItemCount) return
+        if (queueTracks.getOrNull(index)?.id != t.id) return
+        if (YuzMusicCache.localFile(appCtx, t.id) == null) return
+        runCatching {
+            p.removeMediaItem(index)
+            p.addMediaItem(index, buildItem(t))
+        }
+        Log.i(TAG, "prebuffer swap idx=$index -> local ${t.title.take(24)}")
+    }
+
+    /**
+     * #86: fon yuklashi uchun "yo'l berish" qarori — FONDAN chaqiriladi,
+     * shuning uchun faqat [gateTicker] ko'chirgan maydonlarni o'qiydi.
+     *  -1: bekor qil (ijro tarmoqni kerak qildi);
+     *   0: davom et;   >0: shuncha ms dam ol.
+     */
+    private fun backgroundGate(): Long {
+        if (gateBuffering) return -1L
+        if (!gatePlaying) return 0L
+        // Ijro zaxirasi 15s'dan kam bo'lsa — tarmoqni pleyerga qoldiramiz.
+        return if (gateAhead < 15_000L) 1200L else 0L
     }
 
     /** Navbatdagi [index]-qo'shiqqa sakrash (keyingi o'tishda prefetch bo'ladi). */
@@ -286,7 +422,7 @@ object YuzMusicEngine {
 
     // ------------------------------------------------------- failure paths
 
-    /** Buffer 20s o'smasa — jim 403/throttle deb nomzodni almashtiramiz. */
+    /** Buffer o'smay qolsa (tezlikdan kelib chiqqan vaqtda) — nomzodni almashtiramiz. */
     private fun onBufferingStall() {
         val p = player ?: return
         if (p.playbackState == Player.STATE_BUFFERING) {
@@ -314,9 +450,18 @@ object YuzMusicEngine {
             return
         }
         itemRetries = 0
-        Log.i(TAG, "give-up vid=${t.videoId} -> silent download + skip")
+        consecutiveSkips++
+        Log.i(TAG, "give-up vid=${t.videoId} skips=$consecutiveSkips -> bg download + skip")
         p.playWhenReady = false
         silentDownload(t)
+        // #86 bo'ron bekori: ketma-ket 4 qo'shiq boshlanmasa tarmoq
+        // o'lgan belgi — navbatni aylib urinish taroqni ham, batareyani
+        // ham yeydi. To'xtaymiz va foydalanuvchiga ochiq aytamiz.
+        if (consecutiveSkips >= 4) {
+            postStatus(appCtx.getString(R.string.musiqa_st_weaknet))
+            Log.i(TAG, "skip storm -> parked")
+            return
+        }
         if (p.hasNextMediaItem()) {
             p.seekToNextMediaItem()
             p.prepare()
@@ -335,7 +480,11 @@ object YuzMusicEngine {
         if (YuzMusicCache.isDownloaded(appCtx, t.id)) return
         dlInFlight = true
         Thread {
-            val ok = runCatching { YuzMusicCache.downloadBlocking(appCtx, t) }.getOrDefault(false)
+            // #86: shu yuklash KEYINGI qo'shiqni ijrosi bilan raqobatlashadi
+            // — eshik ijroga birinchi navbat beradi.
+            val ok = runCatching {
+                YuzMusicCache.downloadBlocking(appCtx, t, ::backgroundGate)
+            }.getOrDefault(false)
             Log.i(TAG, "silentDownload vid=${t.videoId} ok=$ok")
             dlInFlight = false
             if (ok) ui.post { notifyItemChanged(player?.currentMediaItem) }
@@ -380,9 +529,19 @@ object YuzMusicEngine {
         // shunda ilovadan chiqib ketganda bildirishnomadagi MediaStyle
         // pleyer (sarlavha/bajarguvchi/rasm + tugmalar) har doim chiqadi,
         // qaysi oynadan boshlanganiga qaramay (mini pleyer, pler, ro'yxat).
+        // #87: startForegroundService — Android 8+ ilova fonida oddiy
+        // startService'ni rad etadi; shunda xizmat foreground bo'la olmaydi
+        // va qulf ekranidagi boshqaruv yo'qoladi.
+        // #86: eshik holati shu ipdan yangilanadi (player'ni fon ipidan
+        // o'qib bo'lmaydi).
+        if (playing) ensureGateTicker() else {
+            gatePlaying = false
+            gateBuffering = false
+        }
         if (playing && ::appCtx.isInitialized) {
             runCatching {
-                appCtx.startService(
+                androidx.core.content.ContextCompat.startForegroundService(
+                    appCtx,
                     android.content.Intent(appCtx, uz.kodlikino.top4.ui.YuzMusicService::class.java)
                 )
             }

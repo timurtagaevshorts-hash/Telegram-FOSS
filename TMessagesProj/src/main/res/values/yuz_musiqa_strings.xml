@@ -31,6 +31,11 @@
     <string name="musiqa_radio_on">Radio yoqildi — qo\'shiq tugaganda o\'xshashlari topiladi</string>
     <string name="musiqa_radio_off">Radio o\'chirildi — navbat oxirida to\'xtaydi</string>
     <string name="musiqa_st_extend">O\'xshash qo\'shiqlar qidirilmoqda…</string>
+    <!-- YuzGram #86: sust taroqda urinishlar to\'xtatildi -->
+    <string name="musiqa_st_weaknet">Aloqa sust — bir necha qo\'shiq boshlanmadi. Tarmoqni tekshiring yoki qo\'shiqlarni oldindan yuklab oling.</string>
+    <!-- YuzGram #87: bildirishnoma + qulf ekrani pleyeri kanali -->
+    <string name="musiqa_notif_channel">YuzGram musiqa</string>
+    <string name="musiqa_notif_desc">Kuylab turgan qo\'shiq, qulf ekranidagi boshqaruv tugmalari</string>
     <string name="musiqa_menu_add_queue">Navbatga qo\'shish</string>
     <string name="musiqa_menu_add_playlist">Playlistga qo\'shish</string>
     <string name="musiqa_menu_dl">Yuklab olish</string>
