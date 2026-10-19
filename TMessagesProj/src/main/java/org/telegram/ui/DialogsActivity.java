@@ -599,6 +599,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     // YuzGram #60: chat tepasidagi brend logotipi — oddiy "YuzGram" matnli
     // sarlavha o'rniga gradient belgi + wordmark chizadi.
     private uz.kodlikino.top4.ui.YuzGramBrandMark yuzBrandMark;
+    // YuzGram #85: gildirak OSTIDagi doimiy qidiruv satri ("Qidirish" pill'i +
+    // filtr doirasi) va chat ro'yxati ORQASidagi nebula fon.
+    private uz.kodlikino.top4.ui.YuzGramSearchBar yuzSearchBar;
+    private uz.kodlikino.top4.ui.YuzGramNebula yuzNebula;
 
     private final static int pin = 100;
     private final static int read = 101;
@@ -2150,10 +2154,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 // to'liq ekran). Buning o'rniga tepada gildirak tasmasi bo'sh
                 // joylanadi.
                 if (yuzChatRail != null && yuzChatRail.getVisibility() == VISIBLE) {
-                    int wheelBottom = yuzChatRailTopMargin()
-                            + uz.kodlikino.top4.ui.YuzGramChatWheel.height() + dp(2);
-                    if (wheelBottom > t) {
-                        t = wheelBottom;
+                    int headerBottom = yuzChatHeaderBottom();
+                    if (headerBottom > t) {
+                        t = headerBottom;
                     }
                 }
                 if (t != getPaddingTop() || yuzBottomPad != getPaddingBottom()) {
@@ -2773,6 +2776,35 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         return top + dp(10);
     }
 
+    /** Qidiruv satri gildirakning ostida turadi. */
+    private int yuzSearchBarTopMargin() {
+        return yuzChatRailTopMargin() + uz.kodlikino.top4.ui.YuzGramChatWheel.height() + dp(2);
+    }
+
+    /**
+     * Chat ro'yxati tepasidagi sarlavha blokining (gildirak + qidiruv satri)
+     * pastki chegarasi — ro'yxat padding'i shundan pastda boshlanadi.
+     */
+    private int yuzChatHeaderBottom() {
+        int bottom = yuzChatRailTopMargin() + uz.kodlikino.top4.ui.YuzGramChatWheel.height();
+        if (yuzSearchBar != null && yuzSearchBar.getVisibility() == View.VISIBLE) {
+            bottom = yuzSearchBarTopMargin() + uz.kodlikino.top4.ui.YuzGramSearchBar.height();
+        }
+        return bottom + dp(2);
+    }
+
+    /** Qidiruv pill'i — Telegram'ning o'z qidiruv maydonini ochadi. */
+    private void openYuzGramSearch() {
+        if (parentLayout != null && parentLayout.isInPreviewMode()) {
+            finishPreviewFragment();
+            return;
+        }
+        if (!searchIsShowed) {
+            showSearch(true, false, true);
+        }
+        actionBar.openSearchField(true);
+    }
+
     /** Gildirakdagi qalamcha plitasi bosilganda (pastki FABlar o'rniga). */
     private void onYuzGramRailAction(int action) {
         openYuzGramCompose();
@@ -2801,6 +2833,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 && (rightSlidingDialogContainer == null || !rightSlidingDialogContainer.hasFragment())
                 && (actionBar == null || !actionBar.isActionModeShowed());
         int wantVisibility = visible ? View.VISIBLE : View.GONE;
+        if (yuzSearchBar != null) {
+            yuzSearchBar.setVisibility(wantVisibility);
+        }
         if (yuzChatRail.getVisibility() != wantVisibility) {
             yuzChatRail.setVisibility(wantVisibility);
             if (fragmentView != null) {
@@ -2824,6 +2859,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             lp.gravity = wantGravity;
             lp.topMargin = top;
             yuzChatRail.setLayoutParams(lp);
+        }
+        if (yuzSearchBar != null) {
+            FrameLayout.LayoutParams blp = (FrameLayout.LayoutParams) yuzSearchBar.getLayoutParams();
+            int barTop = yuzSearchBarTopMargin();
+            if (blp != null && blp.topMargin != barTop) {
+                blp.topMargin = barTop;
+                yuzSearchBar.setLayoutParams(blp);
+            }
         }
         ArrayList<MessagesController.DialogFilter> filters = getMessagesController().getDialogFilters();
         int selected = 0;
@@ -5173,6 +5216,30 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             contentView.addView(yuzChatRail, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT,
                     uz.kodlikino.top4.ui.YuzGramChatWheel.height(), Gravity.LEFT | Gravity.TOP,
                     0, yuzChatRailTopMargin(), 0, 0));
+            // YuzGram #85: qidiruv doim ko'rinib turadigan maydonga aylanadi —
+            // action bar'dagi lupa endi ixtiyoriy. Yonidagi dumaloq tugma papka
+            // sozlamalarini ochadi.
+            yuzSearchBar = new uz.kodlikino.top4.ui.YuzGramSearchBar(context);
+            yuzSearchBar.setListener(new uz.kodlikino.top4.ui.YuzGramSearchBar.Listener() {
+                @Override
+                public void onSearchClicked() {
+                    openYuzGramSearch();
+                }
+
+                @Override
+                public void onFilterClicked() {
+                    presentFragment(new FiltersSetupActivity());
+                }
+            });
+            contentView.addView(yuzSearchBar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT,
+                    uz.kodlikino.top4.ui.YuzGramSearchBar.height(), Gravity.LEFT | Gravity.TOP,
+                    0, yuzSearchBarTopMargin(), 0, 0));
+            // YuzGram #85: nebula fon — ContentView'ning birinchi bolasi (index 0),
+            // shunda chat qatorlari shu nur ustidan o'tadi. Tekis qora o'rniga
+            // brend ko'kida chuqurlik.
+            yuzNebula = new uz.kodlikino.top4.ui.YuzGramNebula(context);
+            contentView.addView(yuzNebula, 0, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT,
+                    LayoutHelper.MATCH_PARENT));
             updateYuzGramChatRail(false);
             // Pastki qalamcha + kamera FAB'larini olib tashlaymiz — qalamcha gildirakda.
             if (floatingButtonContainer != null) {

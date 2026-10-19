@@ -36,8 +36,8 @@ import java.util.ArrayList;
  */
 public class YuzGramChatWheel extends View {
 
-    /** Tasma balandligi: fokus doira + ostidagi nom pill'i (+ pastki yoy). */
-    public static final int HEIGHT_DP = 92;
+    /** Tasma balandligi: fokus doira + ostidagi nom va soni pill'i (+ pastki yoy). */
+    public static final int HEIGHT_DP = 86;
     private static final float CENTER_Y_DP = 36f;
     private static final float SPACING_DP = 62f;
     /** Fokusdan necha dona uzoqda dona butunlay yo'qoladi. */
@@ -52,8 +52,12 @@ public class YuzGramChatWheel extends View {
     private static final int INACTIVE_STROKE = 0x7338B6FF;
     private static final int ICON_ACTIVE = 0xFFFFFFFF;
     private static final int ICON_IDLE = 0xFFBFD0EA;
-    private static final int BADGE = 0xFFFF4D6D;
-    private static final int PILL_BG = 0xF2171A22;
+    /** Nom (filtrdan tashqari donalar) — fokusda oq, boshqalarda xira ko'k-kul. */
+    private static final int LABEL_IDLE = 0xFFA9C0D8;
+    /** O'qilmaganlar soni pill'i — brend ko'ki (qizil emas: bu xato emas, son). */
+    private static final int COUNT_BG = 0xFF2AABEE;
+    /** Son pill ustida QO'NG'IR oq emas: oq #2AABEE ustida 2.4:1, qorong'i 8:1. */
+    private static final int COUNT_TEXT = 0xFF061424;
 
     public static final int ACTION_COMPOSE = 0;
     public static final int ACTION_CAMERA = 1;
@@ -77,9 +81,8 @@ public class YuzGramChatWheel extends View {
     private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint badgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint badgeTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint countPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
     private final Path path = new Path();
 
@@ -124,11 +127,9 @@ public class YuzGramChatWheel extends View {
                 getResources().getDisplayMetrics());
         textPaint.setTextSize(labelBaseSize);
         textPaint.setTypeface(Typeface.DEFAULT_BOLD);
-        badgeTextPaint.setTextAlign(Paint.Align.CENTER);
-        badgeTextPaint.setTextSize(dp(8.5f));
-        badgeTextPaint.setTypeface(Typeface.DEFAULT_BOLD);
-        badgePaint.setStyle(Paint.Style.FILL);
-        badgePaint.setColor(BADGE);
+        countPaint.setTextAlign(Paint.Align.CENTER);
+        countPaint.setColor(COUNT_TEXT);
+        countPaint.setTypeface(Typeface.DEFAULT_BOLD);
     }
 
     public static int height() {
@@ -339,23 +340,11 @@ public class YuzGramChatWheel extends View {
             drawGlyph(canvas, glyphType(filter, slot), x, gy, glyph);
         }
 
-        // O'qilmaganlar: fokusda sonli pill, chetda qizil nuqta.
+        // O'qilmaganlar soni va nom — donaning OSTIDA (drawCaption), chunki
+        // maketda har bir qalamcha o'z nomi va soni bilan turadi.
         int counter = 0;
         if (type == ITEM_FILTER && counterProvider != null) {
             counter = Math.max(0, counterProvider.getCounter(filter));
-        }
-        if (counter > 0) {
-            if (focus && alpha > 0.6f) {
-                String txt = counter > 99 ? "99+" : String.valueOf(counter);
-                float bw = Math.max(dp(15f), badgeTextPaint.measureText(txt) + dp(7f));
-                float bx = x + r * 0.62f, by = y - r * 0.72f;
-                rect.set(bx - bw / 2f, by - dp(7.5f), bx + bw / 2f, by + dp(7.5f));
-                canvas.drawRoundRect(rect, dp(7.5f), dp(7.5f), badgePaint);
-                badgeTextPaint.setColor(0xFFFFFFFF);
-                canvas.drawText(txt, bx, by + dp(3f), badgeTextPaint);
-            } else {
-                canvas.drawCircle(x + r * 0.72f, y - r * 0.72f, dp(3.4f), badgePaint);
-            }
         }
         if (filter != null && filter.locked) {
             fillPaint.setColor(0xFFFFC24B);
@@ -364,42 +353,80 @@ public class YuzGramChatWheel extends View {
         canvas.restore();
         canvas.restore();
 
-        // Fokus nomi — doira OSTIDagi markazlashgan pill ichida.
-        if (focus) {
-            String label = type == ITEM_FILTER ? labelFor(filter)
-                    : type == ITEM_COMPOSE
-                    ? getContext().getString(R.string.yuz_wheel_new_msg)
-                    : LocaleController.getString("Add", R.string.Add);
-            float acc = 1f - Math.abs(Math.round(pos) - pos) * 2f;
-            if (acc <= 0.01f) {
-                return;
-            }
-            textPaint.setAlpha((int) (255 * acc));
-            textPaint.setColor(0xFFFFFFFF);
-            float ty = y + r + dp(13f);
-            // Nom avval SIG'ISHI kerak, qisqartirish — oxirgi chora. Eski
-            // kod 11 belgida qiyib tashlardi: "Yangiliklar" → "Yangilikla…".
-            // Endi shrift asta kichrayadi, faqat shundan keyin "…" qo'yiladi.
-            float maxText = Math.min(getWidth() - dp(18f), dp(76f));
-            float size = labelBaseSize;
-            textPaint.setTextSize(size);
-            float floor = labelBaseSize * 0.82f;
-            while (size > floor && textPaint.measureText(label) > maxText) {
-                size = Math.max(floor, size - dp(0.5f));
-                textPaint.setTextSize(size);
-            }
-            if (textPaint.measureText(label) > maxText) {
-                label = fitTail(label, maxText);
-            }
-            float tw = textPaint.measureText(label);
-            rect.set(x - tw / 2f - dp(8f), ty - dp(12f), x + tw / 2f + dp(8f), ty + dp(4f));
-            fillPaint.setColor(PILL_BG);
-            fillPaint.setAlpha((int) (232 * acc));
-            canvas.drawRoundRect(rect, dp(8f), dp(8f), fillPaint);
-            fillPaint.setAlpha(255);
-            canvas.drawText(label, x, ty, textPaint);
-            textPaint.setAlpha(255);
+        drawCaption(canvas, labelForSlot(type, filter), x, y, r, alpha, focus, counter);
+    }
+
+    private String labelForSlot(int type, MessagesController.DialogFilter filter) {
+        if (type == ITEM_FILTER) {
+            return labelFor(filter);
         }
+        return type == ITEM_COMPOSE
+                ? getContext().getString(R.string.yuz_wheel_new_msg)
+                : LocaleController.getString("Add", R.string.Add);
+    }
+
+    /**
+     * Donaning ostidagi nom + o'qilmaganlar soni. Maketdagi kabi NOM HAR BIR
+     * donada turadi (faqat fokusda emas): fokusdagi oq va to'liq o'lchamda,
+     * qolganlari xira va kichikroq — shunda karusel "nimalar borligini"
+     * aylanmasdan ham ko'rsatadi. Son nom bilan BIR qatorda turadi: ikki qator
+     * balandligi chat ro'yxatini yeb qo'yadi.
+     */
+    private void drawCaption(Canvas canvas, String label, float x, float y, float r,
+                             float alpha, boolean focus, int counter) {
+        if (label == null || label.isEmpty() || alpha < 0.25f) {
+            return;
+        }
+        float size = focus ? labelBaseSize : labelBaseSize * 0.8f;
+        textPaint.setTextSize(size);
+        textPaint.setColor(focus ? 0xFFFFFFFF : LABEL_IDLE);
+        textPaint.setAlpha((int) (255 * alpha));
+        // Nom avval SIG'ISHI kerak, qisqartirish — oxirgi chora. Eski
+        // kod 11 belgida qiyib tashlardi: "Yangiliklar" → "Yangilikla…".
+        // Endi shrift asta kichrayadi, faqat shundan keyin "…" qo'yiladi.
+        float maxText = focus ? Math.min(getWidth() - dp(18f), dp(76f)) : dp(58f);
+        float floor = size * 0.8f;
+        while (size > floor && textPaint.measureText(label) > maxText) {
+            size = Math.max(floor, size - dp(0.5f));
+            textPaint.setTextSize(size);
+        }
+        if (textPaint.measureText(label) > maxText) {
+            label = fitTail(label, maxText);
+        }
+
+        String count = counter > 0 ? (counter > 99 ? "99+" : String.valueOf(counter)) : null;
+        float pillH = dp(15f);
+        countPaint.setTextSize(focus ? dp(9.5f) : dp(8.5f));
+        float pillW = count == null ? 0f : Math.max(dp(16f), countPaint.measureText(count) + dp(8f));
+        float labelW = textPaint.measureText(label);
+        if (count != null && labelW + dp(4f) + pillW > maxText + dp(10f)) {
+            count = null;
+            pillW = 0f;
+        }
+        float gap = count == null ? 0f : dp(4f);
+        float left = x - (labelW + gap + pillW) / 2f;
+        float ty = y + r + textPaint.getTextSize() + dp(2f);
+        Paint.FontMetrics fm = textPaint.getFontMetrics();
+        float mid = ty - (fm.ascent + fm.descent) / 2f;
+        textPaint.setTextAlign(Paint.Align.LEFT);
+        canvas.drawText(label, left, ty, textPaint);
+        textPaint.setTextAlign(Paint.Align.CENTER);
+        textPaint.setAlpha(255);
+        textPaint.setTextSize(labelBaseSize);
+
+        if (count == null) {
+            return;
+        }
+        countPaint.setAlpha((int) (255 * alpha));
+        rect.set(left + labelW + gap, mid - pillH / 2f, left + labelW + gap + pillW, mid + pillH / 2f);
+        fillPaint.setColor(COUNT_BG);
+        fillPaint.setAlpha((int) (235 * alpha));
+        canvas.drawRoundRect(rect, pillH / 2f, pillH / 2f, fillPaint);
+        fillPaint.setAlpha(255);
+        Paint.FontMetrics cfm = countPaint.getFontMetrics();
+        canvas.drawText(count, left + labelW + gap + pillW / 2f,
+                mid - (cfm.ascent + cfm.descent) / 2f, countPaint);
+        countPaint.setAlpha(255);
     }
 
     /** Matnni maxW kengligiga sig'adigan qismga tushiradi va "…" bilan tugatadi. */
