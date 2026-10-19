@@ -88,6 +88,7 @@
 <string name="home_board_post_promo_subtitle">Minglab foydalanuvchilar ko\'radi</string>
 <string name="home_board_post_promo_free">E\'lon joylash bepul</string>
 <string name="home_board_post_promo_button">+ E\'lon joylash</string>
+<string name="home_board_post_promo_image">E\'lon joylashga taklif</string>
 <string name="profile_my_classified_ads_empty_summary">E\'lon joylash uchun tugmani bosing</string>
 <!-- referenced by dialog_comment_auth.xml (Faza D) but must link now -->
 <string name="auth_phone_sign_in_button">Kirish</string>

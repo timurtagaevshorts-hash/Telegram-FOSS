@@ -38,14 +38,14 @@
 
     <ImageView
         android:id="@+id/tvReelDelete"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
+        android:layout_width="@dimen/yuz_icon_button"
+        android:layout_height="@dimen/yuz_icon_button"
         android:layout_gravity="top|end"
         android:background="@drawable/bg_yuz_tile_delete"
         android:contentDescription="@string/reels_delete"
         android:foreground="?attr/selectableItemBackgroundBorderless"
-        android:padding="14dp"
+        android:padding="@dimen/yuz_space_3"
         android:src="@drawable/ic_yuz_close"
-        android:tint="@color/white"
+        android:tint="@color/yuz_text"
         android:visibility="gone" />
 </FrameLayout>

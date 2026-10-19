@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- YuzGram #85: chat bo'limi sarlavhasi va qidiruv satri matnlari -->
-    <string name="yuz_chat_tagline" translatable="false">Yangi imkoniyatlar, bir ilovada! ✨</string>
+    <string name="yuz_chat_tagline" translatable="false">Yangi imkoniyatlar, bir ilovada!</string>
     <string name="yuz_chat_search_hint" translatable="false">Qidirish</string>
 </resources>

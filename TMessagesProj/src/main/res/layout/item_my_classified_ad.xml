@@ -97,7 +97,7 @@
                     android:paddingVertical="2dp"
                     android:text="@string/classified_ad_blocked_status"
                     android:textColor="@color/yuz_danger"
-                    android:textSize="10sp"
+                    android:textSize="@dimen/yuz_text_micro"
                     android:textStyle="bold"
                     android:visibility="gone" />
             </LinearLayout>

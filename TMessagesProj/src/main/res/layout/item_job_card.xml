@@ -51,7 +51,7 @@
                 android:paddingEnd="@dimen/yuz_space_2"
                 android:paddingBottom="@dimen/yuz_space_1"
                 android:textColor="@color/yuz_text"
-                android:textSize="10sp"
+                android:textSize="@dimen/yuz_text_micro"
                 android:textStyle="bold" />
 
             <TextView

@@ -13,7 +13,7 @@
         android:gravity="center"
         android:text="Izoh yozish"
         android:textColor="@color/yuz_text"
-        android:textSize="18sp"
+        android:textSize="@dimen/yuz_text_section"
         android:textStyle="bold" />
 
     <TextView

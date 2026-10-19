@@ -73,7 +73,7 @@ class KinoDetailActivity(private val movie: Movie) : BaseFragment() {
             current.genre.takeIf { it.isNotBlank() },
             current.duration.takeIf { it.isNotBlank() },
             if (current.rating > 0.0)
-                themedContext?.getString(R.string.kino_rating, formatRating(current.rating))
+                themedContext?.getString(R.string.kino_rating_meta, formatRating(current.rating))
                 ?: "" else null
         ).filter { it.isNotBlank() }
         meta.text = parts.joinToString("  •  ")

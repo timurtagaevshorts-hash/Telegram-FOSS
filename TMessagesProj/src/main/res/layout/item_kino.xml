@@ -73,7 +73,7 @@
                 android:ellipsize="end"
                 android:maxLines="2"
                 android:textColor="@color/yuz_text"
-                android:textSize="18sp"
+                android:textSize="@dimen/yuz_text_section"
                 android:textStyle="bold" />
 
             <TextView

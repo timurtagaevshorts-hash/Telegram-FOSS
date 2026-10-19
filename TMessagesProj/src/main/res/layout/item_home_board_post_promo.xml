@@ -40,7 +40,7 @@
                 android:paddingVertical="@dimen/yuz_space_1"
                 android:text="@string/home_board_post_promo_free"
                 android:textColor="@color/yuz_action"
-                android:textSize="10sp"
+                android:textSize="@dimen/yuz_text_micro"
                 android:textStyle="bold" />
 
             <TextView
@@ -93,18 +93,20 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                app:cardBackgroundColor="@color/modern_surface"
-                app:cardCornerRadius="14dp"
+                app:cardBackgroundColor="@color/yuz_surface"
+                app:cardCornerRadius="@dimen/yuz_radius_field"
                 app:cardElevation="0dp"
-                app:strokeColor="@color/modern_border"
-                app:strokeWidth="1dp">
+                app:strokeColor="@color/yuz_stroke"
+                app:strokeWidth="@dimen/yuz_stroke">
 
-                <TextView
+                <ImageView
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:text="📣"
-                    android:textSize="36sp" />
+                    android:contentDescription="@string/home_board_post_promo_image"
+                    android:padding="@dimen/yuz_space_5"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_yuz_megaphone"
+                    android:tint="@color/yuz_action" />
             </com.google.android.material.card.MaterialCardView>
         </FrameLayout>
     </LinearLayout>

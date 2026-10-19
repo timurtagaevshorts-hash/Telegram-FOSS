@@ -56,30 +56,30 @@
 
         <ImageButton
             android:id="@+id/btnPlayerPrev"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="@dimen/yuz_icon_button"
+            android:layout_height="@dimen/yuz_icon_button"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@null"
+            android:contentDescription="@string/yuz_a11y_prev"
             android:src="@drawable/ic_yuz_prev"
             app:tint="@color/yuz_text" />
 
         <ImageButton
             android:id="@+id/btnPlayerPlay"
-            android:layout_width="46dp"
-            android:layout_height="46dp"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
+            android:layout_width="@dimen/yuz_icon_button"
+            android:layout_height="@dimen/yuz_icon_button"
+            android:layout_marginStart="@dimen/yuz_space_1"
+            android:layout_marginEnd="@dimen/yuz_space_1"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@null"
+            android:contentDescription="@string/yuz_a11y_pause"
             android:src="@drawable/ic_yuz_pause"
             app:tint="@color/yuz_action" />
 
         <ImageButton
             android:id="@+id/btnPlayerNext"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="@dimen/yuz_icon_button"
+            android:layout_height="@dimen/yuz_icon_button"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@null"
+            android:contentDescription="@string/yuz_a11y_next"
             android:src="@drawable/ic_yuz_next"
             app:tint="@color/yuz_text" />
     </LinearLayout>
@@ -93,10 +93,10 @@
 
         <ImageButton
             android:id="@+id/btnPlayerEq"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
+            android:layout_width="@dimen/yuz_button_sm"
+            android:layout_height="@dimen/yuz_button_sm"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@null"
+            android:contentDescription="@string/yuz_a11y_equalizer"
             android:src="@drawable/ic_yuz_eq"
             app:tint="@color/yuz_action" />
 
@@ -128,19 +128,19 @@
 
         <ImageButton
             android:id="@+id/btnPlayerLoop"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
+            android:layout_width="@dimen/yuz_button_sm"
+            android:layout_height="@dimen/yuz_button_sm"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@null"
+            android:contentDescription="@string/yuz_a11y_repeat"
             android:src="@drawable/ic_yuz_loop"
             app:tint="@color/yuz_action" />
 
         <ImageButton
             android:id="@+id/btnPlayerDl"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
+            android:layout_width="@dimen/yuz_button_sm"
+            android:layout_height="@dimen/yuz_button_sm"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@null"
+            android:contentDescription="@string/yuz_a11y_download"
             android:src="@drawable/ic_yuz_download"
             app:tint="@color/yuz_text" />
     </LinearLayout>

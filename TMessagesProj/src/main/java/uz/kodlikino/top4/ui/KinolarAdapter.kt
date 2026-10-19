@@ -57,6 +57,7 @@ class KinolarAdapter(
         holder.meta.visibility = if (meta.isBlank()) View.GONE else View.VISIBLE
         if (movie.rating > 0.0) {
             holder.rating.text = ctx.getString(R.string.kino_rating, formatRating(movie.rating))
+            holder.rating.setIconStart(R.drawable.ic_yuz_star, sizeDp = 13, gapDp = 4)
             holder.rating.visibility = View.VISIBLE
         } else {
             holder.rating.visibility = View.GONE

@@ -19,9 +19,7 @@
 
         <ImageButton
             android:id="@+id/btnKinoDetailBack"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/YuzIconButton"
             android:contentDescription="@string/kino_back"
             android:src="@drawable/ic_back" />
 
@@ -31,7 +29,7 @@
             android:layout_weight="1"
             android:text="@string/kino_title"
             android:textColor="@color/yuz_text"
-            android:textSize="20sp"
+            android:textSize="@dimen/yuz_text_title"
             android:textStyle="bold" />
     </LinearLayout>
 

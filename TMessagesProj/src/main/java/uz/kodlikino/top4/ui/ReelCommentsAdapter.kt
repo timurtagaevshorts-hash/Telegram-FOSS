@@ -158,8 +158,9 @@ class ReelCommentsAdapter(
                 tvReplyHint.visibility = View.VISIBLE
                 tvReplyHint.text = appContext.getString(
                     R.string.reels_comment_reply_to,
-                    comment.replyToAuthorName.ifBlank { "YuzGram" }
+                    comment.replyToAuthorName.ifBlank { appContext.getString(R.string.AppName) }
                 )
+                tvReplyHint.setIconStart(R.drawable.ic_yuz_reply, sizeDp = 13, gapDp = 5)
             } else {
                 tvReplyHint.visibility = View.GONE
             }

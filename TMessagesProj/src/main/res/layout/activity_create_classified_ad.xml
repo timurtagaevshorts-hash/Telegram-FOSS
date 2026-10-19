@@ -248,8 +248,9 @@
                 app:boxBackgroundColor="@color/classified_field_bg"
                 app:boxStrokeColor="@color/yuz_action"
                 app:hintTextColor="@color/yuz_text_muted"
-                app:prefixText="📞 "
-                app:prefixTextColor="@color/yuz_action">
+                app:startIconContentDescription="@string/classified_phone_hint"
+                app:startIconDrawable="@drawable/ic_yuz_phone"
+                app:startIconTint="@color/yuz_action">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etPhone"

@@ -47,7 +47,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/job_board_title"
                         android:textColor="@color/yuz_text"
-                        android:textSize="24sp"
+                        android:textSize="@dimen/yuz_text_title"
                         android:textStyle="bold" />
 
                     <TextView

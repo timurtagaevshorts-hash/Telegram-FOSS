@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Boshqaruv elementlarining ekin (TalkBack) yozuvlari. Ikonlar matnli belgi
+  emas, vektor bo'lgani uchun ularning ma'nosini shu yozuvlar beradi.
+-->
+<resources>
+    <string name="yuz_a11y_back">Orqaga</string>
+    <string name="yuz_a11y_close">Yopish</string>
+    <string name="yuz_a11y_play">Ijro</string>
+    <string name="yuz_a11y_pause">Pauza</string>
+    <string name="yuz_a11y_prev">Oldingi trek</string>
+    <string name="yuz_a11y_next">Keyingi trek</string>
+    <string name="yuz_a11y_repeat">Takrorlash</string>
+    <string name="yuz_a11y_equalizer">Ekvalayzer</string>
+    <string name="yuz_a11y_download">Yuklab olish</string>
+    <string name="yuz_a11y_favorite">Sevimlilarga qo'shish</string>
+</resources>

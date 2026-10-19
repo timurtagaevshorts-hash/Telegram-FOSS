@@ -65,7 +65,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/yuz_space_3"
                     android:textColor="@color/yuz_text"
-                    android:textSize="20sp"
+                    android:textSize="@dimen/yuz_text_title"
                     android:textStyle="bold" />
 
                 <TextView

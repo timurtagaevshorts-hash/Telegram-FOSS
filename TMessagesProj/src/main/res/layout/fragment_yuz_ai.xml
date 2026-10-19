@@ -19,12 +19,9 @@
 
         <ImageButton
             android:id="@+id/btnAiBack"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@null"
-            android:src="@drawable/ic_back"
-            app:tint="@color/yuz_text" />
+            style="@style/YuzIconButton"
+            android:contentDescription="@string/yuz_a11y_back"
+            android:src="@drawable/ic_back" />
 
         <ImageView
             android:layout_width="20dp"
@@ -40,7 +37,7 @@
             android:layout_marginStart="@dimen/yuz_space_2"
             android:text="@string/ai_title"
             android:textColor="@color/yuz_text"
-            android:textSize="18sp"
+            android:textSize="@dimen/yuz_text_title"
             android:textStyle="bold" />
     </LinearLayout>
 

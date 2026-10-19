@@ -37,9 +37,9 @@
     <string name="reels_monetization_title">Daromadga ulash</string>
     <string name="reels_monetization_subtitle">Reel ko\'rishlari daromad hisobiga qo\'shiladi</string>
 
-    <!-- Ovoz tugmasi belgilari (feed yuqorisida) -->
-    <string name="reels_sound_on">🔊</string>
-    <string name="reels_sound_off">🔇</string>
+    <!-- Ovoz tugmasi: ikon holatni, yozuv tugilish harakatini bildiradi. -->
+    <string name="reels_sound_on">Ovozni o\'chirish</string>
+    <string name="reels_sound_off">Ovozni yoqish</string>
 
     <!-- Izohlar paneli -->
     <string name="reels_comments">Izohlar</string>
@@ -51,7 +51,7 @@
     <string name="reels_comment_send">Yuborish</string>
     <string name="reels_comment_empty">Izoh matnini kiriting</string>
     <string name="reels_comment_failed">Izoh yuborilmadi</string>
-    <string name="reels_comment_reply_to">↩ %1$s javob</string>
+    <string name="reels_comment_reply_to">%1$s javob</string>
     <string name="reels_comment_replying_to">%1$s ga javob</string>
     <string name="reels_comment_now">hozirgina</string>
     <string name="reels_comment_minutes">%1$d daqiqa oldin</string>
@@ -63,7 +63,7 @@
     <string name="reels_share">Ulashish</string>
     <string name="reels_share_failed">Ulashish menyusi ochilmadi</string>
     <string name="reels_link_failed">Havola ochilmadi</string>
-    <string name="reels_watch_movie">🎬 Kinoni ko\'rish</string>
+    <string name="reels_watch_movie">Kinoni ko\'rish</string>
 
     <!-- O'z reel'ini o'chirish (faqat egaga ko'rinadigan "⋮") -->
     <string name="reels_menu">Reel menyusi</string>

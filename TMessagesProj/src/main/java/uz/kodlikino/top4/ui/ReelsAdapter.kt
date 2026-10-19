@@ -585,6 +585,7 @@ class ReelsAdapter(
             val hasMovie = reel.movieUrl.isNotBlank()
             val hasAd = reel.adTitle.isNotBlank() && reel.adUrl.isNotBlank()
             btnWatchMovie.visibility = if (hasMovie) View.VISIBLE else View.GONE
+            if (hasMovie) btnWatchMovie.setIconStart(R.drawable.ic_yuz_film, sizeDp = 13, gapDp = 6)
             btnAd.visibility = if (hasAd) View.VISIBLE else View.GONE
             if (hasAd) btnAd.text = reel.adTitle
             reelCtaRow.visibility = if (hasMovie || hasAd) View.VISIBLE else View.GONE

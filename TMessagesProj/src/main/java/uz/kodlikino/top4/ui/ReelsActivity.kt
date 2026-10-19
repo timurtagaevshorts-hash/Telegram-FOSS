@@ -372,9 +372,12 @@ class ReelsActivity @JvmOverloads constructor(
             savedSystemUi = -1
         }
         // Tap bilan ovoz ochilgan bo'lishi mumkin — tugma ikonkasini sinxronlaymiz.
+        val muted = adapter?.isMuted() == true
         muteButton?.setImageResource(
-            if (adapter?.isMuted() == true) R.drawable.ic_yuz_volume_off else R.drawable.ic_yuz_volume_on
+            if (muted) R.drawable.ic_yuz_volume_off else R.drawable.ic_yuz_volume_on
         )
+        muteButton?.contentDescription =
+            getString(if (muted) R.string.reels_sound_off else R.string.reels_sound_on)
     }
 
     /**

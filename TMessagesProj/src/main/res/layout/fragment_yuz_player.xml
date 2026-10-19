@@ -254,7 +254,7 @@
                     android:id="@+id/ivPlHeart"
                     android:layout_width="@dimen/yuz_icon"
                     android:layout_height="@dimen/yuz_icon"
-                    android:contentDescription="@null"
+                    android:contentDescription="@string/yuz_a11y_favorite"
                     android:src="@drawable/ic_yuz_heart"
                     app:tint="@color/yuz_text" />
 

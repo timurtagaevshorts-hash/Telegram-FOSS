@@ -7,7 +7,7 @@
     <string name="profile_reels_empty">Hali reel joylanmagan</string>
     <string name="profile_manage_content">Kontentni boshqarish</string>
     <string name="profile_manage_done">Boshqaruvni tugatish</string>
-    <string name="profile_manage_hint">O\'chirish uchun rasm ustidagi ✕ ni bosing</string>
+    <string name="profile_manage_hint">O\'chirish uchun rasm ustidagi belgini bosing</string>
 
     <string name="profile_sign_in_required">Profilni ko\'rish uchun Telegram orqali kiring</string>
 </resources>

@@ -15,8 +15,8 @@
     <string name="premium_play_unavailable">Bu qurilmada Play orqali sotib olish mavjud emas</string>
     <string name="premium_billing_off">Google Play Billing ulanmagan</string>
     <string name="premium_need_sign_in">Avval Telegram orqali kiring</string>
-    <string name="premium_approved_kino">✅ Premium Kino faollashtirildi!</string>
-    <string name="premium_approved_full">✅ To\'liq Premium faollashtirildi!</string>
+    <string name="premium_approved_kino">Premium Kino faollashtirildi!</string>
+    <string name="premium_approved_full">To\'liq Premium faollashtirildi!</string>
     <string name="premium_approved_kino_sub">Endi premium kinolarni ko\'rishingiz mumkin.\nReels limiti oddiy foydalanuvchi kabi (3 ta/hafta).</string>
     <string name="premium_approved_full_sub">Barcha imtiyozlar ochiq:\n• Premium kinolar\n• Haftasiga 30 tagacha reel\n• 100 MB gacha video</string>
     <string name="premium_active_kino">Sizda Premium Kino faol!</string>
@@ -29,7 +29,7 @@
     <string name="YuzGramPremium">YuzGram Premium</string>
 
     <!-- Kino premium gating -->
-    <string name="kino_premium_required">Bu kino faqat Premium obunuchilar uchun 💎</string>
+    <string name="kino_premium_required">Bu kino faqat Premium obunachilar uchun</string>
 
     <!-- Reels kvotasi (CreateReel ekrani) -->
     <string name="reels_quota_label">Haftalik limit: %1$d/%2$d ta · %3$s gacha</string>
