@@ -15,7 +15,7 @@
 <string name="classified_card_theme_title">Karta fon rangi</string>
 <string name="classified_category">Kategoriya</string>
 <string name="classified_delete">O\'chirish</string>
-<string name="classified_delete_confirm_message">Bu amalni qaytarib bo\'lmaydi.</string>
+<string name="classified_delete_confirm_message">\"%1$s\" o\'chirilsinmi? Bu amalni qaytarib bo\'lmaydi.</string>
 <string name="classified_delete_confirm_title">E\'lonni o\'chirasizmi?</string>
 <string name="classified_delete_failed">E\'lon o\'chirilmadi</string>
 <string name="classified_deleted">E\'lon o\'chirildi</string>
@@ -31,6 +31,7 @@
 <string name="classified_filter_max_price">Maksimal narx (so\'m)</string>
 <string name="classified_filter_min_price">Minimal narx (so\'m)</string>
 <string name="classified_filter_reset">Tozalash</string>
+<string name="classified_filter_region">Viloyat / tuman tanlash</string>
 <string name="classified_filter_title">Filtrlash</string>
 <string name="classified_full_info_hint">To\'liq ma\'lumot</string>
 <string name="classified_images_required">Kamida 1 ta rasm tanlang</string>
@@ -41,6 +42,7 @@
 <string name="classified_no_results_hint">Qidiruv yoki filtr shartlarini o\'zgartiring</string>
 <string name="classified_phone_hint">Telefon raqam</string>
 <string name="classified_phone_missing">Telefon raqam ko\'rsatilmagan</string>
+<string name="classified_call_not_supported">Qo\'ng\'iroq ilovasi topilmadi — raqamni qo\'lda tering</string>
 <string name="classified_phone_required">Telefon raqam kiriting</string>
 <string name="classified_pick_images">Rasm tanlash (5 tagacha)</string>
 <string name="classified_pick_images_count">Rasm tanlash (%1$d/%2$d)</string>
@@ -53,6 +55,18 @@
 <string name="classified_published">E\'lon muvaffaqiyatli joylandi</string>
 <string name="classified_remove_image">Rasmni olib tashlash</string>
 <string name="classified_search_hint">Mahsulot yoki manzil bo\'yicha qidirish…</string>
+<string name="classified_search_keyword_hint">Nima qidiryapsiz? (model, nom)</string>
+<string name="classified_search_location_hint">Joylashuv (Toshkent, Samarqand)</string>
+<string name="classified_ads_subtitle">Yangi imkoniyatlar, siz uchun</string>
+<string name="classified_filter_date_title">Sana</string>
+<string name="classified_filter_sort_title">Saralash</string>
+<string name="classified_sort_default">Odatiy</string>
+<string name="classified_sort_new">Yangi</string>
+<string name="classified_sort_cheap">Arzon</string>
+<string name="classified_sort_expensive">Qimmat</string>
+<string name="classified_filter_today">Bugun</string>
+<string name="classified_filter_7days">7 kun</string>
+<string name="classified_filter_30days">30 kun</string>
 <string name="classified_my_ads">Mening e\'lonlarim</string>
 <string name="classified_share_friends">Do\'stlarga ulashish</string>
 <string name="classified_sign_in_required">E\'lon joylash uchun avval tizimga kiring</string>

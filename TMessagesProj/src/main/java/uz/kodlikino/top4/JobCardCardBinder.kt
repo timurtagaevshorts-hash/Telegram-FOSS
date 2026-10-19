@@ -12,6 +12,7 @@ import uz.kodlikino.top4.models.ClassifiedAd
 import uz.kodlikino.top4.models.ClassifiedAdCardTheme
 import uz.kodlikino.top4.models.JobCard
 import uz.kodlikino.top4.models.JobCardListingTypes
+import uz.kodlikino.top4.ui.setIconStart
 
 object JobCardCardBinder {
 
@@ -29,7 +30,8 @@ object JobCardCardBinder {
         thumbFrame: View,
         isOwn: Boolean
     ) {
-        tvType.text = "${JobCardListingTypes.emoji(card.listingType)} ${JobCardListingTypes.label(card.listingType)}"
+        tvType.text = JobCardListingTypes.label(card.listingType)
+        tvType.setIconStart(JobCardListingTypes.icon(card.listingType))
         tvTitle.text = card.title.ifBlank { card.description.take(60) }
         tvSubtitle.text = card.description.take(120).ifBlank { card.location }
         tvSubtitle.visibility = if (tvSubtitle.text.isNullOrBlank()) View.GONE else View.VISIBLE

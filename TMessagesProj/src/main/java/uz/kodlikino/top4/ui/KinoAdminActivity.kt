@@ -216,10 +216,14 @@ class KinoAdminActivity : BaseFragment() {
         val themed = themedContext ?: return
         chip ?: return
         chip.setBackgroundResource(
-            if (active) R.drawable.bg_classified_category_badge else R.drawable.bg_yuz_chip
+            if (active) R.drawable.bg_yuz_pill_active else R.drawable.bg_yuz_pill
         )
-        @Suppress("DEPRECATION")
-        chip.setTextColor(themed.resources.getColor(if (active) R.color.home_accent else R.color.text_secondary))
+        chip.setTextColor(
+            androidx.core.content.ContextCompat.getColor(
+                themed,
+                if (active) R.color.yuz_text_on_accent else R.color.yuz_text_secondary
+            )
+        )
         chip.setTypeface(null, if (active) Typeface.BOLD else Typeface.NORMAL)
     }
 

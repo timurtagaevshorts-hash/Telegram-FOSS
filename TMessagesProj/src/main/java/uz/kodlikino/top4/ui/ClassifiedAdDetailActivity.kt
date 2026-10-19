@@ -145,8 +145,8 @@ class ClassifiedAdDetailActivity(
         val title = if (ad.title.isNotBlank()) ad.title else getString(R.string.classified_ad_detail)
         toolbar?.title = title
 
-        val emoji = ClassifiedAdCategories.emoji(ad.category)
-        tvCategory?.text = "$emoji ${ClassifiedAdCategories.label(ad.category)}"
+        tvCategory?.text = ClassifiedAdCategories.label(ad.category)
+        tvCategory?.setIconStart(ClassifiedAdCategories.icon(ad.category))
 
         if (ad.model.isNotBlank()) {
             tvModel?.visibility = View.VISIBLE
@@ -159,6 +159,7 @@ class ClassifiedAdDetailActivity(
         tvPrice?.text = ad.formattedPrice()
         tvAddress?.text =
             if (ad.address.isNotBlank()) ad.address else getString(R.string.classified_address_missing)
+        tvAddress?.setIconStart(R.drawable.ic_location_pin, sizeDp = 14, gapDp = 5)
         tvDescription?.text =
             if (ad.description.isNotBlank()) ad.description else getString(R.string.classified_description_missing)
         phoneNumber = ad.phone
@@ -184,7 +185,7 @@ class ClassifiedAdDetailActivity(
         try {
             startActivitySafely(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
         } catch (e: ActivityNotFoundException) {
-            toast(R.string.classified_phone_missing)
+            toast(R.string.classified_call_not_supported)
         }
     }
 

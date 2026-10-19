@@ -41,8 +41,8 @@ object YuzPremiumPlans {
         playProductId = "premium_kino",
         upgradeNote = VALIDITY_NOTE,
         benefits = listOf(
-            "✓ Premium belgilangan kinolarni cheksiz tomosha",
-            "✓ Reels limiti oddiy foydalanuvchi kabi (3 ta/hafta · 50 MB)"
+            "Premium belgilangan kinolarni cheksiz tomosha",
+            "Reels limiti oddiy foydalanuvchi kabi (3 ta/hafta · 50 MB)"
         ),
         buttonText = "Tarifga ulanish"
     )
@@ -54,9 +54,9 @@ object YuzPremiumPlans {
         playProductId = "full_premium",
         upgradeNote = "Premium Kino tarifidan o'tish narxi",
         benefits = listOf(
-            "✓ Barcha premium kinolar ochiq",
-            "✓ Haftasiga 30 tagacha reel joylash",
-            "✓ 100 MB gacha video hajmi"
+            "Barcha premium kinolar ochiq",
+            "Haftasiga 30 tagacha reel joylash",
+            "100 MB gacha video hajmi"
         ),
         buttonText = "To'liq Premium olish"
     )

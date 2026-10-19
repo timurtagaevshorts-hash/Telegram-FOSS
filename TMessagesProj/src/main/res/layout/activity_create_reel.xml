@@ -19,7 +19,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingBottom="32dp">
+        android:paddingBottom="@dimen/yuz_space_8">
 
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
@@ -27,16 +27,16 @@
             android:layout_height="?attr/actionBarSize"
             app:navigationIcon="@drawable/ic_back"
             app:title="@string/reels_create_title"
-            app:titleTextColor="@color/text_primary" />
+            app:titleTextColor="@color/yuz_text" />
 
         <!-- Video tanlash / preview maydoni: bo'sh holatda chaqiriq, tanlangach kadr -->
         <FrameLayout
             android:id="@+id/btnPickVideo"
             android:layout_width="match_parent"
             android:layout_height="240dp"
-            android:layout_marginStart="16dp"
-            android:layout_marginEnd="16dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginStart="@dimen/yuz_space_4"
+            android:layout_marginEnd="@dimen/yuz_space_4"
+            android:layout_marginTop="@dimen/yuz_space_2"
             android:background="@drawable/bg_classified_image_picker"
             android:clickable="true"
             android:focusable="true"
@@ -48,7 +48,7 @@
                 android:layout_height="match_parent"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="@dimen/yuz_gutter">
 
                 <FrameLayout
                     android:layout_width="56dp"
@@ -61,16 +61,16 @@
                         android:layout_gravity="center"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_add_photo"
-                        app:tint="@color/white" />
+                        app:tint="@color/yuz_text" />
                 </FrameLayout>
 
                 <TextView
                     android:id="@+id/tvPickVideoLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="@dimen/yuz_space_3"
                     android:text="@string/reels_pick_video"
-                    android:textColor="@color/text_primary"
+                    android:textColor="@color/yuz_text"
                     android:textSize="15sp"
                     android:textStyle="bold" />
 
@@ -79,8 +79,8 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:text="@string/reels_pick_video_subtitle"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp" />
+                    android:textColor="@color/yuz_text_secondary"
+                    android:textSize="@dimen/yuz_text_secondary" />
             </LinearLayout>
 
             <ImageView
@@ -98,13 +98,13 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:background="@drawable/bg_yuz_chip"
-                android:paddingStart="14dp"
-                android:paddingTop="7dp"
-                android:paddingEnd="14dp"
-                android:paddingBottom="7dp"
+                android:paddingStart="@dimen/yuz_space_4"
+                android:paddingTop="@dimen/yuz_space_2"
+                android:paddingEnd="@dimen/yuz_space_4"
+                android:paddingBottom="@dimen/yuz_space_2"
                 android:text="@string/reels_change_video"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_secondary"
                 android:textStyle="bold"
                 android:visibility="gone" />
 
@@ -113,15 +113,15 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|end"
-                android:layout_marginEnd="10dp"
-                android:layout_marginBottom="10dp"
+                android:layout_marginEnd="@dimen/yuz_space_3"
+                android:layout_marginBottom="@dimen/yuz_space_3"
                 android:background="@drawable/bg_yuz_chip"
-                android:paddingStart="8dp"
-                android:paddingTop="3dp"
-                android:paddingEnd="8dp"
-                android:paddingBottom="3dp"
-                android:textColor="@color/text_primary"
-                android:textSize="11sp"
+                android:paddingStart="@dimen/yuz_space_2"
+                android:paddingTop="@dimen/yuz_space_1"
+                android:paddingEnd="@dimen/yuz_space_2"
+                android:paddingBottom="@dimen/yuz_space_1"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_caption"
                 android:visibility="gone" />
         </FrameLayout>
 
@@ -129,13 +129,13 @@
             android:id="@+id/tvVideoName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginEnd="16dp"
-            android:layout_marginTop="10dp"
+            android:layout_marginStart="@dimen/yuz_space_4"
+            android:layout_marginEnd="@dimen/yuz_space_4"
+            android:layout_marginTop="@dimen/yuz_space_3"
             android:ellipsize="middle"
             android:singleLine="true"
-            android:textColor="@color/home_accent"
-            android:textSize="12sp"
+            android:textColor="@color/yuz_action"
+            android:textSize="@dimen/yuz_text_secondary"
             android:visibility="gone" />
 
         <!-- "0:24 · 18.2 MB · MP4" — tanlangach ko'rinadi -->
@@ -143,15 +143,15 @@
             android:id="@+id/tvVideoMeta"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="6dp"
+            android:layout_marginStart="@dimen/yuz_space_4"
+            android:layout_marginTop="@dimen/yuz_space_2"
             android:background="@drawable/bg_yuz_chip"
-            android:paddingStart="10dp"
-            android:paddingTop="4dp"
-            android:paddingEnd="10dp"
-            android:paddingBottom="4dp"
-            android:textColor="@color/text_secondary"
-            android:textSize="11sp"
+            android:paddingStart="@dimen/yuz_space_3"
+            android:paddingTop="@dimen/yuz_space_1"
+            android:paddingEnd="@dimen/yuz_space_3"
+            android:paddingBottom="@dimen/yuz_space_1"
+            android:textColor="@color/yuz_text_secondary"
+            android:textSize="@dimen/yuz_text_caption"
             android:visibility="gone" />
 
         <!-- Haftalik kvot: "Haftalik limit: 2/3 ta · 50 MB gacha" (YuzReelQuota) -->
@@ -159,18 +159,18 @@
             android:id="@+id/tvQuotaInfo"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginEnd="16dp"
-            android:layout_marginTop="8dp"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp"
+            android:layout_marginStart="@dimen/yuz_space_4"
+            android:layout_marginEnd="@dimen/yuz_space_4"
+            android:layout_marginTop="@dimen/yuz_space_2"
+            android:textColor="@color/yuz_text_secondary"
+            android:textSize="@dimen/yuz_text_secondary"
             android:visibility="gone" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="@dimen/yuz_space_4">
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -178,48 +178,48 @@
                 android:layout_height="wrap_content"
                 android:hint="@string/reels_caption_hint"
                 app:boxBackgroundColor="@color/classified_field_bg"
-                app:boxStrokeColor="@color/home_accent"
-                app:hintTextColor="@color/text_hint">
+                app:boxStrokeColor="@color/yuz_action"
+                app:hintTextColor="@color/yuz_text_muted">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etCaption"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="textCapSentences"
-                    android:textColor="@color/text_primary" />
+                    android:textColor="@color/yuz_text" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:hint="@string/reels_hashtags_hint"
                 app:boxBackgroundColor="@color/classified_field_bg"
-                app:boxStrokeColor="@color/home_accent"
-                app:hintTextColor="@color/text_hint">
+                app:boxStrokeColor="@color/yuz_action"
+                app:hintTextColor="@color/yuz_text_muted">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etHashtags"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="text"
-                    android:textColor="@color/text_primary" />
+                    android:textColor="@color/yuz_text" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Monetizatsiya: Reel.monetizationEnabled (donor feed daromad belgisi) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="@dimen/yuz_space_4"
                 android:background="@drawable/bg_profile_modern_card"
                 android:gravity="center_vertical"
                 android:minHeight="56dp"
                 android:orientation="horizontal"
-                android:paddingStart="14dp"
-                android:paddingTop="8dp"
-                android:paddingEnd="10dp"
-                android:paddingBottom="8dp">
+                android:paddingStart="@dimen/yuz_space_4"
+                android:paddingTop="@dimen/yuz_space_2"
+                android:paddingEnd="@dimen/yuz_space_3"
+                android:paddingBottom="@dimen/yuz_space_2">
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -231,8 +231,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/reels_monetization_title"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp"
+                        android:textColor="@color/yuz_text"
+                        android:textSize="@dimen/yuz_text_body"
                         android:textStyle="bold" />
 
                     <TextView
@@ -240,17 +240,17 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="@string/reels_monetization_subtitle"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="11sp" />
+                        android:textColor="@color/yuz_text_secondary"
+                        android:textSize="@dimen/yuz_text_caption" />
                 </LinearLayout>
 
                 <androidx.appcompat.widget.SwitchCompat
                     android:id="@+id/switchMonetization"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginStart="@dimen/yuz_space_2"
                     android:checked="true"
-                    app:thumbTint="@color/primary" />
+                    app:thumbTint="@color/yuz_action" />
             </LinearLayout>
 
             <ProgressBar
@@ -258,31 +258,31 @@
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="@dimen/yuz_space_4"
                 android:max="100"
-                android:progressTint="@color/home_accent"
+                android:progressTint="@color/yuz_action"
                 android:visibility="gone" />
 
             <TextView
                 android:id="@+id/tvUploadStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp"
+                android:layout_marginTop="@dimen/yuz_space_2"
+                android:textColor="@color/yuz_text_secondary"
+                android:textSize="@dimen/yuz_text_secondary"
                 android:visibility="gone" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPublish"
                 android:layout_width="match_parent"
-                android:layout_height="54dp"
-                android:layout_marginTop="18dp"
+                android:layout_height="@dimen/yuz_button"
+                android:layout_marginTop="@dimen/yuz_gutter"
                 android:text="@string/reels_publish"
-                android:textColor="@color/white"
-                android:textSize="15sp"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_button"
                 android:textStyle="bold"
-                app:backgroundTint="@color/home_accent"
-                app:cornerRadius="27dp" />
+                app:backgroundTint="@color/yuz_action"
+                app:cornerRadius="@dimen/yuz_radius_field" />
         </LinearLayout>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

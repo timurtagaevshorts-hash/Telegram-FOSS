@@ -4,9 +4,9 @@
   Eski KinoTOP4 loyihasidagi hardcode xabarlarning fork versiyasi.
 -->
 <resources>
-    <string name="premium_back">←</string>
+    <string name="premium_back">Orqaga</string>
     <string name="premium_screen_title">YuzGram Premium</string>
-    <string name="premium_hero_title">💎 YuzGram Premium</string>
+    <string name="premium_hero_title">YuzGram Premium</string>
     <string name="premium_hero_subtitle">Kinolar va reelslar uchun to\'liq imtiyoz — Google Play orqali ulaning</string>
     <string name="premium_restore">Xaridlarni tiklash</string>
     <string name="premium_done_close">Yopish</string>

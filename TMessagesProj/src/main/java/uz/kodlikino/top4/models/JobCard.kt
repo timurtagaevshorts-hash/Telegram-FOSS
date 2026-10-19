@@ -1,5 +1,7 @@
 package uz.kodlikino.top4.models
 
+import androidx.annotation.DrawableRes
+import org.telegram.messenger.R
 import java.io.Serializable
 
 /** Ish kartasi — ish qidirish yoki ishchi qidirish e'loni. */
@@ -64,10 +66,11 @@ object JobCardListingTypes {
         else -> "Ish"
     }
 
-    fun emoji(type: String): String = when (type) {
-        SEEKING_WORK -> "👷"
-        HIRING -> "💼"
-        else -> "📋"
+    @DrawableRes
+    fun icon(type: String): Int = when (type) {
+        SEEKING_WORK -> R.drawable.ic_yuz_hardhat
+        HIRING -> R.drawable.ic_yuz_briefcase
+        else -> R.drawable.ic_yuz_clip
     }
 }
 

@@ -9,10 +9,10 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:paddingStart="14dp"
-    android:paddingEnd="14dp"
-    android:paddingTop="9dp"
-    android:paddingBottom="9dp">
+    android:paddingStart="@dimen/yuz_space_4"
+    android:paddingEnd="@dimen/yuz_space_4"
+    android:paddingTop="@dimen/yuz_space_2"
+    android:paddingBottom="@dimen/yuz_space_2">
 
     <FrameLayout
         android:id="@+id/commentAvatarWrap"
@@ -25,8 +25,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:textColor="@color/white"
-            android:textSize="13sp"
+            android:textColor="@color/yuz_text"
+            android:textSize="@dimen/yuz_text_secondary"
             android:textStyle="bold" />
 
         <ImageView
@@ -40,7 +40,7 @@
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
+        android:layout_marginStart="@dimen/yuz_space_3"
         android:layout_weight="1"
         android:orientation="vertical">
 
@@ -50,8 +50,8 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/home_accent"
-            android:textSize="12sp"
+            android:textColor="@color/yuz_action"
+            android:textSize="@dimen/yuz_text_secondary"
             android:visibility="gone" />
 
         <TextView
@@ -60,8 +60,8 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/text_primary"
-            android:textSize="13sp"
+            android:textColor="@color/yuz_text"
+            android:textSize="@dimen/yuz_text_secondary"
             android:textStyle="bold" />
 
         <TextView
@@ -69,16 +69,16 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:textColor="#DEE4EE"
+            android:textColor="@color/yuz_text_secondary"
             android:textIsSelectable="true"
-            android:textSize="14sp" />
+            android:textSize="@dimen/yuz_text_body" />
 
         <TextView
             android:id="@+id/tvCommentTime"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:textColor="@color/text_secondary"
-            android:textSize="11sp" />
+            android:layout_marginTop="@dimen/yuz_space_1"
+            android:textColor="@color/yuz_text_secondary"
+            android:textSize="@dimen/yuz_text_caption" />
     </LinearLayout>
 </LinearLayout>

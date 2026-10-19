@@ -10,8 +10,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp">
+        android:paddingStart="@dimen/yuz_gutter"
+        android:paddingEnd="@dimen/yuz_gutter">
 
         <!-- Top qator: yopish + brend -->
         <LinearLayout
@@ -20,17 +20,17 @@
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingTop="6dp"
-            android:paddingBottom="2dp">
+            android:paddingTop="@dimen/yuz_space_2"
+            android:paddingBottom="@dimen/yuz_space_1">
 
             <ImageButton
                 android:id="@+id/btnPlClose"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="@dimen/yuz_icon_button"
+                android:layout_height="@dimen/yuz_icon_button"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@null"
+                android:contentDescription="@string/musiqa_pl_close"
                 android:src="@drawable/ic_yuz_chevron_down"
-                app:tint="@color/text_primary" />
+                app:tint="@color/yuz_text" />
 
             <TextView
                 android:layout_width="0dp"
@@ -38,13 +38,13 @@
                 android:layout_weight="1"
                 android:gravity="end"
                 android:text="YuzGram Music"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp"
+                android:textColor="@color/yuz_text_secondary"
+                android:textSize="@dimen/yuz_text_secondary"
                 android:textStyle="bold" />
 
             <View
-                android:layout_width="44dp"
-                android:layout_height="44dp" />
+                android:layout_width="@dimen/yuz_icon_button"
+                android:layout_height="@dimen/yuz_icon_button" />
         </LinearLayout>
 
         <!-- Muqova -->
@@ -76,27 +76,27 @@
             android:marqueeRepeatLimit="marquee_forever"
             android:singleLine="true"
             android:text="—"
-            android:textColor="@color/text_primary"
-            android:textSize="20sp"
+            android:textColor="@color/yuz_text"
+            android:textSize="@dimen/yuz_text_title"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tvPlArtist"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="@dimen/yuz_space_1"
             android:ellipsize="end"
             android:singleLine="true"
             android:text=""
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp" />
+            android:textColor="@color/yuz_text_secondary"
+            android:textSize="@dimen/yuz_text_body" />
 
         <!-- Seek -->
         <SeekBar
             android:id="@+id/plSeek"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp" />
+            android:layout_marginTop="@dimen/yuz_space_3" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -109,85 +109,85 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="0:00"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
+                android:textColor="@color/yuz_text_secondary"
+                android:textSize="@dimen/yuz_text_caption" />
 
             <TextView
                 android:id="@+id/tvPlDur"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0:00"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
+                android:textColor="@color/yuz_text_secondary"
+                android:textSize="@dimen/yuz_text_caption" />
         </LinearLayout>
 
         <!-- Asosiy tugmalar -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="@dimen/yuz_space_3"
             android:gravity="center"
             android:orientation="horizontal">
 
             <ImageButton
                 android:id="@+id/btnPlShuffle"
-                android:layout_width="46dp"
-                android:layout_height="46dp"
+                android:layout_width="@dimen/yuz_icon_button"
+                android:layout_height="@dimen/yuz_icon_button"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@null"
-                android:padding="10dp"
+                android:contentDescription="@string/musiqa_pl_shuffle"
+                android:padding="@dimen/yuz_space_2"
                 android:src="@drawable/ic_yuz_shuffle"
-                app:tint="@color/text_primary" />
+                app:tint="@color/yuz_text" />
 
             <ImageButton
                 android:id="@+id/btnPlPrev"
-                android:layout_width="52dp"
-                android:layout_height="52dp"
-                android:layout_marginEnd="12dp"
+                android:layout_width="@dimen/yuz_button"
+                android:layout_height="@dimen/yuz_button"
+                android:layout_marginEnd="@dimen/yuz_space_3"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@null"
-                android:padding="8dp"
+                android:contentDescription="@string/musiqa_pl_prev"
+                android:padding="@dimen/yuz_space_2"
                 android:src="@drawable/ic_yuz_prev"
-                app:tint="@color/text_primary" />
+                app:tint="@color/yuz_text" />
 
             <ImageButton
                 android:id="@+id/btnPlPlay"
                 android:layout_width="72dp"
                 android:layout_height="72dp"
                 android:background="@drawable/bg_yuz_play"
-                android:contentDescription="@null"
-                android:padding="16dp"
+                android:contentDescription="@string/musiqa_pl_play"
+                android:padding="@dimen/yuz_space_4"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_yuz_play"
-                app:tint="#FF0B1220" />
+                app:tint="@color/yuz_text_on_accent" />
 
             <ImageButton
                 android:id="@+id/btnPlNext"
-                android:layout_width="52dp"
-                android:layout_height="52dp"
-                android:layout_marginStart="12dp"
+                android:layout_width="@dimen/yuz_button"
+                android:layout_height="@dimen/yuz_button"
+                android:layout_marginStart="@dimen/yuz_space_3"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@null"
-                android:padding="8dp"
+                android:contentDescription="@string/musiqa_pl_next"
+                android:padding="@dimen/yuz_space_2"
                 android:src="@drawable/ic_yuz_next"
-                app:tint="@color/text_primary" />
+                app:tint="@color/yuz_text" />
 
             <ImageButton
                 android:id="@+id/btnPlRepeat"
-                android:layout_width="46dp"
-                android:layout_height="46dp"
+                android:layout_width="@dimen/yuz_icon_button"
+                android:layout_height="@dimen/yuz_icon_button"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@null"
-                android:padding="10dp"
+                android:contentDescription="@string/musiqa_pl_repeat"
+                android:padding="@dimen/yuz_space_2"
                 android:src="@drawable/ic_yuz_loop"
-                app:tint="@color/text_primary" />
+                app:tint="@color/yuz_text" />
         </LinearLayout>
 
         <!-- Ikkilamchi qator -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="@dimen/yuz_space_3"
             android:orientation="horizontal">
 
             <LinearLayout
@@ -197,23 +197,23 @@
                 android:layout_weight="1"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:paddingVertical="6dp">
+                android:paddingVertical="@dimen/yuz_space_2">
 
                 <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="@dimen/yuz_icon"
+                    android:layout_height="@dimen/yuz_icon"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_yuz_speed"
-                    app:tint="@color/text_primary" />
+                    app:tint="@color/yuz_text" />
 
                 <TextView
                     android:id="@+id/tvPlSpeedLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="Tezlik"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="10sp" />
+                    android:layout_marginTop="@dimen/yuz_space_1"
+                    android:text="@string/musiqa_pl_speed"
+                    android:textColor="@color/yuz_text_secondary"
+                    android:textSize="@dimen/yuz_text_micro" />
             </LinearLayout>
 
             <LinearLayout
@@ -223,22 +223,22 @@
                 android:layout_weight="1"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:paddingVertical="6dp">
+                android:paddingVertical="@dimen/yuz_space_2">
 
                 <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="@dimen/yuz_icon"
+                    android:layout_height="@dimen/yuz_icon"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_yuz_queue"
-                    app:tint="@color/text_primary" />
+                    app:tint="@color/yuz_text" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="Navbat"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="10sp" />
+                    android:layout_marginTop="@dimen/yuz_space_1"
+                    android:text="@string/musiqa_pl_queue"
+                    android:textColor="@color/yuz_text_secondary"
+                    android:textSize="@dimen/yuz_text_micro" />
             </LinearLayout>
 
             <LinearLayout
@@ -248,23 +248,23 @@
                 android:layout_weight="1"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:paddingVertical="6dp">
+                android:paddingVertical="@dimen/yuz_space_2">
 
                 <ImageView
                     android:id="@+id/ivPlHeart"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="@dimen/yuz_icon"
+                    android:layout_height="@dimen/yuz_icon"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_yuz_heart"
-                    app:tint="@color/text_primary" />
+                    app:tint="@color/yuz_text" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="Sevimli"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="10sp" />
+                    android:layout_marginTop="@dimen/yuz_space_1"
+                    android:text="@string/musiqa_pl_fav"
+                    android:textColor="@color/yuz_text_secondary"
+                    android:textSize="@dimen/yuz_text_micro" />
             </LinearLayout>
 
             <LinearLayout
@@ -274,22 +274,22 @@
                 android:layout_weight="1"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:paddingVertical="6dp">
+                android:paddingVertical="@dimen/yuz_space_2">
 
                 <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="@dimen/yuz_icon"
+                    android:layout_height="@dimen/yuz_icon"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_yuz_download"
-                    app:tint="@color/text_primary" />
+                    app:tint="@color/yuz_text" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="Yuklab"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="10sp" />
+                    android:layout_marginTop="@dimen/yuz_space_1"
+                    android:text="@string/musiqa_pl_dl"
+                    android:textColor="@color/yuz_text_secondary"
+                    android:textSize="@dimen/yuz_text_micro" />
             </LinearLayout>
 
             <LinearLayout
@@ -299,22 +299,22 @@
                 android:layout_weight="1"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:paddingVertical="6dp">
+                android:paddingVertical="@dimen/yuz_space_2">
 
                 <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="@dimen/yuz_icon"
+                    android:layout_height="@dimen/yuz_icon"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_yuz_eq"
-                    app:tint="@color/text_primary" />
+                    app:tint="@color/yuz_text" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="Ekvalayzer"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="10sp" />
+                    android:layout_marginTop="@dimen/yuz_space_1"
+                    android:text="@string/musiqa_pl_eq"
+                    android:textColor="@color/yuz_text_secondary"
+                    android:textSize="@dimen/yuz_text_micro" />
             </LinearLayout>
 
             <LinearLayout
@@ -324,23 +324,23 @@
                 android:layout_weight="1"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:paddingVertical="6dp">
+                android:paddingVertical="@dimen/yuz_space_2">
 
                 <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="@dimen/yuz_icon"
+                    android:layout_height="@dimen/yuz_icon"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_yuz_timer"
-                    app:tint="@color/text_primary" />
+                    app:tint="@color/yuz_text" />
 
                 <TextView
                     android:id="@+id/tvPlSleepLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="Uxlash"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="10sp" />
+                    android:layout_marginTop="@dimen/yuz_space_1"
+                    android:text="@string/musiqa_pl_sleep"
+                    android:textColor="@color/yuz_text_secondary"
+                    android:textSize="@dimen/yuz_text_micro" />
             </LinearLayout>
         </LinearLayout>
 
@@ -350,16 +350,16 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="14dp"
-            android:background="@drawable/bg_yuz_chip"
-            android:paddingStart="16dp"
-            android:paddingTop="7dp"
-            android:paddingEnd="16dp"
-            android:paddingBottom="7dp"
-            android:text="RADIO: ON"
-            android:textColor="@color/home_accent"
-            android:textSize="12sp"
+            android:layout_marginTop="@dimen/yuz_space_3"
+            android:layout_marginBottom="@dimen/yuz_space_4"
+            android:background="@drawable/bg_yuz_pill"
+            android:paddingStart="@dimen/yuz_space_4"
+            android:paddingTop="@dimen/yuz_space_2"
+            android:paddingEnd="@dimen/yuz_space_4"
+            android:paddingBottom="@dimen/yuz_space_2"
+            android:text="@string/musiqa_pl_radio_off"
+            android:textColor="@color/yuz_text_secondary"
+            android:textSize="@dimen/yuz_text_secondary"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -373,7 +373,7 @@
         android:background="@drawable/bg_yuz_mini"
         android:elevation="12dp"
         android:orientation="horizontal"
-        android:padding="8dp"
+        android:padding="@dimen/yuz_space_2"
         android:visibility="gone" />
 
     <!-- Navbat paneli (balandlik kodda: ekranning ~46% — XML foizni
@@ -384,9 +384,9 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:background="@drawable/bg_yuz_sheet"
-        android:elevation="14dp"
+        android:elevation="12dp"
         android:orientation="vertical"
-        android:paddingTop="10dp"
+        android:paddingTop="@dimen/yuz_space_3"
         android:visibility="gone">
 
         <LinearLayout
@@ -394,28 +394,40 @@
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="18dp"
-            android:paddingEnd="10dp">
+            android:paddingStart="@dimen/yuz_gutter"
+            android:paddingEnd="@dimen/yuz_space_2">
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Navbat"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp"
+                android:text="@string/musiqa_pl_queue"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_section"
                 android:textStyle="bold" />
 
             <ImageButton
                 android:id="@+id/btnQueueClose"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="@dimen/yuz_button_sm"
+                android:layout_height="@dimen/yuz_button_sm"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@null"
-                android:padding="9dp"
+                android:contentDescription="@string/musiqa_pl_queue_close"
+                android:padding="@dimen/yuz_space_2"
                 android:src="@drawable/ic_yuz_close"
-                app:tint="@color/text_primary" />
+                app:tint="@color/yuz_text" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/plQueueEmpty"
+            style="@style/YuzEmptyHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/yuz_space_6"
+            android:gravity="center"
+            android:paddingStart="@dimen/yuz_gutter"
+            android:paddingEnd="@dimen/yuz_gutter"
+            android:text="@string/musiqa_pl_queue_empty"
+            android:visibility="gone" />
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/plQueueRv"
@@ -423,6 +435,6 @@
             android:layout_height="0dp"
             android:layout_weight="1"
             android:clipToPadding="false"
-            android:paddingBottom="12dp" />
+            android:paddingBottom="@dimen/yuz_space_3" />
     </LinearLayout>
 </FrameLayout>

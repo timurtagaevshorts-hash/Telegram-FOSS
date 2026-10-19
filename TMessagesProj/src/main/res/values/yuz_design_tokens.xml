@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  YuzGram dizayn to'plami — butun ilova uchun yagona raqamlar.
+  Eski `yuz_classified_colors.xml` brend palstrasini saqlaydi; bu fayl qo'shimcha
+  ravishda tipografiya masshtabi, oraliq qadami, burchak radiusi va tugma balandliklarini
+  belgilaydi. Maqsad: bir xil rol — bir xil raqam (ekrandan ekranga "52 vs 54dp" kabi
+  farqlar tug'ilmasin).
+
+  Uslublar: `yuz_design_styles.xml`.
+-->
+<resources>
+
+    <!-- ============ Ranglar (brend palitrasining taxalluslari) ============ -->
+    <!-- Yagona HARAKAT aksenti: barcha CTA, faol holat, ikon-suzib bo'yash. -->
+    <color name="yuz_action">#2AABEE</color>
+    <!-- Ikkilamchi brend rangi — FAQAT bezak (navigatsiya doirasi, gradient),
+         tugmalarda ishlatilmaydi. -->
+    <color name="yuz_decor">#5B6CF9</color>
+    <color name="yuz_on_action">#FFFFFF</color>
+
+    <color name="yuz_text">#FFFFFF</color>
+    <color name="yuz_text_secondary">#95A1B4</color>
+    <!-- Placeholder / hint: qorong'i sirt ustida 4.5:1 chegarasidan pastga
+         tushmasligi uchun eski `text_hint` (#5E6F84) dan bir pogona yuqori. -->
+    <color name="yuz_text_muted">#7A8AA0</color>
+    <color name="yuz_text_on_accent">#06121C</color>
+
+    <color name="yuz_bg">#0A1120</color>
+    <color name="yuz_surface">#0D121D</color>
+    <color name="yuz_surface_raised">#121925</color>
+    <color name="yuz_field">#121824</color>
+    <color name="yuz_stroke">#202B3C</color>
+    <color name="yuz_stroke_soft">#1CFFFFFF</color>
+    <color name="yuz_stroke_strong">#3DFFFFFF</color>
+
+    <color name="yuz_gold">#FFD84D</color>
+    <color name="yuz_danger">#FF5C5C</color>
+    <!-- Reels\'dagi faol layk — brend palitrasidagi yagona issiq holat rangi. -->
+    <color name="yuz_like">#FF4D6D</color>
+    <!-- Bosish texurasi (ripple) — qorong\'i sirtlarda ko\'rinadigan yagona qiymat. -->
+    <color name="yuz_ripple">#26FFFFFF</color>
+
+    <!-- ============ Tipografiya masshtabi ============ -->
+    <dimen name="yuz_text_display">26sp</dimen>   <!-- faqat brend so'zi / qahramon sarlavha -->
+    <dimen name="yuz_text_title">22sp</dimen>     <!-- ekran sarlavhasi -->
+    <dimen name="yuz_text_section">16sp</dimen>   <!-- bo'lim sarlavhasi -->
+    <dimen name="yuz_text_body">14sp</dimen>      <!-- asosiy matn -->
+    <dimen name="yuz_text_secondary">13sp</dimen> <!-- ikkilamchi matn -->
+    <dimen name="yuz_text_caption">11sp</dimen>   <!-- label, vaqt, badge -->
+    <dimen name="yuz_text_micro">10sp</dimen>     <!-- badge ichida (eng past chegara) -->
+    <dimen name="yuz_text_button">15sp</dimen>
+
+    <!-- ============ Oraliq qadami (4 dp) ============ -->
+    <dimen name="yuz_space_1">4dp</dimen>
+    <dimen name="yuz_space_2">8dp</dimen>
+    <dimen name="yuz_space_3">12dp</dimen>
+    <dimen name="yuz_space_4">16dp</dimen>
+    <dimen name="yuz_space_5">20dp</dimen>
+    <dimen name="yuz_space_6">24dp</dimen>
+    <dimen name="yuz_space_8">32dp</dimen>
+    <!-- Ekranning yon bo'shlig'i — barcha ekranlarda bitta. -->
+    <dimen name="yuz_gutter">20dp</dimen>
+
+    <!-- ============ Burchak radiusi ============ -->
+    <dimen name="yuz_radius_sm">10dp</dimen>
+    <dimen name="yuz_radius_field">14dp</dimen>
+    <dimen name="yuz_radius_card">20dp</dimen>
+    <dimen name="yuz_radius_pill">100dp</dimen>
+
+    <!-- ============ Nazorat balandliklari / ikonlar ============ -->
+    <dimen name="yuz_button">52dp</dimen>
+    <dimen name="yuz_button_sm">40dp</dimen>
+    <dimen name="yuz_field_height">48dp</dimen>
+    <dimen name="yuz_icon_button">44dp</dimen>
+    <dimen name="yuz_chip_height">34dp</dimen>
+    <dimen name="yuz_icon">24dp</dimen>
+    <dimen name="yuz_icon_sm">16dp</dimen>
+    <dimen name="yuz_icon_tile">44dp</dimen>
+    <dimen name="yuz_stroke">1dp</dimen>
+    <dimen name="yuz_touch_min">44dp</dimen>
+
+</resources>

@@ -3,12 +3,16 @@
   YuzGram Premium ekrani — qora-neon palitrada tarif tanlash + Google Play
   to'lovi. KinoTOP4'dagi activity_premium.xml mexanizmining fork moslamasi
   (Theme.YuzGramAds ContextThemeWrapper ostida, BaseFragment ichida).
+
+  Dizayn qoidalari (f1): narx — kartadagi eng yirik raqam; CTA — bitta
+  YuzButton balandligi/radiusi; imtiyozlar ro'yxati matnoldi "✓" belgisi
+  bilan emas, kodda qo'shiladigan vektor belgi bilan chiqadi.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/home_bg">
+    android:background="@color/yuz_bg">
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/premiumScroll"
@@ -21,209 +25,169 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingStart="18dp"
-            android:paddingTop="8dp"
-            android:paddingEnd="18dp"
-            android:paddingBottom="48dp">
+            android:paddingStart="@dimen/yuz_gutter"
+            android:paddingTop="@dimen/yuz_space_2"
+            android:paddingEnd="@dimen/yuz_gutter"
+            android:paddingBottom="@dimen/yuz_space_8">
 
             <LinearLayout
                 android:id="@+id/premiumTopBar"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="@dimen/yuz_field_height"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <TextView
+                <ImageButton
                     android:id="@+id/btnPremiumBack"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:gravity="center"
-                    android:text="@string/premium_back"
-                    android:textColor="@color/text_primary"
-                    android:textSize="22sp" />
+                    style="@style/YuzIconButton"
+                    android:contentDescription="@string/premium_back"
+                    android:src="@drawable/ic_yuz_back" />
 
                 <TextView
+                    style="@style/YuzScreenTitle"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:paddingStart="6dp"
-                    android:paddingEnd="6dp"
-                    android:text="@string/premium_screen_title"
-                    android:textColor="@color/text_primary"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
+                    android:paddingStart="@dimen/yuz_space_2"
+                    android:paddingEnd="@dimen/yuz_space_2"
+                    android:text="@string/premium_screen_title" />
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="@dimen/yuz_space_2"
                 android:background="@drawable/bg_yuz_premium_hero"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="@dimen/yuz_space_5">
 
                 <TextView
+                    android:id="@+id/tvPremiumHero"
+                    style="@style/YuzScreenTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/premium_hero_title"
-                    android:textColor="@color/white"
-                    android:textSize="22sp"
-                    android:textStyle="bold" />
+                    android:text="@string/premium_hero_title" />
 
                 <TextView
+                    style="@style/YuzBodySecondary"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="@string/premium_hero_subtitle"
-                    android:textColor="#D6ECFF"
-                    android:textSize="13sp" />
+                    android:layout_marginTop="@dimen/yuz_space_2"
+                    android:text="@string/premium_hero_subtitle" />
             </LinearLayout>
 
             <TextView
                 android:id="@+id/tvPremiumStatus"
+                style="@style/YuzLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:textColor="@color/classified_price_gold"
-                android:textSize="13sp"
-                android:textStyle="bold"
+                android:layout_marginTop="@dimen/yuz_space_3"
+                android:textColor="@color/yuz_gold"
                 android:visibility="gone" />
 
             <LinearLayout
                 android:id="@+id/cardKino"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="@dimen/yuz_space_4"
                 android:background="@drawable/bg_yuz_premium_card"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="@dimen/yuz_space_4">
 
                 <TextView
                     android:id="@+id/tvKinoTitle"
+                    style="@style/YuzSectionHeader"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/text_primary"
-                    android:textSize="17sp"
-                    android:textStyle="bold" />
+                    android:layout_height="wrap_content" />
 
                 <TextView
                     android:id="@+id/tvKinoPrice"
+                    style="@style/YuzScreenTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="@color/classified_price_gold"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
+                    android:layout_marginTop="@dimen/yuz_space_1"
+                    android:textColor="@color/yuz_gold" />
 
                 <TextView
                     android:id="@+id/tvKinoPlayPrice"
+                    style="@style/YuzCaption"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
+                    android:layout_marginTop="@dimen/yuz_space_1"
                     android:visibility="gone" />
 
-                <TextView
-                    android:id="@+id/tvKinoBenefits"
+                <LinearLayout
+                    android:id="@+id/llKinoBenefits"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:lineSpacingExtra="4dp"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:layout_marginTop="@dimen/yuz_space_3"
+                    android:orientation="vertical" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnPayKino"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:layout_marginTop="14dp"
-                    android:enabled="false"
-                    android:textColor="@color/white"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    app:backgroundTint="@color/home_accent_purple"
-                    app:cornerRadius="25dp" />
+                    style="@style/YuzButton"
+                    android:layout_marginTop="@dimen/yuz_space_4"
+                    android:enabled="false" />
             </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/cardFull"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="@dimen/yuz_space_4"
                 android:background="@drawable/bg_yuz_premium_card"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="@dimen/yuz_space_4">
 
                 <TextView
                     android:id="@+id/tvFullTitle"
+                    style="@style/YuzSectionHeader"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/text_primary"
-                    android:textSize="17sp"
-                    android:textStyle="bold" />
+                    android:layout_height="wrap_content" />
 
                 <TextView
                     android:id="@+id/tvFullPrice"
+                    style="@style/YuzScreenTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="@color/classified_price_gold"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
+                    android:layout_marginTop="@dimen/yuz_space_1"
+                    android:textColor="@color/yuz_gold" />
 
                 <TextView
                     android:id="@+id/tvFullPlayPrice"
+                    style="@style/YuzCaption"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
+                    android:layout_marginTop="@dimen/yuz_space_1"
                     android:visibility="gone" />
 
-                <TextView
-                    android:id="@+id/tvFullBenefits"
+                <LinearLayout
+                    android:id="@+id/llFullBenefits"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:lineSpacingExtra="4dp"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:layout_marginTop="@dimen/yuz_space_3"
+                    android:orientation="vertical" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnPayFull"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:layout_marginTop="14dp"
-                    android:enabled="false"
-                    android:textColor="@color/white"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    app:backgroundTint="@color/home_accent"
-                    app:cornerRadius="25dp" />
+                    style="@style/YuzButton"
+                    android:layout_marginTop="@dimen/yuz_space_4"
+                    android:enabled="false" />
             </LinearLayout>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRestorePurchases"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="14dp"
-                android:text="@string/premium_restore"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp"
-                app:cornerRadius="24dp"
-                app:strokeColor="@color/modern_border" />
+                style="@style/YuzButtonSecondary"
+                android:layout_marginTop="@dimen/yuz_space_3"
+                android:text="@string/premium_restore" />
 
             <TextView
+                style="@style/YuzCaption"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:gravity="center"
-                android:text="@string/premium_pay_note"
-                android:textColor="@color/text_hint"
-                android:textSize="12sp" />
+                android:text="@string/premium_pay_note" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
@@ -231,41 +195,32 @@
         android:id="@+id/premiumApprovedOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/home_bg"
+        android:background="@color/yuz_bg"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="28dp"
+        android:padding="@dimen/yuz_space_8"
         android:visibility="gone">
 
         <TextView
             android:id="@+id/tvApprovedTitle"
+            style="@style/YuzScreenTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:textColor="@color/classified_price_gold"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+            android:textColor="@color/yuz_gold" />
 
         <TextView
             android:id="@+id/tvApprovedSubtitle"
+            style="@style/YuzBodySecondary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:gravity="center"
-            android:lineSpacingExtra="5dp"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp" />
+            android:layout_marginTop="@dimen/yuz_space_3"
+            android:gravity="center" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnApprovedClose"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_marginTop="28dp"
-            android:text="@string/premium_done_close"
-            android:textColor="@color/white"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            app:backgroundTint="@color/home_accent"
-            app:cornerRadius="26dp" />
+            style="@style/YuzButton"
+            android:layout_marginTop="@dimen/yuz_space_6"
+            android:text="@string/premium_done_close" />
     </LinearLayout>
 </FrameLayout>

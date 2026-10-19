@@ -11,7 +11,7 @@
     app:cardBackgroundColor="@color/surface_elevated"
     app:cardCornerRadius="16dp"
     app:cardElevation="5dp"
-    app:strokeColor="@color/home_accent"
+    app:strokeColor="@color/yuz_action"
     app:strokeWidth="1.5dp">
 
     <LinearLayout
@@ -20,15 +20,15 @@
         android:background="@drawable/bg_classified_post_hero"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="14dp"
-        android:paddingTop="12dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="12dp">
+        android:paddingStart="@dimen/yuz_space_4"
+        android:paddingTop="@dimen/yuz_space_3"
+        android:paddingEnd="@dimen/yuz_space_3"
+        android:paddingBottom="@dimen/yuz_space_3">
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="10dp"
+            android:layout_marginEnd="@dimen/yuz_space_3"
             android:layout_weight="1"
             android:orientation="vertical">
 
@@ -36,10 +36,10 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_classified_category_badge_light"
-                android:paddingHorizontal="8dp"
-                android:paddingVertical="3dp"
+                android:paddingHorizontal="@dimen/yuz_space_2"
+                android:paddingVertical="@dimen/yuz_space_1"
                 android:text="@string/home_board_post_promo_free"
-                android:textColor="@color/home_accent"
+                android:textColor="@color/yuz_action"
                 android:textSize="10sp"
                 android:textStyle="bold" />
 
@@ -47,43 +47,43 @@
                 android:id="@+id/tvPromoTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="@dimen/yuz_space_2"
                 android:lineSpacingExtra="2dp"
                 android:text="@string/home_board_post_promo_title"
-                android:textColor="@color/text_primary"
+                android:textColor="@color/yuz_text"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="@dimen/yuz_space_1"
                 android:text="@string/home_board_post_promo_subtitle"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
+                android:textColor="@color/yuz_text_secondary"
+                android:textSize="@dimen/yuz_text_secondary" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPromoPostAd"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:layout_marginTop="10dp"
+                android:layout_height="@dimen/yuz_button_sm"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:minWidth="0dp"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
+                android:paddingStart="@dimen/yuz_space_4"
+                android:paddingEnd="@dimen/yuz_space_4"
                 android:text="@string/home_board_post_promo_button"
                 android:textAllCaps="false"
-                android:textColor="@color/white"
-                android:textSize="13sp"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_secondary"
                 android:textStyle="bold"
-                app:backgroundTint="@color/home_accent"
-                app:cornerRadius="20dp"
+                app:backgroundTint="@color/yuz_action"
+                app:cornerRadius="@dimen/yuz_radius_field"
                 app:icon="@drawable/ic_add"
                 app:iconGravity="textStart"
                 app:iconPadding="6dp"
                 app:iconSize="18dp"
-                app:iconTint="@color/white" />
+                app:iconTint="@color/yuz_text" />
         </LinearLayout>
 
         <FrameLayout

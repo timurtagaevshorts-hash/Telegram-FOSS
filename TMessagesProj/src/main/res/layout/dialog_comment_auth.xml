@@ -5,47 +5,47 @@
     android:layout_height="wrap_content"
     android:background="@drawable/bg_bottom_sheet_comments"
     android:orientation="vertical"
-    android:padding="20dp">
+    android:padding="@dimen/yuz_gutter">
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
         android:text="Izoh yozish"
-        android:textColor="@color/text_primary"
+        android:textColor="@color/yuz_text"
         android:textSize="18sp"
         android:textStyle="bold" />
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="@dimen/yuz_space_2"
         android:gravity="center"
         android:lineSpacingExtra="3dp"
         android:text="Izoh qoldirish uchun kiring va qisqa profil yarating.\nIlovaning boshqa qismlari uchun ro'yxatdan o'tish shart emas."
-        android:textColor="@color/text_secondary"
-        android:textSize="13sp" />
+        android:textColor="@color/yuz_text_secondary"
+        android:textSize="@dimen/yuz_text_secondary" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnPhoneSignIn"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:layout_marginTop="18dp"
+        android:layout_height="@dimen/yuz_button"
+        android:layout_marginTop="@dimen/yuz_gutter"
         android:text="@string/auth_phone_sign_in_button"
         android:textColor="@color/text_on_gold"
         android:textStyle="bold"
-        app:backgroundTint="@color/white"
-        app:cornerRadius="25dp"
+        app:backgroundTint="@color/yuz_text"
+        app:cornerRadius="@dimen/yuz_radius_field"
         app:icon="@drawable/ic_login"
         app:iconGravity="textStart"
-        app:iconTint="@color/text_primary" />
+        app:iconTint="@color/yuz_text" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnCancelAuth"
         style="@style/Widget.MaterialComponents.Button.TextButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="@dimen/yuz_space_1"
         android:text="Bekor qilish"
-        android:textColor="@color/text_secondary" />
+        android:textColor="@color/yuz_text_secondary" />
 </LinearLayout>

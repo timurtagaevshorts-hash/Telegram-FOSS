@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingBottom="32dp">
+        android:paddingBottom="@dimen/yuz_space_8">
 
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
@@ -17,15 +17,15 @@
             android:layout_height="?attr/actionBarSize"
             app:navigationIcon="@drawable/ic_back"
             app:title="@string/job_board_post"
-            app:titleTextColor="@color/text_primary" />
+            app:titleTextColor="@color/yuz_text" />
 
         <!-- Rasm tanlagich (ixtiyoriy, bitta rasm) -->
         <FrameLayout
             android:id="@+id/btnPickImage"
             android:layout_width="match_parent"
             android:layout_height="180dp"
-            android:layout_marginStart="16dp"
-            android:layout_marginEnd="16dp"
+            android:layout_marginStart="@dimen/yuz_space_4"
+            android:layout_marginEnd="@dimen/yuz_space_4"
             android:background="@drawable/bg_classified_image_picker"
             android:clickable="true"
             android:focusable="true"
@@ -48,16 +48,16 @@
                         android:layout_gravity="center"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_add_photo"
-                        app:tint="@color/white" />
+                        app:tint="@color/yuz_text" />
                 </FrameLayout>
 
                 <TextView
                     android:id="@+id/tvPickImageLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="@dimen/yuz_space_3"
                     android:text="@string/job_board_pick_image_optional"
-                    android:textColor="@color/text_primary"
+                    android:textColor="@color/yuz_text"
                     android:textSize="15sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -75,33 +75,33 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="@dimen/yuz_space_4">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/job_board_listing_type"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_secondary"
                 android:textStyle="bold" />
 
             <Spinner
                 android:id="@+id/spinnerListingType"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="@dimen/yuz_space_2"
                 android:background="@drawable/bg_classified_search_bar"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp" />
+                android:paddingStart="@dimen/yuz_space_3"
+                android:paddingEnd="@dimen/yuz_space_3" />
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilTitle"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="@dimen/yuz_space_4"
                 android:hint="@string/job_board_title_hint"
-                app:hintTextColor="@color/text_secondary">
+                app:hintTextColor="@color/yuz_text_secondary">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etTitle"
@@ -109,16 +109,16 @@
                     android:layout_height="wrap_content"
                     android:inputType="textCapSentences"
                     android:maxLines="2"
-                    android:textColor="@color/text_primary" />
+                    android:textColor="@color/yuz_text" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:hint="@string/job_board_description_hint"
-                app:hintTextColor="@color/text_secondary">
+                app:hintTextColor="@color/yuz_text_secondary">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etDescription"
@@ -127,7 +127,7 @@
                     android:gravity="top"
                     android:inputType="textMultiLine|textCapSentences"
                     android:minLines="3"
-                    android:textColor="@color/text_primary" />
+                    android:textColor="@color/yuz_text" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Ish haqi bo'limi — faqat "Ishchi kerak" holatida -->
@@ -140,29 +140,29 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="@dimen/yuz_space_4"
                     android:text="@string/job_board_salary_type"
-                    android:textColor="@color/text_primary"
-                    android:textSize="13sp"
+                    android:textColor="@color/yuz_text"
+                    android:textSize="@dimen/yuz_text_secondary"
                     android:textStyle="bold" />
 
                 <Spinner
                     android:id="@+id/spinnerSalaryType"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="@dimen/yuz_space_2"
                     android:background="@drawable/bg_classified_search_bar"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp" />
+                    android:paddingStart="@dimen/yuz_space_3"
+                    android:paddingEnd="@dimen/yuz_space_3" />
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilSalary"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="@dimen/yuz_space_3"
                     android:hint="@string/job_board_salary_hint"
-                    app:hintTextColor="@color/text_secondary">
+                    app:hintTextColor="@color/yuz_text_secondary">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etSalary"
@@ -171,7 +171,7 @@
                         android:importantForAutofill="no"
                         android:inputType="number"
                         android:maxLines="1"
-                        android:textColor="@color/text_primary" />
+                        android:textColor="@color/yuz_text" />
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
@@ -179,9 +179,9 @@
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:hint="@string/classified_phone_hint"
-                app:hintTextColor="@color/text_secondary">
+                app:hintTextColor="@color/yuz_text_secondary">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etPhone"
@@ -189,16 +189,16 @@
                     android:layout_height="wrap_content"
                     android:inputType="phone"
                     android:maxLines="1"
-                    android:textColor="@color/text_primary" />
+                    android:textColor="@color/yuz_text" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:hint="@string/job_board_location_hint"
-                app:hintTextColor="@color/text_secondary">
+                app:hintTextColor="@color/yuz_text_secondary">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etLocation"
@@ -206,7 +206,7 @@
                     android:layout_height="wrap_content"
                     android:inputType="textCapSentences"
                     android:maxLines="1"
-                    android:textColor="@color/text_primary" />
+                    android:textColor="@color/yuz_text" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- #75: hudud tanlagichi — filtr qidiruvi region maydoniga tayanadi. -->
@@ -214,36 +214,36 @@
                 android:id="@+id/btnJobPickRegion"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="match_parent"
-                android:layout_height="46dp"
-                android:layout_marginTop="8dp"
+                android:layout_height="@dimen/yuz_button"
+                android:layout_marginTop="@dimen/yuz_space_2"
                 android:text="Viloyat / tuman tanlash (ixtiyoriy)"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
-                app:cornerRadius="12dp"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_secondary"
+                app:cornerRadius="@dimen/yuz_radius_field"
                 app:icon="@drawable/ic_location_pin"
                 app:iconGravity="start"
-                app:iconTint="@color/primary"
-                app:strokeColor="#26FFFFFF" />
+                app:iconTint="@color/yuz_action"
+                app:strokeColor="@color/yuz_stroke_soft" />
 
             <ProgressBar
                 android:id="@+id/uploadProgress"
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="@dimen/yuz_space_4"
                 android:indeterminate="true"
-                android:indeterminateTint="@color/primary"
+                android:indeterminateTint="@color/yuz_action"
                 android:visibility="gone" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPublish"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="18dp"
+                android:layout_height="@dimen/yuz_button"
+                android:layout_marginTop="@dimen/yuz_gutter"
                 android:text="@string/job_board_publish"
-                android:textColor="@color/white"
-                app:backgroundTint="@color/primary"
-                app:cornerRadius="14dp" />
+                android:textColor="@color/yuz_text"
+                app:backgroundTint="@color/yuz_action"
+                app:cornerRadius="@dimen/yuz_radius_field" />
         </LinearLayout>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

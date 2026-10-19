@@ -10,7 +10,6 @@ import com.google.android.material.card.MaterialCardView
 import org.telegram.messenger.R
 import uz.kodlikino.top4.models.ClassifiedAd
 import uz.kodlikino.top4.models.ClassifiedAdCardTheme
-import uz.kodlikino.top4.models.ClassifiedAdCategories
 
 object ClassifiedAdCardBinder {
 
@@ -30,8 +29,8 @@ object ClassifiedAdCardBinder {
         onImageClick: (() -> Unit)? = null,
         isOwn: Boolean = false
     ) {
-        val emoji = ClassifiedAdCategories.emoji(ad.category)
-        tvCategory.text = "$emoji ${ClassifiedAdCategories.label(ad.category)}"
+        // Kartada kategoriya ko'rsatilmaydi: badge joyi narx va model uchun kerak,
+        // tur filter chiplarida allaqachon tanlangan.
         tvCategory.visibility = View.GONE
 
         if (ad.model.isNotBlank()) {

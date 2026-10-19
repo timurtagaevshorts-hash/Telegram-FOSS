@@ -4,8 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:ellipsize="marquee"
-    android:paddingHorizontal="14dp"
-    android:paddingVertical="12dp"
+    android:paddingHorizontal="@dimen/yuz_space_4"
+    android:paddingVertical="@dimen/yuz_space_3"
     android:singleLine="true"
-    android:textColor="@color/text_primary"
-    android:textSize="14sp" />
+    android:textColor="@color/yuz_text"
+    android:textSize="@dimen/yuz_text_body" />

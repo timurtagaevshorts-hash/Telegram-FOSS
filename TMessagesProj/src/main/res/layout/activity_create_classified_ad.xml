@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingBottom="32dp">
+        android:paddingBottom="@dimen/yuz_space_8">
 
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
@@ -17,18 +17,18 @@
             android:layout_height="?attr/actionBarSize"
             app:navigationIcon="@drawable/ic_back"
             app:title="@string/classified_post_ad"
-            app:titleTextColor="@color/text_primary" />
+            app:titleTextColor="@color/yuz_text" />
 
         <!-- Premium hero -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginEnd="16dp"
+            android:layout_marginStart="@dimen/yuz_space_4"
+            android:layout_marginEnd="@dimen/yuz_space_4"
             android:background="@drawable/bg_classified_post_hero"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:padding="16dp">
+            android:padding="@dimen/yuz_space_4">
 
             <ImageView
                 android:layout_width="36dp"
@@ -40,7 +40,7 @@
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="@dimen/yuz_space_3"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -48,8 +48,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/classified_post_ad"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
+                    android:textColor="@color/yuz_text"
+                    android:textSize="@dimen/yuz_text_section"
                     android:textStyle="bold" />
 
                 <TextView
@@ -57,8 +57,8 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:text="@string/classified_post_subtitle"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp" />
+                    android:textColor="@color/yuz_text_secondary"
+                    android:textSize="@dimen/yuz_text_secondary" />
             </LinearLayout>
         </LinearLayout>
 
@@ -66,7 +66,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="@dimen/yuz_space_4">
 
             <!-- Graphic image picker -->
             <FrameLayout
@@ -77,7 +77,7 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground"
-                android:padding="20dp">
+                android:padding="@dimen/yuz_gutter">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -96,16 +96,16 @@
                             android:layout_gravity="center"
                             android:contentDescription="@null"
                             android:src="@drawable/ic_add_photo"
-                            app:tint="@color/white" />
+                            app:tint="@color/yuz_text" />
                     </FrameLayout>
 
                     <TextView
                         android:id="@+id/tvPickImagesLabel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginTop="@dimen/yuz_space_3"
                         android:text="@string/classified_add_photos"
-                        android:textColor="@color/text_primary"
+                        android:textColor="@color/yuz_text"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -114,8 +114,8 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="@string/classified_add_photos_subtitle"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp" />
+                        android:textColor="@color/yuz_text_secondary"
+                        android:textSize="@dimen/yuz_text_secondary" />
                 </LinearLayout>
             </FrameLayout>
 
@@ -123,61 +123,61 @@
                 android:id="@+id/rvSelectedImages"
                 android:layout_width="match_parent"
                 android:layout_height="88dp"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:visibility="gone" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
+                android:layout_marginTop="@dimen/yuz_gutter"
                 android:text="@string/classified_category"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_secondary"
                 android:textStyle="bold" />
 
             <Spinner
                 android:id="@+id/spinnerCategory"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="@dimen/yuz_space_2"
                 android:background="@drawable/bg_classified_search_bar"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp" />
+                android:paddingStart="@dimen/yuz_space_3"
+                android:paddingEnd="@dimen/yuz_space_3" />
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="@dimen/yuz_space_4"
                 android:hint="@string/classified_model_hint"
                 app:boxBackgroundColor="@color/classified_field_bg"
-                app:boxStrokeColor="@color/home_accent_purple"
-                app:hintTextColor="@color/text_hint">
+                app:boxStrokeColor="@color/yuz_action"
+                app:hintTextColor="@color/yuz_text_muted">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etModel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="textCapSentences"
-                    android:textColor="@color/text_primary" />
+                    android:textColor="@color/yuz_text" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:hint="@string/classified_title_hint"
                 app:boxBackgroundColor="@color/classified_field_bg"
-                app:boxStrokeColor="@color/home_accent_purple"
-                app:hintTextColor="@color/text_hint">
+                app:boxStrokeColor="@color/yuz_action"
+                app:hintTextColor="@color/yuz_text_muted">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="textCapSentences"
-                    android:textColor="@color/text_primary" />
+                    android:textColor="@color/yuz_text" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
@@ -185,33 +185,33 @@
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:hint="@string/classified_price_hint"
                 app:boxBackgroundColor="@color/classified_field_bg"
-                app:boxStrokeColor="@color/home_accent_purple"
-                app:hintTextColor="@color/text_hint"
+                app:boxStrokeColor="@color/yuz_action"
+                app:hintTextColor="@color/yuz_text_muted"
                 app:suffixText="@string/classified_price_suffix"
-                app:suffixTextColor="@color/home_accent_purple">
+                app:suffixTextColor="@color/yuz_action">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etPrice"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="number"
-                    android:textColor="@color/text_primary" />
+                    android:textColor="@color/yuz_text" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:hint="@string/classified_address_hint"
                 app:boxBackgroundColor="@color/classified_field_bg"
-                app:boxStrokeColor="@color/home_accent_purple"
-                app:hintTextColor="@color/text_hint"
+                app:boxStrokeColor="@color/yuz_action"
+                app:hintTextColor="@color/yuz_text_muted"
                 app:startIconDrawable="@drawable/ic_location_pin"
-                app:startIconTint="@color/home_accent_purple">
+                app:startIconTint="@color/yuz_action">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etAddress"
@@ -220,7 +220,7 @@
                     android:imeOptions="actionNext"
                     android:inputType="textCapSentences"
                     android:maxLines="1"
-                    android:textColor="@color/text_primary" />
+                    android:textColor="@color/yuz_text" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- #75: hudud tanlagichi — filtr qidiruvi region maydoniga tayanadi. -->
@@ -228,46 +228,46 @@
                 android:id="@+id/btnPickRegion"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="match_parent"
-                android:layout_height="46dp"
-                android:layout_marginTop="8dp"
+                android:layout_height="@dimen/yuz_button"
+                android:layout_marginTop="@dimen/yuz_space_2"
                 android:text="Viloyat / tuman tanlash (ixtiyoriy)"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
-                app:cornerRadius="12dp"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_secondary"
+                app:cornerRadius="@dimen/yuz_radius_field"
                 app:icon="@drawable/ic_location_pin"
                 app:iconGravity="start"
-                app:iconTint="@color/primary"
-                app:strokeColor="#26FFFFFF" />
+                app:iconTint="@color/yuz_action"
+                app:strokeColor="@color/yuz_stroke_soft" />
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:hint="@string/classified_phone_hint"
                 app:boxBackgroundColor="@color/classified_field_bg"
-                app:boxStrokeColor="@color/home_accent_purple"
-                app:hintTextColor="@color/text_hint"
+                app:boxStrokeColor="@color/yuz_action"
+                app:hintTextColor="@color/yuz_text_muted"
                 app:prefixText="📞 "
-                app:prefixTextColor="@color/home_accent_purple">
+                app:prefixTextColor="@color/yuz_action">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etPhone"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="phone"
-                    android:textColor="@color/text_primary" />
+                    android:textColor="@color/yuz_text" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:hint="@string/classified_full_info_hint"
                 app:boxBackgroundColor="@color/classified_field_bg"
-                app:boxStrokeColor="@color/home_accent_purple"
-                app:hintTextColor="@color/text_hint">
+                app:boxStrokeColor="@color/yuz_action"
+                app:hintTextColor="@color/yuz_text_muted">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etDescription"
@@ -276,7 +276,7 @@
                     android:gravity="top"
                     android:inputType="textMultiLine|textCapSentences"
                     android:minLines="4"
-                    android:textColor="@color/text_primary" />
+                    android:textColor="@color/yuz_text" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!--
@@ -288,11 +288,10 @@
 
             <TextView
                 android:id="@+id/tvUploadStatus"
+                style="@style/YuzBodySecondary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:visibility="gone" />
 
             <ProgressBar
@@ -300,22 +299,16 @@
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:max="100"
-                android:progressTint="@color/home_accent_purple"
+                android:progressTint="@color/yuz_action"
                 android:visibility="gone" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPublish"
-                android:layout_width="match_parent"
-                android:layout_height="54dp"
-                android:layout_marginTop="20dp"
-                android:text="@string/classified_publish"
-                android:textColor="@color/white"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                app:backgroundTint="@color/home_accent_purple"
-                app:cornerRadius="27dp" />
+                style="@style/YuzButton"
+                android:layout_marginTop="@dimen/yuz_space_5"
+                android:text="@string/classified_publish" />
         </LinearLayout>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

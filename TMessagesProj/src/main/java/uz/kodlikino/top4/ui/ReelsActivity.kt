@@ -768,8 +768,11 @@ class ReelsActivity @JvmOverloads constructor(
             return
         }
         hint.visibility = View.VISIBLE
-        hint.text = getString(R.string.reels_comment_replying_to,
-            target.authorName.ifBlank { "YuzGram" }) + "   ✕"
+        hint.text = getString(
+            R.string.reels_comment_replying_to,
+            target.authorName.ifBlank { getString(R.string.AppName) }
+        )
+        hint.setIconEnd(R.drawable.ic_yuz_close, sizeDp = 13, gapDp = 8)
         hint.isClickable = true
         hint.setOnClickListener {
             replyTarget = null

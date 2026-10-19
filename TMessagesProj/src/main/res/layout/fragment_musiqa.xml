@@ -13,9 +13,9 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="4dp"
-        android:paddingEnd="8dp"
-        android:paddingBottom="6dp">
+        android:paddingStart="@dimen/yuz_space_1"
+        android:paddingEnd="@dimen/yuz_space_2"
+        android:paddingBottom="@dimen/yuz_space_2">
 
         <ImageButton
             android:id="@+id/btnMusiqaBack"
@@ -24,22 +24,22 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@null"
             android:src="@drawable/ic_back"
-            app:tint="@color/text_primary" />
+            app:tint="@color/yuz_text" />
 
         <ImageView
             android:layout_width="20dp"
             android:layout_height="20dp"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="@dimen/yuz_space_2"
             android:src="@drawable/ic_yuz_music"
-            app:tint="@color/home_accent" />
+            app:tint="@color/yuz_action" />
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="@dimen/yuz_space_2"
             android:text="@string/musiqa_title"
-            android:textColor="@color/text_primary"
+            android:textColor="@color/yuz_text"
             android:textSize="18sp"
             android:textStyle="bold" />
 
@@ -51,7 +51,7 @@
             android:layout_height="wrap_content"
             android:minWidth="0dp"
             android:text="@string/musiqa_saved_btn"
-            android:textSize="13sp" />
+            android:textSize="@dimen/yuz_text_secondary" />
     </LinearLayout>
 
     <!-- Qidiruv qatori -->
@@ -60,9 +60,9 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="8dp">
+        android:paddingStart="@dimen/yuz_space_4"
+        android:paddingEnd="@dimen/yuz_space_4"
+        android:paddingBottom="@dimen/yuz_space_2">
 
         <EditText
             android:id="@+id/etMusiqaQuery"
@@ -74,34 +74,34 @@
             android:imeOptions="actionSearch"
             android:inputType="text"
             android:maxLines="1"
-            android:paddingStart="14dp"
-            android:paddingTop="10dp"
-            android:paddingEnd="14dp"
-            android:paddingBottom="10dp"
-            android:textColor="@color/text_primary"
-            android:textColorHint="@color/text_secondary"
+            android:paddingStart="@dimen/yuz_space_4"
+            android:paddingTop="@dimen/yuz_space_3"
+            android:paddingEnd="@dimen/yuz_space_4"
+            android:paddingBottom="@dimen/yuz_space_3"
+            android:textColor="@color/yuz_text"
+            android:textColorHint="@color/yuz_text_secondary"
             android:textSize="15sp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnMusiqaSearch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="@dimen/yuz_space_2"
             android:text="@string/musiqa_search"
-            android:textSize="14sp"
-            app:cornerRadius="12dp" />
+            android:textSize="@dimen/yuz_text_body"
+            app:cornerRadius="@dimen/yuz_radius_field" />
     </LinearLayout>
 
     <TextView
         android:id="@+id/tvMusiqaStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
-        android:paddingBottom="6dp"
+        android:paddingStart="@dimen/yuz_gutter"
+        android:paddingEnd="@dimen/yuz_gutter"
+        android:paddingBottom="@dimen/yuz_space_2"
         android:text="@string/musiqa_trending"
-        android:textColor="@color/text_secondary"
-        android:textSize="13sp" />
+        android:textColor="@color/yuz_text_secondary"
+        android:textSize="@dimen/yuz_text_secondary" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvMusiqa"
@@ -109,7 +109,7 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:clipToPadding="false"
-        android:paddingBottom="16dp" />
+        android:paddingBottom="@dimen/yuz_space_4" />
 
     <!-- YuzGram #62: pastdagi ijochi panel (gone; kuylash boshlanganda ko'rinadi) -->
     <include layout="@layout/layout_yuz_music_player" />

@@ -12,10 +12,10 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="4dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="8dp">
+        android:paddingStart="@dimen/yuz_space_1"
+        android:paddingTop="@dimen/yuz_space_2"
+        android:paddingEnd="@dimen/yuz_space_4"
+        android:paddingBottom="@dimen/yuz_space_2">
 
         <ImageButton
             android:id="@+id/btnKinoDetailBack"
@@ -30,7 +30,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/kino_title"
-            android:textColor="@color/text_primary"
+            android:textColor="@color/yuz_text"
             android:textSize="20sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -58,52 +58,52 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="18dp">
+                android:padding="@dimen/yuz_gutter">
 
                 <TextView
                     android:id="@+id/tvKinoDetailTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/text_primary"
-                    android:textSize="22sp"
+                    android:textColor="@color/yuz_text"
+                    android:textSize="@dimen/yuz_text_title"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/tvKinoDetailMeta"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:textColor="@color/home_accent"
-                    android:textSize="13sp" />
+                    android:layout_marginTop="@dimen/yuz_space_2"
+                    android:textColor="@color/yuz_action"
+                    android:textSize="@dimen/yuz_text_secondary" />
 
                 <TextView
                     android:id="@+id/tvKinoDetailViews"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp" />
+                    android:layout_marginTop="@dimen/yuz_space_1"
+                    android:textColor="@color/yuz_text_secondary"
+                    android:textSize="@dimen/yuz_text_secondary" />
 
                 <TextView
                     android:id="@+id/tvKinoDetailDesc"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="@dimen/yuz_space_4"
                     android:lineSpacingExtra="4dp"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="14sp" />
+                    android:textColor="@color/yuz_text_secondary"
+                    android:textSize="@dimen/yuz_text_body" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnKinoWatch"
                     android:layout_width="match_parent"
-                    android:layout_height="54dp"
+                    android:layout_height="@dimen/yuz_button"
                     android:layout_marginTop="22dp"
                     android:text="@string/kino_watch"
-                    android:textColor="@color/white"
-                    android:textSize="16sp"
+                    android:textColor="@color/yuz_text"
+                    android:textSize="@dimen/yuz_text_section"
                     android:textStyle="bold"
-                    app:backgroundTint="@color/home_accent"
-                    app:cornerRadius="14dp" />
+                    app:backgroundTint="@color/yuz_action"
+                    app:cornerRadius="@dimen/yuz_radius_field" />
             </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>

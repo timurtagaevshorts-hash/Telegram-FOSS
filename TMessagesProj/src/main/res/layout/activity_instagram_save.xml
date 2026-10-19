@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingBottom="32dp">
+        android:paddingBottom="@dimen/yuz_space_8">
 
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/instagramSaveToolbar"
@@ -17,16 +17,16 @@
             android:layout_height="?attr/actionBarSize"
             app:navigationIcon="@drawable/ic_back"
             app:title="@string/instagram_save_title"
-            app:titleTextColor="@color/text_primary" />
+            app:titleTextColor="@color/yuz_text" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="16dp"
-            android:paddingTop="4dp"
-            android:paddingEnd="16dp">
+            android:paddingStart="@dimen/yuz_space_4"
+            android:paddingTop="@dimen/yuz_space_1"
+            android:paddingEnd="@dimen/yuz_space_4">
 
             <FrameLayout
                 android:layout_width="44dp"
@@ -44,15 +44,15 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="@dimen/yuz_space_3"
                 android:orientation="vertical">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/instagram_save_hero"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
+                    android:textColor="@color/yuz_text"
+                    android:textSize="@dimen/yuz_text_section"
                     android:textStyle="bold" />
 
                 <TextView
@@ -60,7 +60,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:text="@string/instagram_save_subtitle"
-                    android:textColor="@color/text_secondary"
+                    android:textColor="@color/yuz_text_secondary"
                     android:textSize="12.5sp" />
             </LinearLayout>
         </LinearLayout>
@@ -69,7 +69,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="@dimen/yuz_space_4">
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -77,27 +77,27 @@
                 app:cardBackgroundColor="@color/classified_card_default_bg"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="0dp"
-                app:strokeColor="@color/classified_card_default_stroke"
+                app:strokeColor="@color/yuz_stroke_soft"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="14dp">
+                    android:padding="@dimen/yuz_space_4">
 
                     <com.google.android.material.textfield.TextInputLayout
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:hint="@string/instagram_save_link_hint"
-                        android:textColorHint="@color/text_secondary"
+                        android:textColorHint="@color/yuz_text_secondary"
                         app:boxCornerRadiusBottomEnd="14dp"
                         app:boxCornerRadiusBottomStart="14dp"
                         app:boxCornerRadiusTopEnd="14dp"
                         app:boxCornerRadiusTopStart="14dp"
-                        app:boxStrokeColor="@color/primary"
-                        app:hintTextColor="@color/text_secondary">
+                        app:boxStrokeColor="@color/yuz_action"
+                        app:hintTextColor="@color/yuz_text_secondary">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etInstagramLink"
@@ -105,40 +105,40 @@
                             android:layout_height="wrap_content"
                             android:inputType="textUri"
                             android:maxLines="3"
-                            android:textColor="@color/text_primary"
-                            android:textSize="14sp" />
+                            android:textColor="@color/yuz_text"
+                            android:textSize="@dimen/yuz_text_body" />
                     </com.google.android.material.textfield.TextInputLayout>
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="@dimen/yuz_space_3"
                         android:orientation="horizontal">
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnInstagramPaste"
                             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                             android:layout_width="0dp"
-                            android:layout_height="48dp"
+                            android:layout_height="@dimen/yuz_button"
                             android:layout_weight="1"
                             android:text="@string/instagram_save_paste"
-                            android:textColor="@color/text_primary"
-                            app:cornerRadius="14dp"
-                            app:strokeColor="@color/classified_card_default_stroke" />
+                            android:textColor="@color/yuz_text"
+                            app:cornerRadius="@dimen/yuz_radius_field"
+                            app:strokeColor="@color/yuz_stroke_soft" />
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnInstagramDownload"
                             android:layout_width="0dp"
-                            android:layout_height="48dp"
-                            android:layout_marginStart="10dp"
+                            android:layout_height="@dimen/yuz_button"
+                            android:layout_marginStart="@dimen/yuz_space_3"
                             android:layout_weight="1.6"
                             android:text="@string/instagram_save_download"
-                            android:textColor="@color/white"
-                            app:backgroundTint="@color/primary"
-                            app:cornerRadius="14dp"
+                            android:textColor="@color/yuz_text"
+                            app:backgroundTint="@color/yuz_action"
+                            app:cornerRadius="@dimen/yuz_radius_field"
                             app:icon="@drawable/ic_yuz_download"
                             app:iconGravity="textStart"
-                            app:iconTint="@color/white" />
+                            app:iconTint="@color/yuz_text" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -147,27 +147,27 @@
                 android:id="@+id/instagramProgressPanel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:background="@drawable/bg_instagram_progress"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="14dp"
-                android:paddingTop="10dp"
-                android:paddingEnd="14dp"
-                android:paddingBottom="10dp"
+                android:paddingStart="@dimen/yuz_space_4"
+                android:paddingTop="@dimen/yuz_space_3"
+                android:paddingEnd="@dimen/yuz_space_4"
+                android:paddingBottom="@dimen/yuz_space_3"
                 android:visibility="gone">
 
                 <ProgressBar
                     android:layout_width="20dp"
                     android:layout_height="20dp"
-                    android:indeterminateTint="@color/primary" />
+                    android:indeterminateTint="@color/yuz_action" />
 
                 <TextView
                     android:id="@+id/tvInstagramProgress"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:textColor="@color/text_primary"
+                    android:layout_marginStart="@dimen/yuz_space_3"
+                    android:textColor="@color/yuz_text"
                     android:textSize="13.5sp" />
             </LinearLayout>
 
@@ -175,7 +175,7 @@
                 android:id="@+id/instagramResultCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="@dimen/yuz_space_4"
                 android:visibility="gone"
                 app:cardBackgroundColor="@color/classified_card_default_bg"
                 app:cardCornerRadius="22dp"
@@ -187,38 +187,38 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="14dp">
+                    android:padding="@dimen/yuz_space_4">
 
                     <TextView
                         android:id="@+id/tvInstagramAuthor"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="10dp"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp"
+                        android:layout_marginBottom="@dimen/yuz_space_3"
+                        android:textColor="@color/yuz_text_secondary"
+                        android:textSize="@dimen/yuz_text_secondary"
                         android:visibility="gone" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnInstagramSaveGallery"
                         android:layout_width="match_parent"
-                        android:layout_height="54dp"
+                        android:layout_height="@dimen/yuz_button"
                         android:text="@string/instagram_save_gallery"
-                        android:textColor="@color/white"
+                        android:textColor="@color/yuz_text"
                         android:textStyle="bold"
-                        app:backgroundTint="@color/instagram_action"
-                        app:cornerRadius="16dp"
+                        app:backgroundTint="@color/yuz_action"
+                        app:cornerRadius="@dimen/yuz_radius_field"
                         app:icon="@drawable/ic_yuz_gallery"
                         app:iconGravity="textStart"
-                        app:iconTint="@color/white" />
+                        app:iconTint="@color/yuz_text" />
 
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
+                        android:layout_marginTop="@dimen/yuz_space_4"
                         app:cardBackgroundColor="#0A0F16"
                         app:cardCornerRadius="18dp"
                         app:cardElevation="0dp"
-                        app:strokeColor="@color/classified_card_default_stroke"
+                        app:strokeColor="@color/yuz_stroke_soft"
                         app:strokeWidth="1dp">
 
                         <FrameLayout

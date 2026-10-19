@@ -56,7 +56,7 @@
         android:layout_width="44dp"
         android:layout_height="44dp"
         android:layout_gravity="center"
-        android:indeterminateTint="@color/home_accent"
+        android:indeterminateTint="@color/yuz_action"
         android:visibility="gone" />
 
     <!-- Bosilganda qisqa ko'rinadigan play/pause belgisi -->
@@ -81,7 +81,7 @@
         android:layout_gravity="center"
         android:contentDescription="@null"
         android:src="@drawable/ic_yuz_heart_filled"
-        android:tint="#FFFF4D6D"
+        android:tint="@color/yuz_like"
         android:visibility="gone" />
 
     <!--
@@ -94,13 +94,13 @@
         android:layout_height="44dp"
         android:layout_gravity="top|end"
         android:layout_marginTop="54dp"
-        android:layout_marginEnd="14dp"
+        android:layout_marginEnd="@dimen/yuz_space_4"
         android:background="@drawable/bg_yuz_reel_action"
         android:contentDescription="@string/reels_menu"
         android:foreground="?attr/selectableItemBackgroundBorderless"
-        android:padding="9dp"
+        android:padding="@dimen/yuz_space_2"
         android:src="@drawable/ic_yuz_more"
-        android:tint="@color/white"
+        android:tint="@color/yuz_text"
         android:visibility="gone" />
 
     <!--
@@ -114,8 +114,8 @@
         android:layout_width="match_parent"
         android:layout_height="3dp"
         android:layout_gravity="bottom"
-        android:layout_marginStart="10dp"
-        android:layout_marginEnd="10dp"
+        android:layout_marginStart="@dimen/yuz_space_3"
+        android:layout_marginEnd="@dimen/yuz_space_3"
         android:layout_marginBottom="80dp"
         android:max="1000"
         android:progress="0"
@@ -126,7 +126,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_marginEnd="12dp"
+        android:layout_marginEnd="@dimen/yuz_space_3"
         android:layout_marginBottom="96dp"
         android:gravity="center_horizontal"
         android:orientation="vertical">
@@ -138,9 +138,9 @@
             android:background="@drawable/bg_yuz_reel_action"
             android:contentDescription="@string/reels_like"
             android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:padding="12dp"
+            android:padding="@dimen/yuz_space_3"
             android:src="@drawable/ic_yuz_heart"
-            android:tint="@color/white" />
+            android:tint="@color/yuz_text" />
 
         <TextView
             android:id="@+id/tvLikeCount"
@@ -151,21 +151,21 @@
             android:shadowDy="1"
             android:shadowRadius="4"
             android:text="0"
-            android:textColor="@color/white"
-            android:textSize="12sp" />
+            android:textColor="@color/yuz_text"
+            android:textSize="@dimen/yuz_text_secondary" />
 
         <!-- Izoh: bosilganda pastda izohlar paneli ochiladi (ReelsActivity) -->
         <ImageView
             android:id="@+id/btnComments"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="@dimen/yuz_space_4"
             android:background="@drawable/bg_yuz_reel_action"
             android:contentDescription="@string/reels_comments"
             android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:padding="12dp"
+            android:padding="@dimen/yuz_space_3"
             android:src="@drawable/ic_yuz_comment"
-            android:tint="@color/white" />
+            android:tint="@color/yuz_text" />
 
         <TextView
             android:id="@+id/tvCommentCount"
@@ -176,25 +176,25 @@
             android:shadowDy="1"
             android:shadowRadius="4"
             android:text="0"
-            android:textColor="@color/white"
-            android:textSize="12sp" />
+            android:textColor="@color/yuz_text"
+            android:textSize="@dimen/yuz_text_secondary" />
 
         <ImageView
             android:id="@+id/btnShare"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="@dimen/yuz_space_4"
             android:background="@drawable/bg_yuz_reel_action"
             android:contentDescription="@string/reels_share"
             android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:padding="12dp"
+            android:padding="@dimen/yuz_space_3"
             android:src="@drawable/ic_yuz_share"
-            android:tint="@color/white" />
+            android:tint="@color/yuz_text" />
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="@dimen/yuz_space_4"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -209,13 +209,13 @@
                 android:id="@+id/tvViews"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="@dimen/yuz_space_1"
                 android:shadowColor="#A6000000"
                 android:shadowDy="1"
                 android:shadowRadius="4"
                 android:text="0"
-                android:textColor="@color/white"
-                android:textSize="12sp" />
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_secondary" />
         </LinearLayout>
     </LinearLayout>
 
@@ -225,7 +225,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:layout_marginStart="14dp"
+        android:layout_marginStart="@dimen/yuz_space_4"
         android:layout_marginEnd="84dp"
         android:layout_marginBottom="88dp"
         android:orientation="vertical">
@@ -239,8 +239,8 @@
             android:focusable="true"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp">
+            android:paddingTop="@dimen/yuz_space_1"
+            android:paddingBottom="@dimen/yuz_space_1">
 
             <FrameLayout
                 android:layout_width="34dp"
@@ -253,7 +253,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:text="R"
-                    android:textColor="@color/white"
+                    android:textColor="@color/yuz_text"
                     android:textSize="15sp"
                     android:textStyle="bold" />
             </FrameLayout>
@@ -262,14 +262,14 @@
                 android:id="@+id/tvUploaderName"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
+                android:layout_marginStart="@dimen/yuz_space_3"
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:shadowColor="#A6000000"
                 android:shadowDy="1"
                 android:shadowRadius="4"
-                android:textColor="@color/white"
+                android:textColor="@color/yuz_text"
                 android:textSize="15sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -278,7 +278,7 @@
             android:id="@+id/tvCaption"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="@dimen/yuz_space_2"
             android:ellipsize="end"
             android:lineSpacingExtra="2dp"
             android:maxLines="4"
@@ -286,7 +286,7 @@
             android:shadowDy="1"
             android:shadowRadius="4"
             android:textColor="#F2FFFFFF"
-            android:textSize="14sp" />
+            android:textSize="@dimen/yuz_text_body" />
 
         <!--
           KinoTOP4'dagi CTA qatori: `movieUrl` bo'lsa "Kinoni ko'rish",
@@ -297,7 +297,7 @@
             android:id="@+id/reelCtaRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="9dp"
+            android:layout_marginTop="@dimen/yuz_space_2"
             android:orientation="horizontal"
             android:visibility="gone">
 
@@ -308,13 +308,13 @@
                 android:background="@drawable/bg_classified_category_badge"
                 android:contentDescription="@string/reels_watch_movie"
                 android:foreground="?attr/selectableItemBackground"
-                android:paddingStart="11dp"
-                android:paddingTop="6dp"
-                android:paddingEnd="11dp"
-                android:paddingBottom="6dp"
+                android:paddingStart="@dimen/yuz_space_3"
+                android:paddingTop="@dimen/yuz_space_2"
+                android:paddingEnd="@dimen/yuz_space_3"
+                android:paddingBottom="@dimen/yuz_space_2"
                 android:text="@string/reels_watch_movie"
-                android:textColor="@color/home_accent"
-                android:textSize="12sp"
+                android:textColor="@color/yuz_action"
+                android:textSize="@dimen/yuz_text_secondary"
                 android:textStyle="bold"
                 android:visibility="gone" />
 
@@ -322,18 +322,18 @@
                 android:id="@+id/btnAd"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="@dimen/yuz_space_2"
                 android:layout_weight="1"
                 android:background="@drawable/bg_classified_category_badge_light"
                 android:ellipsize="end"
                 android:foreground="?attr/selectableItemBackground"
                 android:maxLines="1"
-                android:paddingStart="11dp"
-                android:paddingTop="6dp"
-                android:paddingEnd="11dp"
-                android:paddingBottom="6dp"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp"
+                android:paddingStart="@dimen/yuz_space_3"
+                android:paddingTop="@dimen/yuz_space_2"
+                android:paddingEnd="@dimen/yuz_space_3"
+                android:paddingBottom="@dimen/yuz_space_2"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_secondary"
                 android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>

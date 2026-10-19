@@ -12,15 +12,15 @@
         android:id="@+id/miniProgress"
         android:layout_width="match_parent"
         android:layout_height="2.5dp"
-        android:background="@color/home_accent" />
+        android:background="@color/yuz_action" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="52dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="8dp"
-        android:paddingEnd="4dp">
+        android:paddingStart="@dimen/yuz_space_2"
+        android:paddingEnd="@dimen/yuz_space_1">
 
         <ImageView
             android:id="@+id/ivMiniCover"
@@ -28,15 +28,15 @@
             android:layout_height="38dp"
             android:background="@drawable/bg_yuz_cover"
             android:contentDescription="@null"
-            android:padding="6dp"
+            android:padding="@dimen/yuz_space_2"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_yuz_music"
-            app:tint="@color/home_accent" />
+            app:tint="@color/yuz_action" />
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="@dimen/yuz_space_3"
             android:layout_weight="1"
             android:orientation="vertical">
 
@@ -47,8 +47,8 @@
                 android:ellipsize="end"
                 android:singleLine="true"
                 android:text=""
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_secondary"
                 android:textStyle="bold" />
 
             <TextView
@@ -58,8 +58,8 @@
                 android:ellipsize="end"
                 android:singleLine="true"
                 android:text=""
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
+                android:textColor="@color/yuz_text_secondary"
+                android:textSize="@dimen/yuz_text_caption" />
         </LinearLayout>
 
         <ImageButton
@@ -68,9 +68,9 @@
             android:layout_height="44dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@null"
-            android:padding="10dp"
+            android:padding="@dimen/yuz_space_3"
             android:src="@drawable/ic_yuz_play"
-            app:tint="@color/text_primary" />
+            app:tint="@color/yuz_text" />
 
         <ImageButton
             android:id="@+id/btnMiniClose"
@@ -78,8 +78,8 @@
             android:layout_height="36dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@null"
-            android:padding="9dp"
+            android:padding="@dimen/yuz_space_2"
             android:src="@drawable/ic_yuz_close"
-            app:tint="@color/text_secondary" />
+            app:tint="@color/yuz_text_secondary" />
     </LinearLayout>
 </LinearLayout>

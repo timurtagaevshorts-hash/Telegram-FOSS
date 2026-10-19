@@ -62,7 +62,9 @@ class YuzProfileReelsView(
 
         emptyView = TextView(context)
         emptyView.text = context.getString(R.string.profile_reels_empty)
-        emptyView.setTextColor(0xFF8A9BB4.toInt())
+        emptyView.setTextColor(
+            androidx.core.content.ContextCompat.getColor(context, R.color.yuz_text_secondary)
+        )
         emptyView.textSize = 15f
         emptyView.gravity = Gravity.CENTER
         emptyView.visibility = View.GONE

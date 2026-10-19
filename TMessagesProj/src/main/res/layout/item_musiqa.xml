@@ -6,10 +6,10 @@
     android:background="?attr/selectableItemBackground"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingStart="16dp"
-    android:paddingTop="8dp"
-    android:paddingEnd="12dp"
-    android:paddingBottom="8dp">
+    android:paddingStart="@dimen/yuz_space_4"
+    android:paddingTop="@dimen/yuz_space_2"
+    android:paddingEnd="@dimen/yuz_space_3"
+    android:paddingBottom="@dimen/yuz_space_2">
 
     <ImageView
         android:id="@+id/ivMusiqaCover"
@@ -22,7 +22,7 @@
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
+        android:layout_marginStart="@dimen/yuz_space_3"
         android:layout_weight="1"
         android:orientation="vertical">
 
@@ -32,7 +32,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/text_primary"
+            android:textColor="@color/yuz_text"
             android:textSize="15sp"
             android:textStyle="bold" />
 
@@ -42,36 +42,36 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp" />
+            android:textColor="@color/yuz_text_secondary"
+            android:textSize="@dimen/yuz_text_secondary" />
     </LinearLayout>
 
     <TextView
         android:id="@+id/tvMusiqaDur"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:textColor="@color/text_secondary"
-        android:textSize="12sp" />
+        android:layout_marginStart="@dimen/yuz_space_2"
+        android:textColor="@color/yuz_text_secondary"
+        android:textSize="@dimen/yuz_text_secondary" />
 
     <!-- YuzGram #62: qo'shiqni keshga yuklab olish -->
     <ImageButton
         android:id="@+id/btnMusiqaDl"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:layout_marginStart="4dp"
+        android:layout_marginStart="@dimen/yuz_space_1"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@null"
         android:src="@drawable/ic_yuz_download"
-        app:tint="@color/text_secondary" />
+        app:tint="@color/yuz_text_secondary" />
 
     <ImageButton
         android:id="@+id/btnMusiqaPlay"
         android:layout_width="44dp"
         android:layout_height="44dp"
-        android:layout_marginStart="4dp"
+        android:layout_marginStart="@dimen/yuz_space_1"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@null"
         android:src="@drawable/ic_yuz_play"
-        app:tint="@color/home_accent" />
+        app:tint="@color/yuz_action" />
 </LinearLayout>

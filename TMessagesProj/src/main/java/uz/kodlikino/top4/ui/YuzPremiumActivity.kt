@@ -99,11 +99,42 @@ class YuzPremiumActivity : BaseFragment() {
         }
     }
 
+    /** Ikkala tarif kartasi imtiyozlarini vektor belgili qatorlar qilib chiqaradi. */
+    private fun fillBenefits(container: android.widget.LinearLayout?, benefits: List<String>) {
+        val themed = themedContext ?: return
+        container ?: return
+        container.removeAllViews()
+        val d = themed.resources.displayMetrics.density
+        benefits.forEach { label ->
+            val row = TextView(themed).apply {
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = (4f * d).toInt() }
+                setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13f)
+                setTextColor(
+                    androidx.core.content.ContextCompat.getColor(themed, R.color.yuz_text_secondary)
+                )
+                text = label
+            }
+            row.setIconStart(
+                R.drawable.ic_yuz_check, sizeDp = 16, gapDp = 8,
+                tintColor = androidx.core.content.ContextCompat.getColor(themed, R.color.yuz_action)
+            )
+            container.addView(row)
+        }
+    }
+
     /** Ikkala tarif kartasini donor matnlari bilan to'ldiradi va tugmalarni ulaydi. */
     private fun fillPlanTexts() {
         // ContextThemeWrapper.findViewById ishonchli emas — fragment View daraxtini
         // ishlatamiz (createView'da chaqirilganda hali hierarxiyaga ulanmagan).
         val root = fragmentView ?: return
+        root.findViewById<TextView>(R.id.tvPremiumHero)?.setIconStart(
+            R.drawable.ic_yuz_diamond, sizeDp = 20, gapDp = 8,
+            tintColor = androidx.core.content.ContextCompat.getColor(
+                root.context, R.color.yuz_gold
+            )
+        )
         for (plan in listOf(YuzPremiumPlans.PREMIUM_KINO, YuzPremiumPlans.FULL_PREMIUM)) {
             val isKino = plan.id == YuzPremiumPlans.PREMIUM_KINO.id
             val tvTitle = root.findViewById<TextView>(
@@ -111,9 +142,6 @@ class YuzPremiumActivity : BaseFragment() {
             )
             val tvPrice = root.findViewById<TextView>(
                 if (isKino) R.id.tvKinoPrice else R.id.tvFullPrice
-            )
-            val tvBenefits = root.findViewById<TextView>(
-                if (isKino) R.id.tvKinoBenefits else R.id.tvFullBenefits
             )
             val btn = root.findViewById<MaterialButton>(
                 if (isKino) R.id.btnPayKino else R.id.btnPayFull
@@ -125,7 +153,10 @@ class YuzPremiumActivity : BaseFragment() {
             )
             tvTitle?.setCompoundDrawablePadding(AndroidUtilities.dp(8f))
             tvPrice?.text = plan.formattedPrice()
-            tvBenefits?.text = plan.benefits.joinToString("\n")
+            fillBenefits(
+                root.findViewById(if (isKino) R.id.llKinoBenefits else R.id.llFullBenefits),
+                plan.benefits
+            )
             btn?.text = plan.buttonText
             btn?.setOnClickListener { launchPurchase(plan) }
         }

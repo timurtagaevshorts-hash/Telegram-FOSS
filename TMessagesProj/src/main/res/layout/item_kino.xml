@@ -13,7 +13,7 @@
     app:cardBackgroundColor="#1A1A1A"
     app:cardCornerRadius="16dp"
     app:cardElevation="4dp"
-    app:strokeColor="#333333"
+    app:strokeColor="@color/yuz_stroke"
     app:strokeWidth="1dp">
 
     <LinearLayout
@@ -72,7 +72,7 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:maxLines="2"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/yuz_text"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
@@ -83,7 +83,7 @@
                 android:layout_marginTop="6dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="#FF9800"
+                android:textColor="@color/yuz_action"
                 android:textSize="14sp" />
 
             <TextView
@@ -93,7 +93,7 @@
                 android:layout_marginTop="4dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="#AAAAAA"
+                android:textColor="@color/yuz_text_secondary"
                 android:textSize="13sp" />
 
             <TextView
@@ -101,7 +101,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:textColor="#FFD700"
+                android:textColor="@color/yuz_gold"
                 android:textSize="13sp" />
 
             <TextView
@@ -111,27 +111,27 @@
                 android:layout_marginTop="8dp"
                 android:ellipsize="end"
                 android:maxLines="3"
-                android:textColor="#CCCCCC"
+                android:textColor="@color/yuz_text_secondary"
                 android:textSize="12sp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnKinoCardWatch"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
+                android:layout_height="@dimen/yuz_button_sm"
                 android:layout_marginTop="10dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:text="@string/kino_watch_cta"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_button"
                 android:textStyle="bold"
-                app:backgroundTint="#FF9800"
-                app:cornerRadius="18dp"
+                app:backgroundTint="@color/yuz_action"
+                app:cornerRadius="@dimen/yuz_radius_field"
                 app:icon="@drawable/ic_yuz_kino"
                 app:iconSize="18dp"
-                app:iconTint="#FFFFFF" />
+                app:iconTint="@color/yuz_text" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

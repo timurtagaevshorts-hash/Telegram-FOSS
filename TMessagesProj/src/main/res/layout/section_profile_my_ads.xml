@@ -5,42 +5,42 @@
     android:layout_height="wrap_content"
     android:background="@drawable/bg_profile_modern_card"
     android:orientation="vertical"
-    android:padding="14dp">
+    android:padding="@dimen/yuz_space_4">
 
     <TextView
         android:id="@+id/tvMyClassifiedAdsSummary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="@color/text_secondary"
-        android:textSize="13sp" />
+        android:textColor="@color/yuz_text_secondary"
+        android:textSize="@dimen/yuz_text_secondary" />
 
     <TextView
         android:id="@+id/tvMyClassifiedAdsEmpty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
-        android:paddingTop="24dp"
-        android:paddingBottom="24dp"
+        android:paddingTop="@dimen/yuz_space_6"
+        android:paddingBottom="@dimen/yuz_space_6"
         android:text="@string/profile_my_classified_ads_empty_summary"
-        android:textColor="@color/text_hint"
-        android:textSize="13sp"
+        android:textColor="@color/yuz_text_muted"
+        android:textSize="@dimen/yuz_text_secondary"
         android:visibility="gone" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvMyClassifiedAds"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="@dimen/yuz_space_3"
         android:nestedScrollingEnabled="false"
         android:overScrollMode="never" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnPostClassifiedAd"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginTop="14dp"
+        android:layout_height="@dimen/yuz_button"
+        android:layout_marginTop="@dimen/yuz_space_4"
         android:text="@string/classified_post_ad"
         android:textAllCaps="false"
         android:textStyle="bold"
-        app:cornerRadius="16dp" />
+        app:cornerRadius="@dimen/yuz_radius_field" />
 </LinearLayout>

@@ -16,7 +16,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
@@ -220,19 +219,19 @@ class ElonlarActivity : BaseFragment() {
         return root
     }
 
-    /** "Mening e'lonlarim" tugmasining holati — yoqilganda neon ko'k, o'chganda kulrang. */
+    /** "Mening e'lonlarim" tugmasining holati — yoqilganda to'ldirilgan ko'k pill. */
     private fun updateMyAdsButton() {
         val btn = btnMyAds ?: return
-        if (mineOnly) {
-            btn.setBackgroundResource(R.drawable.bg_classified_my_ads_active)
-            btn.setTextColor(android.graphics.Color.WHITE)
-        } else {
-            btn.setBackgroundResource(R.drawable.bg_classified_search_bar)
-            val ctx = themedContext ?: context ?: return
-            btn.setTextColor(
-                androidx.core.content.ContextCompat.getColor(ctx, R.color.text_secondary)
+        val ctx = themedContext ?: context ?: return
+        btn.setBackgroundResource(
+            if (mineOnly) R.drawable.bg_yuz_pill_active else R.drawable.bg_yuz_pill
+        )
+        btn.setTextColor(
+            androidx.core.content.ContextCompat.getColor(
+                ctx,
+                if (mineOnly) R.color.yuz_text_on_accent else R.color.yuz_text_secondary
             )
-        }
+        )
     }
 
     private fun openDetail(ad: ClassifiedAd) {
@@ -254,10 +253,10 @@ class ElonlarActivity : BaseFragment() {
         val themed = themedContext ?: context ?: return
         val title = if (ad.title.isBlank()) ad.model else ad.title
         AlertDialog.Builder(themed)
-            .setTitle("E'lonni o'chirish")
-            .setMessage("\"$title\" o'chirilsinmi? Bu amalni qaytarib bo'lmaydi.")
-            .setNegativeButton("Bekor qilish", null)
-            .setPositiveButton("O'chirish") { _, _ -> deleteAd(ad) }
+            .setTitle(R.string.classified_delete_confirm_title)
+            .setMessage(themed.getString(R.string.classified_delete_confirm_message, title))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.classified_delete) { _, _ -> deleteAd(ad) }
             .show()
     }
 
@@ -285,43 +284,19 @@ class ElonlarActivity : BaseFragment() {
 
     private fun setupCategoryChips(context: Context) {
         val group = chipGroup ?: return
-        group.removeAllViews()
-        // Palitra resurslardan olinadi — chat/Elonlar/Reels bir xil aksentni ishlatadi.
-        val accent = androidx.core.content.ContextCompat.getColor(context, R.color.primary)
-        val surface = androidx.core.content.ContextCompat.getColor(context, R.color.home_card)
-        val muted = androidx.core.content.ContextCompat.getColor(context, R.color.text_secondary)
-        // BaseFragment — View emas (oddiy abstract klass), shuning uchun `resources`
-        // yoki `requireContext()` bu yerda yo'q: parametr kelgan Context ishlatiladi.
-        val density = context.resources.displayMetrics.density
-        fun addPill(label: String, id: String?, checked: Boolean) {
-            val chip = Chip(context).apply {
-                text = label
-                isCheckable = true
-                isChecked = checked
-                setTextColor(
-                    android.content.res.ColorStateList.valueOf(
-                        if (checked) android.graphics.Color.WHITE else muted
-                    )
-                )
-                chipBackgroundColor = android.content.res.ColorStateList.valueOf(
-                    if (checked) accent else surface
-                )
-                chipStrokeWidth = 1f * density
-                chipStrokeColor = android.content.res.ColorStateList.valueOf(
-                    if (checked) 0x00FFFFFF else 0x1AFFFFFF
-                )
-                chipCornerRadius = 20f * density
-                setOnClickListener {
-                    selectedCategory = id
-                    setupCategoryChips(context)
-                    applyFilter()
-                }
-            }
-            group.addView(chip)
+        // Chiplar yagona uslubdan (YuzChips) o'tadi: kategoriya chiplari va filtr
+        // qatorlari bir xil ko'rinishi shart.
+        val items = ArrayList<YuzChips.Item>()
+        items.add(
+            YuzChips.Item("", context.getString(R.string.classified_all_categories))
+        )
+        ClassifiedAdCategories.all.forEach { items.add(YuzChips.Item(it.id, it.label, it.icon)) }
+        val selected = items.indexOfFirst { it.id == (selectedCategory ?: "") }.coerceAtLeast(0)
+        YuzChips.fill(context, group, items, selected) { i ->
+            selectedCategory = items[i].id.ifBlank { null }
+            setupCategoryChips(context)
+            applyFilter()
         }
-        addPill("Barchasi", null, selectedCategory == null)
-        // Emoji bilan: qator endi to'liq kenglikda — turkumni bir qarashda ajratish oson.
-        ClassifiedAdCategories.all.forEach { addPill("${it.emoji} ${it.label}", it.id, selectedCategory == it.id) }
     }
 
     /** #75: filtr panelidagi chip qatorlari — kategoriya chiplari bilan bir xil uslub. */
@@ -331,42 +306,21 @@ class ElonlarActivity : BaseFragment() {
         selectedIndex: Int,
         onSelect: (Int) -> Unit
     ) {
-        val g = group ?: return
         val ctx = themedContext ?: return
-        g.removeAllViews()
-        val accent = androidx.core.content.ContextCompat.getColor(ctx, R.color.primary)
-        val surface = androidx.core.content.ContextCompat.getColor(ctx, R.color.home_card)
-        val muted = androidx.core.content.ContextCompat.getColor(ctx, R.color.text_secondary)
-        val density = ctx.resources.displayMetrics.density
-        labels.forEachIndexed { index, label ->
-            val checked = index == selectedIndex
-            val chip = Chip(ctx).apply {
-                text = label
-                isCheckable = true
-                isChecked = checked
-                setTextColor(
-                    android.content.res.ColorStateList.valueOf(
-                        if (checked) android.graphics.Color.WHITE else muted
-                    )
-                )
-                chipBackgroundColor = android.content.res.ColorStateList.valueOf(
-                    if (checked) accent else surface
-                )
-                chipStrokeWidth = 1f * density
-                chipStrokeColor = android.content.res.ColorStateList.valueOf(
-                    if (checked) 0x00FFFFFF else 0x1AFFFFFF
-                )
-                chipCornerRadius = 18f * density
-                setOnClickListener { onSelect(index) }
-            }
-            g.addView(chip)
-        }
+        YuzChips.fill(ctx, group, labels.map { YuzChips.Item(it, it) }, selectedIndex, onSelect)
     }
 
     private fun setupDateChips() {
+        val ctx = themedContext ?: return
         val values = listOf(1, 7, 30, 0)
         val selected = values.indexOf(filterDays).coerceAtLeast(0)
-        buildFilterChips(chipGroupDate, listOf("Bugun", "7 kun", "30 kun", "Barchasi"), selected) { i ->
+        val labels = listOf(
+            ctx.getString(R.string.classified_filter_today),
+            ctx.getString(R.string.classified_filter_7days),
+            ctx.getString(R.string.classified_filter_30days),
+            ctx.getString(R.string.classified_all_categories)
+        )
+        buildFilterChips(chipGroupDate, labels, selected) { i ->
             filterDays = values.getOrElse(i) { 0 }
             setupDateChips()
             applyFilter()
@@ -374,7 +328,14 @@ class ElonlarActivity : BaseFragment() {
     }
 
     private fun setupSortChips() {
-        buildFilterChips(chipGroupSort, listOf("Standart", "Yangi", "Arzon", "Qimmat"), sortMode) { i ->
+        val ctx = themedContext ?: return
+        val labels = listOf(
+            ctx.getString(R.string.classified_sort_default),
+            ctx.getString(R.string.classified_sort_new),
+            ctx.getString(R.string.classified_sort_cheap),
+            ctx.getString(R.string.classified_sort_expensive)
+        )
+        buildFilterChips(chipGroupSort, labels, sortMode) { i ->
             sortMode = i
             setupSortChips()
             applyFilter()

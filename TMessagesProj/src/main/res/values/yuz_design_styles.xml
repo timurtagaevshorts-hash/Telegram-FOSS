@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  YuzGram uslublar to'plami — `yuz_design_tokens.xml` raqamlarini rollarga aylantiradi.
+  Qoida: ekranga xos dizayn qarori bu yerda, layout fayllarida emas. Layout faqat
+  `style="@style/Yuz..."` + joylashuv yozadi.
+
+  Matn uslublari istalgan ContextThemeWrapper'da ishlaydi. Tugma/uslub variantlari:
+   * `YuzButton.*` — MaterialButton uchun (Material tema ostidagi ekranlar).
+   * `YuzPill.*`   — oddiy TextView/QDNPill tugmalari uchun (Material talab qilmaydi).
+-->
+<resources>
+
+    <!-- ==================== Matn ==================== -->
+
+    <style name="YuzScreenTitle">
+        <item name="android:textColor">@color/yuz_text</item>
+        <item name="android:textSize">@dimen/yuz_text_title</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="YuzScreenSubtitle">
+        <item name="android:textColor">@color/yuz_text_secondary</item>
+        <item name="android:textSize">@dimen/yuz_text_secondary</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="YuzSectionHeader">
+        <item name="android:textColor">@color/yuz_text</item>
+        <item name="android:textSize">@dimen/yuz_text_section</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="YuzBody">
+        <item name="android:textColor">@color/yuz_text</item>
+        <item name="android:textSize">@dimen/yuz_text_body</item>
+        <item name="android:lineSpacingExtra">3sp</item>
+    </style>
+
+    <style name="YuzBodySecondary">
+        <item name="android:textColor">@color/yuz_text_secondary</item>
+        <item name="android:textSize">@dimen/yuz_text_secondary</item>
+        <item name="android:lineSpacingExtra">2sp</item>
+    </style>
+
+    <style name="YuzCaption">
+        <item name="android:textColor">@color/yuz_text_secondary</item>
+        <item name="android:textSize">@dimen/yuz_text_caption</item>
+    </style>
+
+    <!-- Kichik label: bo'lim sarlavhasi ustidagi holat/teg. Faqat katta harf emas,
+         chunki ALLCAPS o'zbekcha apostrof (ʻ) bilan yomon ko'rinadi. -->
+    <style name="YuzLabel">
+        <item name="android:textColor">@color/yuz_text_secondary</item>
+        <item name="android:textSize">@dimen/yuz_text_caption</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.04</item>
+    </style>
+
+    <style name="YuzBadge">
+        <item name="android:textColor">@color/yuz_text</item>
+        <item name="android:textSize">@dimen/yuz_text_micro</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.02</item>
+    </style>
+
+    <!-- ==================== Tugmalar (MaterialButton) ==================== -->
+
+    <style name="YuzButton" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">@dimen/yuz_button</item>
+        <item name="android:layout_gravity">center</item>
+        <item name="android:paddingLeft">@dimen/yuz_space_4</item>
+        <item name="android:paddingRight">@dimen/yuz_space_4</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textSize">@dimen/yuz_text_button</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="android:textColor">@color/yuz_on_action</item>
+        <item name="backgroundTint">@color/yuz_action</item>
+        <item name="cornerRadius">@dimen/yuz_radius_field</item>
+        <item name="elevation">0dp</item>
+        <item name="rippleColor">@color/yuz_stroke_strong</item>
+        <item name="iconTint">@color/yuz_on_action</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconPadding">@dimen/yuz_space_2</item>
+    </style>
+
+    <!-- Ikkilamchi: shirin, to'ldirilmagan. -->
+    <style name="YuzButtonSecondary" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">@dimen/yuz_button</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textSize">@dimen/yuz_text_button</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="android:textColor">@color/yuz_text</item>
+        <item name="backgroundTint">@color/yuz_field</item>
+        <item name="cornerRadius">@dimen/yuz_radius_field</item>
+        <item name="strokeColor">@color/yuz_stroke</item>
+        <item name="strokeWidth">@dimen/yuz_stroke</item>
+        <item name="rippleColor">@color/yuz_stroke_strong</item>
+        <item name="iconTint">@color/yuz_action</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconPadding">@dimen/yuz_space_2</item>
+    </style>
+
+    <!-- Matn tugmasi: xavfli / bekor qilish. -->
+    <style name="YuzButtonText" parent="Widget.MaterialComponents.Button.TextButton">
+        <item name="android:layout_height">@dimen/yuz_button</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textSize">@dimen/yuz_text_button</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/yuz_text_secondary</item>
+        <item name="rippleColor">@color/yuz_stroke_soft</item>
+    </style>
+
+    <style name="YuzButtonDanger" parent="YuzButtonSecondary">
+        <item name="android:textColor">@color/yuz_danger</item>
+        <item name="strokeColor">#55FF5C5C</item>
+        <item name="iconTint">@color/yuz_danger</item>
+    </style>
+
+    <!-- Kart ichidagi 40dp ikon tugmasi (tahrirlash / o'chirish). -->
+    <style name="YuzButtonIcon" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:layout_width">@dimen/yuz_button_sm</item>
+        <item name="android:layout_height">@dimen/yuz_button_sm</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:padding">0dp</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="backgroundTint">@color/yuz_field</item>
+        <item name="cornerRadius">@dimen/yuz_radius_sm</item>
+        <item name="strokeColor">@color/yuz_stroke</item>
+        <item name="strokeWidth">@dimen/yuz_stroke</item>
+        <item name="rippleColor">@color/yuz_stroke_strong</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconPadding">0dp</item>
+        <item name="iconSize">@dimen/yuz_icon</item>
+    </style>
+
+    <style name="YuzButtonDangerIcon" parent="YuzButtonIcon">
+        <item name="iconTint">@color/yuz_danger</item>
+        <item name="strokeColor">#55FF5C5C</item>
+    </style>
+
+    <!-- Kichik ikon tugmasi: aniq kvadrat, cheksiz ripple. -->
+    <style name="YuzIconButton">
+        <item name="android:layout_width">@dimen/yuz_icon_button</item>
+        <item name="android:layout_height">@dimen/yuz_icon_button</item>
+        <item name="android:padding">@dimen/yuz_space_3</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:tint">@color/yuz_text</item>
+    </style>
+
+    <!-- ==================== Pill / chip (Material talab qilmaydi) ============ -->
+
+    <style name="YuzPill">
+        <item name="android:layout_height">@dimen/yuz_chip_height</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:gravity">center</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:textSize">@dimen/yuz_text_secondary</item>
+        <item name="android:paddingLeft">@dimen/yuz_space_3</item>
+        <item name="android:paddingRight">@dimen/yuz_space_3</item>
+        <item name="android:background">@drawable/bg_yuz_pill</item>
+        <item name="android:textColor">@color/yuz_text_secondary</item>
+    </style>
+
+    <style name="YuzPillActive" parent="YuzPill">
+        <item name="android:background">@drawable/bg_yuz_pill_active</item>
+        <item name="android:textColor">@color/yuz_text_on_accent</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- ==================== Material chip ==================== -->
+
+    <style name="YuzChip" parent="Widget.MaterialComponents.Chip.Choice">
+        <item name="android:layout_height">@dimen/yuz_chip_height</item>
+        <item name="android:textAppearance">@style/YuzChipText</item>
+        <item name="chipBackgroundColor">@color/yuz_chip_bg</item>
+        <item name="chipTextColor">@color/yuz_chip_fg</item>
+        <item name="android:textColor">@color/yuz_chip_fg</item>
+        <item name="chipStrokeWidth">@dimen/yuz_stroke</item>
+        <item name="chipStrokeColor">@color/yuz_chip_stroke</item>
+        <item name="chipCornerRadius">@dimen/yuz_radius_sm</item>
+        <item name="chipIconVisible">false</item>
+        <item name="checkedIconVisible">false</item>
+        <item name="closeIconVisible">false</item>
+        <item name="ensureMinTouchTargetSize">false</item>
+    </style>
+
+    <style name="YuzChipText" parent="TextAppearance.MaterialComponents.Chip">
+        <item name="android:textSize">@dimen/yuz_text_secondary</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- ==================== Karta / maydon ==================== -->
+
+    <style name="YuzCard" parent="Widget.MaterialComponents.CardView">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="cardBackgroundColor">@color/yuz_surface</item>
+        <item name="cardCornerRadius">@dimen/yuz_radius_card</item>
+        <!-- Qorong'i sirt ustida soyali ko'tarish loyqa ko'rinadi; ajratishni
+             1 dp chet bajaradi. -->
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">@color/yuz_stroke</item>
+        <item name="strokeWidth">@dimen/yuz_stroke</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:foreground">?attr/selectableItemBackground</item>
+    </style>
+
+    <style name="YuzField">
+        <item name="android:layout_height">@dimen/yuz_field_height</item>
+        <item name="android:background">@drawable/bg_yuz_field</item>
+        <item name="android:paddingLeft">@dimen/yuz_space_3</item>
+        <item name="android:paddingRight">@dimen/yuz_space_3</item>
+        <item name="android:textColor">@color/yuz_text</item>
+        <item name="android:textColorHint">@color/yuz_text_muted</item>
+        <item name="android:textSize">@dimen/yuz_text_body</item>
+        <item name="android:inputType">text</item>
+        <item name="android:imeOptions">actionSearch</item>
+        <item name="android:maxLines">1</item>
+    </style>
+
+    <style name="YuzEmptyTitle">
+        <item name="android:textColor">@color/yuz_text</item>
+        <item name="android:textSize">@dimen/yuz_text_section</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:gravity">center</item>
+    </style>
+
+    <style name="YuzEmptyHint" parent="YuzBodySecondary">
+        <item name="android:gravity">center</item>
+    </style>
+
+</resources>

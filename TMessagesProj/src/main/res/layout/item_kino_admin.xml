@@ -3,11 +3,11 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
+    android:layout_marginBottom="@dimen/yuz_space_2"
     android:background="@drawable/bg_monet_row"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:padding="12dp">
+    android:padding="@dimen/yuz_space_3">
 
     <LinearLayout
         android:layout_width="0dp"
@@ -21,7 +21,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/text_primary"
+            android:textColor="@color/yuz_text"
             android:textSize="15sp"
             android:textStyle="bold" />
 
@@ -32,8 +32,8 @@
             android:layout_marginTop="2dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
+            android:textColor="@color/yuz_text_secondary"
+            android:textSize="@dimen/yuz_text_secondary" />
     </LinearLayout>
 
     <com.google.android.material.button.MaterialButton
@@ -42,7 +42,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/kino_admin_edit"
-        android:textColor="@color/home_accent" />
+        android:textColor="@color/yuz_action" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnAdminDelete"
@@ -50,5 +50,5 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/kino_admin_delete"
-        android:textColor="#FF6B6B" />
+        android:textColor="@color/yuz_danger" />
 </LinearLayout>

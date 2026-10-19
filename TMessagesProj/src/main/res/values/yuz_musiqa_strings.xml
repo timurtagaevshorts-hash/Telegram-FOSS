@@ -53,4 +53,30 @@
     <string name="musiqa_preset_jazz">Jazz</string>
     <string name="musiqa_preset_rock">Rock</string>
     <string name="musiqa_preset_vocal">Vokal</string>
+    <!-- YuzGram #88: pleyer ekranining tugma matnlari + noto\'g\'ri tushuntirishlari -->
+    <string name="musiqa_pl_close">Pleyerni yopish</string>
+    <string name="musiqa_pl_shuffle">Aralashtirib ijro</string>
+    <string name="musiqa_pl_prev">Oldingi qo\'shiq</string>
+    <string name="musiqa_pl_next">Keyingi qo\'shiq</string>
+    <string name="musiqa_pl_play">Ijro yoki to\'xtatish</string>
+    <string name="musiqa_pl_repeat">Takrorlash</string>
+    <string name="musiqa_pl_queue_close">Navbatni yopish</string>
+    <string name="musiqa_pl_speed">Tezlik</string>
+    <string name="musiqa_pl_speed_value">Tezlik %1$s</string>
+    <string name="musiqa_pl_queue">Navbat</string>
+    <string name="musiqa_pl_fav">Sevimli</string>
+    <string name="musiqa_pl_dl">Yuklash</string>
+    <string name="musiqa_pl_eq">Ekvalayzer</string>
+    <string name="musiqa_pl_sleep">Uxlash</string>
+    <string name="musiqa_pl_radio_off">RADIO: OFF</string>
+    <string name="musiqa_pl_radio_on">RADIO: ON</string>
+    <string name="musiqa_pl_queue_empty">Navbat bo\'sh. Radio yoqilgan bo\'lsa, qo\'shiq tugaganda o\'xshashlari qo\'shiladi.</string>
+    <string name="musiqa_sleep_title">Uyqu taymeri</string>
+    <string name="musiqa_sleep_minutes">%1$d daqiqa</string>
+    <string name="musiqa_sleep_off">Bekor qilish</string>
+    <string name="musiqa_sleep_label_value">Uxlash %1$dd</string>
+    <string name="musiqa_sleep_cleared">Uyqu taymeri bekor qilindi</string>
+    <string name="musiqa_sleep_set">Musiqa %1$d daqiqadan keyin to\'xtaydi</string>
+    <string name="musiqa_fav_added">Sevimlilarga qo\'shildi</string>
+    <string name="musiqa_fav_removed">Sevimlilardan olib tashlandi</string>
 </resources>

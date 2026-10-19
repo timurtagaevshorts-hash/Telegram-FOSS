@@ -490,28 +490,22 @@ class YuzAiActivity : BaseFragment() {
     }
 
     private fun addChip(labelRes: Int, onClick: () -> Unit) {
-        val chip = TextView(ctx)
-        chip.text = ctx.getString(labelRes)
-        chip.setTextColor(0xFFDCE6F5.toInt())
-        chip.textSize = 13f
-        chip.setBackgroundResource(R.drawable.bg_ai_chip)
-        chip.isClickable = true
-        chip.setOnClickListener { onClick() }
-        val hPad = AndroidUtilities.dp(14f)
-        chip.setPadding(hPad, AndroidUtilities.dp(8f), hPad, AndroidUtilities.dp(8f))
-        val lp = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        )
-        lp.marginEnd = AndroidUtilities.dp(8f)
-        chipsRow.addView(chip, lp)
+        val chip = YuzChips.pillText(ctx, ctx.getString(labelRes), false).apply {
+            isClickable = true
+            setOnClickListener { onClick() }
+        }
+        chipsRow.addView(chip)
     }
 
     private fun user(text: String) {
-        addLine(ctx.getString(R.string.ai_utterance_prefix, text), 0xFF2AABEE.toInt(), true)
+        addLine(
+            ctx.getString(R.string.ai_utterance_prefix, text),
+            androidx.core.content.ContextCompat.getColor(ctx, R.color.yuz_action), true
+        )
     }
 
     private fun assistant(text: String) {
-        addLine(text, 0xFFE6EEF9.toInt(), false)
+        addLine(text, androidx.core.content.ContextCompat.getColor(ctx, R.color.yuz_text), false)
     }
 
     private fun addLine(text: String, color: Int, alignRight: Boolean) {

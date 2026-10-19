@@ -15,7 +15,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="10dp">
+        android:padding="@dimen/yuz_space_3">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -42,7 +42,7 @@
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="@dimen/yuz_space_3"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -52,16 +52,16 @@
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:textColor="@color/home_accent"
-                    android:textSize="12sp"
+                    android:textColor="@color/yuz_action"
+                    android:textSize="@dimen/yuz_text_secondary"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/tvCategory"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="11sp"
+                    android:textColor="@color/yuz_text_secondary"
+                    android:textSize="@dimen/yuz_text_caption"
                     android:textStyle="bold"
                     android:visibility="gone" />
 
@@ -69,34 +69,34 @@
                     android:id="@+id/tvAdTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
+                    android:layout_marginTop="@dimen/yuz_space_1"
                     android:ellipsize="end"
                     android:maxLines="2"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
+                    android:textColor="@color/yuz_text"
+                    android:textSize="@dimen/yuz_text_body"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/tvAdPrice"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:paddingHorizontal="8dp"
-                    android:paddingVertical="3dp"
+                    android:layout_marginTop="@dimen/yuz_space_2"
+                    android:paddingHorizontal="@dimen/yuz_space_2"
+                    android:paddingVertical="@dimen/yuz_space_1"
                     android:textColor="#C77800"
-                    android:textSize="13sp"
+                    android:textSize="@dimen/yuz_text_secondary"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/tvBlockedStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="@dimen/yuz_space_1"
                     android:background="@drawable/bg_admin_blocked_badge"
-                    android:paddingHorizontal="8dp"
+                    android:paddingHorizontal="@dimen/yuz_space_2"
                     android:paddingVertical="2dp"
                     android:text="@string/classified_ad_blocked_status"
-                    android:textColor="#FF5252"
+                    android:textColor="@color/yuz_danger"
                     android:textSize="10sp"
                     android:textStyle="bold"
                     android:visibility="gone" />
@@ -106,7 +106,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="@dimen/yuz_space_3"
             android:gravity="end"
             android:orientation="horizontal">
 
@@ -114,18 +114,18 @@
                 android:id="@+id/btnEditAd"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="@dimen/yuz_button_sm"
                 android:text="@string/classified_edit"
-                app:cornerRadius="20dp" />
+                app:cornerRadius="@dimen/yuz_radius_field" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnDeleteAd"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:layout_marginStart="8dp"
+                android:layout_height="@dimen/yuz_button_sm"
+                android:layout_marginStart="@dimen/yuz_space_2"
                 android:text="@string/classified_delete"
-                app:cornerRadius="20dp" />
+                app:cornerRadius="@dimen/yuz_radius_field" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

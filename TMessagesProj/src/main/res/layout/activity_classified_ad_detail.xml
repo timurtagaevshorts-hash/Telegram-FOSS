@@ -9,15 +9,15 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingBottom="24dp">
+        android:paddingBottom="@dimen/yuz_space_6">
 
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:navigationIcon="@drawable/ic_back"
+            app:navigationIcon="@drawable/ic_yuz_back"
             app:title="@string/classified_ad_detail"
-            app:titleTextColor="@color/text_primary" />
+            app:titleTextColor="@color/yuz_text" />
 
         <androidx.viewpager2.widget.ViewPager2
             android:id="@+id/vpImages"
@@ -28,7 +28,7 @@
             android:id="@+id/tabImageIndicator"
             android:layout_width="match_parent"
             android:layout_height="16dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="@dimen/yuz_space_2"
             app:tabBackground="@drawable/tab_classified_indicator"
             app:tabGravity="center"
             app:tabIndicatorHeight="0dp" />
@@ -37,91 +37,75 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="@dimen/yuz_gutter">
 
+            <!-- Kategoriya: ikon + nom (ClassifiedAdDetailActivity bindAd()). -->
             <TextView
                 android:id="@+id/tvCategory"
+                style="@style/YuzLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/home_accent"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                android:textColor="@color/yuz_action" />
 
             <TextView
                 android:id="@+id/tvModel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="@color/home_accent_purple"
-                android:textSize="15sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="@dimen/yuz_space_2"
+                android:textColor="@color/yuz_text_secondary"
+                android:textSize="@dimen/yuz_text_secondary" />
 
             <TextView
                 android:id="@+id/tvTitle"
+                style="@style/YuzScreenTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:textColor="@color/text_primary"
-                android:textSize="22sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="@dimen/yuz_space_2" />
 
             <TextView
                 android:id="@+id/tvPrice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:textColor="#FFD84D"
-                android:textSize="20sp"
+                android:layout_marginTop="@dimen/yuz_space_3"
+                android:textColor="@color/yuz_gold"
+                android:textSize="@dimen/yuz_text_title"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvAddress"
+                style="@style/YuzBodySecondary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
+                android:layout_marginTop="@dimen/yuz_space_2" />
 
             <TextView
+                style="@style/YuzSectionHeader"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/classified_description"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="@dimen/yuz_space_6"
+                android:text="@string/classified_description" />
 
             <TextView
                 android:id="@+id/tvDescription"
+                style="@style/YuzBodySecondary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:lineSpacingExtra="4dp"
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
+                android:layout_marginTop="@dimen/yuz_space_2"
+                android:lineSpacingExtra="4dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnShareFriends"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="12dp"
+                style="@style/YuzButtonSecondary"
+                android:layout_marginTop="@dimen/yuz_space_4"
                 android:text="@string/classified_share_friends"
-                app:cornerRadius="26dp"
-                app:icon="@drawable/ic_share"
-                app:iconGravity="textStart"
-                app:strokeColor="@color/home_accent_purple" />
+                app:icon="@drawable/ic_yuz_share" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnCall"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="20dp"
+                style="@style/YuzButton"
+                android:layout_marginTop="@dimen/yuz_space_2"
                 android:text="@string/classified_call_seller"
-                app:backgroundTint="@color/home_accent_purple"
-                app:cornerRadius="26dp"
-                app:icon="@drawable/ic_phone_call"
-                app:iconGravity="textStart" />
+                app:icon="@drawable/ic_yuz_phone" />
         </LinearLayout>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

@@ -95,7 +95,7 @@ class JobCardDetailActivity(
             try {
                 context?.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
             } catch (e: ActivityNotFoundException) {
-                toast("Telefon ilovasi topilmadi")
+                toast(R.string.classified_call_not_supported)
             }
         }
 
@@ -123,7 +123,8 @@ class JobCardDetailActivity(
         loadedCard = card
         phoneNumber = card.phone
         val themed = themedContext ?: return
-        tvType?.text = "${JobCardListingTypes.emoji(card.listingType)} ${JobCardListingTypes.label(card.listingType)}"
+        tvType?.text = JobCardListingTypes.label(card.listingType)
+        tvType?.setIconStart(JobCardListingTypes.icon(card.listingType))
         tvTitle?.text = card.title
         tvLocation?.text = card.location.ifBlank { getString(R.string.classified_address_missing) }
         tvDescription?.text = card.description.ifBlank { getString(R.string.classified_description_missing) }

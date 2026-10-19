@@ -140,12 +140,26 @@ class CreateClassifiedAdActivity(
             }
         }
 
-        val categoryLabels = ClassifiedAdCategories.all.map { "${it.emoji} ${it.label}" }
-        spinnerCategory?.adapter = ArrayAdapter(
-            themed,
-            R.layout.item_classified_spinner,
-            categoryLabels
-        ).apply { setDropDownViewResource(R.layout.item_classified_spinner) }
+        // Kategoriya ro'yxati: emoji o'rniga chizilgan ikon (har punktda), shunda
+        // tanlangan holat ham belgi bilan o'qiladi.
+        val categoryLabels = ClassifiedAdCategories.all.map { it.label }
+        spinnerCategory?.adapter = object : ArrayAdapter<String>(
+            themed, R.layout.item_classified_spinner, categoryLabels
+        ) {
+            private fun withIcon(view: View, position: Int): View {
+                (view as? android.widget.TextView)?.setIconStart(
+                    ClassifiedAdCategories.all[position].icon, sizeDp = 16, gapDp = 8
+                )
+                return view
+            }
+
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+                withIcon(super.getView(position, convertView, parent), position)
+
+            override fun getDropDownView(
+                position: Int, convertView: View?, parent: ViewGroup
+            ): View = withIcon(super.getDropDownView(position, convertView, parent), position)
+        }
 
         imageThumbAdapter = ClassifiedAdImageThumbAdapter { index ->
             val removed = imageItems.removeAt(index)
