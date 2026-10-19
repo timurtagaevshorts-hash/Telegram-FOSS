@@ -6292,6 +6292,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 overlay.onResume();
             }
         }
+        resyncYuzGramBottomBar();
         ConnectionsManager.getInstance(currentAccount).setAppPaused(false, false);
         updateCurrentConnectionState(currentAccount);
         if (PhotoViewer.hasInstance() && PhotoViewer.getInstance().isVisible()) {
@@ -8026,6 +8027,28 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     /** Joriy skroll yashirinish holati — controller bu yerda flag saqlamaydi. */
     public boolean isYuzGramBarScrollHidden() {
         return yuzGramBarScrollHidden;
+    }
+
+    /**
+     * YuzGram: bar holatini noldan qayta hisoblaydi — skroll yashirinishi
+     * bekor qilinadi va bar joriy ekranga qarab ko'rsatiladi.
+     *
+     * Ilovaga qayta kirganda (onResume) kerak: foydalanuvchi ro'yxatni pastga
+     * surib barni yashirgan edi, ilovani orqaga qaytargan. `yuzGramBarOwner`
+     * o'zgarmagani uchun tiklanish sharti ishga tushmas, ro'yxat esa allaqachon
+     * tepada bo'lmagani uchun skroll laguchi ham barni qaytarmas edi — bar
+     * butunlay g'oyib bo'lib qolardi.
+     */
+    private void resyncYuzGramBottomBar() {
+        if (yuzGramBottomBar == null) {
+            return;
+        }
+        yuzGramBarScrollHidden = false;
+        yuzGramBarOwner = null;
+        updateYuzGramBottomBar();
+        // Top fragment bu paytda null bo'lsa (reinstaniya davomi) update erta
+        // qaytadi — keyingi kadrdan qayta hisoblaymiz.
+        yuzGramBottomBar.post(this::updateYuzGramBottomBar);
     }
 
     public static BaseFragment getLastFragment() {
