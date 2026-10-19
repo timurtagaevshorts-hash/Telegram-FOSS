@@ -2145,10 +2145,20 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     additionalPadding += authHintCell.getMeasuredHeight();
                 }
                 final int yuzBottomPad = hasYuzGramBottomBar ? uz.kodlikino.top4.ui.YuzGramBottomBar.height() : 0;
-                final int yuzRailPad = yuzChatRail != null && yuzChatRail.getVisibility() == VISIBLE ? uz.kodlikino.top4.ui.YuzGramChatWheel.width() : 0;
-                if (t != getPaddingTop() || yuzBottomPad != getPaddingBottom() || yuzRailPad != getPaddingRight()) {
+                // YuzGram #81: gildirak endi ro'yxat USTIDagi to'liq kenglikdagi
+                // tasma — chatlar uchun o'ngdan 88dp chekinish KERAK EMAS (ro'yxat
+                // to'liq ekran). Buning o'rniga tepada gildirak tasmasi bo'sh
+                // joylanadi.
+                if (yuzChatRail != null && yuzChatRail.getVisibility() == VISIBLE) {
+                    int wheelBottom = yuzChatRailTopMargin()
+                            + uz.kodlikino.top4.ui.YuzGramChatWheel.height() + dp(2);
+                    if (wheelBottom > t) {
+                        t = wheelBottom;
+                    }
+                }
+                if (t != getPaddingTop() || yuzBottomPad != getPaddingBottom()) {
                     setTopGlowOffset(t);
-                    setPadding(0, t, yuzRailPad, yuzBottomPad);
+                    setPadding(0, t, 0, yuzBottomPad);
                     if (hasStories) {
                         parentPage.progressView.setPaddingTop(Math.max(0, t - dp(DialogStoriesCell.HEIGHT_IN_DP)));
                     } else {
@@ -2763,11 +2773,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         return top + dp(10);
     }
 
-    /** Ustun pastki navigatsiya panelidan biroz yuqorida turadi. */
-    private int yuzChatRailBottomMargin() {
-        return uz.kodlikino.top4.ui.YuzGramBottomBar.height() + dp(8);
-    }
-
     /** Gildirakdagi qalamcha plitasi bosilganda (pastki FABlar o'rniga). */
     private void onYuzGramRailAction(int action) {
         openYuzGramCompose();
@@ -2813,17 +2818,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             return;
         }
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) yuzChatRail.getLayoutParams();
-        int bottom = yuzChatRailBottomMargin();
-        int wantGravity = Gravity.RIGHT | Gravity.BOTTOM;
-        if (lp != null && (lp.gravity != wantGravity || lp.bottomMargin != bottom)) {
+        int top = yuzChatRailTopMargin();
+        int wantGravity = Gravity.LEFT | Gravity.TOP;
+        if (lp != null && (lp.gravity != wantGravity || lp.topMargin != top)) {
             lp.gravity = wantGravity;
-            lp.bottomMargin = bottom;
+            lp.topMargin = top;
             yuzChatRail.setLayoutParams(lp);
         }
-        // Ustun pastdan yuqoriga o'sadi; tepada action bar / stories paneliga tegmasin.
-        int topReserve = yuzChatRailTopMargin();
-        int railMax = yuzChatRail.getResources().getDisplayMetrics().heightPixels - topReserve - bottom - dp(6);
-        yuzChatRail.setMaxRailHeight(Math.max(dp(70), railMax));
         ArrayList<MessagesController.DialogFilter> filters = getMessagesController().getDialogFilters();
         int selected = 0;
         if (filterTabsView != null && filterTabsView.getCurrentTabId() >= 0) {
@@ -5160,16 +5161,18 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             contentView.addView(filterTabsView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 44));
         }
         if (filterTabsView != null && isYuzGramMainRoot()) {
-            // YuzGram #71: vertikal ustun o'rniga barmoq bilan aylanadigan
-            // dumaloq filtr gildiragi (ochilganda gorizontal chiplar o'rnini bosadi).
+            // YuzGram #81: filtr gildiragi chat ro'yxati USTIDA, to'liq kenglikda
+            // gorizontal aylanadigan karusel (sobiq o'ng qirradagi vertikal ustun).
             yuzChatRail = new uz.kodlikino.top4.ui.YuzGramChatWheel(context);
             yuzChatRail.setListener(index -> selectYuzGramFilter(index));
             yuzChatRail.setOnAddFolder(() -> presentFragment(new FiltersSetupActivity()));
             yuzChatRail.setCounterProvider(this::yuzChatRailCounter);
             yuzChatRail.setActionListener(this::onYuzGramRailAction);
-            // Kamera plitasi olib tashlandi — hikoya joylash Reels tepasiga ko'chdi (#70).
+            // Kamera plitasi olib tashlangan — hikoya joylash Reels tepasida (#70).
             yuzChatRail.setActions(true, false);
-            contentView.addView(yuzChatRail, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.RIGHT | Gravity.BOTTOM, 0, 0, 0, yuzChatRailBottomMargin()));
+            contentView.addView(yuzChatRail, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT,
+                    uz.kodlikino.top4.ui.YuzGramChatWheel.height(), Gravity.LEFT | Gravity.TOP,
+                    0, yuzChatRailTopMargin(), 0, 0));
             updateYuzGramChatRail(false);
             // Pastki qalamcha + kamera FAB'larini olib tashlaymiz — qalamcha gildirakda.
             if (floatingButtonContainer != null) {

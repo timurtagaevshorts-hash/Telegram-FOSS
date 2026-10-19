@@ -24,23 +24,24 @@ import org.telegram.messenger.R;
 import java.util.ArrayList;
 
 /**
- * YuzGram #71: o'ng qirradagi aylanadigan DUMALOQ gildirak — papka/filtr
- * tugmalari katta aylana yo'li (dugos) bo'ylab joylashadi; barmoq bilan
- * surib aylantiriladi, markazdagi (fokus) nuqta tanlanadi, qo'yib
- * yuborilganda inertsiya bilan eng yaqin tugmaga "shakllanib" qonadi
- * (overshoot prujina). Bosish ham to'g'ridan-to'g'ri tanlaydi.
+ * YuzGram #81: chat ro'yxati USTIDagi gorizontal dumaloq karusel — papka/filtr
+ * tugmalari ekranning markazidagi fokus doirada tanlanadi; barmoq bilan yonga
+ * surib aylantiriladi, qo'yib yuborilganda inertsiya bilan eng yaqin tugmaga
+ * "shakllanib" qonadi (overshoot prujina). Bosish ham to'g'ridan-to'g'ri
+ * tanlaydi.
  *
- * Ustundagi eski kontrakt saqlanadi: setFilters/setListener/
- * setCounterProvider/setActionListener/setOnAddFolder/setMaxRailHeight,
- * shuning uchun DialogsActivity'ning tanlash mexanizmi o'zgarmaydi.
+ * Eski vertikal ustun kontrakti saqlanadi: setFilters/setListener/
+ * setCounterProvider/setActionListener/setOnAddFolder — DialogsActivity'ning
+ * tanlash mexanizmi o'zgarmaydi.
  */
 public class YuzGramChatWheel extends View {
 
-    /** Gildirak egallaydigan qator kengligi (fokus doira + label). */
-    public static final int WIDTH_DP = 88;
-    private static final float RADIUS_DP = 132f;
-    private static final float STEP_DEG = 27f;
-    private static final float EDGE_DP = 30f;
+    /** Tasma balandligi: fokus doira + ostidagi nom pill'i (+ pastki yoy). */
+    public static final int HEIGHT_DP = 92;
+    private static final float CENTER_Y_DP = 36f;
+    private static final float SPACING_DP = 62f;
+    /** Fokusdan necha dona uzoqda dona butunlay yo'qoladi. */
+    private static final float CULL_SLOTS = 4.2f;
     private static final float CIRCLE_DP = 44f;
 
     private static final int BORDER = 0x592AABEE;
@@ -51,9 +52,7 @@ public class YuzGramChatWheel extends View {
     private static final int INACTIVE_STROKE = 0x7338B6FF;
     private static final int ICON_ACTIVE = 0xFFFFFFFF;
     private static final int ICON_IDLE = 0xFFBFD0EA;
-    private static final int TEXT_IDLE = 0xFF8E9DBB;
     private static final int BADGE = 0xFFFF4D6D;
-    private static final int TRACK = 0x14FFFFFF;
     private static final int PILL_BG = 0xF2171A22;
 
     public static final int ACTION_COMPOSE = 0;
@@ -92,12 +91,11 @@ public class YuzGramChatWheel extends View {
     private boolean showCompose = true;
     private boolean addTile;
 
-    private float pos;           // aylanish pozitsiyasi (dona birligida)
+    private float pos;           // karusel pozitsiyasi (dona birligida)
     private int selectedIndex = 0;
-    private int maxWheelHeight;
 
-    private float downY, downPos;
-    private float lastY, lastT;
+    private float downX, downPos;
+    private float lastX, lastT;
     private float velocity;      // px/s
     private boolean dragging;
     private int pressItem = -1;  // bosilgan dona indeksi (-1 yo'q)
@@ -130,8 +128,8 @@ public class YuzGramChatWheel extends View {
         badgePaint.setColor(BADGE);
     }
 
-    public static int width() {
-        return AndroidUtilities.dp(WIDTH_DP);
+    public static int height() {
+        return AndroidUtilities.dp(HEIGHT_DP);
     }
 
     // ------------------------------------------------------------ API
@@ -156,14 +154,6 @@ public class YuzGramChatWheel extends View {
         // Kamera #70 dan keyin chatda kerak emas (storylar Reels'ga ko'chdi).
         if (showCompose != compose) {
             showCompose = compose;
-            requestLayout();
-            invalidate();
-        }
-    }
-
-    public void setMaxRailHeight(int px) {
-        if (maxWheelHeight != px) {
-            maxWheelHeight = px;
             requestLayout();
             invalidate();
         }
@@ -227,36 +217,22 @@ public class YuzGramChatWheel extends View {
         return n;
     }
 
-    /** Fokus doira markazi. */
-    private float focusCx() {
-        return getWidth() - dp(EDGE_DP);
-    }
-
-    private float wheelCx() {
-        return focusCx() + dp(RADIUS_DP);
-    }
-
-    private float wheelCy() {
-        return getHeight() / 2f;
-    }
-
     private float spacingPx() {
-        return (float) (Math.toRadians(STEP_DEG) * dp(RADIUS_DP));
+        return dp(SPACING_DP);
     }
 
     /** slot uchun markaz nuqtasi; qaytaradi false agar ko'rinish tashqarisida. */
     private boolean itemCenter(int slot, float[] out) {
-        float step = (float) Math.toRadians(STEP_DEG);
-        float th = (slot - pos) * step;
-        if (Math.abs(th) > Math.toRadians(66f)) {
+        float d = slot - pos;
+        if (Math.abs(d) > CULL_SLOTS) {
             return false;
         }
-        float cx = wheelCx(), cy = wheelCy(), R = dp(RADIUS_DP);
-        float f = (float) (Math.abs(th) / Math.toRadians(66f));
-        out[0] = cx - (float) Math.cos(th) * R;
-        out[1] = cy + (float) Math.sin(th) * R;
-        out[2] = 1f - 0.5f * f;                 // masshtab
-        out[3] = 1f - 0.75f * f;                // shaffoflik
+        float f = Math.abs(d) / CULL_SLOTS;
+        out[0] = getWidth() / 2f + d * spacingPx();
+        // Chetdagilar biroz pastga tushadi — gildirak yoyi hissi.
+        out[1] = dp(CENTER_Y_DP) + dp(12f) * f * f;
+        out[2] = 1f - 0.42f * f;                 // masshtab
+        out[3] = 1f - 0.78f * f;                 // shaffoflik
         return true;
     }
 
@@ -264,14 +240,11 @@ public class YuzGramChatWheel extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int w = (int) dp(WIDTH_DP);
         int wMode = MeasureSpec.getMode(widthMeasureSpec);
-        if (wMode == MeasureSpec.EXACTLY) {
-            w = MeasureSpec.getSize(widthMeasureSpec);
-        }
-        float desired = slotCount() * spacingPx() + dp(30);
-        int h = (int) Math.min(desired, maxWheelHeight > 0 ? maxWheelHeight : desired);
-        h = Math.max(h, (int) dp(120));
+        int w = wMode == MeasureSpec.EXACTLY
+                ? MeasureSpec.getSize(widthMeasureSpec)
+                : Math.min(MeasureSpec.getSize(widthMeasureSpec), (int) dp(360f));
+        int h = height();
         int hMode = MeasureSpec.getMode(heightMeasureSpec);
         if (hMode == MeasureSpec.EXACTLY) {
             h = MeasureSpec.getSize(heightMeasureSpec);
@@ -286,15 +259,6 @@ public class YuzGramChatWheel extends View {
         if (getWidth() == 0 || getHeight() == 0) {
             return;
         }
-        float R = dp(RADIUS_DP);
-        float cx = wheelCx(), cy = wheelCy();
-
-        // Yumshoq traektoriya chizig'i — gildirak doirasining ko'rinadigan qismi.
-        strokePaint.setColor(TRACK);
-        strokePaint.setStrokeWidth(dp(1.6f));
-        canvas.drawCircle(cx, cy, R, strokePaint);
-        strokePaint.setStrokeWidth(dp(1.4f));
-
         int n = slotCount();
         float[] p = new float[4];
         // Chetdakilardan markazga: fokus eng ustida chizilsin.
@@ -316,6 +280,9 @@ public class YuzGramChatWheel extends View {
                           float alpha, boolean focus) {
         int type = itemType(slot);
         if (type < 0) {
+            return;
+        }
+        if (x < -dp(CIRCLE_DP) || x > getWidth() + dp(CIRCLE_DP)) {
             return;
         }
         MessagesController.DialogFilter filter =
@@ -394,8 +361,7 @@ public class YuzGramChatWheel extends View {
         canvas.restore();
         canvas.restore();
 
-        // Fokus nomi — doira OSTIDagi markazlashgan pill ichida (gildirak
-        // 88dp tasmada yonga joy qoldirmaydi).
+        // Fokus nomi — doira OSTIDagi markazlashgan pill ichida.
         if (focus) {
             String label = type == ITEM_FILTER ? labelFor(filter)
                     : type == ITEM_COMPOSE
@@ -682,8 +648,8 @@ public class YuzGramChatWheel extends View {
                     animator.cancel();
                     animator = null;
                 }
-                downY = event.getY();
-                lastY = event.getY();
+                downX = event.getX();
+                lastX = event.getX();
                 lastT = event.getEventTime();
                 downPos = pos;
                 velocity = 0f;
@@ -692,19 +658,19 @@ public class YuzGramChatWheel extends View {
                 return true;
             }
             case MotionEvent.ACTION_MOVE: {
-                float y = event.getY();
+                float x = event.getX();
                 float t = event.getEventTime();
                 float dt = Math.max(1f, t - lastT);
-                float v = (y - lastY) / dt * 1000f;
+                float v = (x - lastX) / dt * 1000f;
                 velocity = velocity * 0.6f + v * 0.4f;
-                lastY = y;
+                lastX = x;
                 lastT = t;
-                float dy = y - downY;
-                if (!dragging && Math.abs(dy) > dp(8f) && slotCount() > 1) {
+                float dx = x - downX;
+                if (!dragging && Math.abs(dx) > dp(8f) && slotCount() > 1) {
                     dragging = true;
                 }
                 if (dragging) {
-                    float want = downPos - dy / spacingPx();
+                    float want = downPos - dx / spacingPx();
                     // Rezinka: chegaradan ortga cho'zilsa qarshilik.
                     if (want < 0f) {
                         want = want * 0.35f;
