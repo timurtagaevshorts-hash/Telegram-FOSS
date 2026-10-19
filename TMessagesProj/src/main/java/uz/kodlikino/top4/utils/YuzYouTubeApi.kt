@@ -106,9 +106,17 @@ object YuzYouTubeApi {
     private val streamCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<YuzAudioStream>>>()
     private val attempt = java.util.concurrent.ConcurrentHashMap<String, Int>()
 
+    // #84: bitta URL ko'pincha bir range so'rovini o'tkazadi — refresh
+    // takroran bir xil URL'ni qaytarmasligi uchun ishlatilganlarni belgilaymiz.
+    private val used = java.util.concurrent.ConcurrentHashMap<String, MutableSet<String>>()
+
     private fun cached(videoId: String): List<YuzAudioStream> {
         val e = streamCache[videoId] ?: return emptyList()
-        return if (System.currentTimeMillis() - e.first < CACHE_TTL) e.second else emptyList()
+        if (System.currentTimeMillis() - e.first < CACHE_TTL) return e.second
+        // URL'lar muddati tugadi — "ishlatilgan" belgilari ham keraksiz.
+        streamCache.remove(videoId)
+        used.remove(videoId)
+        return emptyList()
     }
 
     /** Yagona resolve zanjiri: NewPipeExtractor -> ANDROID -> IOS; natija cache. */
@@ -133,11 +141,64 @@ object YuzYouTubeApi {
     fun noteBadStream(videoId: String) {
         attempt[videoId] = (attempt[videoId] ?: 0) + 1
         streamCache.remove(videoId)
+        used.remove(videoId)
     }
+
+    /**
+     * YuzGram #84: YuzRangeReader bir oynada rad etildi — [at] baytdan
+     * davom ettiradigan YANGI URL kerak.
+     *
+     * MUHIM: davom etish uchun beriladigan URL shu [currentUrl]'ning
+     * itag'ida bo'lishi shart — 140 (aac) va 251 (opus) boshqa-boshqa
+     * fayllar, ularning baytlari aralashsa oqim buziladi
+     * (yarim/noqulayotgan qo'shiq).
+     * Ketma-ketlik: keshdagi ishlatilmagan shu-itag URL -> qayta resolve ->
+     * (faqat boshida, at==0) har qanday nomzod.
+     */
+    fun refreshStream(videoId: String, at: Long, currentUrl: String): YuzAudioStream? {
+        val itag = itagOf(currentUrl)
+        usedUrls(videoId).add(currentUrl)
+        var s = pickStream(streamsFor(videoId), itag, videoId)
+        if (s == null) {
+            streamCache.remove(videoId)
+            attempt[videoId] = (attempt[videoId] ?: 0) + 1
+            s = pickStream(streamsFor(videoId), itag, videoId)
+            // Boshidan (at==0) format farqi zararsiz — istalgan nomzod.
+            if (s == null && at == 0L) s = pickStream(streamsFor(videoId), null, videoId)
+        }
+        if (s == null) return null
+        usedUrls(videoId).add(s.url)
+        android.util.Log.i("YuzMusic", "refreshStream $videoId @$at itag=$itag -> ${s.ext} bits=${s.approxBytes}")
+        return s
+    }
+
+    private fun pickStream(
+        list: List<YuzAudioStream>,
+        itag: String?,
+        videoId: String
+    ): YuzAudioStream? {
+        val busy = usedUrls(videoId)
+        return list.firstOrNull {
+            (itag == null || itagOf(it.url) == itag) && !busy.contains(it.url)
+        }
+    }
+
+    private fun usedUrls(videoId: String): MutableSet<String> =
+        used.computeIfAbsent(videoId) {
+            java.util.Collections.newSetFromMap(
+                java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+            )
+        }
+
+    /** URL'dagi itag= parametri; NPE va InnerTube URL'larida mavjud. */
+    fun itagOf(url: String): String? = ITAG_RE.find(url)?.groupValues?.get(1)
+
+    private val ITAG_RE = Regex("[?&]itag=(\\d+)")
 
     /** Yangi navbat boshlanganda rotatsiyani tozalash. */
     fun resetRotation() {
         attempt.clear()
+        used.clear()
     }
 
     private fun collectFromVideo(

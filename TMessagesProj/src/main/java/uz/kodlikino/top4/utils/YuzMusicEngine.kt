@@ -57,7 +57,30 @@ object YuzMusicEngine {
     private const val TAG = "YuzMusic"
     private val ui = Handler(Looper.getMainLooper())
     private val observers = CopyOnWriteArrayList<Observer>()
-    private val bufferingWatchdog = Runnable { onBufferingStall() }
+    private val bufferingWatchdog = object : Runnable {
+        override fun run() {
+            val p = player ?: return
+            if (p.playbackState != Player.STATE_BUFFERING) return
+            val now = android.os.SystemClock.elapsedRealtime()
+            val bp = p.bufferedPosition
+            if (bp != lastBuffered) {
+                lastBuffered = bp
+                stallMark = now
+            }
+            // #84: yumaloq 30s o'rniga PROGRESS kuzatuvi — uzun qo'shiq
+            // buffer'i sekin ham bo'lsa o'saver ekan to'xtatmaymiz, lekin
+            // 20s umuma jilmimasa yoki 2 daqiqa davomida tayyor bo'lmasa
+            // qo'shiq nomzodini almashtiramiz.
+            if (now - stallMark > 20000L || now - bufferingStarted > 120000L) {
+                onBufferingStall()
+            } else {
+                ui.postDelayed(this, 2000L)
+            }
+        }
+    }
+    private var bufferingStarted = 0L
+    private var stallMark = 0L
+    private var lastBuffered = -1L
 
     @Volatile
     private var player: ExoPlayer? = null
@@ -140,9 +163,14 @@ object YuzMusicEngine {
                     }
                     Player.STATE_BUFFERING -> {
                         ui.removeCallbacks(bufferingWatchdog)
-                        // #68: NewPipeExtractor birinchi ochilishda player JS'ni
-                        // ham yuklab oladi — 15s yetmaydi, 30s.
-                        ui.postDelayed(bufferingWatchdog, 30000)
+                        // #84: progress kuzatuvi — har 2s'da buffered o'sishini
+                        // tekshiramiz (birinchi ochilishda NPE JS parse ~15s
+                        // olishi mumkin, shuning uchun darhol sanamaymiz).
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        bufferingStarted = now
+                        stallMark = now
+                        lastBuffered = p.bufferedPosition
+                        ui.postDelayed(bufferingWatchdog, 2000L)
                     }
                     Player.STATE_ENDED -> postStatus(null)
                 }

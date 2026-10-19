@@ -7,12 +7,9 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.TransferListener
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
-import java.io.InputStream
 import java.io.RandomAccessFile
 
 /**
@@ -25,8 +22,14 @@ import java.io.RandomAccessFile
  *     aylantirish — open() media3'ning LOADER IPIDA chaqiriladi, shuning
  *     uchun UI qotmaydi va keyingi qo'shiq oldindan tayyorlanadi.
  *  2) SOZLANGAN SO'ROVLAR: "Accept-Encoding: identity" + formatga mos UA.
- *     Sabab: sukut gzip so'rovini googlevideo 403 bilan rad etadi
- *     (telefon logcat'da tasdiqlangan).
+ *     Sabab: sukut gzip so'rovini googlevideo 403 bilan rad etadi.
+ *
+ * YuzGram #84: endi o'qish YuzRangeReader orqali — KICHIK, CHEKLANGAN Range
+ * oynalari ketma-ketligi. Oldin initial open Range'SIZ (butun fayl) so'rovi
+ * yuborardi, Google esa uzun qo'shiqni ~1 MB'da (128kbit/s ≈ 65s) kesib
+ * 403 qaytarardi: shu tufayli faqat qisqa treklar eshitilar edi. Reader
+ * oynalarni ulaydi, rad etilsa bayt joyidan yangi URL so'raydi va erta EOF
+ * qaytarmaydi.
  *
  * Uch xil manba: marker (YouTube oqimi), oddiy https (Deezer preview),
  * file:// (keshdagi local fayl).
@@ -40,8 +43,7 @@ class YuzStreamDataSource(private val http: OkHttpClient) : DataSource {
 
     private var listener: TransferListener? = null
     private var currentSpec: DataSpec? = null
-    private var response: Response? = null
-    private var body: InputStream? = null
+    private var reader: YuzRangeReader? = null
     private var raf: RandomAccessFile? = null
     private var uri: Uri? = null
     private var bytesRemaining = Long.MAX_VALUE
@@ -78,62 +80,47 @@ class YuzStreamDataSource(private val http: OkHttpClient) : DataSource {
 
     private fun openHttp(dataSpec: DataSpec, raw: String): Long {
         var markerVid: String? = null
-        val (url, ua) = if (raw.startsWith(URI_PREFIX)) {
+        val position = dataSpec.position.coerceAtLeast(0L)
+        val specLength = if (dataSpec.length == C.LENGTH_UNSET.toLong()) -1L else dataSpec.length
+        val stream = if (raw.startsWith(URI_PREFIX)) {
             val vid = raw.substring(URI_PREFIX.length)
             markerVid = vid
-            val stream = YuzYouTubeApi.resolveStream(vid)
+            YuzYouTubeApi.resolveStream(vid)
                 ?: run {
                     Log.i(TAG, "resolve EMPTY vid=$vid")
                     throw FileNotFoundException("no audio stream for $vid")
                 }
-            Log.i(TAG, "resolved vid=$vid ext=${stream.ext} bits=${stream.approxBytes}")
-            stream.url to stream.ua
         } else {
-            raw to YuzYouTubeApi.UA
+            YuzAudioStream(raw, "m4a", 0L, YuzYouTubeApi.UA)
         }
 
-        val builder = Request.Builder().url(url)
-            // #67 403 tuzatishi: googlevideo gzip so'rovini yoqtirmaydi.
-            .header("User-Agent", ua)
-            .header("Accept-Encoding", "identity")
-        val position = dataSpec.position
-        val length = dataSpec.length
-        when {
-            length != C.LENGTH_UNSET.toLong() ->
-                builder.header("Range", "bytes=$position-${position + length - 1}")
-            position != 0L ->
-                builder.header("Range", "bytes=$position-")
-        }
+        val r = YuzRangeReader(
+            http = http,
+            url = stream.url,
+            ua = stream.ua,
+            start = position,
+            limit = specLength,
+            expectedTotal = stream.approxBytes,
+            refresh = markerVid?.let { vid ->
+                { at: Long, cur: String -> YuzYouTubeApi.refreshStream(vid, at, cur) }
+            },
+            // Range/oyna faqat googlevideo uchun: Deezer CDN'iga eski
+            // yaxshi ishlagan bitta GET yuboriladi.
+            windows = stream.url.contains("googlevideo")
+        )
+        r.open()
+        reader = r
+        uri = Uri.parse(stream.url)
 
-        val resp = try {
-            http.newCall(builder.build()).execute()
-        } catch (e: IOException) {
-            // #69: tarmoq xatosida ham nomzod aylanadi — keyingi open()
-            // boshqa URL'ni oladi (prefetch cache yangilanadi).
-            markerVid?.let { YuzYouTubeApi.noteBadStream(it) }
-            throw e
-        }
-        if (!resp.isSuccessful) {
-            val code = resp.code
-            resp.close()
-            Log.i(TAG, "stream HTTP $code url=${url.take(70)}")
-            markerVid?.let { YuzYouTubeApi.noteBadStream(it) }
-            throw IOException("HTTP $code")
-        }
-        response = resp
-        body = resp.body?.byteStream()
-            ?: run { resp.close(); throw IOException("empty body") }
-        uri = Uri.parse(url)
-
-        val contentLen = resp.body?.contentLength() ?: -1L
+        val known = r.length
         openedLength = when {
-            length != C.LENGTH_UNSET.toLong() -> length
-            contentLen >= 0L -> contentLen
+            specLength >= 0L -> specLength
+            known >= 0L -> known
             else -> C.LENGTH_UNSET.toLong()
         }
         bytesRemaining = if (openedLength == C.LENGTH_UNSET.toLong())
             Long.MAX_VALUE else openedLength
-        Log.i(TAG, "open http code=${resp.code} len=$openedLength")
+        Log.i(TAG, "open http pos=$position len=$openedLength total=$known")
         return openedLength
     }
 
@@ -148,14 +135,24 @@ class YuzStreamDataSource(private val http: OkHttpClient) : DataSource {
             notifyBytes(n)
             return n
         }
-        val stream = body ?: throw IOException("closed")
+        val r = reader ?: throw IOException("closed")
         if (bytesRemaining <= 0L) return C.RESULT_END_OF_INPUT
         val cap = readLength.toLong().coerceAtMost(bytesRemaining).toInt()
-        val n = stream.read(buffer, offset, cap)
+        val n = try {
+            r.read(buffer, offset, cap)
+        } catch (e: IOException) {
+            markerVid()?.let { YuzYouTubeApi.noteBadStream(it) }
+            throw e
+        }
         if (n <= 0) return C.RESULT_END_OF_INPUT
         bytesRemaining -= n
         notifyBytes(n)
         return n
+    }
+
+    private fun markerVid(): String? {
+        val raw = currentSpec?.uri?.toString() ?: return null
+        return if (raw.startsWith(URI_PREFIX)) raw.substring(URI_PREFIX.length) else null
     }
 
     private fun notifyBytes(n: Int) {
@@ -167,11 +164,9 @@ class YuzStreamDataSource(private val http: OkHttpClient) : DataSource {
     override fun getUri(): Uri? = uri
 
     override fun close() {
-        runCatching { body?.close() }
-        runCatching { response?.close() }
+        runCatching { reader?.close() }
         runCatching { raf?.close() }
-        body = null
-        response = null
+        reader = null
         raf = null
     }
 

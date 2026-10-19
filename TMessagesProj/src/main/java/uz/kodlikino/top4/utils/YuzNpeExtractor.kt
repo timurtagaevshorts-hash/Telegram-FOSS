@@ -108,7 +108,7 @@ object YuzNpeExtractor {
                     YuzAudioStream(
                         url = url,
                         ext = s.format?.name?.lowercase() ?: "m4a",
-                        approxBytes = 0L,
+                        approxBytes = clenOf(url),
                         ua = WEB_UA
                     )
                 )
@@ -119,5 +119,14 @@ object YuzNpeExtractor {
             Log.i(TAG, "npe fail $videoId ${e.javaClass.simpleName}: ${e.message?.take(120)}")
             emptyList()
         }
+    }
+
+    /** googlevideo URL'laridagi clen= paramtri — to'liq fayl hajmi (#84 reader). */
+    private fun clenOf(url: String): Long {
+        val i = url.indexOf("clen=")
+        if (i < 0) return 0L
+        var j = i + 5
+        while (j < url.length && url[j] in '0'..'9') j++
+        return url.substring(i + 5, j).toLongOrNull() ?: 0L
     }
 }

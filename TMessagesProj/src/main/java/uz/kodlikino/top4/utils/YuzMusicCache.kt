@@ -3,24 +3,35 @@ package uz.kodlikino.top4.utils
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
+import okhttp3.OkHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.TimeUnit
 
 /**
  * YuzGram #62: qo'shiqlarni keshga yuklab olish (oflayd tinglash).
  * YuzGram #63: YouTube qatorlari endi TO'LIQ audio sifatida saqlanadi
  * (M4A/WebM), Deezer zaxirasi eski mp3 preview formatida qoladi.
- * Fayllar ichki xotirada, indeks SharedPreferences'da JSON sifatida.
+ * YuzGram #84: YouTube fayllari YuzRangeReader orqali — kichik Range
+ * oynalari ketma-ketligi + to'liqlik tekshiruvi (yarim fayl qabul
+ * qilinmaydi). Fayllar ichki xotirada, indeks SharedPreferences'da JSON.
  */
 object YuzMusicCache {
 
     private const val PREFS = "yuz_music_dl"
     private const val DIR = "yuzmusic"
+    private const val TAG = "YuzMusic"
     private val main = Handler(Looper.getMainLooper())
     private val EXT = arrayOf("m4a", "mp3", "webm")
+
+    private val http = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(45, TimeUnit.SECONDS)
+        .build()
 
     private fun dir(context: Context): File {
         val d = File(context.filesDir, DIR)
@@ -71,6 +82,11 @@ object YuzMusicCache {
      * YuzGram #65: bitta URL emas — resolveStreamCandidates nomzodlari
      * ketma-ket sinaladi (ANDROID/IOS, "n"siz variantlar); oxirgi chora
      * Deezer mp3 preview.
+     * YuzGram #84: googlevideo nomzodlari endi YuzRangeReader bilan — kichik
+     * Range oynalari, uzilgan joydan davom etish va MAJBURIY to'liqlik
+     * tekshiruvi. Oldin bitta Range'siz GET butun faylni so'raytigan, Google
+     * esa ~1 MB'dan keyin 403 berib yarim fayl qoldirgan edi (yarim fayl =
+     * "1 daqiqalik qo'shiq" alomati).
      */
     fun downloadBlocking(context: Context, track: YuzTrack): Boolean {
         if (isDownloaded(context, track.id)) return true
@@ -79,14 +95,19 @@ object YuzMusicCache {
         } catch (_: Exception) {
             emptyList()
         }
-        android.util.Log.i("YuzMusic", "downloadBlocking ${track.videoId} candidates=${streams.size}")
-        val attempts = ArrayList<Pair<YuzAudioStream, String>>()
-        for (s in streams) attempts.add(s to s.url)
+        Log.i(TAG, "downloadBlocking ${track.videoId} candidates=${streams.size}")
+        val attempts = ArrayList<YuzAudioStream>()
+        attempts.addAll(streams)
         if (track.previewUrl.isNotBlank()) {
-            attempts.add(YuzAudioStream(track.previewUrl, "mp3", 0, "") to track.previewUrl)
+            attempts.add(YuzAudioStream(track.previewUrl, "mp3", 0L, ""))
         }
-        for ((stream, url) in attempts) {
-            if (fetchTo(context, track.id, url, stream.ext, stream.ua)) {
+        for (s in attempts) {
+            val ok = if (s.url.contains("googlevideo")) {
+                fetchRanges(context, track.id, s, track.videoId)
+            } else {
+                fetchPlain(context, track.id, s)
+            }
+            if (ok) {
                 addToIndex(context, track)
                 return true
             }
@@ -94,40 +115,88 @@ object YuzMusicCache {
         return false
     }
 
-    private fun fetchTo(context: Context, id: Long, url: String, ext: String, ua: String): Boolean {
+    /** Bayt joyi bo'yicha shu videoId'ning (shu itag'da) yangi URL'ini qaytaradi. */
+    private fun sameVideo(videoId: String): (Long, String) -> YuzAudioStream? =
+        { at: Long, cur: String -> YuzYouTubeApi.refreshStream(videoId, at, cur) }
+
+    /** googlevideo: kichik Range oynalari + rad etilsa shu baytga yangi URL. */
+    private fun fetchRanges(context: Context, id: Long, stream: YuzAudioStream, videoId: String): Boolean {
+        val tmp = File(dir(context), "$id.tmp")
+        runCatching { if (tmp.exists()) tmp.delete() }
+        // refresh FAQAT shu videoId uchun: muqobil videoning baytlari
+        // yarim faylga aralashib ketmasligi kerak.
+        val refresh: ((Long, String) -> YuzAudioStream?)? =
+            if (videoId.isNotBlank()) sameVideo(videoId) else null
+        val reader = YuzRangeReader(http, stream.url, stream.ua, 0L, -1L, stream.approxBytes, refresh)
+        var complete = false
+        try {
+            reader.open()
+            val expect = reader.length
+            var got = 0L
+            tmp.outputStream().use { out ->
+                val buf = ByteArray(64 * 1024)
+                var guard = 0
+                while (guard++ < 65536) {
+                    val n = reader.read(buf, 0, buf.size)
+                    if (n <= 0) break
+                    out.write(buf, 0, n)
+                    got += n
+                }
+            }
+            complete = got > 0L && (expect < 0L || got >= expect)
+            Log.i(TAG, "download ranges got=$got expect=$expect ext=${stream.ext} ok=$complete")
+        } catch (e: Exception) {
+            Log.i(TAG, "download range ERR ${e.javaClass.simpleName} ${stream.url.take(60)}")
+        } finally {
+            reader.close()
+        }
+        return if (complete) promote(context, tmp, id, stream.ext) else {
+            runCatching { tmp.delete() }
+            false
+        }
+    }
+
+    /** Oddiy HTTPS (Deezer preview) — bitta GET, hajm kichik. */
+    private fun fetchPlain(context: Context, id: Long, stream: YuzAudioStream): Boolean {
+        val tmp = File(dir(context), "$id.tmp")
         var conn: HttpURLConnection? = null
         return try {
-            conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            conn = (URL(stream.url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 8000
                 readTimeout = 30000
                 requestMethod = "GET"
-                if (ua.isNotBlank()) setRequestProperty("User-Agent", ua)
+                if (stream.ua.isNotBlank()) setRequestProperty("User-Agent", stream.ua)
                 // #67: googlevideo "gzip" Accept-Encoding'ni 403 bilan rad etadi.
                 setRequestProperty("Accept-Encoding", "identity")
                 instanceFollowRedirects = true
             }
             val code = conn.responseCode
             if (code !in 200..299) {
-                android.util.Log.i("YuzMusic", "download HTTP $code ext=$ext ua=${ua.take(18)} url=${url.take(60)}")
+                Log.i(TAG, "download HTTP $code ext=${stream.ext} url=${stream.url.take(60)}")
                 return false
             }
-            val tmp = File(dir(context), "$id.tmp")
             conn.inputStream.use { input ->
                 tmp.outputStream().use { out -> input.copyTo(out) }
             }
-            val dst = File(dir(context), "$id.$ext")
-            if (!tmp.renameTo(dst)) {
-                tmp.delete()
-                return false
-            }
-            android.util.Log.i("YuzMusic", "download OK ${dst.length()}B -> ${dst.name}")
-            true
+            Log.i(TAG, "download plain ${tmp.length()}B ext=${stream.ext}")
+            promote(context, tmp, id, stream.ext)
         } catch (e: Exception) {
-            android.util.Log.i("YuzMusic", "download ERR ${e.javaClass.simpleName} ${url.take(60)}")
+            Log.i(TAG, "download plain ERR ${e.javaClass.simpleName} ${stream.url.take(60)}")
+            runCatching { tmp.delete() }
             false
         } finally {
             conn?.disconnect()
         }
+    }
+
+    private fun promote(context: Context, tmp: File, id: Long, ext: String): Boolean {
+        val dst = File(dir(context), "$id.$ext")
+        if (!tmp.renameTo(dst)) {
+            tmp.delete()
+            return false
+        }
+        Log.i(TAG, "download OK ${dst.length()}B -> ${dst.name}")
+        return true
     }
 
     fun remove(context: Context, id: Long) {
