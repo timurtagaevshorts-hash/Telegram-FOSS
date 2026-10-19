@@ -141,7 +141,7 @@
 
                 <ImageView
                     style="@style/FuncsionCardIconImg"
-                    android:background="@drawable/bg_func_teal"
+                    android:background="@drawable/bg_func_amber"
                     android:src="@drawable/ic_yuz_film" />
 
                 <LinearLayout style="@style/FuncsionCardText">

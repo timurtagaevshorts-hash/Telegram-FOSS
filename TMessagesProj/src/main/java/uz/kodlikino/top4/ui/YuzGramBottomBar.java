@@ -59,7 +59,8 @@ public class YuzGramBottomBar extends View {
     private static final int ICON_ACTIVE = 0xFFFFFFFF;  // faol ikon (pill ustida oq)
     private static final int ICON_IDLE = 0xFF8E9DBB;    // o'chiq ikon
     private static final int TEXT_ACTIVE = 0xFFE9F6FF;  // faol matn
-    private static final int TEXT_IDLE = 0xFF74809B;    // o'chiq matn
+    // 10.5sp kichik matn — sirt ustida kamida 4.5:1 kerak (bu juftlikda ~6.3:1).
+    private static final int TEXT_IDLE = 0xFF8794AF;    // o'chiq matn
 
     private final Paint surfacePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -254,17 +255,28 @@ public class YuzGramBottomBar extends View {
         pressAnim.start();
     }
 
-    /** Barning ko'rinishini animatsiya bilan yoqish/o'chirish. */
+    /**
+     * Barning ko'rinishini animatsiya bilan yoqish/o'chirish.
+     *
+     * Holat tekshiruvi `shown` flag'iga EMAS, balki View'ning haqiqiy
+     * ko'rinishiga ham qaraydi: flag bilan sirt bir-biridan ajralib qolishi
+     * mumkin (masalan yashirish animatsiyasi bekor bo'lib view GONE bo'lib
+     * qolganda — eski kodda `shown == visible` erta return bundan keyin barni
+     * bir umr ko'rsatmas edi). Bu yerda bunday zidlik o'z-o'zidan tiklanadi.
+     */
     public void setVisible(boolean visible) {
-        if (shown == visible) {
+        if (visible ? (shown && getVisibility() == VISIBLE)
+                : (!shown && getVisibility() == GONE)) {
             return;
         }
         shown = visible;
         animate().cancel();
         if (visible) {
             setVisibility(VISIBLE);
-            setAlpha(0f);
-            setTranslationY(height() * 0.7f);
+            if (getAlpha() >= 1f) {
+                setAlpha(0f);
+                setTranslationY(height() * 0.7f);
+            }
             animate().alpha(1f).translationY(0f).setDuration(300)
                     .setInterpolator(new OvershootInterpolator(0.55f)).start();
         } else {
@@ -400,20 +412,32 @@ public class YuzGramBottomBar extends View {
         return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
+    /**
+     * Ikon to'plami — bitta chiziq oilasi (yumaloq uchli shtrip, bir xil
+     * burchak radiusi formulasi) va bitta faollik tili: tanlangan slotda
+     * ikonning "imzo" elementi to'ldiriladi (quloqcha / play / katak / bosh).
+     *
+     * Barcha o'lchamlar `k = size / iconSize` bilan masshtablanadi: ikon
+     * "pop" qilganda geometriya ham birga o'sadi, aks holda (eski kodda
+     * qo'l bilan berilgan dp(6), dp(11) kabi ofsetlar) shakl buzilib,
+     * tanlangan ikon qiyshayib ko'rinardi.
+     */
     private void drawIcon(Canvas canvas, int tab, float cx, float cy, float size, int color, boolean active) {
         iconPaint.setColor(color);
-        iconPaint.setStrokeWidth(AndroidUtilities.dp(active ? 2.1f : 1.8f));
+        iconPaint.setStrokeWidth(AndroidUtilities.dp(active ? 2.05f : 1.75f));
+        float k = size / iconSize;
         float half = size / 2f;
         switch (tab) {
             case TAB_ASOSIY: {
-                float r = AndroidUtilities.dp(5);
-                tmpRect.set(cx - half, cy - half + AndroidUtilities.dp(1),
-                        cx + half, cy + half - AndroidUtilities.dp(4));
-                drawRoundRectStroke(canvas, tmpRect, r);
+                // Suhbat ko'pigi + chap-pastdagi quloqcha
+                tmpRect.set(cx - half, cy - half + AndroidUtilities.dp(1f) * k,
+                        cx + half, cy + half - AndroidUtilities.dp(6f) * k);
+                drawRoundRectStroke(canvas, tmpRect, AndroidUtilities.dp(5.5f) * k);
                 path.reset();
-                path.moveTo(cx - half + AndroidUtilities.dp(6), tmpRect.bottom);
-                path.lineTo(cx - half + AndroidUtilities.dp(4), tmpRect.bottom + AndroidUtilities.dp(5));
-                path.lineTo(cx - half + AndroidUtilities.dp(11), tmpRect.bottom);
+                path.moveTo(tmpRect.left + AndroidUtilities.dp(6.5f) * k, tmpRect.bottom);
+                path.lineTo(tmpRect.left + AndroidUtilities.dp(3.5f) * k,
+                        tmpRect.bottom + AndroidUtilities.dp(5.2f) * k);
+                path.lineTo(tmpRect.left + AndroidUtilities.dp(11.5f) * k, tmpRect.bottom);
                 path.close();
                 iconPaint.setStyle(Paint.Style.FILL);
                 canvas.drawPath(path, iconPaint);
@@ -421,15 +445,17 @@ public class YuzGramBottomBar extends View {
                 break;
             }
             case TAB_REELS: {
-                // Reels: yumaloq kadr ichida "play" uchburchagi
-                float r = AndroidUtilities.dp(5);
+                // Reels: yumaloq kadr ichida "play" uchburchagi.
+                // Uchburchak og'irlik markazi ko'rgazgich markaziga yaqin
+                // bo'lishi kerak — chap qirrani biroz chamalasak, "o'ngga
+                // siljigan" hissi yo'qoladi (optik markazlash).
                 tmpRect.set(cx - half, cy - half, cx + half, cy + half);
-                drawRoundRectStroke(canvas, tmpRect, r);
-                float tri = AndroidUtilities.dp(4.6f) * (size / iconSize);
+                drawRoundRectStroke(canvas, tmpRect, AndroidUtilities.dp(6f) * k);
+                float tri = AndroidUtilities.dp(4.7f) * k;
                 path.reset();
-                path.moveTo(cx - tri * 0.7f, cy - tri);
-                path.lineTo(cx - tri * 0.7f, cy + tri);
-                path.lineTo(cx + tri, cy);
+                path.moveTo(cx - tri * 0.55f, cy - tri);
+                path.lineTo(cx - tri * 0.55f, cy + tri);
+                path.lineTo(cx + tri * 1.12f, cy);
                 path.close();
                 iconPaint.setStyle(Paint.Style.FILL);
                 canvas.drawPath(path, iconPaint);
@@ -437,8 +463,8 @@ public class YuzGramBottomBar extends View {
                 break;
             }
             case TAB_ELONLAR: {
-                // Elonlar: 2x2 katalog to'rini; faol slotda yuqori-chap katak to'ldiriladi
-                float gap = AndroidUtilities.dp(2.5f) * (size / iconSize);
+                // Funksiyalar: 2x2 to'plam to'rini; faol slotda yuqori-chap katak to'ldiriladi
+                float gap = AndroidUtilities.dp(3f) * k;
                 float cell = (size - gap) / 2f;
                 float left = cx - half, top = cy - half;
                 for (int gx = 0; gx < 2; gx++) {
@@ -450,23 +476,30 @@ public class YuzGramBottomBar extends View {
                                 top + gy * (cell + gap) + cell);
                         if (active && gx == 0 && gy == 0) {
                             iconPaint.setStyle(Paint.Style.FILL);
-                            canvas.drawRoundRect(tmpRect, AndroidUtilities.dp(3), AndroidUtilities.dp(3), iconPaint);
+                            canvas.drawRoundRect(tmpRect, AndroidUtilities.dp(3.4f) * k,
+                                    AndroidUtilities.dp(3.4f) * k, iconPaint);
                             iconPaint.setStyle(Paint.Style.STROKE);
                         } else {
-                            drawRoundRectStroke(canvas, tmpRect, AndroidUtilities.dp(3));
+                            drawRoundRectStroke(canvas, tmpRect, AndroidUtilities.dp(3.4f) * k);
                         }
                     }
                 }
                 break;
             }
             case TAB_PROFIL: {
-                float k = size / iconSize;
-                float headR = AndroidUtilities.dp(4.2f) * k;
-                canvas.drawCircle(cx, cy - AndroidUtilities.dp(3.5f) * k, headR, iconPaint);
+                float headR = AndroidUtilities.dp(4.3f) * k;
+                float headCy = cy - AndroidUtilities.dp(3.8f) * k;
+                if (active) {
+                    iconPaint.setStyle(Paint.Style.FILL);
+                    canvas.drawCircle(cx, headCy, headR, iconPaint);
+                    iconPaint.setStyle(Paint.Style.STROKE);
+                } else {
+                    canvas.drawCircle(cx, headCy, headR, iconPaint);
+                }
                 path.reset();
-                tmpRect.set(cx - half, cy + AndroidUtilities.dp(2) * k,
-                        cx + half, cy + half + AndroidUtilities.dp(7f) * k);
-                path.addArc(tmpRect, 200, 140);
+                tmpRect.set(cx - half * 0.96f, cy + AndroidUtilities.dp(1.4f) * k,
+                        cx + half * 0.96f, cy + half + AndroidUtilities.dp(6.6f) * k);
+                path.addArc(tmpRect, 200f, 140f);
                 canvas.drawPath(path, iconPaint);
                 break;
             }

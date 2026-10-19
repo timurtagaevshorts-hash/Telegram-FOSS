@@ -105,6 +105,8 @@ public class YuzGramChatWheel extends View {
 
     private LinearGradient activeShader;
     private float shaderCx = Float.MIN_VALUE, shaderCy = Float.MIN_VALUE, shaderR = Float.MIN_VALUE;
+    /** Fokus nomining asosiy o'lchami (sp) — sig'imganda shundan pastga tushadi. */
+    private float labelBaseSize;
 
     public YuzGramChatWheel(Context context) {
         super(context);
@@ -118,8 +120,9 @@ public class YuzGramChatWheel extends View {
         iconPaint.setStrokeCap(Paint.Cap.ROUND);
         iconPaint.setStrokeJoin(Paint.Join.ROUND);
         textPaint.setTextAlign(Paint.Align.CENTER);
-        textPaint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 12f,
-                getResources().getDisplayMetrics()));
+        labelBaseSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 12f,
+                getResources().getDisplayMetrics());
+        textPaint.setTextSize(labelBaseSize);
         textPaint.setTypeface(Typeface.DEFAULT_BOLD);
         badgeTextPaint.setTextAlign(Paint.Align.CENTER);
         badgeTextPaint.setTextSize(dp(8.5f));
@@ -367,9 +370,6 @@ public class YuzGramChatWheel extends View {
                     : type == ITEM_COMPOSE
                     ? getContext().getString(R.string.yuz_wheel_new_msg)
                     : LocaleController.getString("Add", R.string.Add);
-            if (label.length() > 11) {
-                label = label.substring(0, 10) + "…";
-            }
             float acc = 1f - Math.abs(Math.round(pos) - pos) * 2f;
             if (acc <= 0.01f) {
                 return;
@@ -377,7 +377,21 @@ public class YuzGramChatWheel extends View {
             textPaint.setAlpha((int) (255 * acc));
             textPaint.setColor(0xFFFFFFFF);
             float ty = y + r + dp(13f);
-            float tw = Math.min(textPaint.measureText(label), dp(70f));
+            // Nom avval SIG'ISHI kerak, qisqartirish — oxirgi chora. Eski
+            // kod 11 belgida qiyib tashlardi: "Yangiliklar" → "Yangilikla…".
+            // Endi shrift asta kichrayadi, faqat shundan keyin "…" qo'yiladi.
+            float maxText = Math.min(getWidth() - dp(18f), dp(76f));
+            float size = labelBaseSize;
+            textPaint.setTextSize(size);
+            float floor = labelBaseSize * 0.82f;
+            while (size > floor && textPaint.measureText(label) > maxText) {
+                size = Math.max(floor, size - dp(0.5f));
+                textPaint.setTextSize(size);
+            }
+            if (textPaint.measureText(label) > maxText) {
+                label = fitTail(label, maxText);
+            }
+            float tw = textPaint.measureText(label);
             rect.set(x - tw / 2f - dp(8f), ty - dp(12f), x + tw / 2f + dp(8f), ty + dp(4f));
             fillPaint.setColor(PILL_BG);
             fillPaint.setAlpha((int) (232 * acc));
@@ -386,6 +400,15 @@ public class YuzGramChatWheel extends View {
             canvas.drawText(label, x, ty, textPaint);
             textPaint.setAlpha(255);
         }
+    }
+
+    /** Matnni maxW kengligiga sig'adigan qismga tushiradi va "…" bilan tugatadi. */
+    private String fitTail(String text, float maxW) {
+        int end = text.length();
+        while (end > 1 && textPaint.measureText(text.substring(0, end) + "…") > maxW) {
+            end--;
+        }
+        return text.substring(0, end) + "…";
     }
 
     private String labelFor(MessagesController.DialogFilter filter) {
