@@ -90,7 +90,12 @@ dependencies {
     // keyin oqimni kesib qo'yardi -> to'liq qo'shiqlar ijro bo'lmadi.
     // v0.24.5 oxirgi rhino-1.7.15 (Java 8) versiyasi — D8 o'tadi, decrypting
     // ishlaydi, to'liq treklar to'xtovsiz eshitiladi.
-    implementation 'com.github.TeamNewPipe.NewPipeExtractor:extractor:v0.24.5'
+    implementation('com.github.TeamNewPipe.NewPipeExtractor:extractor:v0.24.5') {
+        // full78 CI: spotbugs-annotations 4.8.6 (v0.24.5'ning transitive
+        // bog'lanishi) D8 7.0.3'da dexing'ni qidiradi. Bu faqat kompilyatsiya
+        // davomidagi belgilar to'plami — ish vaqtida keraksiz, chiqarib tashlanadi.
+        exclude group: 'com.github.spotbugs', module: 'spotbugs-annotations'
+    }
     // Google Play Billing — YuzGram Premium to'lovi (donor 8.0.0, lekin u SDK 34
     // talab qiladi; 5.2.1 = compileSdk 33 bilan yig'iladigan oxirgi qator).
     implementation 'com.android.billingclient:billing:5.2.1'
