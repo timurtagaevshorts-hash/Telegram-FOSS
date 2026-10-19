@@ -286,7 +286,7 @@ object YuzMusicEngine {
 
     // ------------------------------------------------------- failure paths
 
-    /** 15s buffering = jim 403/timeout deb hisoblaymiz. */
+    /** Buffer 20s o'smasa — jim 403/throttle deb nomzodni almashtiramiz. */
     private fun onBufferingStall() {
         val p = player ?: return
         if (p.playbackState == Player.STATE_BUFFERING) {
