@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaMetadata
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
@@ -41,6 +42,8 @@ class YuzMusicNotification(context: Context) : DefaultMediaNotificationProvider(
     CHANNEL_ID,
     R.string.musiqa_notif_channel
 ) {
+
+    private val appContext: Context = context
 
     init {
         setSmallIcon(R.drawable.player)
@@ -88,7 +91,7 @@ class YuzMusicNotification(context: Context) : DefaultMediaNotificationProvider(
         actionFactory: MediaNotification.ActionFactory
     ): IntArray {
         val compact = super.addNotificationActions(session, mediaButtons, builder, actionFactory)
-        builder.setColor(COLOR)
+        builder.setColor(ContextCompat.getColor(appContext, R.color.yuz_action))
         // media3 tugmalari tartibi: [oldingi, ijro, keyingi, (to'xtatish)].
         // Qulf ekrani/yon o'rnaki qisqa ko'rinishda aylanish tugasi o'rtada
         // qolishi uchun birinchi uchtasini ko'rsatamiz.
@@ -99,6 +102,5 @@ class YuzMusicNotification(context: Context) : DefaultMediaNotificationProvider(
         /** Alohida id — boshqa bildirishnomalar bilan urishmaydi. */
         const val ID = 870042
         const val CHANNEL_ID = "yuzgram_music"
-        private const val COLOR = 0xFF2AABEE.toInt()
     }
 }

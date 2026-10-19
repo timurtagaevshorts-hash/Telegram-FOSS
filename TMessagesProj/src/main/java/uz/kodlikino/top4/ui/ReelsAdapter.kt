@@ -3,7 +3,7 @@ package uz.kodlikino.top4.ui
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
+import androidx.core.content.ContextCompat
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -364,7 +364,8 @@ class ReelsAdapter(
     }
 
     /** Tanlangan layk rangi — ikon va son bir xil belgini beradi. */
-    private val likeOnColor = 0xFFFF4D6D.toInt()
+    private val likeOnColor = ContextCompat.getColor(appContext, R.color.yuz_like)
+    private val likeOffColor = ContextCompat.getColor(appContext, R.color.yuz_text)
 
     private fun dpF(value: Float): Float = AndroidUtilities.dp(value).toFloat()
 
@@ -542,7 +543,7 @@ class ReelsAdapter(
                     .into(ivThumbnail)
             } else {
                 ivThumbnail.setImageDrawable(null)
-                ivThumbnail.setBackgroundColor(0xFF0A1120.toInt())
+                ivThumbnail.setBackgroundColor(ContextCompat.getColor(appContext, R.color.yuz_bg))
             }
             refreshLikeUi()
             btnLike.setOnClickListener {
@@ -610,13 +611,13 @@ class ReelsAdapter(
             btnLike.setImageResource(
                 if (isLiked) R.drawable.ic_yuz_heart_filled else R.drawable.ic_yuz_heart
             )
-            btnLike.setColorFilter(if (isLiked) likeOnColor else Color.WHITE)
+            btnLike.setColorFilter(if (isLiked) likeOnColor else likeOffColor)
             tvLikeCount.text = compactCount(count)
             // Tanlangan holat sonida ham ko'rinsin: foydalanuvchi ro'yxatdan
             // chiqib qaytganda "men buni layk qilganmanmi" degan savol
             // ikonkaning to'ldirilganligigina emas, sonning rangi bilan ham
             // javoblanadi.
-            tvLikeCount.setTextColor(if (isLiked) likeOnColor else Color.WHITE)
+            tvLikeCount.setTextColor(if (isLiked) likeOnColor else likeOffColor)
         }
 
         /**

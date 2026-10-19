@@ -118,11 +118,11 @@
                 android:layout_height="@dimen/yuz_button"
                 android:layout_weight="1"
                 android:text="@string/classified_call"
-                android:textColor="@color/yuz_text"
+                android:textColor="@color/yuz_on_action"
                 app:backgroundTint="@color/yuz_action"
                 app:cornerRadius="@dimen/yuz_radius_field"
                 app:icon="@drawable/ic_call"
-                app:iconTint="@color/yuz_text" />
+                app:iconTint="@color/yuz_on_action" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnDelete"

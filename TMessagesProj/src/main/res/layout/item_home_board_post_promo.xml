@@ -74,7 +74,7 @@
                 android:paddingEnd="@dimen/yuz_space_4"
                 android:text="@string/home_board_post_promo_button"
                 android:textAllCaps="false"
-                android:textColor="@color/yuz_text"
+                android:textColor="@color/yuz_on_action"
                 android:textSize="@dimen/yuz_text_secondary"
                 android:textStyle="bold"
                 app:backgroundTint="@color/yuz_action"
@@ -83,7 +83,7 @@
                 app:iconGravity="textStart"
                 app:iconPadding="6dp"
                 app:iconSize="18dp"
-                app:iconTint="@color/yuz_text" />
+                app:iconTint="@color/yuz_on_action" />
         </LinearLayout>
 
         <FrameLayout

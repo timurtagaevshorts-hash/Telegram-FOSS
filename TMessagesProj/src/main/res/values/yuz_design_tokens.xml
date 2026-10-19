@@ -16,7 +16,9 @@
     <!-- Ikkilamchi brend rangi — FAQAT bezak (navigatsiya doirasi, gradient),
          tugmalarda ishlatilmaydi. -->
     <color name="yuz_decor">#5B6CF9</color>
-    <color name="yuz_on_action">#FFFFFF</color>
+    <!-- Accent (#2AABEE) ustidagi yozuv: oq matn 2.57:1 beradi (AA osti),
+         shuning uchun bu yerda to'q siyaq-siyoh ishlatiladi — 7.34:1. -->
+    <color name="yuz_on_action">#06121C</color>
 
     <color name="yuz_text">#FFFFFF</color>
     <color name="yuz_text_secondary">#95A1B4</color>

@@ -32,7 +32,7 @@
         android:shadowColor="#80000000"
         android:shadowRadius="4"
         android:text="0"
-        android:textColor="@color/white"
+        android:textColor="@color/yuz_text"
         android:textSize="12sp"
         android:textStyle="bold" />
 

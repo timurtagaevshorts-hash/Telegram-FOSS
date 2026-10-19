@@ -53,7 +53,7 @@
                     android:paddingEnd="7dp"
                     android:paddingBottom="2dp"
                     android:text="18+"
-                    android:textColor="@color/white"
+                    android:textColor="@color/yuz_text"
                     android:textSize="11sp"
                     android:textStyle="bold" />
             </FrameLayout>
@@ -124,14 +124,14 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:text="@string/kino_watch_cta"
-                android:textColor="@color/yuz_text"
+                android:textColor="@color/yuz_on_action"
                 android:textSize="@dimen/yuz_text_button"
                 android:textStyle="bold"
                 app:backgroundTint="@color/yuz_action"
                 app:cornerRadius="@dimen/yuz_radius_field"
                 app:icon="@drawable/ic_yuz_kino"
                 app:iconSize="18dp"
-                app:iconTint="@color/yuz_text" />
+                app:iconTint="@color/yuz_on_action" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

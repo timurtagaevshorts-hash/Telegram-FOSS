@@ -48,7 +48,7 @@
                 android:paddingEnd="@dimen/yuz_space_2"
                 android:paddingBottom="2dp"
                 android:text="Yangi"
-                android:textColor="@color/yuz_text"
+                android:textColor="@color/yuz_on_action"
                 android:textSize="@dimen/yuz_text_micro"
                 android:textStyle="bold" />
         </com.google.android.material.card.MaterialCardView>

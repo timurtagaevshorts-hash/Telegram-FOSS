@@ -241,7 +241,7 @@
                 android:layout_height="@dimen/yuz_button"
                 android:layout_marginTop="@dimen/yuz_gutter"
                 android:text="@string/job_board_publish"
-                android:textColor="@color/yuz_text"
+                android:textColor="@color/yuz_on_action"
                 app:backgroundTint="@color/yuz_action"
                 app:cornerRadius="@dimen/yuz_radius_field" />
         </LinearLayout>

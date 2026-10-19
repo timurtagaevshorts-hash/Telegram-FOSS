@@ -14,7 +14,6 @@ import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 import com.google.android.material.tabs.TabLayout
@@ -244,49 +243,27 @@ class JobCardsActivity : BaseFragment() {
         }
     }
 
-    /** #75: filtr chip'lari — Elonlar panelidagi bilan bir xil uslub. */
+    /** #75: filtr chip'lari — Elonlar paneli bilan bir xil ([YuzChips]) maket. */
     private fun buildFilterChips(
         group: ChipGroup?,
         labels: List<String>,
         selectedIndex: Int,
         onSelect: (Int) -> Unit
     ) {
-        val g = group ?: return
         val ctx = themedContext ?: return
-        g.removeAllViews()
-        val accent = androidx.core.content.ContextCompat.getColor(ctx, R.color.primary)
-        val surface = androidx.core.content.ContextCompat.getColor(ctx, R.color.home_card)
-        val muted = androidx.core.content.ContextCompat.getColor(ctx, R.color.text_secondary)
-        val density = ctx.resources.displayMetrics.density
-        labels.forEachIndexed { index, label ->
-            val checked = index == selectedIndex
-            val chip = Chip(ctx).apply {
-                text = label
-                isCheckable = true
-                isChecked = checked
-                setTextColor(
-                    android.content.res.ColorStateList.valueOf(
-                        if (checked) android.graphics.Color.WHITE else muted
-                    )
-                )
-                chipBackgroundColor = android.content.res.ColorStateList.valueOf(
-                    if (checked) accent else surface
-                )
-                chipStrokeWidth = 1f * density
-                chipStrokeColor = android.content.res.ColorStateList.valueOf(
-                    if (checked) 0x00FFFFFF else 0x1AFFFFFF
-                )
-                chipCornerRadius = 18f * density
-                setOnClickListener { onSelect(index) }
-            }
-            g.addView(chip)
-        }
+        YuzChips.fill(ctx, group, labels.map { YuzChips.Item(it, it) }, selectedIndex, onSelect)
     }
 
     private fun setupDateChips() {
         val values = listOf(1, 7, 30, 0)
         val selected = values.indexOf(filterDays).coerceAtLeast(0)
-        buildFilterChips(chipGroupDate, listOf("Bugun", "7 kun", "30 kun", "Barchasi"), selected) { i ->
+        val labels = listOf(
+            getString(R.string.classified_filter_today),
+            getString(R.string.classified_filter_7days),
+            getString(R.string.classified_filter_30days),
+            getString(R.string.classified_all_categories)
+        )
+        buildFilterChips(chipGroupDate, labels, selected) { i ->
             filterDays = values.getOrElse(i) { 0 }
             setupDateChips()
             applyFilter()
@@ -294,7 +271,13 @@ class JobCardsActivity : BaseFragment() {
     }
 
     private fun setupSortChips() {
-        buildFilterChips(chipGroupSort, listOf("Standart", "Yangi", "Arzon", "Qimmat"), sortMode) { i ->
+        val labels = listOf(
+            getString(R.string.classified_sort_default),
+            getString(R.string.classified_sort_new),
+            getString(R.string.classified_sort_cheap),
+            getString(R.string.classified_sort_expensive)
+        )
+        buildFilterChips(chipGroupSort, labels, sortMode) { i ->
             sortMode = i
             setupSortChips()
             applyFilter()

@@ -367,10 +367,10 @@
         android:layout_marginEnd="@dimen/yuz_gutter"
         android:layout_marginBottom="92dp"
         android:text="@string/job_board_post"
-        android:textColor="@color/yuz_text"
+        android:textColor="@color/yuz_on_action"
         app:backgroundTint="@color/yuz_action"
         app:elevation="8dp"
         app:icon="@drawable/ic_add"
-        app:iconTint="@color/yuz_text" />
+        app:iconTint="@color/yuz_on_action" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

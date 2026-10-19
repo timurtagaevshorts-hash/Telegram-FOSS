@@ -35,7 +35,7 @@
         android:layout_gravity="top|center_horizontal"
         android:shadowColor="#80000000"
         android:shadowRadius="6"
-        android:textColor="@color/white"
+        android:textColor="@color/yuz_text"
         android:textSize="14sp" />
 
     <TextView

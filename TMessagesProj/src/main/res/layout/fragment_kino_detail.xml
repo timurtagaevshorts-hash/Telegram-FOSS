@@ -97,7 +97,7 @@
                     android:layout_height="@dimen/yuz_button"
                     android:layout_marginTop="22dp"
                     android:text="@string/kino_watch"
-                    android:textColor="@color/yuz_text"
+                    android:textColor="@color/yuz_on_action"
                     android:textSize="@dimen/yuz_text_section"
                     android:textStyle="bold"
                     app:backgroundTint="@color/yuz_action"

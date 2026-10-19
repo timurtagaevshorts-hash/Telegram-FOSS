@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
@@ -103,7 +104,7 @@ class ProfileReelsAdapter(
                     .into(thumb)
             } else {
                 thumb.setImageDrawable(null)
-                thumb.setBackgroundColor(0xFF0A1120.toInt())
+                thumb.setBackgroundColor(ContextCompat.getColor(appContext, R.color.yuz_bg))
             }
             del.visibility = if (manageMode) View.VISIBLE else View.GONE
             del.setOnClickListener {
