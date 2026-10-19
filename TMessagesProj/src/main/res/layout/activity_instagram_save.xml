@@ -75,7 +75,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:cardBackgroundColor="@color/classified_card_default_bg"
-                app:cardCornerRadius="20dp"
+                app:cardCornerRadius="@dimen/yuz_radius_card"
                 app:cardElevation="0dp"
                 app:strokeColor="@color/yuz_stroke_soft"
                 app:strokeWidth="1dp">
@@ -178,9 +178,9 @@
                 android:layout_marginTop="@dimen/yuz_space_4"
                 android:visibility="gone"
                 app:cardBackgroundColor="@color/classified_card_default_bg"
-                app:cardCornerRadius="22dp"
+                app:cardCornerRadius="@dimen/yuz_radius_card"
                 app:cardElevation="8dp"
-                app:strokeColor="#33FFFFFF"
+                app:strokeColor="@color/yuz_stroke_strong"
                 app:strokeWidth="1.5dp">
 
                 <LinearLayout
@@ -215,8 +215,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/yuz_space_4"
-                        app:cardBackgroundColor="#0A0F16"
-                        app:cardCornerRadius="18dp"
+                        app:cardBackgroundColor="@color/yuz_surface"
+                        app:cardCornerRadius="@dimen/yuz_radius_card"
                         app:cardElevation="0dp"
                         app:strokeColor="@color/yuz_stroke_soft"
                         app:strokeWidth="1dp">

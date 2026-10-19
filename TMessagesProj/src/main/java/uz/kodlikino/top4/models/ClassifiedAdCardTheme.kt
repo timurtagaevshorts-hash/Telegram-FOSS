@@ -2,6 +2,7 @@ package uz.kodlikino.top4.models
 
 import android.content.Context
 import android.graphics.Color
+import androidx.core.content.ContextCompat
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
@@ -32,21 +33,23 @@ data class ClassifiedCardStyle(
 
 object ClassifiedAdCardTheme {
 
+    private fun token(context: Context, res: Int): Int = ContextCompat.getColor(context, res)
+
     fun styleFor(themeRaw: String, context: Context, isPremiumUser: Boolean = false): ClassifiedCardStyle {
         // Neon palitra (yuz_classified_colors.xml) bilan bir xil: kartalar ham to'q
         // ko'k-keymish sirt ustida, brend ko'ki va oltin narx bilan chiqadi — shunda
         // Elonlar feed'i chat/pastki bar bilan bitta uslubda ko'rinadi.
         return ClassifiedCardStyle(
-            cardBackground = Color.parseColor("#0D121D"),
-            titleColor = Color.parseColor("#FFFFFF"),
-            secondaryColor = Color.parseColor("#95A1B4"),
-            priceColor = Color.parseColor("#FFD84D"),
-            strokeColor = Color.parseColor("#202B3C"),
+            cardBackground = token(context, R.color.yuz_surface),
+            titleColor = token(context, R.color.yuz_text),
+            secondaryColor = token(context, R.color.yuz_text_secondary),
+            priceColor = token(context, R.color.yuz_gold),
+            strokeColor = token(context, R.color.yuz_stroke),
             categoryBgRes = R.drawable.bg_classified_category_badge,
-            categoryTextColor = Color.parseColor("#FFFFFF"),
+            categoryTextColor = token(context, R.color.yuz_text),
             priceBadgeBgRes = R.drawable.bg_classified_price_badge,
-            addressIconTint = Color.parseColor("#2AABEE"),
-            imageStrokeColor = Color.parseColor("#202B3C"),
+            addressIconTint = token(context, R.color.yuz_action),
+            imageStrokeColor = token(context, R.color.yuz_stroke),
             premiumAccent = false
         )
     }

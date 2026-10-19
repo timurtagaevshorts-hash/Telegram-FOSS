@@ -37,7 +37,7 @@ object YuzChips {
             textStartPadding = 6f * d
             textEndPadding = 6f * d
             chipMinHeight = 34f * d
-            chipCornerRadius = 10f * d
+            chipCornerRadius = 17f * d
             checkedIcon = null
             closeIcon = null
             setEnsureMinTouchTargetSize(false)

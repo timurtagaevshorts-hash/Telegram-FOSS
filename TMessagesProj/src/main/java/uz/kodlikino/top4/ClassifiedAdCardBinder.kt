@@ -70,8 +70,8 @@ object ClassifiedAdCardBinder {
                 .load(primary)
                 .transform(CenterCrop())
                 .transition(DrawableTransitionOptions.withCrossFade())
-                .placeholder(R.color.home_card)
-                .error(R.color.home_card)
+                .placeholder(R.color.yuz_surface)
+                .error(R.color.yuz_surface)
                 .into(ivAdImage)
             if (images.size > 1) {
                 tvImageCount.visibility = View.VISIBLE

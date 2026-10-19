@@ -45,8 +45,8 @@ class ClassifiedAdDetailImageAdapter(
                 .load(url)
                 .fitCenter()
                 .transition(DrawableTransitionOptions.withCrossFade())
-                .placeholder(R.color.home_card)
-                .error(R.color.home_card)
+                .placeholder(R.color.yuz_surface)
+                .error(R.color.yuz_surface)
                 .into(ivImage)
 
             itemView.setOnClickListener {

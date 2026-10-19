@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <gradient android:startColor="#2AABEE" android:endColor="#5B6CF9" android:angle="135" />
-    <corners android:radius="22dp" />
+    <gradient android:startColor="@color/yuz_action" android:endColor="@color/yuz_decor" android:angle="135" />
+    <corners android:radius="@dimen/yuz_radius_card" />
 </shape>

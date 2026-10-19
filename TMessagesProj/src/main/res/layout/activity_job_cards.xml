@@ -93,7 +93,7 @@
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:src="@drawable/ic_search"
-                        app:tint="#95A1B4" />
+                        app:tint="@color/yuz_text_secondary" />
 
                     <EditText
                         android:id="@+id/etJobSearch"
@@ -153,7 +153,7 @@
                         android:layout_marginEnd="@dimen/yuz_space_2"
                         android:layout_weight="1"
                         android:hint="Min maosh"
-                        app:boxBackgroundColor="@color/home_card"
+                        app:boxBackgroundColor="@color/yuz_field"
                         app:boxCornerRadiusTopStart="12dp"
                         app:boxCornerRadiusTopEnd="12dp"
                         app:boxCornerRadiusBottomStart="12dp"
@@ -173,7 +173,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:hint="Max maosh"
-                        app:boxBackgroundColor="@color/home_card"
+                        app:boxBackgroundColor="@color/yuz_field"
                         app:boxCornerRadiusTopStart="12dp"
                         app:boxCornerRadiusTopEnd="12dp"
                         app:boxCornerRadiusBottomStart="12dp"
@@ -201,7 +201,7 @@
                         android:layout_marginEnd="@dimen/yuz_space_2"
                         android:layout_weight="1"
                         android:hint="Joylashuv (Shahar/Tuman)"
-                        app:boxBackgroundColor="@color/home_card"
+                        app:boxBackgroundColor="@color/yuz_field"
                         app:boxCornerRadiusTopStart="12dp"
                         app:boxCornerRadiusTopEnd="12dp"
                         app:boxCornerRadiusBottomStart="12dp"
@@ -337,7 +337,7 @@
                 android:alpha="0.8"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_yuz_briefcase"
-                android:tint="#66BFD0EA" />
+                android:tint="@color/yuz_text_muted" />
 
             <TextView
                 android:id="@+id/tvEmpty"

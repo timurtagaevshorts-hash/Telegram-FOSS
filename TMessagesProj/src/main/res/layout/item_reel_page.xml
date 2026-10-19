@@ -70,7 +70,7 @@
         android:contentDescription="@null"
         android:padding="22dp"
         android:src="@drawable/ic_yuz_play"
-        android:tint="#E6FFFFFF"
+        android:tint="@color/yuz_on_media"
         android:visibility="gone" />
 
     <!-- Ikki marta bosilganda paydo bo'ladigan yurak (KinoTOP4'dagi kabi) -->
@@ -147,7 +147,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="1dp"
-            android:shadowColor="#A6000000"
+            android:shadowColor="@color/yuz_scrim_strong"
             android:shadowDy="1"
             android:shadowRadius="4"
             android:text="0"
@@ -172,7 +172,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="1dp"
-            android:shadowColor="#A6000000"
+            android:shadowColor="@color/yuz_scrim_strong"
             android:shadowDy="1"
             android:shadowRadius="4"
             android:text="0"
@@ -203,14 +203,14 @@
                 android:layout_height="13dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_yuz_eye"
-                android:tint="#CCFFFFFF" />
+                android:tint="@color/yuz_on_media_dim" />
 
             <TextView
                 android:id="@+id/tvViews"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/yuz_space_1"
-                android:shadowColor="#A6000000"
+                android:shadowColor="@color/yuz_scrim_strong"
                 android:shadowDy="1"
                 android:shadowRadius="4"
                 android:text="0"
@@ -266,7 +266,7 @@
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:shadowColor="#A6000000"
+                android:shadowColor="@color/yuz_scrim_strong"
                 android:shadowDy="1"
                 android:shadowRadius="4"
                 android:textColor="@color/yuz_text"
@@ -282,10 +282,10 @@
             android:ellipsize="end"
             android:lineSpacingExtra="2dp"
             android:maxLines="4"
-            android:shadowColor="#A6000000"
+            android:shadowColor="@color/yuz_scrim_strong"
             android:shadowDy="1"
             android:shadowRadius="4"
-            android:textColor="#F2FFFFFF"
+            android:textColor="@color/yuz_on_media"
             android:textSize="@dimen/yuz_text_body" />
 
         <!--

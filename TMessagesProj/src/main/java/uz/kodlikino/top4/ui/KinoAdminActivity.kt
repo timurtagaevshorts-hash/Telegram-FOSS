@@ -306,7 +306,7 @@ class KinoAdminActivity : BaseFragment() {
         for ((name, ts) in recent) {
             val row = TextView(themed).apply {
                 text = "$name · ${agoLabel(ts, now)}"
-                setTextColor(themed.resources.getColor(R.color.text_secondary))
+                setTextColor(ContextCompat.getColor(themed, R.color.yuz_text_secondary))
                 textSize = 13f
                 setBackgroundResource(R.drawable.bg_profile_modern_card)
                 setPadding(

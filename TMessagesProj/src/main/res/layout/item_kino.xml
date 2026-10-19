@@ -10,8 +10,8 @@
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground"
-    app:cardBackgroundColor="#1A1A1A"
-    app:cardCornerRadius="16dp"
+    app:cardBackgroundColor="@color/yuz_surface"
+    app:cardCornerRadius="@dimen/yuz_radius_card"
     app:cardElevation="4dp"
     app:strokeColor="@color/yuz_stroke"
     app:strokeWidth="1dp">
@@ -25,8 +25,8 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="120dp"
             android:layout_height="160dp"
-            app:cardBackgroundColor="#2A2A2A"
-            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/yuz_bg"
+            app:cardCornerRadius="@dimen/yuz_radius_sm"
             app:cardElevation="0dp">
 
             <FrameLayout
@@ -112,7 +112,7 @@
                 android:ellipsize="end"
                 android:maxLines="3"
                 android:textColor="@color/yuz_text_secondary"
-                android:textSize="12sp" />
+                android:textSize="@dimen/yuz_text_secondary" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnKinoCardWatch"

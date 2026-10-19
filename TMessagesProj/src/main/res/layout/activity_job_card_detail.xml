@@ -35,7 +35,7 @@
             android:layout_height="wrap_content"
             android:layout_margin="@dimen/yuz_space_4"
             app:cardBackgroundColor="@color/classified_card_default_bg"
-            app:cardCornerRadius="18dp"
+            app:cardCornerRadius="@dimen/yuz_radius_card"
             app:cardElevation="6dp"
             app:strokeColor="@color/yuz_stroke_soft"
             app:strokeWidth="1dp">
@@ -135,7 +135,7 @@
                 app:cornerRadius="@dimen/yuz_radius_field"
                 app:icon="@drawable/ic_delete"
                 app:iconTint="@color/yuz_danger"
-                app:strokeColor="#55FF5C5C" />
+                app:strokeColor="@color/yuz_danger_soft" />
         </LinearLayout>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

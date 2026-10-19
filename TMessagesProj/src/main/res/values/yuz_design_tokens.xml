@@ -34,6 +34,10 @@
     <color name="yuz_stroke">#202B3C</color>
     <color name="yuz_stroke_soft">#1CFFFFFF</color>
     <color name="yuz_stroke_strong">#3DFFFFFF</color>
+    <!-- Tanlanmagan chip hoshiyasi: brendning ikkilamchi rangi, 25% shaffoflik. -->
+    <color name="yuz_stroke_decor">#405B6CF9</color>
+    <!-- Ko'tarilgan panelning accent hoshiyasi (mini-pleyer, 20%). -->
+    <color name="yuz_stroke_action">#332AABEE</color>
 
     <color name="yuz_gold">#FFD84D</color>
     <color name="yuz_danger">#FF5C5C</color>
@@ -41,6 +45,18 @@
     <color name="yuz_like">#FF4D6D</color>
     <!-- Bosish texurasi (ripple) — qorong\'i sirtlarda ko\'rinadigan yagona qiymat. -->
     <color name="yuz_ripple">#26FFFFFF</color>
+    <!-- Xato holatdagi tug\'a hoshiyasi (to\'liq yulduz emas, yumshoq chegara). -->
+    <color name="yuz_danger_soft">#55FF5C5C</color>
+
+    <!-- ============ Media ustidagi qatlamlar ============ -->
+    <!-- Bu ranglar palitra emas, ular faqat video/rasm USTIDA ishlaydi:
+         yarim shaffof qoplamalar to\'liq opaqqan rangdan yaxshi o\'qiladi. -->
+    <color name="yuz_scrim">#80000000</color>            <!-- panel ortidagi qoraytish -->
+    <color name="yuz_scrim_strong">#A6000000</color>     <!-- media ustidagi matn soyasi -->
+    <color name="yuz_panel_elevated">#E6121824</color>   <!-- qalqib turuvchi mini-pleyer -->
+    <color name="yuz_fill_ghost">#0DFFFFFF</color>       <!-- media ustidagi mayda panel -->
+    <color name="yuz_on_media">#E6FFFFFF</color>         <!-- media ustidagi asosiy matn -->
+    <color name="yuz_on_media_dim">#CCFFFFFF</color>     <!-- media ustidagi ikon/son -->
 
     <!-- ============ Tipografiya masshtabi ============ -->
     <dimen name="yuz_text_display">26sp</dimen>   <!-- faqat brend so'zi / qahramon sarlavha -->
@@ -68,6 +84,9 @@
     <dimen name="yuz_radius_field">14dp</dimen>
     <dimen name="yuz_radius_card">20dp</dimen>
     <dimen name="yuz_radius_pill">100dp</dimen>
+    <!-- Chip balandligining yarmi = aynan pill. Material Chip'ga 100dp berish
+         xavfli (ShapeAppearance qisqartirmaydi), shuning uchun aniq yarim. -->
+    <dimen name="yuz_radius_chip">17dp</dimen>
 
     <!-- ============ Nazorat balandliklari / ikonlar ============ -->
     <dimen name="yuz_button">52dp</dimen>

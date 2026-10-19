@@ -10,7 +10,7 @@
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground"
     app:cardBackgroundColor="@color/classified_card_default_bg"
-    app:cardCornerRadius="18dp"
+    app:cardCornerRadius="@dimen/yuz_radius_card"
     app:cardElevation="6dp"
     app:strokeColor="@color/yuz_stroke_soft"
     app:strokeWidth="1dp">

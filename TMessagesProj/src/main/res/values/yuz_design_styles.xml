@@ -193,7 +193,7 @@
         <item name="android:textColor">@color/yuz_chip_fg</item>
         <item name="chipStrokeWidth">@dimen/yuz_stroke</item>
         <item name="chipStrokeColor">@color/yuz_chip_stroke</item>
-        <item name="chipCornerRadius">@dimen/yuz_radius_sm</item>
+        <item name="chipCornerRadius">@dimen/yuz_radius_chip</item>
         <item name="chipIconVisible">false</item>
         <item name="checkedIconVisible">false</item>
         <item name="closeIconVisible">false</item>

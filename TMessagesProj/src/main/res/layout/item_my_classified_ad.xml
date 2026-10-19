@@ -6,7 +6,7 @@
     android:layout_height="wrap_content"
     android:layout_marginVertical="6dp"
     app:cardBackgroundColor="@color/surface_elevated"
-    app:cardCornerRadius="18dp"
+    app:cardCornerRadius="@dimen/yuz_radius_card"
     app:cardElevation="3dp"
     app:strokeColor="@color/modern_border"
     app:strokeWidth="1dp">
@@ -26,7 +26,7 @@
                 android:layout_width="96dp"
                 android:layout_height="96dp"
                 app:cardBackgroundColor="@color/modern_surface"
-                app:cardCornerRadius="14dp"
+                app:cardCornerRadius="@dimen/yuz_radius_field"
                 app:cardElevation="0dp"
                 app:strokeColor="@color/modern_border"
                 app:strokeWidth="1dp">
@@ -83,7 +83,7 @@
                     android:layout_marginTop="@dimen/yuz_space_2"
                     android:paddingHorizontal="@dimen/yuz_space_2"
                     android:paddingVertical="@dimen/yuz_space_1"
-                    android:textColor="#C77800"
+                    android:textColor="@color/yuz_gold"
                     android:textSize="@dimen/yuz_text_secondary"
                     android:textStyle="bold" />
 

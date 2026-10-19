@@ -8,10 +8,10 @@
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground"
-    app:cardBackgroundColor="@color/home_card"
-    app:cardCornerRadius="16dp"
+    app:cardBackgroundColor="@color/yuz_surface"
+    app:cardCornerRadius="@dimen/yuz_radius_card"
     app:cardElevation="0dp"
-    app:strokeColor="#1AFFFFFF"
+    app:strokeColor="@color/yuz_stroke_soft"
     app:strokeWidth="1dp">
 
     <LinearLayout
@@ -24,7 +24,7 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="100dp"
             android:layout_height="100dp"
-            app:cardCornerRadius="12dp"
+            app:cardCornerRadius="@dimen/yuz_radius_sm"
             app:cardElevation="0dp"
             app:strokeWidth="0dp">
 
@@ -92,7 +92,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:background="@drawable/bg_classified_price_badge"
-                    android:backgroundTint="#1AFFFFFF"
+                    android:backgroundTint="@color/yuz_stroke_soft"
                     android:paddingStart="@dimen/yuz_space_2"
                     android:paddingTop="@dimen/yuz_space_1"
                     android:paddingEnd="@dimen/yuz_space_2"
@@ -131,6 +131,6 @@
             android:layout_height="20dp"
             android:layout_marginStart="@dimen/yuz_space_2"
             android:src="@drawable/ic_edit"
-            app:tint="#33FFFFFF" />
+            app:tint="@color/yuz_stroke_strong" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

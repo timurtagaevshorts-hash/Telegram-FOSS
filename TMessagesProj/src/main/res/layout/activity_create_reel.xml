@@ -87,7 +87,7 @@
                 android:id="@+id/ivVideoPreview"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="#05070C"
+                android:background="@color/yuz_bg"
                 android:contentDescription="@null"
                 android:scaleType="centerCrop"
                 android:visibility="gone" />
