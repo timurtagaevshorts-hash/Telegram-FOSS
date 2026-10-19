@@ -804,7 +804,8 @@ class ReelsActivity @JvmOverloads constructor(
     }
 
     /**
-     * Orqaga bosilganda: avval izohlar panelini yopamiz.
+     * Orqaga bosilganda: avval izohlar panelini yopamiz; root tab'da bo'lsak —
+     * #80: ilovadan chiqmasdan Chat bo'limiga qaytamiz.
      * Diqqat: Telegram semantikası bo'yicha `false` = "orqa tugmani men ishlatdim,
      * fragmentni yopma" (qarang ActionBarLayout.onBackPressed — `true` bo'lsa
      * closeLastFragment() chaqiriladi).
@@ -816,6 +817,10 @@ class ReelsActivity @JvmOverloads constructor(
         }
         if (commentsOpen) {
             closeComments()
+            return false
+        }
+        if (YuzGramNav.isTabRoot(this)) {
+            YuzGramNav.select(this, YuzGramBottomBar.TAB_ASOSIY)
             return false
         }
         return super.onBackPressed()

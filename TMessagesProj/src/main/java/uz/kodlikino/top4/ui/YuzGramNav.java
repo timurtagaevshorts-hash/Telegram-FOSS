@@ -16,6 +16,19 @@ public final class YuzGramNav {
     private YuzGramNav() {
     }
 
+    /**
+     * #80: fragment hozir pastki navigatsiyaning iltizi (root tab'i) — ya'ni
+     * ustida/bastida boshqa ekran yo'q. Orqaga tugmasini "Chat"ga yo'naltirish
+     * uchigana shu holatda ishlatiladi; ustga qo'yilgan ekranlar oddiy pop qiladi.
+     */
+    public static boolean isTabRoot(BaseFragment f) {
+        if (f == null || f.getParentLayout() == null) {
+            return false;
+        }
+        java.util.List<BaseFragment> stack = f.getParentLayout().getFragmentStack();
+        return stack != null && stack.size() == 1 && stack.get(0) == f;
+    }
+
     public static void select(BaseFragment current, int tab) {
         if (current == null) {
             return;

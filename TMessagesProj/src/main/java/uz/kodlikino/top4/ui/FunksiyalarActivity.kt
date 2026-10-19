@@ -62,4 +62,16 @@ class FunksiyalarActivity : BaseFragment() {
         super.onResume()
         actionBar?.visibility = View.GONE
     }
+
+    /**
+     * #80: Profil tab'i root'da orqaga bosilsa — ilovadan chiqishdan oldin
+     * Chat bo'limiga qaytamiz. `false` = tugmani ishlatdik, fragment yopilmaydi.
+     */
+    override fun onBackPressed(): Boolean {
+        if (YuzGramNav.isTabRoot(this)) {
+            YuzGramNav.select(this, YuzGramBottomBar.TAB_ASOSIY)
+            return false
+        }
+        return super.onBackPressed()
+    }
 }

@@ -3304,6 +3304,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             // YuzGram "Profil" tab'i: o'z profilida qo'ng'iroq/video kerak emas.
             videoCallItem.setVisibility(View.GONE);
             callItem.setVisibility(View.GONE);
+            // YuzGram #80: tab profil — tepa chapdagi "ortga" belgisi kerak emas
+            // (pastki bar + orqaga tugma Chat'ga qaytaradi).
+            if (actionBar.getBackButton() != null) {
+                actionBar.getBackButton().setVisibility(View.GONE);
+            }
         }
         if (myProfile) {
             editItem = menu.addItem(edit_profile, R.drawable.group_edit_profile);
@@ -7879,6 +7884,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     public boolean onBackPressed() {
         if (closeSheet()) {
+            return false;
+        }
+        // YuzGram #80: "Profil" tab'ida orqaga — ilovadan chiqishdan avval
+        // Chat bo'limiga qaytamiz (faqat root tab; ustga qo'yilganda oddiy pop).
+        if (myProfile && uz.kodlikino.top4.ui.YuzGramNav.isTabRoot(this)) {
+            uz.kodlikino.top4.ui.YuzGramNav.select(this, uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ASOSIY);
             return false;
         }
         return actionBar.isEnabled() && (sharedMediaRow == -1 || sharedMediaLayout == null || !sharedMediaLayout.closeActionMode());
