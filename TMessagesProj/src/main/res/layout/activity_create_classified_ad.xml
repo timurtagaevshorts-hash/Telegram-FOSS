@@ -226,18 +226,14 @@
             <!-- #75: hudud tanlagichi — filtr qidiruvi region maydoniga tayanadi. -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPickRegion"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                style="@style/YuzButtonSecondary"
                 android:layout_width="match_parent"
                 android:layout_height="@dimen/yuz_button"
                 android:layout_marginTop="@dimen/yuz_space_2"
-                android:text="Viloyat / tuman tanlash (ixtiyoriy)"
-                android:textColor="@color/yuz_text"
+                android:text="@string/classified_region_optional"
                 android:textSize="@dimen/yuz_text_secondary"
-                app:cornerRadius="@dimen/yuz_radius_field"
                 app:icon="@drawable/ic_location_pin"
-                app:iconGravity="start"
-                app:iconTint="@color/yuz_action"
-                app:strokeColor="@color/yuz_stroke_soft" />
+                app:iconGravity="start" />
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"

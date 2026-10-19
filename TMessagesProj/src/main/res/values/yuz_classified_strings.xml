@@ -32,6 +32,7 @@
 <string name="classified_filter_min_price">Minimal narx (so\'m)</string>
 <string name="classified_filter_reset">Tozalash</string>
 <string name="classified_filter_region">Viloyat / tuman tanlash</string>
+<string name="classified_region_optional">Viloyat / tuman tanlash (ixtiyoriy)</string>
 <string name="classified_filter_title">Filtrlash</string>
 <string name="classified_full_info_hint">To\'liq ma\'lumot</string>
 <string name="classified_images_required">Kamida 1 ta rasm tanlang</string>

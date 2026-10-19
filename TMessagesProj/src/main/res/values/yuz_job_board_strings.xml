@@ -24,6 +24,10 @@
     <string name="job_board_salary_hint">Ish haqi</string>
     <string name="job_board_location_hint">Manzil</string>
     <string name="job_board_pick_image_optional">Rasm (ixtiyoriy)</string>
+    <string name="job_board_subtitle">Ishchi yoki ish toping — hudud bo\'yicha</string>
+    <string name="job_board_filters">Filtrlar</string>
+    <string name="job_board_region_only">Ro\'yxatdan</string>
+    <string name="job_board_filter_search">Qidirish</string>
     <string name="job_board_change_image">Rasmni almashtirish</string>
 
     <!-- Elon batafsil ekranida qo'ng'iroq tugmasi uchun umumiy yozuv -->

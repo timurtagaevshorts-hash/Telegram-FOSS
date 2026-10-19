@@ -117,14 +117,11 @@
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnInstagramPaste"
-                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            style="@style/YuzButtonSecondary"
                             android:layout_width="0dp"
                             android:layout_height="@dimen/yuz_button"
                             android:layout_weight="1"
-                            android:text="@string/instagram_save_paste"
-                            android:textColor="@color/yuz_text"
-                            app:cornerRadius="@dimen/yuz_radius_field"
-                            app:strokeColor="@color/yuz_stroke_soft" />
+                            android:text="@string/instagram_save_paste" />
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnInstagramDownload"
@@ -132,10 +129,8 @@
                             android:layout_height="@dimen/yuz_button"
                             android:layout_marginStart="@dimen/yuz_space_3"
                             android:layout_weight="1.6"
+                            style="@style/YuzButton"
                             android:text="@string/instagram_save_download"
-                            android:textColor="@color/yuz_on_action"
-                            app:backgroundTint="@color/yuz_action"
-                            app:cornerRadius="@dimen/yuz_radius_field"
                             app:icon="@drawable/ic_yuz_download"
                             app:iconGravity="textStart"
                             app:iconTint="@color/yuz_on_action" />
@@ -202,14 +197,10 @@
                         android:id="@+id/btnInstagramSaveGallery"
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/yuz_button"
+                        style="@style/YuzButton"
                         android:text="@string/instagram_save_gallery"
-                        android:textColor="@color/yuz_on_action"
-                        android:textStyle="bold"
-                        app:backgroundTint="@color/yuz_action"
-                        app:cornerRadius="@dimen/yuz_radius_field"
                         app:icon="@drawable/ic_yuz_gallery"
-                        app:iconGravity="textStart"
-                        app:iconTint="@color/yuz_on_action" />
+                        app:iconGravity="textStart" />
 
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="match_parent"

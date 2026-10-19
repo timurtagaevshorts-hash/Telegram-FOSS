@@ -274,15 +274,11 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPublish"
+                style="@style/YuzButton"
                 android:layout_width="match_parent"
                 android:layout_height="@dimen/yuz_button"
                 android:layout_marginTop="@dimen/yuz_gutter"
-                android:text="@string/reels_publish"
-                android:textColor="@color/yuz_on_action"
-                android:textSize="@dimen/yuz_text_button"
-                android:textStyle="bold"
-                app:backgroundTint="@color/yuz_action"
-                app:cornerRadius="@dimen/yuz_radius_field" />
+                android:text="@string/reels_publish" />
         </LinearLayout>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

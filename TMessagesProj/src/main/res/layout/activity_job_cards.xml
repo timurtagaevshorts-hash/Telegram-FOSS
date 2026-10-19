@@ -53,7 +53,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Ishchi yoki ish toping — hudud bo'yicha"
+                        android:text="@string/job_board_subtitle"
                         android:textColor="@color/yuz_text_secondary"
                         android:textSize="@dimen/yuz_text_secondary" />
                 </LinearLayout>
@@ -137,7 +137,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="@dimen/yuz_space_3"
-                    android:text="Filtrlar"
+                    android:text="@string/job_board_filters"
                     android:textColor="@color/yuz_text"
                     android:textSize="@dimen/yuz_text_section"
                     android:textStyle="bold" />
@@ -218,17 +218,13 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnJobRegionPicker"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        style="@style/YuzButtonSecondary"
                         android:layout_width="wrap_content"
                         android:layout_height="@dimen/yuz_button"
-                        android:text="Ro'yxatdan"
-                        android:textColor="@color/yuz_text"
+                        android:text="@string/job_board_region_only"
                         android:textSize="@dimen/yuz_text_secondary"
-                        app:cornerRadius="@dimen/yuz_radius_field"
                         app:icon="@drawable/ic_location_pin"
-                        app:iconGravity="start"
-                        app:iconTint="@color/yuz_action"
-                        app:strokeColor="@color/yuz_stroke_soft" />
+                        app:iconGravity="start" />
                 </LinearLayout>
 
                 <TextView
@@ -236,7 +232,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/yuz_space_4"
                     android:layout_marginBottom="@dimen/yuz_space_2"
-                    android:text="Sana"
+                    android:text="@string/classified_filter_date_title"
                     android:textColor="@color/yuz_text_secondary"
                     android:textSize="@dimen/yuz_text_secondary"
                     android:textStyle="bold" />
@@ -261,7 +257,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/yuz_space_3"
                     android:layout_marginBottom="@dimen/yuz_space_2"
-                    android:text="Saralash"
+                    android:text="@string/classified_filter_sort_title"
                     android:textColor="@color/yuz_text_secondary"
                     android:textSize="@dimen/yuz_text_secondary"
                     android:textStyle="bold" />
@@ -289,23 +285,20 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnJobFilterReset"
-                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        style="@style/YuzButtonGhost"
                         android:layout_width="0dp"
                         android:layout_height="@dimen/yuz_button"
                         android:layout_marginEnd="@dimen/yuz_space_2"
                         android:layout_weight="1"
-                        android:text="Tozalash"
-                        android:textColor="@color/yuz_text_secondary"
-                        app:cornerRadius="@dimen/yuz_radius_field" />
+                        android:text="@string/classified_filter_reset" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnJobFilterApply"
                         android:layout_width="0dp"
                         android:layout_height="@dimen/yuz_button"
                         android:layout_weight="1"
-                        android:text="Qidirish"
-                        app:backgroundTint="@color/yuz_action"
-                        app:cornerRadius="@dimen/yuz_radius_field" />
+                        style="@style/YuzButton"
+                        android:text="@string/job_board_filter_search" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>

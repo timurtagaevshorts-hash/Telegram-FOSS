@@ -130,6 +130,28 @@
     </style>
 
     <!-- Kart ichidagi 40dp ikon tugmasi (tahrirlash / o'chirish). -->
+    <!-- Kichik CTA: karta ichida 52dp sig'maydi (Elonlar, promo, kino katakchasi). -->
+    <style name="YuzButtonSmall" parent="YuzButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">@dimen/yuz_button_sm</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:textSize">@dimen/yuz_text_secondary</item>
+        <item name="iconSize">18dp</item>
+    </style>
+
+    <!-- Yumshoq (flat) yordamchi tugma — birlamchi tugmaning yonida, masalan
+         "Tozalash" / "Qidirish" juftligida. -->
+    <style name="YuzButtonGhost" parent="Widget.MaterialComponents.Button.TextButton">
+        <item name="android:layout_height">@dimen/yuz_button</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textSize">@dimen/yuz_text_button</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/yuz_text_secondary</item>
+        <item name="cornerRadius">@dimen/yuz_radius_field</item>
+        <item name="rippleColor">@color/yuz_ripple</item>
+    </style>
+
     <style name="YuzButtonIcon" parent="Widget.MaterialComponents.Button.OutlinedButton">
         <item name="android:layout_width">@dimen/yuz_button_sm</item>
         <item name="android:layout_height">@dimen/yuz_button_sm</item>

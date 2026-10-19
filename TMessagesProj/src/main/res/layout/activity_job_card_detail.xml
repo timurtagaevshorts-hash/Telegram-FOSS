@@ -117,22 +117,18 @@
                 android:layout_width="0dp"
                 android:layout_height="@dimen/yuz_button"
                 android:layout_weight="1"
+                style="@style/YuzButton"
                 android:text="@string/classified_call"
-                android:textColor="@color/yuz_on_action"
-                app:backgroundTint="@color/yuz_action"
-                app:cornerRadius="@dimen/yuz_radius_field"
-                app:icon="@drawable/ic_call"
-                app:iconTint="@color/yuz_on_action" />
+                app:icon="@drawable/ic_call" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnDelete"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                style="@style/YuzButtonSecondary"
                 android:layout_width="wrap_content"
                 android:layout_height="@dimen/yuz_button"
                 android:layout_marginStart="@dimen/yuz_space_3"
                 android:text="@string/classified_delete"
                 android:visibility="gone"
-                app:cornerRadius="@dimen/yuz_radius_field"
                 app:icon="@drawable/ic_delete"
                 app:iconTint="@color/yuz_danger"
                 app:strokeColor="@color/yuz_danger_soft" />

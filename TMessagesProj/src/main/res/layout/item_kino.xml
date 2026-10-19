@@ -117,21 +117,12 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnKinoCardWatch"
                 android:layout_width="wrap_content"
+                style="@style/YuzButtonSmall"
                 android:layout_height="@dimen/yuz_button_sm"
-                android:layout_marginTop="10dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:text="@string/kino_watch_cta"
-                android:textColor="@color/yuz_on_action"
                 android:textSize="@dimen/yuz_text_button"
-                android:textStyle="bold"
-                app:backgroundTint="@color/yuz_action"
-                app:cornerRadius="@dimen/yuz_radius_field"
-                app:icon="@drawable/ic_yuz_kino"
-                app:iconSize="18dp"
-                app:iconTint="@color/yuz_on_action" />
+                app:icon="@drawable/ic_yuz_kino" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

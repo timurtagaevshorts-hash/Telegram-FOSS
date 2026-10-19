@@ -96,12 +96,9 @@
                     android:layout_width="match_parent"
                     android:layout_height="@dimen/yuz_button"
                     android:layout_marginTop="22dp"
+                    style="@style/YuzButton"
                     android:text="@string/kino_watch"
-                    android:textColor="@color/yuz_on_action"
-                    android:textSize="@dimen/yuz_text_section"
-                    android:textStyle="bold"
-                    app:backgroundTint="@color/yuz_action"
-                    app:cornerRadius="@dimen/yuz_radius_field" />
+                    android:textSize="@dimen/yuz_text_section" />
             </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
