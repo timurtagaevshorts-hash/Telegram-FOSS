@@ -90,8 +90,8 @@
     -->
     <ImageView
         android:id="@+id/btnReelMenu"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
         android:layout_gravity="top|end"
         android:layout_marginTop="54dp"
         android:layout_marginEnd="14dp"
@@ -133,8 +133,8 @@
 
         <ImageView
             android:id="@+id/btnLike"
-            android:layout_width="46dp"
-            android:layout_height="46dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="@drawable/bg_yuz_reel_action"
             android:contentDescription="@string/reels_like"
             android:foreground="?attr/selectableItemBackgroundBorderless"
@@ -146,6 +146,10 @@
             android:id="@+id/tvLikeCount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:shadowColor="#A6000000"
+            android:shadowDy="1"
+            android:shadowRadius="4"
             android:text="0"
             android:textColor="@color/white"
             android:textSize="12sp" />
@@ -153,8 +157,8 @@
         <!-- Izoh: bosilganda pastda izohlar paneli ochiladi (ReelsActivity) -->
         <ImageView
             android:id="@+id/btnComments"
-            android:layout_width="46dp"
-            android:layout_height="46dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_marginTop="14dp"
             android:background="@drawable/bg_yuz_reel_action"
             android:contentDescription="@string/reels_comments"
@@ -167,14 +171,18 @@
             android:id="@+id/tvCommentCount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:shadowColor="#A6000000"
+            android:shadowDy="1"
+            android:shadowRadius="4"
             android:text="0"
             android:textColor="@color/white"
             android:textSize="12sp" />
 
         <ImageView
             android:id="@+id/btnShare"
-            android:layout_width="46dp"
-            android:layout_height="46dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_marginTop="14dp"
             android:background="@drawable/bg_yuz_reel_action"
             android:contentDescription="@string/reels_share"
@@ -202,6 +210,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
+                android:shadowColor="#A6000000"
+                android:shadowDy="1"
+                android:shadowRadius="4"
                 android:text="0"
                 android:textColor="@color/white"
                 android:textSize="12sp" />
@@ -255,6 +266,9 @@
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:maxLines="1"
+                android:shadowColor="#A6000000"
+                android:shadowDy="1"
+                android:shadowRadius="4"
                 android:textColor="@color/white"
                 android:textSize="15sp"
                 android:textStyle="bold" />
@@ -268,6 +282,9 @@
             android:ellipsize="end"
             android:lineSpacingExtra="2dp"
             android:maxLines="4"
+            android:shadowColor="#A6000000"
+            android:shadowDy="1"
+            android:shadowRadius="4"
             android:textColor="#F2FFFFFF"
             android:textSize="14sp" />
 

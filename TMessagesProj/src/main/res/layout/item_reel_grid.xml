@@ -4,7 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="140dp"
     android:layout_margin="2dp"
-    android:background="@color/modern_surface">
+    android:background="@color/modern_surface"
+    android:foreground="?attr/selectableItemBackground">
 
     <ImageView
         android:id="@+id/ivReelThumb"
@@ -37,14 +38,13 @@
 
     <ImageView
         android:id="@+id/tvReelDelete"
-        android:layout_width="30dp"
-        android:layout_height="30dp"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
         android:layout_gravity="top|end"
-        android:layout_marginTop="6dp"
-        android:layout_marginEnd="6dp"
-        android:background="@drawable/bg_classified_image_count_badge"
-        android:contentDescription="@null"
-        android:padding="7dp"
+        android:background="@drawable/bg_yuz_tile_delete"
+        android:contentDescription="@string/reels_delete"
+        android:foreground="?attr/selectableItemBackgroundBorderless"
+        android:padding="14dp"
         android:src="@drawable/ic_yuz_close"
         android:tint="@color/white"
         android:visibility="gone" />

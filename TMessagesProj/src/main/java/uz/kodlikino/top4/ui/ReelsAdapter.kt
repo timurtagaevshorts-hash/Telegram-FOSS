@@ -12,6 +12,8 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -30,6 +32,7 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import org.telegram.messenger.R
 import uz.kodlikino.top4.models.Reel
+import org.telegram.messenger.AndroidUtilities
 import uz.kodlikino.top4.utils.YuzViewedReels
 import uz.kodlikino.top4.utils.YuzVideoCache
 
@@ -360,6 +363,11 @@ class ReelsAdapter(
         else -> count.toString()
     }
 
+    /** Tanlangan layk rangi — ikon va son bir xil belgini beradi. */
+    private val likeOnColor = 0xFFFF4D6D.toInt()
+
+    private fun dpF(value: Float): Float = AndroidUtilities.dp(value).toFloat()
+
     // Ko'z ikonkasi XML tarafda (drawableStart/ImageView) — bu yerda faqat son.
     private fun viewsLabel(count: Int): String = compactCount(count)
 
@@ -436,6 +444,7 @@ class ReelsAdapter(
                 liked[r.id] = true
                 likeShown[r.id] = (likeShown[r.id] ?: r.likeCount) + 1
                 refreshLikeUi()
+                popLike()
                 onLikeToggle(r.id, true)
             }
             showLikeBurst()
@@ -502,6 +511,17 @@ class ReelsAdapter(
         fun bind(reel: Reel) {
             this.reel = reel
             playbackBar.progress = 0
+            // Holder boshqa reel uchun qayta ishlatilganda animatsiya
+            // qiymatlari bilan kelishi mumkin — maydonni tozalaymiz.
+            btnLike.animate().cancel()
+            btnLike.scaleX = 1f
+            btnLike.scaleY = 1f
+            tvLikeCount.animate().cancel()
+            tvLikeCount.translationY = 0f
+            cancelBadgeHide()
+            tvPlayPauseBadge.animate().cancel()
+            tvPlayPauseBadge.alpha = 0f
+            tvPlayPauseBadge.visibility = View.GONE
             val name = reel.uploadedByName.ifBlank { "YuzGram" }
             tvUploaderName.text = name
             tvAvatarInitial.text = name.take(1).uppercase()
@@ -532,6 +552,7 @@ class ReelsAdapter(
                 val base = likeShown[r.id] ?: r.likeCount
                 likeShown[r.id] = if (nowLiked) base + 1 else base - 1
                 refreshLikeUi()
+                if (nowLiked) popLike()
                 onLikeToggle(r.id, nowLiked)
             }
             refreshCommentUi()
@@ -588,20 +609,85 @@ class ReelsAdapter(
             btnLike.setImageResource(
                 if (isLiked) R.drawable.ic_yuz_heart_filled else R.drawable.ic_yuz_heart
             )
-            btnLike.setColorFilter(if (isLiked) 0xFFFF4D6D.toInt() else Color.WHITE)
+            btnLike.setColorFilter(if (isLiked) likeOnColor else Color.WHITE)
             tvLikeCount.text = compactCount(count)
+            // Tanlangan holat sonida ham ko'rinsin: foydalanuvchi ro'yxatdan
+            // chiqib qaytganda "men buni layk qilganmanmi" degan savol
+            // ikonkaning to'ldirilganligigina emas, sonning rangi bilan ham
+            // javoblanadi.
+            tvLikeCount.setTextColor(if (isLiked) likeOnColor else Color.WHITE)
         }
 
+        /**
+         * Layk bosilganda ikon qisqacha "urib" qaytadi (pastki navigatsiya
+         * bari animatePop'i bilan bir xil harakat tili) va son bir zumda
+         * ko'tarilib tushadi.
+         */
+        fun popLike() {
+            btnLike.animate().cancel()
+            btnLike.scaleX = 1.34f
+            btnLike.scaleY = 1.34f
+            btnLike.animate().scaleX(1f).scaleY(1f).setDuration(260L)
+                .setInterpolator(OvershootInterpolator(2.2f)).start()
+            tvLikeCount.animate().cancel()
+            tvLikeCount.translationY = 0f
+            tvLikeCount.animate().translationY(-dpF(4f)).setDuration(110L)
+                .setInterpolator(DecelerateInterpolator())
+                .withEndAction {
+                    tvLikeCount.animate().translationY(0f).setDuration(190L)
+                        .setInterpolator(OvershootInterpolator(1.6f)).start()
+                }.start()
+        }
+
+        /**
+         * Kechiktirilgan yashirinish laguchi — saqlanadi, chunki qayta-qayta
+         * bosish eski runnable'ni yangi ko'rinishning ustidan o'tkazib
+         * yubormasligi kerak.
+         */
+        private var badgeHide: Runnable? = null
+
+        private fun cancelBadgeHide() {
+            badgeHide?.let { mainHandler.removeCallbacks(it) }
+            badgeHide = null
+        }
+
+        private fun fadeOutBadge() {
+            cancelBadgeHide()
+            if (tvPlayPauseBadge.visibility != View.VISIBLE) return
+            tvPlayPauseBadge.animate().cancel()
+            tvPlayPauseBadge.animate().alpha(0f).setDuration(150L)
+                .withEndAction { tvPlayPauseBadge.visibility = View.GONE }
+                .start()
+        }
+
+        /**
+         * Play/pause belgisi. Qattiq `VISIBLE/GONE` o'rniga cross-fade: 72dp'lik
+         * dyha video ustida "sakrab" yo'qolishi g'alati ko'rinadi, fade esa
+         * boshqa qatlamlar (poster, yurak) bilan bir harakat tilida gapiradi.
+         */
         fun setPlayingBadge(isPlaying: Boolean) {
+            cancelBadgeHide()
             if (isPlaying) {
-                tvPlayPauseBadge.visibility = View.GONE
-            } else {
-                tvPlayPauseBadge.setImageResource(R.drawable.ic_yuz_play)
-                tvPlayPauseBadge.visibility = View.VISIBLE
-                mainHandler.postDelayed({
-                    if (player?.isPlaying != true) tvPlayPauseBadge.visibility = View.GONE
-                }, 900L)
+                fadeOutBadge()
+                return
             }
+            tvPlayPauseBadge.setImageResource(R.drawable.ic_yuz_play)
+            val wasHidden = tvPlayPauseBadge.visibility != View.VISIBLE
+            tvPlayPauseBadge.visibility = View.VISIBLE
+            tvPlayPauseBadge.animate().cancel()
+            if (wasHidden) {
+                tvPlayPauseBadge.alpha = 0f
+                tvPlayPauseBadge.scaleX = 0.84f
+                tvPlayPauseBadge.scaleY = 0.84f
+            }
+            tvPlayPauseBadge.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                .setDuration(190L).setInterpolator(DecelerateInterpolator()).start()
+            val hide = Runnable {
+                badgeHide = null
+                if (player?.isPlaying != true) fadeOutBadge()
+            }
+            badgeHide = hide
+            mainHandler.postDelayed(hide, 900L)
         }
 
         private fun togglePlay() {
