@@ -40,7 +40,7 @@ object YuzChips {
             chipCornerRadius = 10f * d
             checkedIcon = null
             closeIcon = null
-            ensureMinTouchTargetSize = false
+            setEnsureMinTouchTargetSize(false)
             chipBackgroundColor =
                 ContextCompat.getColorStateList(context, R.color.yuz_chip_bg)
             setTextColor(
@@ -54,9 +54,9 @@ object YuzChips {
                 chipIconSize = 18f * d
                 chipIconTint =
                     ContextCompat.getColorStateList(context, R.color.yuz_chip_fg)
-                chipIconVisible = true
+                setChipIconVisible(true)
             } else {
-                chipIconVisible = false
+                setChipIconVisible(false)
             }
         }
     }

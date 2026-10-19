@@ -190,7 +190,6 @@
         <item name="android:layout_height">@dimen/yuz_chip_height</item>
         <item name="android:textAppearance">@style/YuzChipText</item>
         <item name="chipBackgroundColor">@color/yuz_chip_bg</item>
-        <item name="chipTextColor">@color/yuz_chip_fg</item>
         <item name="android:textColor">@color/yuz_chip_fg</item>
         <item name="chipStrokeWidth">@dimen/yuz_stroke</item>
         <item name="chipStrokeColor">@color/yuz_chip_stroke</item>
