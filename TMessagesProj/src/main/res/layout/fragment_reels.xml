@@ -186,7 +186,7 @@
         android:paddingEnd="@dimen/yuz_space_6"
         android:text="@string/reels_empty"
         android:textColor="@color/yuz_text_secondary"
-        android:textSize="15sp"
+        android:textSize="@dimen/yuz_text_body"
         android:visibility="gone" />
 
     <!--

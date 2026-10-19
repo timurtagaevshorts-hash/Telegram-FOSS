@@ -254,7 +254,7 @@
                     android:layout_gravity="center"
                     android:text="R"
                     android:textColor="@color/yuz_text"
-                    android:textSize="15sp"
+                    android:textSize="@dimen/yuz_text_body"
                     android:textStyle="bold" />
             </FrameLayout>
 
@@ -270,7 +270,7 @@
                 android:shadowDy="1"
                 android:shadowRadius="4"
                 android:textColor="@color/yuz_text"
-                android:textSize="15sp"
+                android:textSize="@dimen/yuz_text_body"
                 android:textStyle="bold" />
         </LinearLayout>
 

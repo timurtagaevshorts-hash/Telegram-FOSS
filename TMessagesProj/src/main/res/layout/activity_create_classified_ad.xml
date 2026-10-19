@@ -35,7 +35,7 @@
                 android:layout_height="36dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_yuz_crown"
-                android:tint="#FFC24B" />
+                android:tint="@color/yuz_gold" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -106,7 +106,7 @@
                         android:layout_marginTop="@dimen/yuz_space_3"
                         android:text="@string/classified_add_photos"
                         android:textColor="@color/yuz_text"
-                        android:textSize="15sp"
+                        android:textSize="@dimen/yuz_text_section"
                         android:textStyle="bold" />
 
                     <TextView

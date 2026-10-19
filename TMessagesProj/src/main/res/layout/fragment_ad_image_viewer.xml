@@ -33,10 +33,10 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|center_horizontal"
-        android:shadowColor="#80000000"
+        android:shadowColor="@color/yuz_scrim"
         android:shadowRadius="6"
         android:textColor="@color/yuz_text"
-        android:textSize="14sp" />
+        android:textSize="@dimen/yuz_text_body" />
 
     <TextView
         android:id="@+id/tvViewerHint"
@@ -44,9 +44,9 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="34dp"
-        android:shadowColor="#80000000"
+        android:shadowColor="@color/yuz_scrim"
         android:shadowRadius="6"
         android:text="@string/classified_viewer_hint"
-        android:textColor="#B3FFFFFF"
-        android:textSize="12sp" />
+        android:textColor="@color/yuz_on_media_dim"
+        android:textSize="@dimen/yuz_text_secondary" />
 </FrameLayout>

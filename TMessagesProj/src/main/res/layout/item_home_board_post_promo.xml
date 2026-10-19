@@ -51,7 +51,7 @@
                 android:lineSpacingExtra="2dp"
                 android:text="@string/home_board_post_promo_title"
                 android:textColor="@color/yuz_text"
-                android:textSize="15sp"
+                android:textSize="@dimen/yuz_text_body"
                 android:textStyle="bold" />
 
             <TextView

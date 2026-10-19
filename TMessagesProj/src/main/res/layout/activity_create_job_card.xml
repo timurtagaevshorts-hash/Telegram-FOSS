@@ -58,7 +58,7 @@
                     android:layout_marginTop="@dimen/yuz_space_3"
                     android:text="@string/job_board_pick_image_optional"
                     android:textColor="@color/yuz_text"
-                    android:textSize="15sp"
+                    android:textSize="@dimen/yuz_text_section"
                     android:textStyle="bold" />
             </LinearLayout>
 

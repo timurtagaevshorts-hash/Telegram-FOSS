@@ -79,7 +79,7 @@
                     android:paddingEnd="@dimen/yuz_space_3"
                     android:paddingBottom="@dimen/yuz_space_2"
                     android:textColor="@color/yuz_gold"
-                    android:textSize="15sp"
+                    android:textSize="@dimen/yuz_text_section"
                     android:textStyle="bold" />
 
                 <TextView

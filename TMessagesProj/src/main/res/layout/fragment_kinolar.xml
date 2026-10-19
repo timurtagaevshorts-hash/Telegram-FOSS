@@ -54,7 +54,7 @@
             android:layout_gravity="center"
             android:text="@string/kino_empty"
             android:textColor="@color/yuz_text_secondary"
-            android:textSize="15sp"
+            android:textSize="@dimen/yuz_text_body"
             android:visibility="gone" />
 
         <ProgressBar
