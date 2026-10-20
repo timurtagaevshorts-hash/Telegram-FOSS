@@ -319,7 +319,14 @@ class ReelsAdapter(
         activePos = pos
         val holder = findHolder(pos)
         if (holder != null) {
-            activate(holder)
+            // #110: sahifa faollashuvi (hikoya faylini ochish, pleyer) main
+            // thread'da sinxron ishlaydi — bitta buzilgan hikoya butun ilovani
+            // yiqitmasligi uchun bu cho'qqida ushlab, xatoni sahifaga chiqaramiz.
+            try {
+                activate(holder)
+            } catch (_: Exception) {
+                showActivateError(holder)
+            }
             return
         }
         if (attempt >= 6) return
@@ -329,6 +336,19 @@ class ReelsAdapter(
             target.postDelayed(retry, 50L)
         } else {
             mainHandler.postDelayed(retry, 50L)
+        }
+    }
+
+    /** Sahifani "video yo'q" holatiga tushiradi — crash o'rniga retry paneli. */
+    private fun showActivateError(h: PageHolder) {
+        try {
+            val offline = !NetworkReachability.isOnline(appContext)
+            h.tvError.text = appContext.getString(
+                if (offline) R.string.reels_err_offline else R.string.reels_err_failed
+            )
+            h.errorRow.visibility = View.VISIBLE
+            h.errorRow.setOnClickListener { retryActive() }
+        } catch (_: Exception) {
         }
     }
 
@@ -412,21 +432,24 @@ class ReelsAdapter(
             override fun run() {
                 storyPoll = null
                 if (activeHolder !== h || activePos != pos) return
-                val f = YuzStoryFeed.resolveVideoFile(account, reel)
-                if (f != null) {
-                    playStoryFile(h, ensurePlayer(), f)
-                    return
-                }
-                YuzStoryFeed.startVideoDownload(account, reel, true)
-                if (++ticks >= 60) {
-                    // ~24 soniya bo'lmadi — oddiy retry paneli ko'rsatiladi.
+                // Main thread'da qayta-post bo'ladigan yagona sikl — bu yerda
+                // ko'tarilgan istisno bevosita crash bo'ladi (#110).
+                try {
+                    val f = YuzStoryFeed.resolveVideoFile(account, reel)
+                    if (f != null) {
+                        playStoryFile(h, ensurePlayer(), f)
+                        return
+                    }
+                    YuzStoryFeed.startVideoDownload(account, reel, true)
+                    if (++ticks >= 60) {
+                        // ~24 soniya bo'lmadi — oddiy retry paneli ko'rsatiladi.
+                        showActivateError(h)
+                        h.pageProgress.visibility = View.GONE
+                        return
+                    }
+                } catch (_: Exception) {
+                    showActivateError(h)
                     h.pageProgress.visibility = View.GONE
-                    val offline = !NetworkReachability.isOnline(appContext)
-                    h.tvError.text = appContext.getString(
-                        if (offline) R.string.reels_err_offline else R.string.reels_err_failed
-                    )
-                    h.errorRow.visibility = View.VISIBLE
-                    h.errorRow.setOnClickListener { retryActive() }
                     return
                 }
                 storyPoll = this

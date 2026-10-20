@@ -491,7 +491,16 @@ class ReelsActivity @JvmOverloads constructor(
                 reelsList?.visibility = View.VISIBLE
                 return@launch
             }
-            renderReels(reels, keepPosition)
+            // #110: renderReels pleyer yaratish/hikoya bog'lash sinxron yolini
+            // ochadi — xato bo'lsa tasma bo'sh qolib ketsa-yu, ilova crash qilmasin.
+            try {
+                renderReels(reels, keepPosition)
+            } catch (_: Exception) {
+                progressBar?.visibility = View.GONE
+                emptyView?.visibility = View.VISIBLE
+                emptyView?.text = getString(R.string.reels_empty)
+                reelsList?.visibility = View.GONE
+            }
         }
     }
 
@@ -530,7 +539,12 @@ class ReelsActivity @JvmOverloads constructor(
         val account = currentAccount
         for (offset in intArrayOf(-1, 0, 1)) {
             val r = currentReels.getOrNull(center + offset) ?: continue
-            if (r.isStory) YuzStoryFeed.preload(account, r)
+            if (r.isStory) {
+                try {
+                    YuzStoryFeed.preload(account, r)
+                } catch (_: Exception) {
+                }
+            }
         }
     }
 
@@ -547,9 +561,12 @@ class ReelsActivity @JvmOverloads constructor(
     private fun refreshLikeState(reelId: String?) {
         val rid = reelId ?: return
         val key = YuzStoryFeed.parseKey(rid) ?: return
-        val item = YuzStoryFeed.findStoryItem(currentAccount, key.first, key.second) ?: return
-        val liked = item.sent_reaction != null && item.sent_reaction !is TLRPC.TL_reactionEmpty
-        adapter?.applyLikeState(rid, liked, item.views?.reactions_count ?: 0)
+        try {
+            val item = YuzStoryFeed.findStoryItem(currentAccount, key.first, key.second) ?: return
+            val liked = item.sent_reaction != null && item.sent_reaction !is TLRPC.TL_reactionEmpty
+            adapter?.applyLikeState(rid, liked, item.views?.reactions_count ?: 0)
+        } catch (_: Exception) {
+        }
     }
 
     /**

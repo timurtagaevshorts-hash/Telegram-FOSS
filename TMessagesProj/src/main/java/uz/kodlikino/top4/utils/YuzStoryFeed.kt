@@ -84,9 +84,14 @@ object YuzStoryFeed {
             }
             if (dialogId == 0L) continue
             if (filterId != null && filterId != dialogId) continue
-            for (item in ps.stories) {
-                val reel = toReel(account, dialogId, item, archived = false) ?: continue
-                if (seen.add(reel.id)) out.add(reel)
+            // Bitta peer buzilgan bo'lsa butun tasma o'lmasin — hikoyalar
+            // xotidadagi obyektlar, ular istalgan paytda almashishi mumkin.
+            try {
+                for (item in ps.stories) {
+                    val reel = toReel(account, dialogId, item, archived = false) ?: continue
+                    if (seen.add(reel.id)) out.add(reel)
+                }
+            } catch (_: Exception) {
             }
         }
 
@@ -173,13 +178,16 @@ object YuzStoryFeed {
         } catch (_: Exception) {
             return null
         }
-        sc.getStories(dialogId)?.let { ps ->
-            for (item in ps.stories) {
-                if (item.id == storyId) {
-                    item.dialogId = dialogId
-                    return item
+        try {
+            sc.getStories(dialogId)?.let { ps ->
+                for (item in ps.stories) {
+                    if (item.id == storyId) {
+                        item.dialogId = dialogId
+                        return item
+                    }
                 }
             }
+        } catch (_: Exception) {
         }
         for (type in intArrayOf(
             StoriesController.StoriesList.TYPE_ARCHIVE,
