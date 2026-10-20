@@ -446,8 +446,7 @@ class ReelsActivity @JvmOverloads constructor(
     /**
      * Telegram native profil oynasi — o'zi va begonalar uchun ham. YuzGram uid
      * formati "tg_<telegram_user_id>", shuning uchun undan to'g'ridan-to'g'ri
-     * user_id olamiz. Reelslar native profilning "Reels" tab'ida ko'rinadi
-     * (SharedMediaLayout -> YuzProfileReelsView).
+     * user_id olamiz.
      */
     private fun openNativeProfile(uid: String) {
         val userId = uid.removePrefix("tg_").toLongOrNull() ?: return
