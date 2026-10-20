@@ -1780,14 +1780,17 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             yuzApkToggle.setAlpha(a);
             yuzApkToggle.setClickable(a > 0.5f);
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) yuzApkToggle.getLayoutParams();
-            int afterBrand = yuzBrandMark.getRight() + dp(6);
-            int minLeft = contentView.getWidth() - dp(112);
-            int maxLeft = contentView.getWidth() - dp(30) - yuzApkToggle.getMeasuredWidth() - dp(12);
-            int left = Math.min(Math.max(afterBrand, minLeft), maxLeft);
-            int rightMargin = Math.max(0, contentView.getWidth() - left - yuzApkToggle.getMeasuredWidth());
-            if (lp.rightMargin != rightMargin) {
-                lp.rightMargin = rightMargin;
-                yuzApkToggle.setLayoutParams(lp);
+            int width = yuzApkToggle.getParent() instanceof View ? ((View) yuzApkToggle.getParent()).getWidth() : 0;
+            if (width > 0) {
+                int afterBrand = yuzBrandMark.getRight() + dp(6);
+                int minLeft = width - dp(112);
+                int maxLeft = width - dp(30) - yuzApkToggle.getMeasuredWidth() - dp(12);
+                int left = Math.min(Math.max(afterBrand, minLeft), maxLeft);
+                int rightMargin = Math.max(0, width - left - yuzApkToggle.getMeasuredWidth());
+                if (lp.rightMargin != rightMargin) {
+                    lp.rightMargin = rightMargin;
+                    yuzApkToggle.setLayoutParams(lp);
+                }
             }
         }
     }
@@ -1822,7 +1825,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             }
             Toast.makeText(getParentActivity(), getString(on ? R.string.yuz_apk_guard_on : R.string.yuz_apk_guard_off), Toast.LENGTH_SHORT).show();
         });
-        builder.setNegativeButton(android.R.string.cancel, null);
+        builder.setNegativeButton(getString(android.R.string.cancel), null);
         showDialog(builder.create());
     }
 
@@ -1848,19 +1851,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
          * Past tomonda kesish yo'q — qatorlar nav bar ostidan o'tib boradi.
          */
         private int yuzClipTop;
-
-        @Override
-        protected void dispatchDraw(Canvas canvas) {
-            if (yuzClipTop > 0) {
-                int save = canvas.save();
-                canvas.clipRect(0, yuzClipTop, getWidth(), getHeight());
-                super.dispatchDraw(canvas);
-                canvas.restoreToCount(save);
-            } else {
-                super.dispatchDraw(canvas);
-            }
-        }
-
 
         public boolean updateDialogsOnNextDraw;
         private boolean firstLayout = true;
@@ -1957,6 +1947,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         @Override
         protected void dispatchDraw(Canvas canvas) {
             canvas.save();
+            // YuzGram #96: chatlar qidiruv pill'i (sarlavha bandi) ichiga HECH
+            // qachon kirib chiqmasligi uchun chizish maydoni tepadan kesiladi.
+            if (yuzClipTop > 0) {
+                canvas.clipRect(0, yuzClipTop, getMeasuredWidth(), getMeasuredHeight());
+            }
             if (rightFragmentOpenedProgress > 0) {
                 canvas.clipRect(0, 0, AndroidUtilities.lerp(getMeasuredWidth(), dp(RightSlidingDialogContainer.getRightPaddingSize()), rightFragmentOpenedProgress), getMeasuredHeight());
                 paint.setColor(Theme.getColor(Theme.key_chats_pinnedOverlay));
