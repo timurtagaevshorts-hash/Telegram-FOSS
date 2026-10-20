@@ -2,6 +2,8 @@ package uz.kodlikino.top4.ui
 
 import android.content.Context
 import android.graphics.Rect
+import android.net.ConnectivityManager
+import android.os.Build
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
@@ -115,6 +117,9 @@ class ReelsActivity @JvmOverloads constructor(
     private var selectedPosition = startIndex.coerceAtLeast(0)
     private var pendingTargetId = targetReelId
 
+    // #99: tarmoq qayta urilganda feed/videoni avto-tiklash.
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
     /** #70: reel to'liq ekranda ochilganmi (sarlavha/storiya qatori yashirin). */
     private var reelFullscreen = false
     private var savedSystemUi = -1
@@ -222,6 +227,7 @@ class ReelsActivity @JvmOverloads constructor(
         setupComments(root, themed)
         loadReels()
         warmUpAuth()
+        registerNetworkWatch()
         return root
     }
 
@@ -446,7 +452,12 @@ class ReelsActivity @JvmOverloads constructor(
                     emptyView?.visibility = View.VISIBLE
                     reelsList?.visibility = View.GONE
                 }
-                emptyView?.text = getString(R.string.reels_load_failed)
+                // #99: sabab aniq ko'rsatilsin — tarmoq yo'qmi yoki servermi.
+                val ctx = themedContext ?: context
+                val offline = ctx != null && !uz.kodlikino.top4.utils.NetworkReachability.isOnline(ctx)
+                emptyView?.text = getString(
+                    if (offline) R.string.reels_err_no_internet else R.string.reels_load_failed
+                )
                 return@launch
             }
             // Kesh bilan bir xil tasma (id ketma-ketligi) — qayta submit
@@ -871,6 +882,42 @@ class ReelsActivity @JvmOverloads constructor(
         if (job.isActive) job.join()
     }
 
+    /**
+     * #99: tarmoq uzilganda/ qaytganda — Feed'ni tinch holatda qayta yuklaymiz,
+     * video bo'sa adapter avto-urinishi orqali tiklanadi (user hech narsa
+     * bosishi shart emas).
+     */
+    private fun registerNetworkWatch() {
+        if (Build.VERSION.SDK_INT < 23) return
+        val cm = (parentActivity ?: context)?.getSystemService(Context.CONNECTIVITY_SERVICE)
+            as? ConnectivityManager ?: return
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                val view = fragmentView ?: return
+                view.post {
+                    if (fragmentView == null) return@post
+                    if (currentReels.isEmpty() && !loading) loadReels() else adapter?.retryActive()
+                }
+            }
+        }
+        try {
+            cm.registerDefaultNetworkCallback(cb)
+            networkCallback = cb
+        } catch (_: Exception) {
+            // Ruxsat/versiya tuzaqi — feed manual retry bilan ishlayveradi.
+        }
+    }
+
+    private fun unregisterNetworkWatch() {
+        val cm = (parentActivity ?: context)?.getSystemService(Context.CONNECTIVITY_SERVICE)
+            as? ConnectivityManager
+        try {
+            if (Build.VERSION.SDK_INT >= 23 && networkCallback != null) cm?.unregisterNetworkCallback(networkCallback!!)
+        } catch (_: Exception) {
+        }
+        networkCallback = null
+    }
+
     override fun onResume() {
         super.onResume()
         actionBar?.visibility = View.GONE
@@ -890,6 +937,7 @@ class ReelsActivity @JvmOverloads constructor(
 
     override fun onFragmentDestroy() {
         exitReelFullscreen()
+        unregisterNetworkWatch()
         adapter?.release()
         adapter = null
         keyboardListener?.let { listener ->

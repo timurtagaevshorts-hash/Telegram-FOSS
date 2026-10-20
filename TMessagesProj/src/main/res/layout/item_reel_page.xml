@@ -84,6 +84,39 @@
         android:tint="@color/yuz_like"
         android:visibility="gone" />
 
+    <!-- #99: video ochilmaganda — spinner o'rniga sabab + "Qayta urinish". -->
+    <LinearLayout
+        android:id="@+id/reelErrorRow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_yuz_reel_badge"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/yuz_space_4"
+        android:paddingTop="@dimen/yuz_space_2"
+        android:paddingEnd="@dimen/yuz_space_4"
+        android:paddingBottom="@dimen/yuz_space_2"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvReelError"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/yuz_text"
+            android:textSize="@dimen/yuz_text_secondary" />
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginStart="@dimen/yuz_space_3"
+            android:contentDescription="@string/reels_retry"
+            android:src="@drawable/ic_refresh"
+            android:tint="@color/yuz_action" />
+    </LinearLayout>
+
     <!--
         O'z reel'i egasi uchun "⋮" menyusi (o'chirish). Faqat uploadedByUid ==
         joriy Telegram uid bo'lganda ko'rinadi — ReelsAdapter.bind() boshqaradi.

@@ -33,6 +33,8 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import org.telegram.messenger.R
 import uz.kodlikino.top4.models.Reel
 import org.telegram.messenger.AndroidUtilities
+import uz.kodlikino.top4.utils.NetworkReachability
+import uz.kodlikino.top4.utils.YuzReelPreloader
 import uz.kodlikino.top4.utils.YuzViewedReels
 import uz.kodlikino.top4.utils.YuzVideoCache
 
@@ -91,6 +93,10 @@ class ReelsAdapter(
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    // #99: xato/urinish holati — faol sahifa bo'yicha saqlanadi.
+    private val retryTag = object()
+    private var playAttempts = 0
+
     /**
      * Playback progress chizig'i — controller o'chirilgan (`use_controller=false`,
      * media3-ui RecyclerView tuzaqidan saqlanish uchun), shuning uchun pozitsiyani
@@ -121,9 +127,13 @@ class ReelsAdapter(
         override fun onPlaybackStateChanged(playbackState: Int) {
             val holder = activeHolder ?: return
             when (playbackState) {
-                Player.STATE_BUFFERING -> holder.pageProgress.visibility = View.VISIBLE
+                Player.STATE_BUFFERING -> {
+                    holder.errorRow.visibility = View.GONE
+                    holder.pageProgress.visibility = View.VISIBLE
+                }
                 Player.STATE_READY -> {
                     holder.pageProgress.visibility = View.GONE
+                    holder.errorRow.visibility = View.GONE
                     holder.ivThumbnail.visibility = View.GONE
                     val reel = holder.reel
                     // Dedup SharedPreferences'da saqlanadi — ilova/qayta ochishda
@@ -138,6 +148,38 @@ class ReelsAdapter(
                 else -> holder.pageProgress.visibility = View.GONE
             }
         }
+
+        /** #99: uzilish/xato endi "mangaligacha spinner" EMAS — retry UX. */
+        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            val holder = activeHolder ?: return
+            if (playAttempts < 3) {
+                playAttempts++
+                val delay = 900L * playAttempts
+                mainHandler.postDelayed(retryTag, Runnable {
+                    if (activeHolder === holder) activate(holder)
+                }, delay)
+                Log.i("ReelsAdapter", "playError ${error.errorCode} attempt=$playAttempts retryIn=${delay}ms")
+                return
+            }
+            holder.pageProgress.visibility = View.GONE
+            val offline = !NetworkReachability.isOnline(appContext)
+            holder.tvError.text = appContext.getString(
+                if (offline) R.string.reels_err_offline else R.string.reels_err_failed
+            )
+            holder.errorRow.visibility = View.VISIBLE
+            holder.errorRow.setOnClickListener { retryActive() }
+            Log.w("ReelsAdapter", "playError FINAL code=${error.errorCode} msg=${error.message}")
+        }
+    }
+
+    /** #99: "Qayta urinish" — xato panelidan keyin qo'ldan qayta boshlash. */
+    fun retryActive() {
+        val h = activeHolder ?: return
+        // Ijro normal holatda — aralashmaymiz (videoni qayta boshlamaymiz).
+        if (h.errorRow.visibility != View.VISIBLE) return
+        mainHandler.removeCallbacks(retryTag)
+        playAttempts = 0
+        activate(h)
     }
 
     fun submit(list: List<Reel>) {
@@ -253,7 +295,13 @@ class ReelsAdapter(
         p.setMediaItem(MediaItem.fromUri(reel.videoUrl))
         p.prepare()
         p.playWhenReady = true
+        if (NetworkReachability.isOnline(appContext)) {
+            YuzReelPreloader.warm(appContext, reel.videoUrl, 4_000_000L)
+        }
         h.playerView.player = p
+        h.errorRow.visibility = View.GONE
+        mainHandler.removeCallbacks(retryTag)
+        if (h !== activeHolder) playAttempts = 0
         h.pageProgress.visibility = View.VISIBLE
     }
 
@@ -300,6 +348,7 @@ class ReelsAdapter(
 
     fun release() {
         mainHandler.removeCallbacks(progressTicker)
+        mainHandler.removeCallbacks(retryTag)
         activeHolder?.playerView?.player = null
         activeHolder = null
         player?.let {
@@ -315,10 +364,17 @@ class ReelsAdapter(
         // o'qiladi — bir marta yuklangan reel keyingi ko'rishda deyarli darhol
         // boshlanadi; (2) [DefaultLoadControl] o'yinni "katta yig'ib" emas,
         // birinchi imkon bo'ladigan joyda boshlaydi (bufferForPlayback ~150ms).
+        // #99: sus tarmoqda kichik va sekin-to'ydigan buffer — birinchi kadr
+        // tezroq chiqadi, qayta-bufferlash kamayadi; Wi-Fi'da eski katta qiymat.
+        val slowNet = NetworkReachability.kind(appContext) == NetworkReachability.NetKind.CELLULAR
         val loadControl = DefaultLoadControl.Builder()
-            // media3 1.0.2 API: min=800ms, max=12s, playback=150ms, rebuffer=400ms
-            // (setBufferForPlaybackMs faqat 1.1.0+ da bor — shu eski imzo bilan).
-            .setBufferDurationsMs(800, 12000, 150, 400)
+            // media3 1.0.2 API: min, max, playback, rebuffer (ms)
+            .setBufferDurationsMs(
+                if (slowNet) 500 else 800,
+                if (slowNet) 6000 else 12000,
+                if (slowNet) 120 else 150,
+                if (slowNet) 300 else 400
+            )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
         val created = ExoPlayer.Builder(appContext)
@@ -393,6 +449,9 @@ class ReelsAdapter(
         private val reelCtaRow: LinearLayout = itemView.findViewById(R.id.reelCtaRow)
         private val btnWatchMovie: TextView = itemView.findViewById(R.id.btnWatchMovie)
         private val btnAd: TextView = itemView.findViewById(R.id.btnAd)
+        // #99: ijro uzilganda ko'rinadigan "Qayta urinish" qatori.
+        val errorRow: LinearLayout = itemView.findViewById(R.id.reelErrorRow)
+        val tvError: TextView = itemView.findViewById(R.id.tvReelError)
 
         var reel: Reel? = null
 
@@ -512,6 +571,7 @@ class ReelsAdapter(
         fun bind(reel: Reel) {
             this.reel = reel
             playbackBar.progress = 0
+            errorRow.visibility = View.GONE
             // Holder boshqa reel uchun qayta ishlatilganda animatsiya
             // qiymatlari bilan kelishi mumkin — maydonni tozalaymiz.
             btnLike.animate().cancel()

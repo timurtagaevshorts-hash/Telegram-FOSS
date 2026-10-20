@@ -2,6 +2,7 @@ package uz.kodlikino.top4.utils
 
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DataSource
@@ -34,8 +35,10 @@ object YuzReelPreloader {
 
     private const val TAG = "YuzReelPreloader"
 
-    /** Har bir keyingi reel uchun oldindan tortilinadigan baytlar (birinchi kadr + boshqaruv). */
-    private const val WARM_BYTES = 1_500_000L
+    // #99: tarmoq turiga qarab oldindan yuklash hajmi.
+    private const val WARM_BYTES_WIFI = 2_500_000L
+    private const val WARM_BYTES_CELLULAR = 700_000L
+    private const val NONE = 0L
 
     /** oldinga nechta reel illyutatsiya qilinadi (qorin bu tomonda siljitiladi). */
     private const val AHEAD = 2
@@ -48,6 +51,10 @@ object YuzReelPreloader {
     /** URL'ning kesh-kaliti (query'siz) — takroriy ishlarni oldini oladi. */
     private val inflight = HashSet<String>()
 
+    /** #99: yangi snap avvalgi navbatni bekor qiladi (generatsiya hisobagichi). */
+    @Volatile
+    private var generation = 0L
+
     /**
      * [center] atrofidagi reel'larni oldindan yuklashga buyruq. Faol sahifa
      * almashtganda [uz.kodlikino.top4.ui.ReelsActivity]ning snap-listener'idan
@@ -58,14 +65,24 @@ object YuzReelPreloader {
         // Butun ish IO oqimida: [YuzVideoCache.cache] birinchi chaqiruvda
         // SimpleCache'ni disk + SQLite bilan ochadi — main thread'da bu
         // birinchi kadrni sekinlashtirishi mumkin.
+        // Uzilgan tarmoqda keraksiz urinish va trafik sarfini oldini olamiz.
+        if (NetworkReachability.kind(context) == NetworkReachability.NetKind.NONE) return
+        val gen = ++generation
         scope.launch {
             val app = context.applicationContext
+            val limit = when (NetworkReachability.kind(app)) {
+                NetworkReachability.NetKind.WIFI -> WARM_BYTES_WIFI
+                NetworkReachability.NetKind.CELLULAR -> WARM_BYTES_CELLULAR
+                else -> WARM_BYTES_CELLULAR
+            }
             // oldingilar ustuvor: foydalanuvchi ko'pincha pastga (keyingi) ketadi.
             for (off in 1..AHEAD) {
-                reels.getOrNull(center + off)?.let { warm(app, it.videoUrl) }
+                if (generation != gen) return@launch
+                reels.getOrNull(center + off)?.let { warm(app, it.videoUrl, limit, gen) }
             }
             for (off in 1..BEHIND) {
-                reels.getOrNull(center - off)?.let { warm(app, it.videoUrl) }
+                if (generation != gen) return@launch
+                reels.getOrNull(center - off)?.let { warm(app, it.videoUrl, limit, gen) }
             }
         }
     }
@@ -74,8 +91,9 @@ object YuzReelPreloader {
      * Bitta videoning bosh qismini keshga tortadi. [inflight] tufayli bir URL
      * asossida faqat borta boradi; tugagach yoki xatoda set'dan olib tashlanadi.
      */
-    fun warm(context: Context, url: String) {
-        if (url.isBlank()) return
+    @JvmOverloads
+    fun warm(context: Context, url: String, bytes: Long = WARM_BYTES_WIFI, gen: Long = -1L) {
+        if (url.isBlank() || bytes <= 0L) return
         val app = context.applicationContext
         val key = cacheKey(url)
         val start = synchronized(this) { inflight.add(key) }
@@ -86,15 +104,23 @@ object YuzReelPreloader {
                 val spec = DataSpec.Builder()
                     .setUri(Uri.parse(url))
                     .setPosition(0L)
-                    .setLength(WARM_BYTES)
+                    .setLength(bytes)
                     .build()
                 try {
                     // media3: open() uzunlik(qaytaradi, o'qish manbai SHU source.
                     source.open(spec)
                     val buffer = ByteArray(64 * 1024)
                     var transferred = 0L
-                    while (transferred < WARM_BYTES) {
-                        val chunk = minOf(buffer.size.toLong(), WARM_BYTES - transferred).toInt()
+                    while (transferred < bytes) {
+                        // #99: foydalanuvchi ketgani — yarim o'qishni kesamiz;
+                        // CacheDataSource yozgan qismini to'lamiz, keyingi
+                        // urinish qolgandan davom etadi.
+                        if (gen >= 0 && generation != gen) break
+                        if (Build.VERSION.SDK_INT >= 23) {
+                            val nc = source as? androidx.media3.datasource.NetworkConfigurable
+                            if (nc != null && !nc.isConnected(app)) break
+                        }
+                        val chunk = minOf(buffer.size.toLong(), bytes - transferred).toInt()
                         // read() versiyaniga qarab Int yoki Long qaytadi — ikkalasi ham
                         // shu kod bilan ishlaydi (EOF/0 == to'xtash).
                         val n = source.read(buffer, 0, chunk)

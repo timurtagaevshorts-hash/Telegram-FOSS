@@ -7,6 +7,12 @@
     <string name="reels_post">Reel joylash</string>
     <string name="reels_refresh">Yangilash</string>
 
+    <!-- #99: past internet / ijro uzilishi holatlari -->
+    <string name="reels_err_failed">Video ochilmadi — urinishlar tugadi</string>
+    <string name="reels_err_offline">Internet yo\'q — ulangach bosing</string>
+    <string name="reels_err_no_internet">Internet yo\'q. Ulaningach qayta urining</string>
+    <string name="reels_retry">Qayta urinish</string>
+
     <string name="reels_create_title">Reel joylash</string>
     <string name="reels_pick_video">Video tanlash</string>
     <string name="reels_change_video">Boshqa video</string>
