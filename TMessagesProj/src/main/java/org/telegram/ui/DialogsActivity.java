@@ -2149,19 +2149,21 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     additionalPadding += authHintCell.getMeasuredHeight();
                 }
                 final int yuzBottomPad = hasYuzGramBottomBar ? uz.kodlikino.top4.ui.YuzGramBottomBar.height() : 0;
-                // YuzGram #81: gildirak endi ro'yxat USTIDagi to'liq kenglikdagi
-                // tasma — chatlar uchun o'ngdan 88dp chekinish KERAK EMAS (ro'yxat
-                // to'liq ekran). Buning o'rniga tepada gildirak tasmasi bo'sh
-                // joylanadi.
+                // YuzGram #93: filtr reykasi — o'ng chekkadagi vertikal ustun.
+                // Chatlar ro'yxati unga o'ngdan chekinadi; tepada faqat qidiruv
+                // pill'i qoladi.
+                int yuzRightPad = 0;
                 if (yuzChatRail != null && yuzChatRail.getVisibility() == VISIBLE) {
                     int headerBottom = yuzChatHeaderBottom();
                     if (headerBottom > t) {
                         t = headerBottom;
                     }
+                    yuzRightPad = uz.kodlikino.top4.ui.YuzGramChatWheel.width() - dp(12);
                 }
-                if (t != getPaddingTop() || yuzBottomPad != getPaddingBottom()) {
+                if (t != getPaddingTop() || yuzBottomPad != getPaddingBottom()
+                        || yuzRightPad != getPaddingRight()) {
                     setTopGlowOffset(t);
-                    setPadding(0, t, 0, yuzBottomPad);
+                    setPadding(0, t, yuzRightPad, yuzBottomPad);
                     if (hasStories) {
                         parentPage.progressView.setPaddingTop(Math.max(0, t - dp(DialogStoriesCell.HEIGHT_IN_DP)));
                     } else {
@@ -2769,28 +2771,25 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 && initialDialogsType == DIALOGS_TYPE_DEFAULT;
     }
 
-    private int yuzChatRailTopMargin() {
+    /** YuzGram #93: sarlavha bloki endi faqat qidiruv pill'i — reyka o'ng ustun. */
+    private int yuzSearchBarTopMargin() {
         int top = actionBar != null && actionBar.getMeasuredHeight() > 0 ? actionBar.getMeasuredHeight() : dp(56);
         // YuzGram #70: storiya qatori chatdan olib tashlandi — tepada faqat
         // action bar o'rni qoladi.
         return top + dp(10);
     }
 
-    /** Qidiruv satri gildirakning ostida turadi. */
-    private int yuzSearchBarTopMargin() {
-        return yuzChatRailTopMargin() + uz.kodlikino.top4.ui.YuzGramChatWheel.height() + dp(2);
+    /** Reyka ustuni qidiruv satri ostidan boshlanadi (pill soyasi bilan tutashadi). */
+    private int yuzChatRailTopMargin() {
+        return yuzChatHeaderBottom() - dp(4);
     }
 
     /**
-     * Chat ro'yxati tepasidagi sarlavha blokining (gildirak + qidiruv satri)
-     * pastki chegarasi — ro'yxat padding'i shundan pastda boshlanadi.
+     * Chat ro'yxati tepasidagi sarlavha blokining (qidiruv pill'i) pastki
+     * chegarasi — ro'yxat padding'i shundan pastda boshlanadi.
      */
     private int yuzChatHeaderBottom() {
-        int bottom = yuzChatRailTopMargin() + uz.kodlikino.top4.ui.YuzGramChatWheel.height();
-        if (yuzSearchBar != null && yuzSearchBar.getVisibility() == View.VISIBLE) {
-            bottom = yuzSearchBarTopMargin() + uz.kodlikino.top4.ui.YuzGramSearchBar.height();
-        }
-        return bottom + dp(2);
+        return yuzSearchBarTopMargin() + uz.kodlikino.top4.ui.YuzGramSearchBar.height() + dp(2);
     }
 
     /** Qidiruv pill'i — Telegram'ning o'z qidiruv maydonini ochadi. */
@@ -2854,7 +2853,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) yuzChatRail.getLayoutParams();
         int top = yuzChatRailTopMargin();
-        int wantGravity = Gravity.LEFT | Gravity.TOP;
+        int wantGravity = Gravity.RIGHT | Gravity.TOP;
         if (lp != null && (lp.gravity != wantGravity || lp.topMargin != top)) {
             lp.gravity = wantGravity;
             lp.topMargin = top;
@@ -5204,21 +5203,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             contentView.addView(filterTabsView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 44));
         }
         if (filterTabsView != null && isYuzGramMainRoot()) {
-            // YuzGram #81: filtr gildiragi chat ro'yxati USTIDA, to'liq kenglikda
-            // gorizontal aylanadigan karusel (sobiq o'ng qirradagi vertikal ustun).
-            yuzChatRail = new uz.kodlikino.top4.ui.YuzGramChatWheel(context);
-            yuzChatRail.setListener(index -> selectYuzGramFilter(index));
-            yuzChatRail.setOnAddFolder(() -> presentFragment(new FiltersSetupActivity()));
-            yuzChatRail.setCounterProvider(this::yuzChatRailCounter);
-            yuzChatRail.setActionListener(this::onYuzGramRailAction);
-            // Kamera plitasi olib tashlangan — hikoya joylash Reels tepasida (#70).
-            yuzChatRail.setActions(true, false);
-            contentView.addView(yuzChatRail, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT,
-                    uz.kodlikino.top4.ui.YuzGramChatWheel.height(), Gravity.LEFT | Gravity.TOP,
-                    0, yuzChatRailTopMargin(), 0, 0));
             // YuzGram #85: qidiruv doim ko'rinib turadigan maydonga aylanadi —
-            // action bar'dagi lupa endi ixtiyoriy. Yonidagi dumaloq tugma papka
-            // sozlamalarini ochadi.
+            // action bar'dagi lupa endi ixtiyoriy. Filtr (sliders) ikonkasi
+            // pill'ning o'ng chekkasi ICCHIDA (maket #93).
             yuzSearchBar = new uz.kodlikino.top4.ui.YuzGramSearchBar(context);
             yuzSearchBar.setListener(new uz.kodlikino.top4.ui.YuzGramSearchBar.Listener() {
                 @Override
@@ -5234,6 +5221,19 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             contentView.addView(yuzSearchBar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT,
                     uz.kodlikino.top4.ui.YuzGramSearchBar.height(), Gravity.LEFT | Gravity.TOP,
                     0, yuzSearchBarTopMargin(), 0, 0));
+            // YuzGram #93: filtr reykasi — maketdagi kabi O'NG CHEKKADAGI yarim
+            // aylanadigan vertikal ustun (sarlavha bloki emas). Ro'yxat unga
+            // o'ng padding bilan chekinadi.
+            yuzChatRail = new uz.kodlikino.top4.ui.YuzGramChatWheel(context);
+            yuzChatRail.setListener(index -> selectYuzGramFilter(index));
+            yuzChatRail.setOnAddFolder(() -> presentFragment(new FiltersSetupActivity()));
+            yuzChatRail.setCounterProvider(this::yuzChatRailCounter);
+            yuzChatRail.setActionListener(this::onYuzGramRailAction);
+            // Kamera plitasi olib tashlangan — hikoya joylash Reels tepasida (#70).
+            yuzChatRail.setActions(true, false);
+            contentView.addView(yuzChatRail, LayoutHelper.createFrame(
+                    uz.kodlikino.top4.ui.YuzGramChatWheel.width(), LayoutHelper.MATCH_PARENT,
+                    Gravity.RIGHT | Gravity.TOP, 0, yuzChatRailTopMargin(), 0, 0));
             // YuzGram #85: nebula fon — ContentView'ning birinchi bolasi (index 0),
             // shunda chat qatorlari shu nur ustidan o'tadi. Tekis qora o'rniga
             // brend ko'kida chuqurlik.

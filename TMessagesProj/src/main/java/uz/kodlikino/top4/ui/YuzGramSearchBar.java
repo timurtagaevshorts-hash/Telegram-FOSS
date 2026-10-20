@@ -13,12 +13,13 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.R;
 
 /**
- * YuzGram #85: chat ro'yxati tepasidagi qidiruv satri — maketdagi "Qidirish"
- * pill'i va yonidagi dumaloq filtr tugmasi.
+ * YuzGram #85/#93: chat sarlavhasidagi qidiruv satri — maketdagi "Qidirish"
+ * pill'i. Filtr (sliders) ikonkasi endi pill'ning O'NG CHEKKASI ICCHIDA
+ * turadi (alohida doira yo'q).
  *
- * Ikkita alohida urish zonasi:
- *  • pill  → Telegram qidiruv maydoni (onSearchClicked)
- *  • doira → papka/filtr sozlamalari (onFilterClicked)
+ * Ikkita urish zonasi bitta pill ichida:
+ *  • pill chap/o'rta → Telegram qidiruv maydoni (onSearchClicked)
+ *  • pill o'ng chekkasi (~44dp) → papka/filtr sozlamalari (onFilterClicked)
  *
  * Nima uchun alohida View: Telegram'ning o'z qidiruvi action bar'dagi ikonkani
  * bosishni talab qiladi; bu yerda qidiruv doim ko'rinib turadigan maydon.
@@ -29,8 +30,9 @@ public class YuzGramSearchBar extends View {
     public static final int HEIGHT_DP = 52;
     private static final float PILL_H_DP = 40f;
     private static final float SIDE_DP = 14f;
-    private static final float BTN_DP = 40f;
-    private static final float GAP_DP = 8f;
+    /** Pill ichidagi sliders zonasi kengligi va uning markazi. */
+    private static final float BTN_ZONE_DP = 46f;
+    private static final float BTN_R_DP = 15f;
 
     private static final int FILL_TOP = 0xCC1E3352;
     private static final int FILL_BOTTOM = 0xCC14263F;
@@ -60,8 +62,8 @@ public class YuzGramSearchBar extends View {
 
     private Listener listener;
     private int pressedZone = ZONE_NONE;
-    // Pill va doira bir xil balandlikda (40dp) va markazlashgan — shuning uchun
-    // bitta vertikal gradient ikkisiga ham yetadi (onDraw'da yaratilmasin).
+    // Pill balandligi markazlashgan — bitta vertikal gradient yetarli
+    // (onDraw'da yaratilmasin).
     private LinearGradient glassShader;
 
     public YuzGramSearchBar(Context context) {
@@ -114,13 +116,11 @@ public class YuzGramSearchBar extends View {
         }
         float cy = h / 2f;
         float pillH = dp(PILL_H_DP);
-        float btnR = dp(BTN_DP) / 2f;
-        float btnCx = w - dp(SIDE_DP) - btnR;
+        float btnR = dp(BTN_R_DP);
+        float btnCx = w - dp(SIDE_DP) - dp(BTN_ZONE_DP) / 2f;
 
-        glassRect.set(dp(SIDE_DP), cy - pillH / 2f, btnCx - btnR - dp(GAP_DP), cy + pillH / 2f);
+        glassRect.set(dp(SIDE_DP), cy - pillH / 2f, w - dp(SIDE_DP), cy + pillH / 2f);
         drawGlass(canvas, glassRect, pillH / 2f, glassShader, pressedZone == ZONE_SEARCH);
-        glassRect.set(btnCx - btnR, cy - btnR, btnCx + btnR, cy + btnR);
-        drawGlass(canvas, glassRect, btnR, glassShader, pressedZone == ZONE_FILTER);
 
         float lensR = dp(6.4f);
         float lensCx = dp(SIDE_DP) + dp(15f) + lensR;
@@ -132,6 +132,16 @@ public class YuzGramSearchBar extends View {
                 cy - (fm.ascent + fm.descent) / 2f, textPaint);
         textPaint.setAlpha(255);
 
+        // Sliders — pill ichida; bosilganda orqasida nozik yorug'lik doira.
+        if (pressedZone == ZONE_FILTER) {
+            fillPaint.setColor(0x26FFFFFF);
+            canvas.drawCircle(btnCx, cy, btnR + dp(4f), fillPaint);
+            fillPaint.setColor(0);
+        }
+        // Ikonka bilan pill o'ng chekkasi orasidagi ingichka ajratgich.
+        float sepX = btnCx - btnR - dp(6f);
+        strokePaint.setColor(pressedZone == ZONE_FILTER ? 0x668FC4F0 : 0x336FA8E0);
+        canvas.drawLine(sepX, cy - pillH / 2f + dp(9f), sepX, cy + pillH / 2f - dp(9f), strokePaint);
         drawSliders(canvas, btnCx, cy, btnR);
     }
 
@@ -173,18 +183,17 @@ public class YuzGramSearchBar extends View {
 
     private int zoneAt(float x, float y) {
         float cy = getHeight() / 2f;
-        float btnR = dp(BTN_DP) / 2f;
-        float btnCx = getWidth() - dp(SIDE_DP) - btnR;
-        float dx = x - btnCx, dy = y - cy;
-        if (dx * dx + dy * dy <= (btnR + dp(5f)) * (btnR + dp(5f))) {
+        float pillH = dp(PILL_H_DP);
+        if (x < dp(SIDE_DP) - dp(4f) || x > getWidth() - dp(SIDE_DP) + dp(4f)
+                || y < cy - pillH / 2f - dp(6f) || y > cy + pillH / 2f + dp(6f)) {
+            return ZONE_NONE;
+        }
+        // O'ng chekkadagi ~46dp — filtr zonasi (pill ICCHIDA).
+        float btnCx = getWidth() - dp(SIDE_DP) - dp(BTN_ZONE_DP) / 2f;
+        if (x >= btnCx - dp(BTN_ZONE_DP) / 2f) {
             return ZONE_FILTER;
         }
-        float pillH = dp(PILL_H_DP);
-        if (x >= dp(SIDE_DP) - dp(4f) && x <= btnCx - btnR - dp(GAP_DP) + dp(4f)
-                && y >= cy - pillH / 2f - dp(6f) && y <= cy + pillH / 2f + dp(6f)) {
-            return ZONE_SEARCH;
-        }
-        return ZONE_NONE;
+        return ZONE_SEARCH;
     }
 
     @Override
