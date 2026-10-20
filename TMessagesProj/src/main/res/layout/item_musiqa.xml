@@ -44,6 +44,26 @@
             android:maxLines="1"
             android:textColor="@color/yuz_text_secondary"
             android:textSize="@dimen/yuz_text_secondary" />
+
+        <!-- YuzGram #109: yuklash progressi — neon gradient chiziq -->
+        <FrameLayout
+            android:id="@+id/boxMusiqaDlProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:visibility="gone">
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:background="@drawable/yuz_dl_track" />
+
+            <View
+                android:id="@+id/vwMusiqaDlFill"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:background="@drawable/yuz_dl_fill" />
+        </FrameLayout>
     </LinearLayout>
 
     <TextView

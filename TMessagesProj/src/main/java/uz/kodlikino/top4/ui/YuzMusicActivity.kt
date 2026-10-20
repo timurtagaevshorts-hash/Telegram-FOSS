@@ -59,6 +59,9 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private var shimmer: View? = null
     private var hitsBox: View? = null
     private val downloadingIds = HashSet<Long>()
+    // #109: bekor qilingan yuklashlar — tugash siginali kelganda
+    // "muvaffaqiyatsiz" toastini chiqmaslik uchun belgilanadi.
+    private val canceledIds = HashSet<Long>()
 
     private val effects by lazy { YuzMusicEffects(ctx) }
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -430,6 +433,8 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         if (busy || !moreAvailable || offlineMode || listSource == 0 || currentList.isEmpty()) return
         busy = true
         moreRound++
+        // #109: quyida hali kelmagan qatorlar o'rnida shimmer skelet yonadi.
+        adapter.setLoadingMore(true)
         val round = moreRound
         val q = lastQuery
         val exclude = HashSet(shownIds)
@@ -444,6 +449,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             }
             busy = false
             if (destroyed) return@launch
+            adapter.setLoadingMore(false)
             if (more.isNullOrEmpty()) {
                 if (more != null) moreAvailable = false
             } else {
@@ -580,6 +586,17 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             Toast.makeText(ctx, R.string.musiqa_dl_removed, Toast.LENGTH_SHORT).show()
             return
         }
+        // YuzGram #109: davom etayotgan qatorda tugma endi X — bosilsa
+        // yuklash bekor qilinadi. Qator reader gate'dan o'tib haqiqiy
+        // tugaguncha "davom etmoqda" bo'lib qoladi (takroriy bosish no-op).
+        if (track.id in downloadingIds) {
+            if (track.id !in canceledIds) {
+                canceledIds.add(track.id)
+                YuzMusicCache.cancel(track.id)
+                Toast.makeText(ctx, R.string.musiqa_dl_canceling, Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
         if (YuzMusicCache.isDownloaded(ctx, track.id)) {
             Toast.makeText(ctx, R.string.musiqa_dl_exists, Toast.LENGTH_SHORT).show()
             return
@@ -593,8 +610,10 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             if (!destroyed) adapter.setProgress(track.id, pct)
         }) { ok ->
             downloadingIds.remove(track.id)
+            val wasCancel = canceledIds.remove(track.id) && !ok
             if (destroyed) return@download
             adapter.setDownloading(downloadingIds)
+            if (wasCancel) return@download
             adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
             syncPlayingMark()
             Toast.makeText(ctx,

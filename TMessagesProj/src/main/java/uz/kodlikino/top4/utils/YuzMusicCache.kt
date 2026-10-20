@@ -84,11 +84,30 @@ object YuzMusicCache {
     // tushib, faylni buzmasligi kerak).
     private val active = java.util.Collections.synchronizedSet(HashSet<Long>())
 
+    // YuzGram #109: shu hajmdan katta googlevideo fayllari IKKI ulanishda
+    // parallel tortiladi (quyi va yuqori yarmi) — throttle har bir
+    // alohida ulanishga qo'yiladi, shuning uchun taxminan 2 barobar tez.
+    private const val PAR_MIN = 512L * 1024
+
+    // YuzGram #109: bekor qilish bayroqlari. download() id bo'yicha bayroq
+    // ro'yxatdan o'tkazadi, UI cancel(id) qo'yadi, gate orqali reader'ga
+    // yetib boradi (manfiy = "taslim bo'l", tmp o'chiriladi). Fon prebuffer
+    // o'z gate'ini o'zi beradi — cancel unda ishtirok etmaydi.
+    private val cancelFlags =
+        java.util.concurrent.ConcurrentHashMap<Long, java.util.concurrent.atomic.AtomicBoolean>()
+
+    /** #109: davom etayotgan foydalanuvchi yuklashini to'xtatish. */
+    fun cancel(id: Long) {
+        cancelFlags[id]?.set(true)
+    }
+
     /** Yo'ldan boshlab [onDone] UI ipida chaqiriladi (true = muvaffaqiyat).
      * [onProgress] 0..99 foizni asosiy ipda beradi. */
     fun download(context: Context, track: YuzTrack, onProgress: ((Int) -> Unit)? = null, onDone: (Boolean) -> Unit) {
         if (!active.add(track.id)) return
         val app = context.applicationContext
+        val cancel = java.util.concurrent.atomic.AtomicBoolean(false)
+        cancelFlags[track.id] = cancel
         var lastPct = -1
         val raw: (Long, Long) -> Unit = { got, expect ->
             if (expect > 0L) {
@@ -100,7 +119,11 @@ object YuzMusicCache {
             }
         }
         Thread {
-            val ok = runCatching { downloadBlocking(app, track, null, raw) }.getOrDefault(false)
+            // #109: gate endi bekor qilish bayrog'ini olib boradi —
+            // reader har oyna ochishda tekshiradi va -1'da to'xtaydi.
+            val gate = { if (cancel.get()) -1L else 0L }
+            val ok = runCatching { downloadBlocking(app, track, gate, raw) }.getOrDefault(false)
+            cancelFlags.remove(track.id)
             active.remove(track.id)
             main.post { onDone(ok) }
         }.start()
@@ -152,7 +175,7 @@ object YuzMusicCache {
                     addToIndex(context, track)
                     return true
                 }
-            } else if (fetchPlain(context, track.id, s, progress)) {
+            } else if (fetchPlain(context, track.id, s, gate, progress)) {
                 addToIndex(context, track)
                 return true
             }
@@ -191,6 +214,19 @@ object YuzMusicCache {
         // yarim faylga aralashib ketmasligi kerak.
         val refresh: ((Long, String) -> YuzAudioStream?)? =
             if (videoId.isNotBlank()) sameVideo(videoId) else null
+        // #109: hajmi aniq katta faylni avval ikki parallel ulanishda
+        // tortib ko'ramiz. Muvaffaqiyatsizlik bo'lib birorta bayt kelmasa
+        // — oddiy ketma-ket yo'lga qaytamiz (arzon); o'rtada uzilsa —
+        // keyingi nomzodga o'tamiz (ketma-ket ham shu joyni bosar edi).
+        if (stream.approxBytes > PAR_MIN) {
+            val r = fetchRangesSplit(context, tmp, id, stream, refresh, gate, progress)
+            if (r != FAIL) return r
+            if (tmp.length() > 0L) {
+                runCatching { tmp.delete() }
+                return FAIL
+            }
+            runCatching { tmp.delete() }
+        }
         val reader = YuzRangeReader(
             http, stream.url, stream.ua, 0L, -1L, stream.approxBytes, refresh,
             windows = true, gate = gate
@@ -202,7 +238,8 @@ object YuzMusicCache {
             var got = 0L
             var lastEmit = 0L
             tmp.outputStream().use { out ->
-                val buf = ByteArray(64 * 1024)
+                // #109: 256KB buffer — chaqiruvlar sonini 4 barobar qisqartiradi.
+                val buf = ByteArray(256 * 1024)
                 var guard = 0
                 while (guard++ < 65536) {
                     val n = reader.read(buf, 0, buf.size)
@@ -240,11 +277,102 @@ object YuzMusicCache {
         }
     }
 
+    /**
+     * #109: faylni ikki yarimga bo'lib har yarmini ALOHIDA YuzRangeReader
+     * (alohida HTTP ulanish) bilan tortadi. Yozishlar bitta
+     * RandomAccessFile'ga seek+synchronized bilan tushadi — o'rtada
+     * baytlar aralashmaydi. To'liqlik: jami bayt >= kutilgan hajm.
+     * Bekor qilish: biror reader gate'dan -1 ollsa CANCELED.
+     */
+    private fun fetchRangesSplit(
+        context: Context,
+        tmp: File,
+        id: Long,
+        stream: YuzAudioStream,
+        refresh: ((Long, String) -> YuzAudioStream?)?,
+        gate: (() -> Long)?,
+        progress: ((Long, Long) -> Unit)?
+    ): Int {
+        val total = stream.approxBytes
+        val mid = total / 2
+        val ra = YuzRangeReader(
+            http, stream.url, stream.ua, 0L, mid, total, refresh, true, gate
+        )
+        val rb = YuzRangeReader(
+            http, stream.url, stream.ua, mid, total - mid, total, refresh, true, gate
+        )
+        val got = java.util.concurrent.atomic.AtomicLong(0L)
+        val lastEmit = java.util.concurrent.atomic.AtomicLong(0L)
+        val upperFailed = java.util.concurrent.atomic.AtomicBoolean(false)
+        // setLength QO'YMAYMIZ: fayl hajmi yozilgan baytlardan o'sadi —
+        // chaqiruvchi "birorta bayt keldi-yo'qmi"ni tmp.length() bo'yicha
+        // adashmasdan biladi (seek EOF ortiga yozish ham kengaytiradi).
+        val raf = try {
+            java.io.RandomAccessFile(tmp, "rw")
+        } catch (_: Exception) {
+            return FAIL
+        }
+        val upper = Thread {
+            upperFailed.set(
+                runCatching { readHalf(rb, raf, got, lastEmit, total, progress) }
+                    .getOrDefault(false).not()
+            )
+        }
+        upper.start()
+        val lowerOk = runCatching { readHalf(ra, raf, got, lastEmit, total, progress) }
+            .getOrDefault(false)
+        upper.join()
+        runCatching { raf.close() }
+        val canceled = ra.canceled || rb.canceled
+        val complete = lowerOk && !upperFailed.get() && got.get() >= total
+        Log.i(TAG, "download split got=${got.get()} expect=$total cancel=$canceled ok=$complete")
+        if (canceled) {
+            runCatching { tmp.delete() }
+            return CANCELED
+        }
+        return if (complete && promote(context, tmp, id, stream.ext)) OK else FAIL
+    }
+
+    /** #109: bitta yarmni oxirigacha o'qib, to'g'ri offsetga yozadi. */
+    private fun readHalf(
+        reader: YuzRangeReader,
+        raf: java.io.RandomAccessFile,
+        got: java.util.concurrent.atomic.AtomicLong,
+        lastEmit: java.util.concurrent.atomic.AtomicLong,
+        total: Long,
+        progress: ((Long, Long) -> Unit)?
+    ): Boolean {
+        val buf = ByteArray(256 * 1024)
+        try {
+            reader.open()
+            var guard = 0
+            while (guard++ < 65536) {
+                val n = reader.read(buf, 0, buf.size)
+                if (n <= 0) break
+                val at = reader.position() - n
+                synchronized(raf) {
+                    raf.seek(at)
+                    raf.write(buf, 0, n)
+                }
+                val g = got.addAndGet(n.toLong())
+                YuzNetPulse.add(n)
+                if (progress != null && g - lastEmit.get() >= total / 100 + 8192) {
+                    lastEmit.set(g)
+                    progress(g, total)
+                }
+            }
+        } finally {
+            reader.close()
+        }
+        return reader.isEof()
+    }
+
     /** Oddiy HTTPS (Deezer preview) — bitta GET, hajm kichik. */
     private fun fetchPlain(
         context: Context,
         id: Long,
         stream: YuzAudioStream,
+        gate: (() -> Long)?,
         progress: ((Long, Long) -> Unit)?
     ): Boolean {
         val tmp = File(dir(context), "$id-${System.nanoTime()}.tmp")
@@ -273,6 +401,12 @@ object YuzMusicCache {
                     while (true) {
                         val n = input.read(buf)
                         if (n <= 0) break
+                        // #109: bekor qilish (yoki ijro yo'l so'ragan) —
+                        // yarim faylni tashlab chiqamiz.
+                        if (gate != null && runCatching { gate() }.getOrDefault(0L) < 0L) {
+                            runCatching { tmp.delete() }
+                            return false
+                        }
                         out.write(buf, 0, n)
                         got += n
                         if (progress != null && expect > 0 &&
