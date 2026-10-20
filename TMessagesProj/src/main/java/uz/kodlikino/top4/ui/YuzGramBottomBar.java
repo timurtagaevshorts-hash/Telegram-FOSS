@@ -50,10 +50,10 @@ public class YuzGramBottomBar extends View {
     private static final String[] LABELS = {"Asosiy", "Reels", "Funksiyalar", "Profil"};
 
     // Neon palitra (YuzGram brendi; rail bilan bir xil ko'klar)
-    // YuzGram #96: sirt endi yarim shisha — ostidan o'tayotgan chat qatorlari
-    // xira ko'rinadi (butunlay o'qilmaydigan darajada), tugmalar kontrasti
-    // saqlanadi chunki rang juda to'q.
-    private static final int SURFACE = 0xCC0C1626;      // chuqur to'q-ko'k sirt (elonlar foni bilan bir xil)
+    // YuzGram #96/#102: sirt shaffof shisha — ostidan o'tayotgan chat
+    // qatorlari aniq ko'rinadi (#102 talab: "orqasi korinsin"). Kontrast
+    // border + pill + soya hisobiga saqlanadi.
+    private static final int SURFACE = 0x730C1626;      // chuqur to'q-ko'k yarim shaffof sirt
     private static final int BORDER = 0x662AABEE;       // brend-ko'k neon border (#2AABEE)
     private static final int GLOW_BLUE = 0x992AABEE;    // tashqi nur (#2AABEE)
     private static final int PILL_START = 0xFF38B6FF;   // och-ko'k (rail ACTIVE_START)

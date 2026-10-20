@@ -1845,13 +1845,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     public class DialogsRecyclerView extends BlurredRecyclerView implements StoriesListPlaceProvider.ClippedView {
 
-        /**
-         * YuzGram #96: chatlar qidiruv pill'i (sarlavha bandi) ichiga HECH
-         * qachon kirib chiqmasligi uchun chizish maydoni tepadan kesiladi.
-         * Past tomonda kesish yo'q — qatorlar nav bar ostidan o'tib boradi.
-         */
-        private int yuzClipTop;
-
         public boolean updateDialogsOnNextDraw;
         private boolean firstLayout = true;
         private boolean ignoreLayout;
@@ -1947,10 +1940,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         @Override
         protected void dispatchDraw(Canvas canvas) {
             canvas.save();
-            // YuzGram #96: chatlar qidiruv pill'i (sarlavha bandi) ichiga HECH
-            // qachon kirib chiqmasligi uchun chizish maydoni tepadan kesiladi.
-            if (yuzClipTop > 0) {
-                canvas.clipRect(0, yuzClipTop, getMeasuredWidth(), getMeasuredHeight());
+            // YuzGram #96/#102: chatlar qidiruv pill'i (sarlavha bandi) ichiga
+            // HECH qachon kirib chiqmasligi uchun chizish maydoni tepadan
+            // kesiladi. #102: kesim ENDI jonli hisoblanadi — keshlangan qiymat
+            // skroll paytida bir kadr kechikib, qatorlarni pill ortiga
+            // chiqarib qo'yar edi.
+            int yuzClip = yuzLiveHeaderClip();
+            if (yuzClip > 0) {
+                canvas.clipRect(0, yuzClip, getMeasuredWidth(), getMeasuredHeight());
             }
             if (rightFragmentOpenedProgress > 0) {
                 canvas.clipRect(0, 0, AndroidUtilities.lerp(getMeasuredWidth(), dp(RightSlidingDialogContainer.getRightPaddingSize()), rightFragmentOpenedProgress), getMeasuredHeight());
@@ -2236,15 +2233,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         t = headerBottom;
                     }
                 }
-                // YuzGram #96: sarlavha bandi pastidan chizish — pill'ning
-                // o'zi yarim shisha, lekin qatorlar uning ortiga ko'rinmasligi
-                // kerak, shuning uchun faqat top tomon kesiladi.
-                int yuzNewClipTop = isYuzGramMainRoot()
-                        && yuzChatRail != null && yuzChatRail.getVisibility() == VISIBLE ? t : 0;
-                if (yuzNewClipTop != yuzClipTop) {
-                    yuzClipTop = yuzNewClipTop;
-                    invalidate();
-                }
+                // YuzGram #102: tepadan kesim endi dispatchDraw'da jonli
+                // hisoblanadi (yuzLiveHeaderClip) — bu yerda faqat padding.
                 if (t != getPaddingTop() || yuzBottomPad != getPaddingBottom()
                         || 0 != getPaddingRight()) {
                     setTopGlowOffset(t);
@@ -2873,6 +2863,46 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         return yuzSearchBarTopMargin() + uz.kodlikino.top4.ui.YuzGramSearchBar.height() + dp(2);
     }
 
+    /**
+     * YuzGram #102: ro'yxat tepasining bazaviy offseti — DialogsRecyclerView
+     * .onMeasure'dagi t hisobining yuz ildiz uchun kerakli qismi.
+     */
+    private int yuzListTopBase() {
+        if (hasStories || (filterTabsView != null && filterTabsView.getVisibility() == VISIBLE)) {
+            return ActionBar.getCurrentActionBarHeight() + (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0);
+        }
+        return inPreviewMode && Build.VERSION.SDK_INT >= 21 ? AndroidUtilities.statusBarHeight : 0;
+    }
+
+    /**
+     * YuzGram #102: qidiruv pill'ining HAQIQIY (skroll bilan surilgan) pastki
+     * chetini beradi — dispatchDraw har kadrda shu qiymat bilan kesadi, shuning
+     * uchun qatorlar pill ortiga bir kadrlik kechikish bilan ham chiqmaydi.
+     */
+    private int yuzLiveHeaderClip() {
+        if (!isYuzGramMainRoot() || yuzChatRail == null || yuzChatRail.getVisibility() != VISIBLE) {
+            return 0;
+        }
+        int header = Math.max(0, yuzChatHeaderBottom() + (int) scrollYOffset);
+        return Math.max(yuzListTopBase(), header);
+    }
+
+    /**
+     * YuzGram #102: tarmoq uzilganda vanilla "Tarmoqqa ulanish…" overlay'i
+     * o'rniga brend belgisi o'zi shu matnga o'zgaradi (overlay LaunchActivity
+     * .updateCurrentConnectionState'da bostiriladi).
+     */
+    private void applyYuzOfflineBadge() {
+        if (yuzBrandMark == null) {
+            return;
+        }
+        boolean offline = isYuzGramMainRoot() && (currentConnectionState == ConnectionsManager.ConnectionStateConnecting
+                || currentConnectionState == ConnectionsManager.ConnectionStateWaitingForNetwork
+                || currentConnectionState == ConnectionsManager.ConnectionStateConnectingToProxy
+                || currentConnectionState == ConnectionsManager.ConnectionStateUpdating);
+        yuzBrandMark.setOffline(offline);
+    }
+
     /** Qidiruv pill'i — Telegram'ning o'z qidiruv maydonini ochadi. */
     private void openYuzGramSearch() {
         if (parentLayout != null && parentLayout.isInPreviewMode()) {
@@ -3067,6 +3097,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
         if (searchString == null) {
             currentConnectionState = getConnectionsManager().getConnectionState();
+            // YuzGram #102: brend belgisi tarmoq holatini ko'rsatsin va
+            // LaunchActivity'dagi eski overlay matni shu ildizda bostirilsin.
+            applyYuzOfflineBadge();
+            if (parentLayout instanceof LaunchActivity) {
+                ((LaunchActivity) parentLayout).refreshConnectionOverlay();
+            }
 
             getNotificationCenter().addObserver(this, NotificationCenter.dialogsNeedReload);
             NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.emojiLoaded);
@@ -9329,7 +9365,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 yuzBrandMark.setTranslationY(value);
             }
             if (viewPages != null && viewPages[0] != null && viewPages[0].listView != null) {
-                viewPages[0].listView.requestLayout();
+                // YuzGram #102: padding faqat haqiqiy o'zgarishda qayta
+                // hisoblansin. Avval har kadrda requestLayout bo'lardi — bu
+                // tebranish yaratib, clip bir kadr kechikardi.
+                int yuzTargetTop = yuzLiveHeaderClip();
+                if (yuzTargetTop != viewPages[0].listView.getPaddingTop()) {
+                    viewPages[0].listView.requestLayout();
+                }
             }
         }
         if (topBulletin != null) {
@@ -11095,6 +11137,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (currentConnectionState != state) {
                 currentConnectionState = state;
                 updateProxyButton(true, false);
+                applyYuzOfflineBadge(); // YuzGram #102
             }
         } else if (id == NotificationCenter.onDownloadingFilesChanged) {
             updateProxyButton(true, false);

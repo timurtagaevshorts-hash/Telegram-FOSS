@@ -7449,7 +7449,21 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 presentFragment(new ProxyListActivity());
             };
         }
+        // YuzGram #102: asosiy chat ildizida holat matnini alohida overlay
+        // ko'rinishida chizmaymiz — YuzGram brend belgisi o'zi "Tarmoqqa
+        // ulanish…" matniga aylanadi (DialogsActivity.applyYuzOfflineBadge).
+        BaseFragment yuzTop = getLastFragment();
+        if (yuzTop instanceof DialogsActivity && ((DialogsActivity) yuzTop).isYuzGramMainRoot()) {
+            title = null;
+            titleId = 0;
+            action = null;
+        }
         actionBarLayout.setTitleOverlayText(title, titleId, action);
+    }
+
+    /** YuzGram #102: fragment almashganda overlay matnini qayta hisoblatish. */
+    public void refreshConnectionOverlay() {
+        updateCurrentConnectionState(currentAccount);
     }
 
     public void hideVisibleActionMode() {

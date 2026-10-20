@@ -33,6 +33,8 @@ public class YuzGramBrandMark extends View {
     private static final int WORD_PRIMARY = 0xFFFFFFFF;
     private static final int WORD_ACCENT = 0xFF38B6FF;
     private static final int TAGLINE = 0xFF93AECB;
+    // YuzGram #102: tarmoq uzilganda palavra o'rniga chiqadigan matn rangi.
+    private static final int OFFLINE_TEXT = 0xFFFFB86B;
 
     private static final String WORD_1 = "Yuz";
     private static final String WORD_2 = "Gram";
@@ -44,7 +46,9 @@ public class YuzGramBrandMark extends View {
     private final RectF badgeRect = new RectF();
     private final Bitmap logo;
     private final String tagline;
+    private final String offlineText;
     private String tagText = "";
+    private boolean offline;
 
     private int statusBarHeight;
     private int barHeight; // action bar balandligi (status bar'siz)
@@ -59,6 +63,7 @@ public class YuzGramBrandMark extends View {
     public YuzGramBrandMark(Context context) {
         super(context);
         tagline = context.getString(R.string.yuz_chat_tagline);
+        offlineText = context.getString(R.string.yuz_chat_offline);
         logo = BitmapFactory.decodeResource(context.getResources(), R.drawable.yuz_logo);
         badgePaint.setFilterBitmap(true);
         badgeSize = AndroidUtilities.dp(30f);
@@ -68,6 +73,19 @@ public class YuzGramBrandMark extends View {
         tagPaint.setTextSize(AndroidUtilities.dp(10.5f));
         tagPaint.setColor(TAGLINE);
         tagPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+    }
+
+    /** YuzGram #102: tarmoq uzilganda palavra o'rniga "Tarmoqqa ulanish…" chiziladi. */
+    public void setOffline(boolean value) {
+        if (offline != value) {
+            offline = value;
+            requestLayout();
+            invalidate();
+        }
+    }
+
+    public boolean isOffline() {
+        return offline;
     }
 
     /** DialogsActivity har sync'da haqiqiy o'lchamlarni uzatadi. */
@@ -83,7 +101,9 @@ public class YuzGramBrandMark extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        float wordW = wordPaint.measureText(WORD_1) + wordPaint.measureText(WORD_2);
+        wordPaint.setTextSize(AndroidUtilities.dp(offline ? 16.5f : 20f));
+        float wordW = offline ? wordPaint.measureText(offlineText)
+                : wordPaint.measureText(WORD_1) + wordPaint.measureText(WORD_2);
         float tagW = tagPaint.measureText(tagline);
         // O'ngda action bar tugmalari (lupa/menu) turadi — ular bilan
         // urishmaslik uchun ~76dp bo'sh joy qoldiramiz. Sig'masa, avval
@@ -91,7 +111,7 @@ public class YuzGramBrandMark extends View {
         int specW = MeasureSpec.getSize(widthMeasureSpec);
         float avail = specW - AndroidUtilities.dp(16) - badgeSize - AndroidUtilities.dp(9)
                 - AndroidUtilities.dp(76);
-        tagText = tagW <= avail ? tagline : (avail > AndroidUtilities.dp(48) ? fitTail(tagline, avail) : "");
+        tagText = !offline && tagW <= avail ? tagline : (!offline && avail > AndroidUtilities.dp(48) ? fitTail(tagline, avail) : "");
         showTagline = !tagText.isEmpty();
         float textW = Math.max(wordW, tagPaint.measureText(tagText));
         int ideal = (int) (AndroidUtilities.dp(16) + badgeSize + AndroidUtilities.dp(9)
@@ -131,6 +151,8 @@ public class YuzGramBrandMark extends View {
         canvas.drawBitmap(logo, null, badgeRect, badgePaint);
 
         // Palavra: "Yuz" oq + "Gram" ko'k — gradient matn emas.
+        // #102: offline holda parola o'rniga "Tarmoqqa ulanish…" chiziladi.
+        wordPaint.setTextSize(AndroidUtilities.dp(offline ? 16.5f : 20f));
         float tx = bx + badgeSize + AndroidUtilities.dp(9);
         float wordBand = AndroidUtilities.dp(22f);
         float tagBand = AndroidUtilities.dp(13f);
@@ -138,12 +160,17 @@ public class YuzGramBrandMark extends View {
 
         Paint.FontMetrics wfm = wordPaint.getFontMetrics();
         float wordBaseline = blockTop + wordBand / 2f - (wfm.ascent + wfm.descent) / 2f;
-        wordPaint.setColor(WORD_PRIMARY);
-        canvas.drawText(WORD_1, tx, wordBaseline, wordPaint);
-        float w1 = wordPaint.measureText(WORD_1);
-        wordPaint.setColor(WORD_ACCENT);
-        canvas.drawText(WORD_2, tx + w1, wordBaseline, wordPaint);
-        wordPaint.setColor(WORD_PRIMARY);
+        if (offline) {
+            wordPaint.setColor(OFFLINE_TEXT);
+            canvas.drawText(offlineText, tx, wordBaseline, wordPaint);
+            wordPaint.setColor(WORD_PRIMARY);
+        } else {
+            canvas.drawText(WORD_1, tx, wordBaseline, wordPaint);
+            float w1 = wordPaint.measureText(WORD_1);
+            wordPaint.setColor(WORD_ACCENT);
+            canvas.drawText(WORD_2, tx + w1, wordBaseline, wordPaint);
+            wordPaint.setColor(WORD_PRIMARY);
+        }
 
         // Tagline — palavrasining ostida, bir xil chap chetdan
         if (showTagline) {
