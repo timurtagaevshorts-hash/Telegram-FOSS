@@ -90,6 +90,7 @@ import org.telegram.messenger.SvgHelper;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
+import org.telegram.messenger.YuzApkGuard;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.SerializedData;
@@ -243,6 +244,29 @@ public class AlertsCreator {
                     }
                 })
                 .setNegativeButton(LocaleController.getString("ContactsPermissionAlertNotNow", R.string.ContactsPermissionAlertNotNow), null)
+                .create();
+    }
+
+    /**
+     * YuzGram #100: APK fayl ochishga urinish — ogohlantirish. Himoya tugmasi
+     * orqali o'chirilmasa, har urinishda shu xabar chiqadi.
+     */
+    public static Dialog createApkProtectionDialog(Context ctx, Theme.ResourcesProvider resourcesProvider) {
+        LinearLayout layout = new LinearLayout(ctx);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(AndroidUtilities.dp(18), AndroidUtilities.dp(6), AndroidUtilities.dp(18), AndroidUtilities.dp(4));
+        TextView text = new TextView(ctx);
+        text.setText(LocaleController.getString("YuzApkGuardWarnText", R.string.yuz_apk_guard_warn_text));
+        text.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 15);
+        text.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+        layout.addView(text, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        return new AlertDialog.Builder(ctx, resourcesProvider)
+                .setTitle(LocaleController.getString("YuzApkGuardWarnTitle", R.string.yuz_apk_guard_warn_title))
+                .setView(layout)
+                .setPositiveButton(LocaleController.getString("OK", R.string.OK), null)
+                .setNegativeButton(LocaleController.getString("YuzApkGuardDisable", R.string.yuz_apk_guard_disable), (d, w) -> {
+                    YuzApkGuard.setEnabled(false);
+                })
                 .create();
     }
 

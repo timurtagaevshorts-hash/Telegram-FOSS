@@ -3852,6 +3852,10 @@ public class AndroidUtilities {
                     }
                 }
             }
+            if (YuzApkGuard.isEnabled() && (f.getName().toLowerCase().endsWith(".apk") || "application/vnd.android.package-archive".equals(realMimeType))) {
+                AlertsCreator.createApkProtectionDialog(activity, resourcesProvider).show();
+                return true;
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && realMimeType != null && realMimeType.equals("application/vnd.android.package-archive") && !ApplicationLoader.applicationContext.getPackageManager().canRequestPackageInstalls()) {
                 AlertsCreator.createApkRestrictedDialog(activity, resourcesProvider).show();
                 return true;

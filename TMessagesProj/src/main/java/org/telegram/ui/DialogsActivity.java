@@ -599,6 +599,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     // YuzGram #60: chat tepasidagi brend logotipi — oddiy "YuzGram" matnli
     // sarlavha o'rniga gradient belgi + wordmark chizadi.
     private uz.kodlikino.top4.ui.YuzGramBrandMark yuzBrandMark;
+    // #100: APK himoyasi tugmasi — brend yonida, faqat asosiy chat ildizida.
+    private uz.kodlikino.top4.ui.YuzGramApkToggle yuzApkToggle;
     // YuzGram #85: gildirak OSTIDagi doimiy qidiruv satri ("Qidirish" pill'i +
     // filtr doirasi) va chat ro'yxati ORQASidagi nebula fon.
     private uz.kodlikino.top4.ui.YuzGramSearchBar yuzSearchBar;
@@ -1769,6 +1771,59 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         float a = containersAlpha * fade;
         yuzBrandMark.setAlpha(a);
         yuzBrandMark.setClickable(a > 0.5f);
+        if (yuzApkToggle != null) {
+            boolean guardOn = org.telegram.messenger.YuzApkGuard.isEnabled();
+            if (yuzApkToggle.isGuardEnabled() != guardOn) {
+                yuzApkToggle.setEnabled(guardOn);
+            }
+            yuzApkToggle.setTranslationY(actionBar.getTranslationY());
+            yuzApkToggle.setAlpha(a);
+            yuzApkToggle.setClickable(a > 0.5f);
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) yuzApkToggle.getLayoutParams();
+            int afterBrand = yuzBrandMark.getRight() + dp(6);
+            int minLeft = contentView.getWidth() - dp(112);
+            int maxLeft = contentView.getWidth() - dp(30) - yuzApkToggle.getMeasuredWidth() - dp(12);
+            int left = Math.min(Math.max(afterBrand, minLeft), maxLeft);
+            int rightMargin = Math.max(0, contentView.getWidth() - left - yuzApkToggle.getMeasuredWidth());
+            if (lp.rightMargin != rightMargin) {
+                lp.rightMargin = rightMargin;
+                yuzApkToggle.setLayoutParams(lp);
+            }
+        }
+    }
+
+    /**
+     * #100: APK himoyasi dialogi — Yoqish/O'chirish tugmalari bilan.
+     * Holat YuzApkGuard'da (alohida prefs), ochish to'sig'i
+     * [AndroidUtilities.openForView]da tekshiriladi.
+     */
+    private void showYuzApkGuardDialog() {
+        android.widget.LinearLayout row = new android.widget.LinearLayout(getParentActivity());
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(22), dp(10), dp(22), dp(4));
+        android.widget.Switch guardSwitch = new android.widget.Switch(getParentActivity());
+        guardSwitch.setChecked(org.telegram.messenger.YuzApkGuard.isEnabled());
+        TextView guardLabel = new TextView(getParentActivity());
+        guardLabel.setText(getString(R.string.yuz_apk_guard_title));
+        guardLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 16);
+        guardLabel.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
+        row.addView(guardLabel, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
+        row.addView(guardSwitch, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(R.string.yuz_apk_guard_title);
+        builder.setMessage(R.string.yuz_apk_guard_desc);
+        builder.setView(row);
+        builder.setPositiveButton(R.string.yuz_apk_guard_save, (dialog, which) -> {
+            boolean on = guardSwitch.isChecked();
+            org.telegram.messenger.YuzApkGuard.setEnabled(on);
+            if (yuzApkToggle != null) {
+                yuzApkToggle.setEnabled(on);
+            }
+            Toast.makeText(getParentActivity(), getString(on ? R.string.yuz_apk_guard_on : R.string.yuz_apk_guard_off), Toast.LENGTH_SHORT).show();
+        });
+        builder.setNegativeButton(android.R.string.cancel, null);
+        showDialog(builder.create());
     }
 
     /** Brendga bosish — sarlavhaga bosish bilan bir xil: tepaga qaytish. */
@@ -5833,6 +5888,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 return true;
             });
             contentView.addView(yuzBrandMark, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 0, 0, 0, 0));
+            yuzApkToggle = new uz.kodlikino.top4.ui.YuzGramApkToggle(context);
+            yuzApkToggle.setContentDescription(getString(R.string.yuz_apk_guard_toggle));
+            yuzApkToggle.setOnClickListener(v -> showYuzApkGuardDialog());
+            FrameLayout.LayoutParams tgLp = new FrameLayout.LayoutParams(
+                    LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.RIGHT);
+            tgLp.topMargin = AndroidUtilities.statusBarHeight + dp(14);
+            tgLp.rightMargin = dp(80);
+            contentView.addView(yuzApkToggle, tgLp);
         }
         updateStoriesVisibility(false);
         return fragmentView;
