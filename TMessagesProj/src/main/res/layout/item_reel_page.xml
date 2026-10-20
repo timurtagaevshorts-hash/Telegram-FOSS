@@ -45,17 +45,17 @@
         android:scaleType="centerCrop" />
 
     <!--
-      #106: Telegram hikoyasi posti — ImageReceiver hikoyaning o'z manbasidan
-      yuklaydi (striped thumb, to'liq rasm, shifrlash), Glide kerak emas.
-      Faqat story sahifalarida ko'rinadi; video tayyor bo'lib ijro boshlangach
-      yashiriladi (qarang ReelsAdapter).
+      #106: Telegram hikoyasi posti — BackupImageView ichidagi ImageReceiver
+      hikoyaning o'z manbasidan yuklaydi (striped thumb, to'liq rasm,
+      shifrlash), Glide kerak emas. Faqat story sahifalarida ko'rinadi; video
+      tayyor bo'lib ijro boshlangach yashiriladi (qarang ReelsAdapter).
+      BackupImageView'ning (Context, AttributeSet) konstruktori yo'q — view
+      code'da yaratilib shu konteynerga qo'yiladi.
     -->
-    <org.telegram.messenger.ImageReceiver
-        android:id="@+id/storyThumb"
+    <FrameLayout
+        android:id="@+id/storyThumbHost"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@color/home_bg"
-        android:visibility="gone" />
+        android:layout_height="match_parent" />
 
     <!-- Pastdagi qora gradient — matn o'qilishi uchun -->
     <View

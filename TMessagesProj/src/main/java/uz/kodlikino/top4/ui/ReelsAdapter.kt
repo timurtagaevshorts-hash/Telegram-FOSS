@@ -15,6 +15,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -41,8 +42,8 @@ import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.FileLoader
 import org.telegram.messenger.ImageLoader
 import org.telegram.messenger.ImageLocation
-import org.telegram.messenger.ImageReceiver
 import org.telegram.messenger.UserConfig
+import org.telegram.ui.Components.BackupImageView
 import uz.kodlikino.top4.utils.NetworkReachability
 import uz.kodlikino.top4.utils.YuzReelPreloader
 import uz.kodlikino.top4.utils.YuzStoryFeed
@@ -260,7 +261,22 @@ class ReelsAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_reel_page, parent, false)
-        return PageHolder(view)
+        val holder = PageHolder(view)
+        // BackupImageView'ning XML (Context, AttributeSet) konstruktori yo'q —
+        // Telegram uni faqat code'da yaratadi. Shuning uchun hikoya postini
+        // storyThumbHost konteyneriga qo'l bilan qo'shamiz.
+        val biv = BackupImageView(parent.context)
+        biv.setBackgroundColor(ContextCompat.getColor(parent.context, R.color.home_bg))
+        biv.visibility = View.GONE
+        holder.storyThumbHost.addView(
+            biv,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        holder.storyThumb = biv
+        return holder
     }
 
     override fun onBindViewHolder(holder: PageHolder, position: Int) {
@@ -569,7 +585,8 @@ class ReelsAdapter(
     inner class PageHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val playerView: PlayerView = itemView.findViewById(R.id.playerView)
         val ivThumbnail: ImageView = itemView.findViewById(R.id.ivThumbnail)
-        val storyThumb: ImageReceiver = itemView.findViewById(R.id.storyThumb)
+        val storyThumbHost: FrameLayout = itemView.findViewById(R.id.storyThumbHost)
+        lateinit var storyThumb: BackupImageView
         val pageProgress: ProgressBar = itemView.findViewById(R.id.pageProgress)
         val playbackBar: ProgressBar = itemView.findViewById(R.id.playbackBar)
         private val tvPlayPauseBadge: ImageView = itemView.findViewById(R.id.tvPlayPauseBadge)
@@ -813,7 +830,7 @@ class ReelsAdapter(
                     }
                     val thumbSize = FileLoader.getClosestPhotoSizeWithSize(doc.thumbs, 1000)
                     val striped = ImageLoader.createStripedBitmap(doc.thumbs)
-                    storyThumb.setImage(
+                    storyThumb.imageReceiver.setImage(
                         null, null,
                         ImageLocation.getForDocument(doc), filter + "_pframe",
                         if (thumbSize != null) ImageLocation.getForDocument(thumbSize, doc) else null,
@@ -827,7 +844,7 @@ class ReelsAdapter(
                     }
                     val striped = ImageLoader.createStripedBitmap(photo.sizes)
                     val size = FileLoader.getClosestPhotoSizeWithSize(photo.sizes, Integer.MAX_VALUE)
-                    storyThumb.setImage(
+                    storyThumb.imageReceiver.setImage(
                         null, null,
                         ImageLocation.getForPhoto(size, photo), filter,
                         null, null, striped, 0L, null, item, 0

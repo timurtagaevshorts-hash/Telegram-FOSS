@@ -1,6 +1,5 @@
 package uz.kodlikino.top4.utils
 
-import org.telegram.messenger.ChatObject
 import org.telegram.messenger.DialogObject
 import org.telegram.messenger.FileLoader
 import org.telegram.messenger.MessageObject
@@ -59,7 +58,7 @@ object YuzStoryFeed {
         val out = ArrayList<Reel>()
         val seen = HashSet<String>()
         val sc = try {
-            StoriesController.getInstance(account)
+            MessagesController.getInstance(account).getStoriesController()
         } catch (_: Exception) {
             return out
         }
@@ -156,7 +155,7 @@ object YuzStoryFeed {
             if (dialogId > 0) {
                 UserObject.getUserName(mc.getUser(dialogId)) ?: ""
             } else {
-                ChatObject.getUserName(mc.getChat(-dialogId)) ?: ""
+                mc.getChat(-dialogId)?.title ?: ""
             }
         } catch (_: Exception) {
             ""
@@ -170,7 +169,7 @@ object YuzStoryFeed {
     @JvmStatic
     fun findStoryItem(account: Int, dialogId: Long, storyId: Int): TL_stories.StoryItem? {
         val sc = try {
-            StoriesController.getInstance(account)
+            MessagesController.getInstance(account).getStoriesController()
         } catch (_: Exception) {
             return null
         }
@@ -211,7 +210,7 @@ object YuzStoryFeed {
             } else {
                 null
             }
-            StoriesController.getInstance(account).setStoryReaction(dialogId, item, vr)
+            MessagesController.getInstance(account).getStoriesController().setStoryReaction(dialogId, item, vr)
             true
         } catch (_: Exception) {
             false
@@ -227,7 +226,7 @@ object YuzStoryFeed {
     fun markViewed(account: Int, dialogId: Long, storyId: Int): Boolean {
         val item = findStoryItem(account, dialogId, storyId) ?: return false
         return try {
-            val sc = StoriesController.getInstance(account)
+            val sc = MessagesController.getInstance(account).getStoriesController()
             val ps = sc.getStories(dialogId) ?: return false
             sc.markStoryAsRead(ps, item, false)
         } catch (_: Exception) {
@@ -256,8 +255,7 @@ object YuzStoryFeed {
         }
         return try {
             val f = FileLoader.getInstance(account).getPathToAttach(doc) ?: return null
-            val size = doc.size.toLong() and 0xFFFFFFFFL
-            if (f.exists() && (doc.size == 0 || f.length() == size)) f else null
+            if (f.exists() && (doc.size == 0L || f.length() == doc.size)) f else null
         } catch (_: Exception) {
             null
         }

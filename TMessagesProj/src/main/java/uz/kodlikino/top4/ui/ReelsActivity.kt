@@ -546,10 +546,11 @@ class ReelsActivity @JvmOverloads constructor(
 
     /** Faol hikoya uchun like holati — Telegram reaksiyasidan (`sent_reaction`). */
     private fun refreshLikeState(reelId: String?) {
-        val key = YuzStoryFeed.parseKey(reelId) ?: return
+        val rid = reelId ?: return
+        val key = YuzStoryFeed.parseKey(rid) ?: return
         val item = YuzStoryFeed.findStoryItem(currentAccount, key.first, key.second) ?: return
         val liked = item.sent_reaction != null && item.sent_reaction !is TLRPC.TL_reactionEmpty
-        adapter?.applyLikeState(reelId, liked, item.views?.reactions_count ?: 0)
+        adapter?.applyLikeState(rid, liked, item.views?.reactions_count ?: 0)
     }
 
     /**
