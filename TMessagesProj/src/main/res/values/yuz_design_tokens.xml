@@ -20,12 +20,19 @@
          shuning uchun bu yerda to'q siyaq-siyoh ishlatiladi — 7.34:1. -->
     <color name="yuz_on_action">#06121C</color>
 
-    <color name="yuz_text">#FFFFFF</color>
-    <color name="yuz_text_secondary">#95A1B4</color>
+    <!-- Premium matn rampasi: qop-qora ustida SOF oq (platinum) ko'z chamashmaydi,
+         oq faqat "yorug'lik akcenti" bo'lgan sarlavhalarda qoladi. Rol yorug'lik
+         bosqichi bilan o'qiladi: bright > platinum > secondary > muted. -->
+    <color name="yuz_text">#EDF1F8</color>
+    <color name="yuz_text_bright">#FFFFFF</color>
+    <color name="yuz_text_secondary">#A9B6CC</color>
     <!-- Placeholder / hint: qorong'i sirt ustida 4.5:1 chegarasidan pastga
          tushmasligi uchun eski `text_hint` (#5E6F84) dan bir pogona yuqori. -->
-    <color name="yuz_text_muted">#7A8AA0</color>
+    <color name="yuz_text_muted">#8C9BB2</color>
     <color name="yuz_text_on_accent">#06121C</color>
+    <!-- Accent gradienti USTIDAGI ikkilamchi matn: kul emas, shu hue'dan
+         siyaqlangan (craft-floor qoidasi). Premium hero ijobiy izohi shu. -->
+    <color name="yuz_text_on_accent_dim">#CC06121C</color>
 
     <color name="yuz_bg">#000000</color>
     <color name="yuz_surface">#0D121D</color>
@@ -40,6 +47,10 @@
     <color name="yuz_stroke_action">#332AABEE</color>
 
     <color name="yuz_gold">#FFD84D</color>
+    <!-- Oltin gradientning ikkinchi uchquli va uning "folga" chegarasi:
+         premium sirtlarda (hero, tarif kartasi) ishlatiladi. -->
+    <color name="yuz_gold_deep">#F0A93B</color>
+    <color name="yuz_stroke_gold">#33FFD84D</color>
     <color name="yuz_danger">#FF5C5C</color>
     <!-- Reels\'dagi faol layk — brend palitrasidagi yagona issiq holat rangi. -->
     <color name="yuz_like">#FF4D6D</color>

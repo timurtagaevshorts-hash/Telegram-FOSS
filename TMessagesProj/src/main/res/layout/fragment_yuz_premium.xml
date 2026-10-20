@@ -66,6 +66,7 @@
                     style="@style/YuzScreenTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:textColor="@color/yuz_text_on_accent"
                     android:text="@string/premium_hero_title" />
 
                 <TextView
@@ -73,16 +74,16 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/yuz_space_2"
+                    android:textColor="@color/yuz_text_on_accent_dim"
                     android:text="@string/premium_hero_subtitle" />
             </LinearLayout>
 
             <TextView
                 android:id="@+id/tvPremiumStatus"
-                style="@style/YuzLabel"
+                style="@style/YuzPremiumCrest"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/yuz_space_3"
-                android:textColor="@color/yuz_gold"
                 android:visibility="gone" />
 
             <LinearLayout

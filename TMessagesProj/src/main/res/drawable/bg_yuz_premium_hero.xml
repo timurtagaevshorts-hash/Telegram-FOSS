@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Premium hero: brend gradienti + yumshoq oltin "folga" hoshiyasi. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <gradient android:startColor="@color/yuz_action" android:endColor="@color/yuz_decor" android:angle="135" />
+    <gradient
+        android:startColor="@color/yuz_action"
+        android:centerColor="#4264F5"
+        android:endColor="@color/yuz_decor"
+        android:angle="135" />
+    <stroke android:width="@dimen/yuz_stroke" android:color="@color/yuz_stroke_gold" />
     <corners android:radius="@dimen/yuz_radius_card" />
 </shape>

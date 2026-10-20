@@ -13,10 +13,10 @@
     <!-- ==================== Matn ==================== -->
 
     <style name="YuzScreenTitle">
-        <item name="android:textColor">@color/yuz_text</item>
+        <item name="android:textColor">@color/yuz_text_bright</item>
         <item name="android:textSize">@dimen/yuz_text_title</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:letterSpacing">-0.015</item>
         <item name="android:includeFontPadding">false</item>
     </style>
 
@@ -27,9 +27,10 @@
     </style>
 
     <style name="YuzSectionHeader">
-        <item name="android:textColor">@color/yuz_text</item>
+        <item name="android:textColor">@color/yuz_text_bright</item>
         <item name="android:textSize">@dimen/yuz_text_section</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.005</item>
         <item name="android:includeFontPadding">false</item>
     </style>
 
@@ -60,10 +61,18 @@
     </style>
 
     <style name="YuzBadge">
-        <item name="android:textColor">@color/yuz_text</item>
+        <item name="android:textColor">@color/yuz_text_bright</item>
         <item name="android:textSize">@dimen/yuz_text_micro</item>
         <item name="android:textStyle">bold</item>
         <item name="android:letterSpacing">0.02</item>
+    </style>
+
+    <!-- Premium status/crest: ilovadagi yagona "oltin" matn roli. -->
+    <style name="YuzPremiumCrest">
+        <item name="android:textColor">@color/yuz_gold</item>
+        <item name="android:textSize">@dimen/yuz_text_caption</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.06</item>
     </style>
 
     <!-- ==================== Tugmalar (MaterialButton) ==================== -->
@@ -78,6 +87,7 @@
         <item name="android:insetBottom">0dp</item>
         <item name="android:textSize">@dimen/yuz_text_button</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.01</item>
         <item name="android:textAllCaps">false</item>
         <item name="android:stateListAnimator">@null</item>
         <item name="android:textColor">@color/yuz_on_action</item>

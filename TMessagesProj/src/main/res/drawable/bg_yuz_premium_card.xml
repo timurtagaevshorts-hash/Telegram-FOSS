@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Tarif kartasi: ko'tarilgan sir + oltinqo'ng'ir hoshiya (premium signal). -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="@color/yuz_surface" />
-    <stroke android:width="@dimen/yuz_stroke" android:color="@color/yuz_stroke_soft" />
+    <solid android:color="@color/yuz_surface_raised" />
+    <stroke android:width="@dimen/yuz_stroke" android:color="@color/yuz_stroke_gold" />
     <corners android:radius="@dimen/yuz_radius_card" />
 </shape>
