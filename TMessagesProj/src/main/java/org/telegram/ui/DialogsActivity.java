@@ -2239,6 +2239,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         || 0 != getPaddingRight()) {
                     setTopGlowOffset(t);
                     setPadding(0, t, 0, yuzBottomPad);
+                    // YuzGram #108: bar mavjud bo'lsa ro'yxat pastdan kesilmaydi —
+                    // qatorlar shaffof bar ORTIDAN o'tadi (pastki padding endi
+                    // faqat scroll-tugashigi joy: oxirgi qator bar ustiga
+                    // ko'tariladi). Tepa kesim avvalgiday dispatchDraw'dagi
+                    // yuzLiveHeaderClip bilan himoyalangan.
+                    setClipToPadding(yuzBottomPad == 0);
                     if (hasStories) {
                         parentPage.progressView.setPaddingTop(Math.max(0, t - dp(DialogStoriesCell.HEIGHT_IN_DP)));
                     } else {
@@ -2941,21 +2947,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         } else if (searchItem != null && searchItem.getSearchField() != null) {
             AndroidUtilities.showKeyboard(searchItem.getSearchField());
         }
-    }
-
-    /** Gildirakdagi qalamcha plitasi bosilganda (pastki FABlar o'rniga). */
-    private void onYuzGramRailAction(int action) {
-        openYuzGramCompose();
-    }
-
-    private void openYuzGramCompose() {
-        if (parentLayout != null && parentLayout.isInPreviewMode()) {
-            finishPreviewFragment();
-            return;
-        }
-        Bundle args = new Bundle();
-        args.putBoolean("destroyAfterSelect", true);
-        presentFragment(new ContactsActivity(args));
     }
 
     /**
@@ -5397,9 +5388,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             yuzChatRail.setListener(index -> selectYuzGramFilter(index));
             yuzChatRail.setOnAddFolder(() -> presentFragment(new FiltersSetupActivity()));
             yuzChatRail.setCounterProvider(this::yuzChatRailCounter);
-            yuzChatRail.setActionListener(this::onYuzGramRailAction);
-            // Kamera plitasi olib tashlangan — hikoya joylash Reels tepasida (#70).
-            yuzChatRail.setActions(true, false);
+            // YuzGram #108: "Xabar yozish" (qalamcha/compose) plitasi butunlay
+            // olib tashlandi — foydalanuvchi so'rovi (bar yaqinidagi post
+            // tugmasi kerak emas). Kamera plitasi #70 dan keyin ham yo'q.
+            yuzChatRail.setActions(false, false);
             FrameLayout.LayoutParams railLp = new FrameLayout.LayoutParams(
                     uz.kodlikino.top4.ui.YuzGramChatWheel.width(),
                     uz.kodlikino.top4.ui.YuzGramChatWheel.height(),
