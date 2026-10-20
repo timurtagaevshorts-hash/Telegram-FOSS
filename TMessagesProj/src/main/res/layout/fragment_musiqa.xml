@@ -100,13 +100,49 @@
         android:textColor="@color/yuz_text_secondary"
         android:textSize="@dimen/yuz_text_secondary" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvMusiqa"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:paddingBottom="@dimen/yuz_space_4" />
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvMusiqa"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="@dimen/yuz_space_4" />
+
+        <!-- YuzGram #98: qidiruv skeleti (sotuvchi yorug'lik bilan) -->
+        <uz.kodlikino.top4.ui.YuzShimmer
+            android:id="@+id/shimmerMusiqa"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/yuz_space_2"
+            android:visibility="gone" />
+
+        <!-- YuzGram #98: ommabop xitlar kelganda markazdagi animatsiya -->
+        <LinearLayout
+            android:id="@+id/hitsLoading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <uz.kodlikino.top4.ui.YuzPulseLoader
+                android:layout_width="88dp"
+                android:layout_height="88dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_3"
+                android:text="@string/musiqa_hits_loading"
+                android:textColor="@color/yuz_text_secondary"
+                android:textSize="@dimen/yuz_text_secondary" />
+        </LinearLayout>
+    </FrameLayout>
 
     <!-- YuzGram #62: pastdagi ijochi panel (gone; kuylash boshlanganda ko'rinadi) -->
     <include layout="@layout/layout_yuz_music_player" />

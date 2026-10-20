@@ -79,4 +79,7 @@
     <string name="musiqa_sleep_set">Musiqa %1$d daqiqadan keyin to\'xtaydi</string>
     <string name="musiqa_fav_added">Sevimlilarga qo\'shildi</string>
     <string name="musiqa_fav_removed">Sevimlilardan olib tashlandi</string>
+    <!-- YuzGram #98: yuklanish animatsiyalari -->
+    <string name="musiqa_hits_loading">Ommabop xitlar yuklanmoqda\u2026</string>
+    <string name="musiqa_searching">Qo\u2019shiqlar qidirilmoqda\u2026</string>
 </resources>

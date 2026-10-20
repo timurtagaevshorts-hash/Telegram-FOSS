@@ -104,6 +104,16 @@ object YuzMusicEngine {
 
     private val seenIds = HashSet<Long>()
     private var extending = false
+    // YuzGram #98: radio navbatni cheksiz davom ettiradi — urinishlar soni
+    // va qaysi "hit" so'rovi bilan davom etgani shu yerda yuritiladi.
+    private var extendAttempts = 0
+    private var seedRotate = 0
+    private val hitSeeds = arrayOf(
+        "ozbek xit qoshiklar 2026",
+        "trend musiqi 2026",
+        "eng mashhur qoshiklar",
+        "pop hits 2026"
+    )
     @Volatile
     private var dlInFlight = false
     private var lastStatus: String? = null
@@ -199,7 +209,8 @@ object YuzMusicEngine {
                 prefetchNext(p, p.currentMediaItemIndex)
                 markPlayed(item)
                 prebufferNext(p, p.currentMediaItemIndex)
-                if (radio && p.currentMediaItemIndex >= queueTracks.size - 2) extendQueue()
+                extendAttempts = 0
+                if (radio && p.currentMediaItemIndex >= queueTracks.size - 3) extendQueue()
             }
 
             override fun onPlaybackStateChanged(state: Int) {
@@ -225,7 +236,17 @@ object YuzMusicEngine {
                         lastBuffered = p.bufferedPosition
                         ui.postDelayed(bufferingWatchdog, 2000L)
                     }
-                    Player.STATE_ENDED -> postStatus(null)
+                    Player.STATE_ENDED -> {
+                        // YuzGram #98: navbat tugashi — tugash emas. Radio
+                        // yoqilgan bo'lsa o'xshash/ommabop qo'shiqlar
+                        // qo'shib ijro davom etadi.
+                        if (radio && queueTracks.isNotEmpty()) {
+                            postStatus(appCtx.getString(R.string.musiqa_st_extend))
+                            extendQueue(retryStart = true)
+                        } else {
+                            postStatus(null)
+                        }
+                    }
                 }
                 notifyPlaying(p.isPlaying)
             }
@@ -493,27 +514,64 @@ object YuzMusicEngine {
 
     // ---------------------------------------------------------------- radio
 
+    /**
+     * YuzGram #98: navbatni uzluksiz to'ldirish. Zanjir:
+     *  1) ijrochining boshqa qo'shiqlari (o'xshash),
+     *  2) ijrochi + qo'shiq nomi (mospot),
+     *  3) aylanadigan "ommabop xitlar" so'rovi.
+     * Hech biri natija bermasa 3 s dan keyin bir marta qayta uriniladi
+     * (sust tarmoqda cheksiz urinish bo'lmasligi uchun 4 marta bilan cheklangan).
+     */
     private fun extendQueue(retryStart: Boolean = false) {
         if (extending || queueTracks.isEmpty()) return
+        if (extendAttempts >= 4) {
+            if (retryStart) postStatus(appCtx.getString(R.string.musiqa_st_weaknet))
+            return
+        }
         extending = true
-        val anchor = queueTracks.lastOrNull() ?: return
-        val query = (anchor.artist + " " + anchor.title).trim()
-        Log.i(TAG, "extendQueue q='$query'")
+        extendAttempts++
+        val anchor = currentTrack() ?: queueTracks.lastOrNull()
+        val artist = anchor?.artist?.trim().orEmpty()
+        val seeds = ArrayList<String>()
+        if (artist.isNotEmpty()) seeds.add(artist)
+        if (artist.isNotEmpty() && anchor != null) seeds.add((artist + " " + anchor.title).trim())
+        seeds.add(hitSeeds[seedRotate++ % hitSeeds.size])
+        Log.i(TAG, "extendQueue seeds=$seeds attempt=$extendAttempts")
+        val appended = ArrayList<YuzTrack>()
         Thread {
-            val more = YuzMusicGateway.search(query, 15)
-                .ifEmpty { runCatching { YuzYouTubeApi.search(query, 15) }.getOrDefault(emptyList()) }
-            val fresh = more.filter { it.videoId.isNotBlank() && seenIds.add(it.id) }.take(8)
+            var i = 0
+            while (appended.size < 10 && i < seeds.size) {
+                val q = seeds[i++]
+                val more = YuzMusicGateway.search(q, 20)
+                    .ifEmpty { runCatching { YuzYouTubeApi.search(q, 20) }.getOrDefault(emptyList()) }
+                for (t in more) {
+                    if (appended.size >= 10) break
+                    if (t.videoId.isNotBlank() && seenIds.add(t.id)) appended.add(t)
+                }
+            }
             ui.post {
                 extending = false
-                if (fresh.isEmpty()) return@post
+                if (appended.isEmpty()) {
+                    // navbat bo'sh qolmasin — bir marta kechikib qayta urinadi
+                    val p = player
+                    if (radio && p != null && p.playbackState == Player.STATE_ENDED) {
+                        ui.postDelayed({
+                            val pp = player ?: return@postDelayed
+                            if (pp.playbackState == Player.STATE_ENDED) extendQueue(retryStart = true)
+                        }, 3000L)
+                    }
+                    return@post
+                }
                 val p = player ?: return@post
-                queueTracks = queueTracks + fresh
-                runCatching { p.addMediaItems(fresh.map { buildItem(it) }) }
+                extendAttempts = 0
+                queueTracks = queueTracks + appended
+                runCatching { p.addMediaItems(appended.map { buildItem(it) }) }
                 if (retryStart) {
                     postStatus(null)
                     p.prepare()
                     p.playWhenReady = true
                 }
+                for (o in observers) runCatching { o.onItemChanged(p.currentMediaItem) }
             }
         }.start()
     }

@@ -55,6 +55,10 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private lateinit var etQuery: EditText
     private lateinit var statusView: TextView
     private lateinit var adapter: YuzMusicAdapter
+    private var rvList: RecyclerView? = null
+    private var shimmer: View? = null
+    private var hitsBox: View? = null
+    private val downloadingIds = HashSet<Long>()
 
     private val effects by lazy { YuzMusicEffects(ctx) }
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -118,8 +122,11 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
 
         etQuery = root.findViewById(R.id.etMusiqaQuery)
         statusView = root.findViewById(R.id.tvMusiqaStatus)
+        shimmer = root.findViewById(R.id.shimmerMusiqa)
+        hitsBox = root.findViewById(R.id.hitsLoading)
 
         val rv = root.findViewById<RecyclerView>(R.id.rvMusiqa)
+        rvList = rv
         rv.layoutManager = LinearLayoutManager(ctx)
         adapter = YuzMusicAdapter(
             onPlay = { _, pos -> rowPlay(pos) },
@@ -323,7 +330,8 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         hideKeyboard()
         busy = true
         offlineMode = false
-        statusView.text = ctx.getString(R.string.musiqa_loading)
+        statusView.text = ctx.getString(R.string.musiqa_searching)
+        setLoading(skeleton = true, center = false)
         scope.launch {
             val list = try {
                 withContextIo { YuzMusicRepository.search(q) }
@@ -331,6 +339,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
                 null
             }
             busy = false
+            setLoading(skeleton = false, center = false)
             when {
                 list == null -> setStatus(R.string.musiqa_error)
                 list.isEmpty() -> setStatus(R.string.musiqa_empty)
@@ -346,6 +355,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         if (busy) return
         busy = true
         offlineMode = false
+        setLoading(skeleton = false, center = true)
         scope.launch {
             val list = try {
                 withContextIo { YuzMusicRepository.chart() }
@@ -353,6 +363,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
                 null
             }
             busy = false
+            setLoading(skeleton = false, center = false)
             if (list != null && list.isNotEmpty()) {
                 setStatus(R.string.musiqa_trending)
                 applyList(list)
@@ -365,6 +376,17 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private fun setStatus(res: Int) {
         statusLabel = ctx.getString(res)
         statusView.text = statusLabel
+    }
+
+    /**
+     * YuzGram #98: yuklanish holati. [skeleton] — qidiruvda qatorlar o'rnini
+     * bosuvchi skelet; [center] — bo'sh ekranda markazdagi neon animatsiya
+     * (ommabop xitlar kelganda).
+     */
+    private fun setLoading(skeleton: Boolean, center: Boolean) {
+        shimmer?.visibility = if (skeleton) View.VISIBLE else View.GONE
+        hitsBox?.visibility = if (center) View.VISIBLE else View.GONE
+        rvList?.visibility = if (center && currentList.isEmpty()) View.INVISIBLE else View.VISIBLE
     }
 
     private fun applyList(list: List<YuzTrack>) {
@@ -502,7 +524,11 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             return
         }
         Toast.makeText(ctx, R.string.musiqa_dl_started, Toast.LENGTH_SHORT).show()
+        downloadingIds.add(track.id)
+        adapter.setDownloading(downloadingIds)
         YuzMusicCache.download(ctx, track) { ok ->
+            downloadingIds.remove(track.id)
+            adapter.setDownloading(downloadingIds)
             adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
             syncPlayingMark()
             Toast.makeText(ctx,

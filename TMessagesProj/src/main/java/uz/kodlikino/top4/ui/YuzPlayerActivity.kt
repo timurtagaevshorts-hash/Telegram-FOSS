@@ -5,6 +5,7 @@ import android.content.res.ColorStateList
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.animation.ObjectAnimator
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
@@ -45,6 +46,8 @@ class YuzPlayerActivity : BaseFragment() {
     private val effects by lazy { YuzMusicEffects(ctx) }
 
     private var ivCover: ImageView? = null
+    private var plPulse: View? = null
+    private var dlPulse: ObjectAnimator? = null
     private var tvTitle: TextView? = null
     private var tvArtist: TextView? = null
     private var seek: SeekBar? = null
@@ -89,6 +92,7 @@ class YuzPlayerActivity : BaseFragment() {
 
         override fun onStatus(text: String?) {
             tvArtist?.text = text ?: YuzMusicEngine.currentTrack()?.artist ?: ""
+            showBuffering(text != null)
         }
     }
 
@@ -102,6 +106,7 @@ class YuzPlayerActivity : BaseFragment() {
         YuzTopInset.applyPadding(root.findViewById<View>(R.id.plTopBar))
 
         ivCover = root.findViewById(R.id.plCover)
+        plPulse = root.findViewById(R.id.plPulse)
         tvTitle = root.findViewById(R.id.tvPlTitle)
         tvArtist = root.findViewById(R.id.tvPlArtist)
         seek = root.findViewById(R.id.plSeek)
@@ -197,6 +202,7 @@ class YuzPlayerActivity : BaseFragment() {
         p.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) attachEffects()
+                showBuffering(state == Player.STATE_BUFFERING)
             }
         })
         YuzMusicEngine.addObserver(observer)
@@ -208,6 +214,12 @@ class YuzPlayerActivity : BaseFragment() {
     }
 
     // ------------------------------------------------------------- binding
+
+    /** YuzGram #98: yuklanishda muqovani xiralashtirib, markazda neon animatsiya. */
+    private fun showBuffering(on: Boolean) {
+        plPulse?.visibility = if (on) View.VISIBLE else View.GONE
+        ivCover?.animate()?.alpha(if (on) 0.35f else 1f)?.setDuration(220)?.start()
+    }
 
     private fun bind(t: YuzTrack) {
         tvTitle?.text = t.title
@@ -419,7 +431,18 @@ class YuzPlayerActivity : BaseFragment() {
             return
         }
         Toast.makeText(ctx, R.string.musiqa_dl_started, Toast.LENGTH_SHORT).show()
+        val btn = root.findViewById<View>(R.id.btnPlDl)
+        dlPulse?.cancel()
+        dlPulse = if (btn != null) ObjectAnimator.ofFloat(btn, "alpha", 0.95f, 0.2f).apply {
+            duration = 520L
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.REVERSE
+            start()
+        } else null
         YuzMusicCache.download(ctx, t) { ok ->
+            dlPulse?.cancel()
+            dlPulse = null
+            btn?.alpha = 1f
             Toast.makeText(ctx,
                 if (ok) R.string.musiqa_dl_done else R.string.musiqa_dl_fail,
                 Toast.LENGTH_SHORT).show()

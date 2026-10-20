@@ -1,5 +1,6 @@
 package uz.kodlikino.top4.ui
 
+import android.animation.ObjectAnimator
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -26,6 +27,13 @@ class YuzMusicAdapter(
     private val items = ArrayList<YuzTrack>()
     private var playingPos = -1
     private var downloadedIds: Set<Long> = emptySet()
+    // YuzGram #98: yuklab olinayotgan qatorlar — tugma pulsatsiya qiladi.
+    private var downloadingIds: Set<Long> = emptySet()
+
+    fun setDownloading(ids: Set<Long>) {
+        downloadingIds = ids.toSet()
+        notifyDataSetChanged()
+    }
 
     fun submit(list: List<YuzTrack>) {
         items.clear()
@@ -77,7 +85,21 @@ class YuzMusicAdapter(
             if (position == playingPos) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
         )
         val has = t.id in downloadedIds
-        holder.dl.alpha = if (has) 1.0f else 0.55f
+        val busy = t.id in downloadingIds
+        if (busy) {
+            if (holder.pulse == null) {
+                holder.pulse = ObjectAnimator.ofFloat(holder.dl, "alpha", 0.9f, 0.18f).apply {
+                    duration = 520L
+                    repeatCount = ObjectAnimator.INFINITE
+                    repeatMode = ObjectAnimator.REVERSE
+                }
+            }
+            if (holder.pulse!!.isRunning.not()) holder.pulse!!.start()
+        } else {
+            holder.pulse?.cancel()
+            holder.pulse = null
+            holder.dl.alpha = if (has) 1.0f else 0.55f
+        }
         holder.dl.setOnClickListener { onDownload(t, holder.adapterPosition) }
         holder.itemView.setOnClickListener { onPlay(t, holder.adapterPosition) }
         holder.itemView.setOnLongClickListener {
@@ -92,6 +114,7 @@ class YuzMusicAdapter(
         val artist: TextView = v.findViewById(R.id.tvMusiqaArtist)
         val dur: TextView = v.findViewById(R.id.tvMusiqaDur)
         val dl: ImageButton = v.findViewById(R.id.btnMusiqaDl)
+        var pulse: ObjectAnimator? = null
         val play: ImageButton = v.findViewById(R.id.btnMusiqaPlay)
     }
 }
