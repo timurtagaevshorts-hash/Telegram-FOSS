@@ -39,18 +39,18 @@ import java.util.ArrayList;
 public class YuzGramChatWheel extends View {
 
     /** Gumbaz o'rnini bosuvchi ustun kengligi (doira chekkadan chiqadi). */
-    public static final int WIDTH_DP = 150;
+    public static final int WIDTH_DP = 120;
     /** Ustun balandligi — gumbaz diametri nafasi bilan. */
-    public static final int HEIGHT_DP = 262;
+    public static final int HEIGHT_DP = 232;
     /** Shisha gumbaz radiusi; markazi o'ng chekkadan DOME_INSET_DP ichda. */
-    private static final float DOME_R_DP = 120f;
-    private static final float DOME_INSET_DP = 12f;
+    private static final float DOME_R_DP = 100f;
+    private static final float DOME_INSET_DP = 10f;
     /** Donalar yuradigan aylana radiusi va qadam (rad/dona). */
-    private static final float ARC_R_DP = 86f;
-    private static final float ARC_STEP = 0.42f;
+    private static final float ARC_R_DP = 66f;
+    private static final float ARC_STEP = 0.45f;
     /** Fokusdan necha dona uzoqda dona butunlay yo'qoladi. */
     private static final float CULL_SLOTS = 3.2f;
-    private static final float CIRCLE_DP = 36f;
+    private static final float CIRCLE_DP = 30f;
 
     private static final int BORDER = 0x592AABEE;
     private static final int GLOW = 0x662AABEE;
@@ -134,7 +134,7 @@ public class YuzGramChatWheel extends View {
         iconPaint.setStrokeCap(Paint.Cap.ROUND);
         iconPaint.setStrokeJoin(Paint.Join.ROUND);
         textPaint.setTextAlign(Paint.Align.LEFT);
-        labelBaseSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 10.5f,
+        labelBaseSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 9.5f,
                 getResources().getDisplayMetrics());
         textPaint.setTextSize(labelBaseSize);
         textPaint.setTypeface(Typeface.DEFAULT_BOLD);
@@ -323,7 +323,7 @@ public class YuzGramChatWheel extends View {
         }
         MessagesController.DialogFilter filter =
                 type == ITEM_FILTER ? filters.get(slot) : null;
-        float r = dp(CIRCLE_DP) / 2f * scale * (focus ? 1.25f : 1f);
+        float r = dp(CIRCLE_DP) / 2f * scale * (focus ? 1.18f : 1f);
         r *= focus ? (1f + 0.10f * (1f - pulseT)) : 1f;
 
         canvas.save();
@@ -699,7 +699,7 @@ public class YuzGramChatWheel extends View {
                 continue;
             }
             boolean focus = Math.abs(i - pos) < 0.5f;
-            float r = dp(CIRCLE_DP) / 2f * p[2] * (focus ? 1.25f : 1f) + dp(10f);
+            float r = dp(CIRCLE_DP) / 2f * p[2] * (focus ? 1.18f : 1f) + dp(10f);
             float dx = x - p[0], dy = y - p[1];
             if (dx * dx + dy * dy <= r * r) {
                 return i;

@@ -1301,7 +1301,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 } else if (child instanceof DatabaseMigrationHint) {
                     childTop = actionBar.getMeasuredHeight();
                 } else if (child instanceof ViewPage) {
-                    if (!onlySelect || initialDialogsType == DIALOGS_TYPE_FORWARD) {
+                    if (isYuzGramMainRoot()) {
+                        // YuzGram #95: asosiy ildizda ro'yxat tepadan boshlanadi
+                        // (edge-to-edge) — header (wordmark + pill) joyi faqat
+                        // ro'yxat padding'i orqali ajratiladi, aks holda action
+                        // bar ikki marta hisoblanib, bo'sh lenta qolardi.
+                        childTop = 0;
+                    } else if (!onlySelect || initialDialogsType == DIALOGS_TYPE_FORWARD) {
                         if (hasStories || (filterTabsView != null && filterTabsView.getVisibility() == VISIBLE)) {
                             childTop = 0;
                             if (filterTabsView != null && filterTabsView.getVisibility() == VISIBLE) {
@@ -1312,7 +1318,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         }
                     }
                     childTop += topPadding;
-                    if (dialogsHintCell != null) {
+                    if (dialogsHintCell != null && dialogsHintCell.getVisibility() == VISIBLE) {
                         childTop += dialogsHintCell.height();
                     }
                 } else if (child == dialogsHintCell || child instanceof FragmentContextView || child == authHintCell) {
@@ -1722,6 +1728,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             }
             containersAlpha = 1f - progressToDialogStoriesCell;
             actionBar.setTranslationY(scrollYOffset);
+            // YuzGram #95: qidiruv pill'i ham sarlavha bilan birga suriladi.
+            if (yuzSearchBar != null) {
+                yuzSearchBar.setTranslationY(scrollYOffset);
+            }
         }
         if (containersAlpha != 1f) {
             actionBar.getTitlesContainer().setPivotY(AndroidUtilities.statusBarHeight + ActionBar.getCurrentActionBarHeight() / 2f);
@@ -2148,7 +2158,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 // YuzGram #93b: gumbaz reyka ENDI suzuvchi — chatlar ro'yxati
                 // butun kenglikda (maketdagi kabi), shisha gumbaz ostidan o'tadi.
                 if (yuzChatRail != null && yuzChatRail.getVisibility() == VISIBLE) {
-                    int headerBottom = yuzChatHeaderBottom();
+                    // YuzGram #95: header yashirilganda (scrollYOffset < 0) padding
+                    // ham shu qadar qisqaradi — pill bilan birga yuqoriga suriladi.
+                    int headerBottom = Math.max(0, yuzChatHeaderBottom() + (int) scrollYOffset);
                     if (headerBottom > t) {
                         t = headerBottom;
                     }
@@ -2206,11 +2218,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         private void toggleArchiveHidden(boolean action, DialogCell dialogCell) {
-            // YuzGram #61: asosiy ro'yxatda arxiv rejimi doim "pin'langan qator" —
-            // pull-to-reveal'ga o'tish o'chirilgan, aks holda qator yo'qoladi.
-            if (parentPage.dialogsType == DIALOGS_TYPE_DEFAULT && isYuzGramMainRoot()) {
-                return;
-            }
+            // YuzGram #95: #61 qulfi olib tashlandi — arxivlash Telegram'ning
+            // avvalgidek ishlaydi: bo'shaganda "Arxiv" papkasi g'oyib bo'ladi.
             SharedConfig.toggleArchiveHidden();
             final UndoView undoView = getUndoView();
             if (SharedConfig.archiveHidden) {
@@ -2241,10 +2250,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         private void updatePullState() {
-            // YuzGram #61: asosiy chat ekranida arxiv qatori DOIM ko'rinadi —
-            // HIDDEN holatda "Arxiv" qatori yashirin bo'lib, uni ochish uchun
-            // tepadan tortish kerak edi; foydalanuvchi arxivni yo'q deb o'ylardi.
-            parentPage.archivePullViewState = SharedConfig.archiveHidden && !isYuzGramMainRoot()
+            // YuzGram #95: avvalgi holatga qaytarish — papka yashirin rejimda
+            // tepadan tortish bilan ochiladi, bo'sh arxivda qator ko'rinmaydi.
+            parentPage.archivePullViewState = SharedConfig.archiveHidden
                     ? ARCHIVE_ITEM_STATE_HIDDEN : ARCHIVE_ITEM_STATE_PINNED;
             if (parentPage.pullForegroundDrawable != null) {
                 parentPage.pullForegroundDrawable.setWillDraw(parentPage.archivePullViewState != ARCHIVE_ITEM_STATE_PINNED);
@@ -2794,7 +2802,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (!searchIsShowed) {
             showSearch(true, false, true);
         }
-        actionBar.openSearchField(true);
+        // YuzGram #95: openSearchField(true) ichida showKeyboard=false o'tardi —
+        // maydon ochilardi, lekin klaviatura chiqmas edi.
+        if (!actionBar.isSearchFieldVisible()) {
+            actionBar.openSearchField("", true);
+        } else if (searchItem != null && searchItem.getSearchField() != null) {
+            AndroidUtilities.showKeyboard(searchItem.getSearchField());
+        }
     }
 
     /** Gildirakdagi qalamcha plitasi bosilganda (pastki FABlar o'rniga). */
@@ -2843,6 +2857,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         if (!visible) {
             return;
+        }
+        // YuzGram #95: qidiruvdan/menyu yopilib qaytishda header to'liq
+        // ko'rinadigan holatga qaytsin (yashirin holatda qolmasin).
+        if (scrollYOffset < 0f) {
+            setScrollY(0f);
         }
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) yuzChatRail.getLayoutParams();
         int bottom = yuzChatRailBottomMargin();
@@ -3301,7 +3320,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             updatePasscodeButton();
             updateProxyButton(false, false);
         }
-        searchItem = menu.addItem(0, R.drawable.ic_ab_search).setIsSearchField(true, false).setActionBarMenuItemSearchListener(new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
+        // YuzGram #95: asosiy ekranda burchakdagi qidiruv ikonkasi ko'rinmaydi —
+        // qidiruv "Qidirish" pill'idan ochiladi. Ikonka shaklan transparent
+        // qilinadi (butunlay olib tashlamaymiz: maydonning o'sha item ichida).
+        searchItem = isYuzGramMainRoot()
+                ? menu.addItem(0, new ColorDrawable(Color.TRANSPARENT))
+                : menu.addItem(0, R.drawable.ic_ab_search);
+        searchItem.setIsSearchField(true, false).setActionBarMenuItemSearchListener(new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
             boolean isSpeedItemCreated = false;
 
             @Override
@@ -5846,9 +5871,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private boolean checkAutoscrollToStories(ViewPage viewPage) {
         // YuzGram: asosiy ekranda yarim holat qoldirmaymiz — skroll to'xtaganda
         // storylar+sarlavha ya to'liq ko'rinadi, ya to'liq yuqoriga g'oyib bo'ladi.
-        if (isYuzGramMainRoot() && hasStories && progressToActionMode == 0f && !searching
+        if (isYuzGramMainRoot() && (hasStories || (yuzChatRail != null && yuzChatRail.getVisibility() == View.VISIBLE))
+                && progressToActionMode == 0f && !searching
                 && (rightSlidingDialogContainer == null || !rightSlidingDialogContainer.hasFragment())) {
-            float max = dp(DialogStoriesCell.HEIGHT_IN_DP) + yuzHeaderBarHeight();
+            float max = hasStories ? dp(DialogStoriesCell.HEIGHT_IN_DP) + yuzHeaderBarHeight()
+                    : yuzChatHeaderBottom();
             float cur = scrollYOffset;
             if (cur == 0f || cur == -max || viewPages == null || viewPages[0] == null) {
                 return false;
@@ -6157,6 +6184,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     private void updateDialogsHint() {
         if (dialogsHintCell == null || fragmentView == null || getContext() == null) {
+            return;
+        }
+        if (isYuzGramMainRoot()) {
+            // YuzGram #95: asosiy chat ekranida maslahat qatori umuman ko'rsatilmaydi
+            // — tug'ilgan kun/premium yozuvlari qidiruv pill'ining orqasida qolib,
+            // ustiga tepasida bo'sh lenta hosil qilardi.
+            dialogsHintCellVisible = false;
+            dialogsHintCell.setVisibility(View.GONE);
             return;
         }
         if (dialogsHintCell != null) {
@@ -9118,7 +9153,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     private boolean yuzHeaderScroll(int dy, boolean listAtTop) {
-        if (dy == 0 || !hasStories || progressToActionMode != 0f || searching
+        boolean yuzMainHeader = isYuzGramMainRoot() && yuzChatRail != null
+                && yuzChatRail.getVisibility() == View.VISIBLE;
+        if (dy == 0 || (!hasStories && !yuzMainHeader) || progressToActionMode != 0f || searching
                 || rightSlidingDialogContainer != null && rightSlidingDialogContainer.hasFragment()
                 || actionBar != null && actionBar.isActionModeShowed()) {
             return false;
@@ -9128,7 +9165,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (dy > 0 && yuzRestoreAnim != null) {
             yuzRestoreAnim.cancel();
         }
-        float max = dp(DialogStoriesCell.HEIGHT_IN_DP) + yuzHeaderBarHeight();
+        float max = yuzMainHeader && !hasStories ? yuzChatHeaderBottom()
+                : dp(DialogStoriesCell.HEIGHT_IN_DP) + yuzHeaderBarHeight();
         float n = scrollYOffset;
         if (dy > 0) {
             n -= dy;
@@ -9190,10 +9228,21 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         // Bu yerda header-collapse offset'iga qaragan eski, "tepagacha chiqishni
         // kutadigan" logika olib tashlandi.
         scrollYOffset = value;
-        // YuzGram: padding storylar+sarlavha bilan birga yumshta qisqarishi uchun
-        // har kadrda ro'yxatni qayta o'lchatamiz (faqat asosiy ekranda).
-        if (isYuzGramMainRoot() && hasStories && viewPages != null && viewPages[0] != null && viewPages[0].listView != null) {
-            viewPages[0].listView.requestLayout();
+        // YuzGram #95: asosiy ekranda header (wordmark + qidiruv pill'i) shu
+        // offset bilan yuqoriga suriladi va ro'yxat har kadrda qayta o'lchanadi.
+        if (isYuzGramMainRoot()) {
+            if (actionBar != null) {
+                actionBar.setTranslationY(value);
+            }
+            if (yuzSearchBar != null) {
+                yuzSearchBar.setTranslationY(value);
+            }
+            if (yuzBrandMark != null) {
+                yuzBrandMark.setTranslationY(value);
+            }
+            if (viewPages != null && viewPages[0] != null && viewPages[0].listView != null) {
+                viewPages[0].listView.requestLayout();
+            }
         }
         if (topBulletin != null) {
             topBulletin.updatePosition();
