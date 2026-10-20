@@ -1,11 +1,13 @@
 package uz.kodlikino.top4.ai
 
 import android.text.TextUtils
+import org.telegram.messenger.ContactsController
 import org.telegram.messenger.DialogObject
 import org.telegram.messenger.MessagesController
 import org.telegram.messenger.UserObject
 import org.telegram.tgnet.TLRPC
 import java.util.Locale
+import kotlin.math.min
 
 /**
  * AI yordamchining qoida-based "beyni" (Gemini'siz):
@@ -15,6 +17,11 @@ import java.util.Locale
  * #79: nom moslash kengaytirildi — ismning BARCHA tokenlari (familiya ham),
  * apostrof/kirill normallashtirish, va "xabar yubor" buyrug'i topilmasa
  * miyaga (Ask) ketmaydi — to'g'ridan-to'g'ri "topilmadi" deyadi.
+ *
+ * #105: nomlar hovuzi endi FAQAT dialoglar emas — TELEFON KONTAKTLARI ham
+ * qatnashadi (hech suhbat qilmagan "Azam" ham topiladi); natijalar 5 soniyalik
+ * kesh bilan tez; tipografa chidamli ("azom" -> "Azam"); bir xil hovuz cloud
+ * nomini yechishda ham ishlatiladi (findByName).
  */
 object YuzAiEngine {
 
@@ -65,23 +72,77 @@ object YuzAiEngine {
     private val NAV_MAP: List<Pair<String, Section>> = NAV_WORDS_RAW.map { norm(it.first) to it.second }
     private val QUESTION_SET: Set<String> = QUESTION_WORDS.map { norm(it) }.toSet()
 
-    /** Mavjud dialoglardan nomlarni yig'adi (shifrlangan va papka dialoglari tashlanadi). */
+    @Volatile private var cachedPeers: List<Peer>? = null
+    @Volatile private var cachedAt = 0L
+    @Volatile private var cachedAccount = -1
+
+    /**
+     * Dialoglar + TELEFON KONTAKTLARI nomlari hovuzi.
+     * #105: kontaktda hali chat bo'lmagan odam ham topiladi (dialogId = user_id);
+     * natija 5 soniyalik kesh — bitta parse() ichida bir necha marta qurilmaydi.
+     * (Shifrlangan va papka dialoglari tashlanadi.)
+     */
     fun peers(account: Int): List<Peer> {
+        val now = System.currentTimeMillis()
+        val cached = cachedPeers
+        if (cached != null && cachedAccount == account && now - cachedAt < 5_000L) return cached
         val controller = MessagesController.getInstance(account)
         val result = ArrayList<Peer>()
+        val userIds = HashSet<Long>()
         val dialogs = controller.dialogs_dict
-        if (dialogs == null) return result
-        for (i in 0 until dialogs.size()) {
-            val dialog = dialogs.valueAt(i) ?: continue
-            val peer = dialog.peer ?: continue
-            val id = DialogObject.getPeerDialogId(peer)
-            if (id == 0L || DialogObject.isEncryptedDialog(id) || DialogObject.isFolderDialogId(id)) continue
-            val name = peerName(controller, peer) ?: continue
-            if (name.isBlank()) continue
-            val username = peerNameLower(controller, peer, true)
-            result.add(Peer(id, name, username, peer.user_id))
+        if (dialogs != null) {
+            for (i in 0 until dialogs.size()) {
+                val dialog = dialogs.valueAt(i) ?: continue
+                val peer = dialog.peer ?: continue
+                val id = DialogObject.getPeerDialogId(peer)
+                if (id == 0L || DialogObject.isEncryptedDialog(id) || DialogObject.isFolderDialogId(id)) continue
+                val name = peerName(controller, peer) ?: continue
+                if (name.isBlank()) continue
+                val username = peerNameLower(controller, peer, true)
+                if (peer.user_id != 0L) userIds.add(peer.user_id)
+                result.add(Peer(id, name, username, peer.user_id))
+            }
         }
+        runCatching {
+            val cc = ContactsController.getInstance(account)
+            for (contact in cc.contacts) {
+                val uid = contact?.user_id ?: 0L
+                if (uid == 0L || uid in userIds) continue
+                val user = controller.getUser(uid) ?: continue
+                if (UserObject.isDeleted(user)) continue
+                val name = UserObject.getUserName(user) ?: continue
+                if (name.isBlank()) continue
+                userIds.add(uid)
+                result.add(Peer(uid, name, user.username?.takeIf { it.isNotBlank() }, uid))
+            }
+        }
+        cachedPeers = result
+        cachedAccount = account
+        cachedAt = now
         return result
+    }
+
+    /**
+     * #105: bulut (Gemini) qaytargan nomni hovuzdan sillashtiradi — kirill,
+     * tipografiya ("azom" -> "Azam") va familiya qismlariga chidamli.
+     */
+    fun findByName(want: String, account: Int): Peer? {
+        val parts = want.trim().split(Regex("\\s+")).map { norm(it) }.filter { it.length >= 3 }
+        if (parts.isEmpty()) return null
+        var best: Peer? = null
+        var bestScore = 0
+        for (peer in peers(account)) {
+            var score = 0
+            for (part in parts) {
+                val s = scoreToken(part, peer)
+                if (s > 0) score += s
+            }
+            if (score > bestScore) {
+                bestScore = score
+                best = peer
+            }
+        }
+        return best
     }
 
     /** Kichik harf + apostrofsiz + kirill->lotin: "Sardor", "Сардор", "sardor'" bir xil bo'ladi. */
@@ -255,7 +316,30 @@ object YuzAiEngine {
         // Dativ/yo'nalish shakllari: "sardorga" ~ "sardor", "sardordan" ~ "sardor"
         token.length > nameToken.length && token.startsWith(nameToken) -> nameToken.length
         nameToken.length > token.length && nameToken.startsWith(token) && token.length >= 4 -> token.length
+        // #105: tipografa chidamli — STT "azam"ni "azom" deb eshitishi mumkin.
+        // Bitta harf farq (qo'shish/tashlash/almashtirish) faqat uzunroq nomlarda.
+        token.length >= 4 && nameToken.length >= 4 &&
+            Math.abs(token.length - nameToken.length) <= 1 && levenshtein(token, nameToken) == 1 ->
+            300 + min(token.length, nameToken.length)
         else -> 0
+    }
+
+    /** Qisqa tokenlar uchun Levenshtein masofasi (har bir nom <=20 harf). */
+    private fun levenshtein(a: String, b: String): Int {
+        if (a == b) return 0
+        var prev = IntArray(b.length + 1) { it }
+        var cur = IntArray(b.length + 1)
+        for (i in 1..a.length) {
+            cur[0] = i
+            for (j in 1..b.length) {
+                val cost = if (a[i - 1] == b[j - 1]) 0 else 1
+                cur[j] = min(min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost)
+            }
+            val tmp = prev
+            prev = cur
+            cur = tmp
+        }
+        return prev[b.length]
     }
 
     private fun isStopToken(token: String): Boolean =
@@ -313,7 +397,8 @@ object YuzAiEngine {
         // Qolgan buyruq so'zlari ham xabar matni bo'lib qolmasin
         val normBody = norm(body)
         if (SEND_WORDS.any { it == normBody }) return ""
-        return body
+        // #105: professional ko'rinishin — xabar bosh harf bilan boshlansin
+        return body.replaceFirstChar { it.uppercase(Locale.getDefault()) }
     }
 
     private fun nameTokens(name: String): List<String> =

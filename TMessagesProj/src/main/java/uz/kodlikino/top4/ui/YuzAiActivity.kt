@@ -36,7 +36,6 @@ import uz.kodlikino.top4.ai.YuzAiRecorder
 import uz.kodlikino.top4.ai.YuzAiVoice
 import uz.kodlikino.top4.ai.YuzVoiceResult
 import uz.kodlikino.top4.utils.YuzgramAiBrain
-import java.util.Locale
 
 /**
  * AI Yordamchi — faqat OVOZLI yordamchi (yozmatni kiritish maydoni yo'q).
@@ -305,23 +304,12 @@ class YuzAiActivity : BaseFragment() {
         else -> null
     }
 
-    /** Gemini qaytargan nomni lokal dialog nomlari bilan sillasht (siril->lotin ham). */
-    private fun findPeerByName(want: String): YuzAiEngine.Peer? {
-        val w = YuzAiEngine.norm(want)
-        if (w.length < 3) return null
-        var best: YuzAiEngine.Peer? = null
-        for (p in YuzAiEngine.peers(currentAccount)) {
-            val uname = YuzAiEngine.norm(p.username ?: "")
-            if (uname.length >= 4 && (uname == w || uname.startsWith(w) || w.startsWith(uname))) return p
-            val tokens = p.name.lowercase(Locale.getDefault())
-                .split(Regex("\\s+")).map { YuzAiEngine.norm(it) }.filter { it.length >= 3 }
-            for (t in tokens) {
-                if (t == w) return p
-                if ((t.startsWith(w) || w.startsWith(t) || t.contains(w)) && best == null) best = p
-            }
-        }
-        return best
-    }
+    /**
+     * Gemini qaytargan nomni lokal hovuzdan topish. #105: endi yagona mantique
+     * YuzAiEngine.findByName'ida — kontaktlar, tipografiya va familiyalar ham.
+     */
+    private fun findPeerByName(want: String): YuzAiEngine.Peer? =
+        YuzAiEngine.findByName(want, currentAccount)
 
     private fun handleUtterance(raw: String) {
         if (raw.isBlank()) return
