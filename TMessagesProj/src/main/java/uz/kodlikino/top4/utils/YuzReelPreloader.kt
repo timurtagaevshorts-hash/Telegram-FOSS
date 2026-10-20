@@ -116,10 +116,9 @@ object YuzReelPreloader {
                         // CacheDataSource yozgan qismini to'lamiz, keyingi
                         // urinish qolgandan davom etadi.
                         if (gen >= 0 && generation != gen) break
-                        if (Build.VERSION.SDK_INT >= 23) {
-                            val nc = source as? androidx.media3.datasource.NetworkConfigurable
-                            if (nc != null && !nc.isConnected(app)) break
-                        }
+                        // media3 1.0.2'da NetworkConfigurable yo'q (1.1+) —
+                        // o'z ConnectivityMonitor'imiz bilan tekshiramiz.
+                        if (!NetworkReachability.isOnline(app)) break
                         val chunk = minOf(buffer.size.toLong(), bytes - transferred).toInt()
                         // read() versiyaniga qarab Int yoki Long qaytadi — ikkalasi ham
                         // shu kod bilan ishlaydi (EOF/0 == to'xtash).

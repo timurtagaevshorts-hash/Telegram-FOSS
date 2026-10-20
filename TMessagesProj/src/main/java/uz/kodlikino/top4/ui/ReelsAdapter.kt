@@ -7,6 +7,7 @@ import androidx.core.content.ContextCompat
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -94,8 +95,15 @@ class ReelsAdapter(
     private val mainHandler = Handler(Looper.getMainLooper())
 
     // #99: xato/urinish holati — faol sahifa bo'yicha saqlanadi.
-    private val retryTag = object()
     private var playAttempts = 0
+    /** Kutilayotgan retry Runnable'i — Handler'da token yo'q, shuning uchun
+     *  o'zi saqlanadi va removeCallbacks bilan bekor qilinadi. */
+    private var pendingRetry: Runnable? = null
+
+    private fun cancelPendingRetry() {
+        pendingRetry?.let { mainHandler.removeCallbacks(it) }
+        pendingRetry = null
+    }
 
     /**
      * Playback progress chizig'i — controller o'chirilgan (`use_controller=false`,
@@ -155,9 +163,13 @@ class ReelsAdapter(
             if (playAttempts < 3) {
                 playAttempts++
                 val delay = 900L * playAttempts
-                mainHandler.postDelayed(retryTag, Runnable {
+                cancelPendingRetry()
+                val retry = Runnable {
+                    pendingRetry = null
                     if (activeHolder === holder) activate(holder)
-                }, delay)
+                }
+                pendingRetry = retry
+                mainHandler.postDelayed(retry, delay)
                 Log.i("ReelsAdapter", "playError ${error.errorCode} attempt=$playAttempts retryIn=${delay}ms")
                 return
             }
@@ -177,7 +189,7 @@ class ReelsAdapter(
         val h = activeHolder ?: return
         // Ijro normal holatda — aralashmaymiz (videoni qayta boshlamaymiz).
         if (h.errorRow.visibility != View.VISIBLE) return
-        mainHandler.removeCallbacks(retryTag)
+        cancelPendingRetry()
         playAttempts = 0
         activate(h)
     }
@@ -288,6 +300,7 @@ class ReelsAdapter(
         // yo'q — shuning uchun adapterPosition ishlatiladi.
         if (h.adapterPosition != pos) return
         val p = ensurePlayer()
+        val prevHolder = activeHolder
         activeHolder?.playerView?.player = null
         activeHolder = h
         p.removeListener(playerListener)
@@ -300,8 +313,8 @@ class ReelsAdapter(
         }
         h.playerView.player = p
         h.errorRow.visibility = View.GONE
-        mainHandler.removeCallbacks(retryTag)
-        if (h !== activeHolder) playAttempts = 0
+        cancelPendingRetry()
+        if (h !== prevHolder) playAttempts = 0
         h.pageProgress.visibility = View.VISIBLE
     }
 
@@ -348,7 +361,7 @@ class ReelsAdapter(
 
     fun release() {
         mainHandler.removeCallbacks(progressTicker)
-        mainHandler.removeCallbacks(retryTag)
+        cancelPendingRetry()
         activeHolder?.playerView?.player = null
         activeHolder = null
         player?.let {

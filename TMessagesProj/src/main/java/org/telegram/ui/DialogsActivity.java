@@ -1808,13 +1808,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         guardLabel.setText(getString(R.string.yuz_apk_guard_title));
         guardLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 16);
         guardLabel.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
-        row.addView(guardLabel, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
-        row.addView(guardSwitch, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+        row.addView(guardLabel, new android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(guardSwitch, new android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
         AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-        builder.setTitle(R.string.yuz_apk_guard_title);
-        builder.setMessage(R.string.yuz_apk_guard_desc);
+        builder.setTitle(getString(R.string.yuz_apk_guard_title));
+        builder.setMessage(getString(R.string.yuz_apk_guard_desc));
         builder.setView(row);
-        builder.setPositiveButton(R.string.yuz_apk_guard_save, (dialog, which) -> {
+        builder.setPositiveButton(getString(R.string.yuz_apk_guard_save), (dialog, which) -> {
             boolean on = guardSwitch.isChecked();
             org.telegram.messenger.YuzApkGuard.setEnabled(on);
             if (yuzApkToggle != null) {

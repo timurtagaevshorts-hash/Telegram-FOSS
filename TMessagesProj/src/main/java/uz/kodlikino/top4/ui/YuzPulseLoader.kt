@@ -58,7 +58,7 @@ class YuzPulseLoader @JvmOverloads constructor(
         val cx = w / 2f
         val cy = h / 2f
         sweep = if (w > 0 && h > 0) {
-            SweepGradient(cx, cy, intArrayOf(0x002AABEE, 0xFF2AABEE, 0xFF5B6CF9, 0x005B6CF9), null)
+            SweepGradient(cx, cy, intArrayOf(0x002AABEE, 0xFF2AABEE.toInt(), 0xFF5B6CF9.toInt(), 0x005B6CF9), null)
         } else null
     }
 
@@ -77,7 +77,7 @@ class YuzPulseLoader @JvmOverloads constructor(
         canvas.drawCircle(cx, cy, unit * (0.58f + 0.34f * breath), stroke)
 
         // 2) ekvalayzer tayoqchalari
-        fill.color = 0xFF2AABEE
+        fill.color = 0xFF2AABEE.toInt()
         val bars = 5
         val barW = dp(3.2f)
         val gap = dp(2.4f)
