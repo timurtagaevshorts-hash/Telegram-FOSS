@@ -27,7 +27,18 @@ data class Reel(
     val uploadedByPhotoUrl: String = "",
     val isUserUpload: Boolean = false,
     /** Faqat UI — Firestore'da saqlanmaydi */
-    var isLikedByMe: Boolean = false
+    var isLikedByMe: Boolean = false,
+    /**
+     * #106: bu sahifa Firebase reel'i EMAS — Telegram hikoyasi. [id] kaliti
+     * `story_{dialogId}_{storyId}`; video/foto ijrosi [YuzStoryFeed] orqali.
+     */
+    val isStory: Boolean = false,
+    val storyDialogId: Long = 0L,
+    val storyId: Int = 0,
+    /** hikoya videomi (false = foto hikoya) */
+    val storyIsVideo: Boolean = false,
+    /** arxiv/profilga saqlangan hikoya (muddati tugagan) */
+    val storyArchived: Boolean = false
 ) : Serializable {
     /** Sarlavha + hashtag'lardan iborat caption. */
     fun caption(): String {

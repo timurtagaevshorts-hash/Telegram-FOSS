@@ -44,6 +44,19 @@
         android:contentDescription="@null"
         android:scaleType="centerCrop" />
 
+    <!--
+      #106: Telegram hikoyasi posti — ImageReceiver hikoyaning o'z manbasidan
+      yuklaydi (striped thumb, to'liq rasm, shifrlash), Glide kerak emas.
+      Faqat story sahifalarida ko'rinadi; video tayyor bo'lib ijro boshlangach
+      yashiriladi (qarang ReelsAdapter).
+    -->
+    <org.telegram.messenger.ImageReceiver
+        android:id="@+id/storyThumb"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/home_bg"
+        android:visibility="gone" />
+
     <!-- Pastdagi qora gradient — matn o'qilishi uchun -->
     <View
         android:layout_width="match_parent"

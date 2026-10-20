@@ -24,6 +24,10 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.FileDataSource
+import androidx.media3.datasource.TransferListener
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -34,10 +38,17 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import org.telegram.messenger.R
 import uz.kodlikino.top4.models.Reel
 import org.telegram.messenger.AndroidUtilities
+import org.telegram.messenger.FileLoader
+import org.telegram.messenger.ImageLoader
+import org.telegram.messenger.ImageLocation
+import org.telegram.messenger.ImageReceiver
+import org.telegram.messenger.UserConfig
 import uz.kodlikino.top4.utils.NetworkReachability
 import uz.kodlikino.top4.utils.YuzReelPreloader
+import uz.kodlikino.top4.utils.YuzStoryFeed
 import uz.kodlikino.top4.utils.YuzViewedReels
 import uz.kodlikino.top4.utils.YuzVideoCache
+import java.io.File
 
 /**
  * Reels feed adapter'i — vertikal [RecyclerView] sahifalari uchun adapter
@@ -105,6 +116,14 @@ class ReelsAdapter(
         pendingRetry = null
     }
 
+    /** #106: hikoya videosining lokal faylga tushishini kuzatuvchi poll. */
+    private var storyPoll: Runnable? = null
+
+    private fun cancelStoryPoll() {
+        storyPoll?.let { mainHandler.removeCallbacks(it) }
+        storyPoll = null
+    }
+
     /**
      * Playback progress chizig'i — controller o'chirilgan (`use_controller=false`,
      * media3-ui RecyclerView tuzaqidan saqlanish uchun), shuning uchun pozitsiyani
@@ -143,6 +162,10 @@ class ReelsAdapter(
                     holder.pageProgress.visibility = View.GONE
                     holder.errorRow.visibility = View.GONE
                     holder.ivThumbnail.visibility = View.GONE
+                    if (holder.reel?.storyIsVideo == true) {
+                        // Hikoya postiri video ustida qolmasin.
+                        holder.storyThumb.visibility = View.GONE
+                    }
                     val reel = holder.reel
                     // Dedup SharedPreferences'da saqlanadi — ilova/qayta ochishda
                     // ham har reel BIR marta hisoblanadi (haqiqiy ko'rishlar).
@@ -252,6 +275,7 @@ class ReelsAdapter(
     override fun onViewRecycled(holder: PageHolder) {
         super.onViewRecycled(holder)
         holder.playerView.player = null
+        holder.storyThumb.clearImage()
         if (holder === activeHolder) activeHolder = null
     }
 
@@ -299,6 +323,12 @@ class ReelsAdapter(
         // Telegram'ning o'z (vendored) RecyclerView'ida getBindingAdapterPosition()
         // yo'q — shuning uchun adapterPosition ishlatiladi.
         if (h.adapterPosition != pos) return
+        if (reel.isStory) {
+            // #106: hikoya sahifasi — alohida ijro yo'li (local file / photo).
+            activateStory(h, reel)
+            return
+        }
+        cancelStoryPoll()
         val p = ensurePlayer()
         val prevHolder = activeHolder
         activeHolder?.playerView?.player = null
@@ -323,6 +353,91 @@ class ReelsAdapter(
         val pos = activePos
         activePos = -1
         setActivePosition(pos)
+    }
+
+    /**
+     * #106: hikoya sahifasini faollashtirish. Foto hikoya — pleyer kerak emas,
+     * faqat ImageReceiver qatori va "ko'rildi" belgisi. Video hikoya — media3
+     * `tg://` sxemasini tushunmaydi (Telegram'ning o'za pleyeri vendored
+     * exoplayer2 + ExtendedDefaultDataSource bilan ishlaydi), shuning uchun
+     * fayl Telegram'ning o'z [FileLoader]'i bilan attachment papkasiga
+     * tushiriladi va lokal `file://` sifatida ijro etiladi.
+     */
+    private fun activateStory(h: PageHolder, reel: Reel) {
+        cancelStoryPoll()
+        cancelPendingRetry()
+        val pos = activePos
+        val prevHolder = activeHolder
+        activeHolder?.playerView?.player = null
+        activeHolder = h
+        h.errorRow.visibility = View.GONE
+        if (h !== prevHolder) playAttempts = 0
+        val p = ensurePlayer()
+        p.removeListener(playerListener)
+        p.addListener(playerListener)
+        val account = UserConfig.selectedAccount
+        if (!reel.storyIsVideo) {
+            // Foto hikoya: oldingi videoni to'xtatamiz, pleyer pause holatida qoladi.
+            p.pause()
+            h.storyThumb.visibility = View.VISIBLE
+            h.pageProgress.visibility = View.GONE
+            markStoryViewedOnce(h, reel)
+            return
+        }
+        h.storyThumb.visibility = View.VISIBLE
+        val ready = YuzStoryFeed.resolveVideoFile(account, reel)
+        if (ready != null) {
+            playStoryFile(h, p, ready)
+            return
+        }
+        h.pageProgress.visibility = View.VISIBLE
+        var ticks = 0
+        val poll = object : Runnable {
+            override fun run() {
+                storyPoll = null
+                if (activeHolder !== h || activePos != pos) return
+                val f = YuzStoryFeed.resolveVideoFile(account, reel)
+                if (f != null) {
+                    playStoryFile(h, ensurePlayer(), f)
+                    return
+                }
+                YuzStoryFeed.startVideoDownload(account, reel, true)
+                if (++ticks >= 60) {
+                    // ~24 soniya bo'lmadi — oddiy retry paneli ko'rsatiladi.
+                    h.pageProgress.visibility = View.GONE
+                    val offline = !NetworkReachability.isOnline(appContext)
+                    h.tvError.text = appContext.getString(
+                        if (offline) R.string.reels_err_offline else R.string.reels_err_failed
+                    )
+                    h.errorRow.visibility = View.VISIBLE
+                    h.errorRow.setOnClickListener { retryActive() }
+                    return
+                }
+                storyPoll = this
+                mainHandler.postDelayed(this, 400L)
+            }
+        }
+        YuzStoryFeed.startVideoDownload(account, reel, true)
+        storyPoll = poll
+        mainHandler.postDelayed(poll, 350L)
+    }
+
+    private fun playStoryFile(h: PageHolder, p: ExoPlayer, f: File) {
+        storyPoll = null
+        p.setMediaItem(MediaItem.fromUri(Uri.fromFile(f)))
+        p.prepare()
+        p.playWhenReady = true
+        h.playerView.player = p
+        h.pageProgress.visibility = View.VISIBLE
+    }
+
+    /** Foto hikoya ko'rishlari — video bilan bir xil dedup (prefs). */
+    private fun markStoryViewedOnce(h: PageHolder, reel: Reel) {
+        if (!YuzViewedReels.markViewed(appContext, reel.id)) return
+        val next = (viewsShown[reel.id] ?: reel.views) + 1
+        viewsShown[reel.id] = next
+        h.tvViews.text = viewsLabel(next)
+        onViewed(reel.id)
     }
 
     fun pausePlayback() {
@@ -362,6 +477,7 @@ class ReelsAdapter(
     fun release() {
         mainHandler.removeCallbacks(progressTicker)
         cancelPendingRetry()
+        cancelStoryPoll()
         activeHolder?.playerView?.player = null
         activeHolder = null
         player?.let {
@@ -392,7 +508,16 @@ class ReelsAdapter(
             .build()
         val created = ExoPlayer.Builder(appContext)
             .setMediaSourceFactory(
-                ProgressiveMediaSource.Factory(YuzVideoCache.dataSourceFactory(appContext))
+                ProgressiveMediaSource.Factory(
+                    // #106: hikoya fayllari lokal `file://` keladi — ular
+                    // YuzVideoCache'dan O'TMAYDI (kesh faqat HTTP uchun),
+                    // qolgan URL'lar avvalgidek kesh orqali.
+                    object : DataSource.Factory {
+                        private val base = YuzVideoCache.dataSourceFactory(appContext)
+                        override fun createDataSource(): DataSource =
+                            RoutingDataSource(base.createDataSource())
+                    }
+                )
             )
             .setLoadControl(loadControl)
             .setAudioAttributes(
@@ -444,6 +569,7 @@ class ReelsAdapter(
     inner class PageHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val playerView: PlayerView = itemView.findViewById(R.id.playerView)
         val ivThumbnail: ImageView = itemView.findViewById(R.id.ivThumbnail)
+        val storyThumb: ImageReceiver = itemView.findViewById(R.id.storyThumb)
         val pageProgress: ProgressBar = itemView.findViewById(R.id.pageProgress)
         val playbackBar: ProgressBar = itemView.findViewById(R.id.playbackBar)
         private val tvPlayPauseBadge: ImageView = itemView.findViewById(R.id.tvPlayPauseBadge)
@@ -541,7 +667,8 @@ class ReelsAdapter(
         /** Reel'ni tizim ulashish menyusiga chiqaradi (sarlavha + hashtag + URL). */
         private fun shareReel() {
             val r = reel ?: return
-            if (r.videoUrl.isBlank()) return
+            // #106: hikoyada URL yo'q — matnli ulashish (sarlavha + muallif).
+            if (r.videoUrl.isBlank() && !r.isStory) return
             val header = r.title.ifBlank { appContext.getString(R.string.reels_title) }
             val body = buildString {
                 append(header)
@@ -552,7 +679,9 @@ class ReelsAdapter(
                 if (by != null) {
                     append("\n"); append("— ").append(by)
                 }
-                append("\n"); append(r.videoUrl)
+                if (r.videoUrl.isNotBlank()) {
+                    append("\n"); append(r.videoUrl)
+                }
             }
             val send = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
@@ -605,18 +734,29 @@ class ReelsAdapter(
             }
             tvCaption.text = reel.caption()
             tvViews.text = viewsLabel(viewsShown[reel.id] ?: reel.views)
-            ivThumbnail.visibility = View.VISIBLE
-            if (reel.thumbnailUrl.isNotBlank()) {
-                Glide.with(ivThumbnail)
-                    .load(reel.thumbnailUrl)
-                    .centerCrop()
-                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
-                    .placeholder(R.drawable.bg_classified_image_placeholder)
-                    .error(R.drawable.bg_classified_image_placeholder)
-                    .into(ivThumbnail)
-            } else {
+            if (reel.isStory) {
+                // #106: hikoya posti — Telegram'ning o'z ImageReceiver manbasi
+                // (Glide/HTTP yo'q): striped thumb, to'liq rasm, shifrlash.
+                ivThumbnail.visibility = View.GONE
                 ivThumbnail.setImageDrawable(null)
-                ivThumbnail.setBackgroundColor(ContextCompat.getColor(appContext, R.color.yuz_bg))
+                storyThumb.visibility = View.VISIBLE
+                bindStoryThumb(reel)
+            } else {
+                storyThumb.clearImage()
+                storyThumb.visibility = View.GONE
+                ivThumbnail.visibility = View.VISIBLE
+                if (reel.thumbnailUrl.isNotBlank()) {
+                    Glide.with(ivThumbnail)
+                        .load(reel.thumbnailUrl)
+                        .centerCrop()
+                        .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                        .placeholder(R.drawable.bg_classified_image_placeholder)
+                        .error(R.drawable.bg_classified_image_placeholder)
+                        .into(ivThumbnail)
+                } else {
+                    ivThumbnail.setImageDrawable(null)
+                    ivThumbnail.setBackgroundColor(ContextCompat.getColor(appContext, R.color.yuz_bg))
+                }
             }
             refreshLikeUi()
             btnLike.setOnClickListener {
@@ -636,7 +776,8 @@ class ReelsAdapter(
             }
             btnShare.setOnClickListener { shareReel() }
             // "⋮" faqat reel egasiga ko'rinadi (Firestore qoidasi ham shuni tekshiradi).
-            val mine = myUid.isNotBlank() && reel.uploadedByUid == myUid
+            // #106: hikoyalar o'chirilmaydi — ular Telegram'da boshqariladi.
+            val mine = !reel.isStory && myUid.isNotBlank() && reel.uploadedByUid == myUid
             btnReelMenu.visibility = if (mine) View.VISIBLE else View.GONE
             if (mine) {
                 btnReelMenu.setOnClickListener {
@@ -648,6 +789,53 @@ class ReelsAdapter(
                 btnReelMenu.isClickable = false
             }
             bindCta(reel)
+        }
+
+        /**
+         * #106: hikoya postiri — [org.telegram.ui.Stories.PeerStoriesView]'dagi
+         * bilan bir xil `setImage` chaqiruvi (storyItem — parentObject,
+         * FileLoader hikoya reference'ini shundan oladi).
+         */
+        private fun bindStoryThumb(reel: Reel) {
+            val account = UserConfig.selectedAccount
+            val item = YuzStoryFeed.findStoryItem(account, reel.storyDialogId, reel.storyId)
+            if (item == null) {
+                storyThumb.clearImage()
+                return
+            }
+            val filter = "yuzreel"
+            try {
+                if (reel.storyIsVideo) {
+                    val doc = item.media?.getDocument()
+                    if (doc == null) {
+                        storyThumb.clearImage()
+                        return
+                    }
+                    val thumbSize = FileLoader.getClosestPhotoSizeWithSize(doc.thumbs, 1000)
+                    val striped = ImageLoader.createStripedBitmap(doc.thumbs)
+                    storyThumb.setImage(
+                        null, null,
+                        ImageLocation.getForDocument(doc), filter + "_pframe",
+                        if (thumbSize != null) ImageLocation.getForDocument(thumbSize, doc) else null,
+                        filter, striped, 0L, null, item, 0
+                    )
+                } else {
+                    val photo = item.media?.photo
+                    if (photo == null || photo.sizes == null || photo.sizes.isEmpty()) {
+                        storyThumb.clearImage()
+                        return
+                    }
+                    val striped = ImageLoader.createStripedBitmap(photo.sizes)
+                    val size = FileLoader.getClosestPhotoSizeWithSize(photo.sizes, Integer.MAX_VALUE)
+                    storyThumb.setImage(
+                        null, null,
+                        ImageLocation.getForPhoto(size, photo), filter,
+                        null, null, striped, 0L, null, item, 0
+                    )
+                }
+            } catch (_: Exception) {
+                storyThumb.clearImage()
+            }
         }
 
         /**
@@ -769,5 +957,34 @@ class ReelsAdapter(
             val p = player ?: return
             if (p.isPlaying) p.pause() else p.play()
         }
+    }
+}
+
+/**
+ * #106: sxema bo'yicha manba yo'naltiruvchi. Lokal fayllar (FileLoader
+ * tushirgan hikoya videolari `file://`) to'g'ridan-to'g'ri [FileDataSource]
+ * bilan o'qiladi — ularni HTTP-kesh orqali o'tkazish xato; qolgan barcha
+ * URL'lar o'rab olingan fabrikaga (YuzVideoCache) beriladi.
+ */
+private class RoutingDataSource(private val remote: DataSource) : DataSource {
+    private var current: DataSource = remote
+
+    override fun open(dataSpec: DataSpec): Long {
+        current = if (dataSpec.uri?.scheme == "file") FileDataSource() else remote
+        return current.open(dataSpec)
+    }
+
+    override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+        current.read(buffer, offset, length)
+
+    override fun getUri(): Uri? = current.uri
+
+    override fun addTransferListener(listener: TransferListener) {
+        current.addTransferListener(listener)
+        remote.addTransferListener(listener)
+    }
+
+    override fun close() {
+        current.close()
     }
 }
