@@ -1362,6 +1362,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         public boolean onTouchEvent(MotionEvent ev) {
             if (
                     parentLayout != null &&
+                            !isYuzGramMainRoot() &&
                             filterTabsView != null && !filterTabsView.isEditing() &&
                             !searching &&
                             !rightSlidingDialogContainer.hasFragment() &&
@@ -1786,6 +1787,26 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     public class DialogsRecyclerView extends BlurredRecyclerView implements StoriesListPlaceProvider.ClippedView {
 
+        /**
+         * YuzGram #96: chatlar qidiruv pill'i (sarlavha bandi) ichiga HECH
+         * qachon kirib chiqmasligi uchun chizish maydoni tepadan kesiladi.
+         * Past tomonda kesish yo'q — qatorlar nav bar ostidan o'tib boradi.
+         */
+        private int yuzClipTop;
+
+        @Override
+        protected void dispatchDraw(Canvas canvas) {
+            if (yuzClipTop > 0) {
+                int save = canvas.save();
+                canvas.clipRect(0, yuzClipTop, getWidth(), getHeight());
+                super.dispatchDraw(canvas);
+                canvas.restoreToCount(save);
+            } else {
+                super.dispatchDraw(canvas);
+            }
+        }
+
+
         public boolean updateDialogsOnNextDraw;
         private boolean firstLayout = true;
         private boolean ignoreLayout;
@@ -2164,6 +2185,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     if (headerBottom > t) {
                         t = headerBottom;
                     }
+                }
+                // YuzGram #96: sarlavha bandi pastidan chizish — pill'ning
+                // o'zi yarim shisha, lekin qatorlar uning ortiga ko'rinmasligi
+                // kerak, shuning uchun faqat top tomon kesiladi.
+                int yuzNewClipTop = isYuzGramMainRoot()
+                        && yuzChatRail != null && yuzChatRail.getVisibility() == VISIBLE ? t : 0;
+                if (yuzNewClipTop != yuzClipTop) {
+                    yuzClipTop = yuzNewClipTop;
+                    invalidate();
                 }
                 if (t != getPaddingTop() || yuzBottomPad != getPaddingBottom()
                         || 0 != getPaddingRight()) {
