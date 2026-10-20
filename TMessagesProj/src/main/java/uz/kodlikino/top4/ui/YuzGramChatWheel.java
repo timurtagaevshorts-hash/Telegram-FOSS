@@ -38,14 +38,14 @@ import java.util.ArrayList;
 public class YuzGramChatWheel extends View {
 
     /** Reyka ustunining kengligi (yarimoy kirish joyi bilan). */
-    public static final int WIDTH_DP = 120;
+    public static final int WIDTH_DP = 140;
     /** Fokus donasining reyka tepasidan vertikal markazi. */
     private static final float FOCAL_Y_DP = 118f;
     /** Yoy radiuslari: dona markazlari shu egri chiziqda yuradi. */
     private static final float ARC_SPAN_DP = 150f;
     private static final float ARC_STEP = 0.40f;   // rad/dona
     private static final float BULGE_DP = 44f;
-    private static final float X_FOCUS_DP = 66f;
+    private static final float X_FOCUS_DP = 92f;
     /** Fokusdan necha dona uzoqda dona butunlay yo'qoladi. */
     private static final float CULL_SLOTS = 4.0f;
     private static final float CIRCLE_DP = 42f;
@@ -291,8 +291,10 @@ public class YuzGramChatWheel extends View {
         path.moveTo(w, 0);
         path.quadTo(dp(8f), dp(FOCAL_Y_DP), w, h);
         fillPaint.setShader(null);
+        // YuzGram #93 fix: shisha ekran CHEKKASIDA quyuq, yoyga qarab suyua
+        // (maketdagi kabi) — avval teskari edi, yoy chetida yorishib qolardi.
         LinearGradient panelShader = new LinearGradient(w - dp(112f), 0, w, 0,
-                new int[]{PANEL_EDGE, 0x001B3A5C}, null, Shader.TileMode.CLAMP);
+                new int[]{0x001B3A5C, PANEL_EDGE}, null, Shader.TileMode.CLAMP);
         fillPaint.setShader(panelShader);
         canvas.drawPath(path, fillPaint);
         fillPaint.setShader(null);

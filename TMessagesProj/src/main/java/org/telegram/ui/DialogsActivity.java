@@ -5218,9 +5218,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     presentFragment(new FiltersSetupActivity());
                 }
             });
-            contentView.addView(yuzSearchBar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT,
-                    uz.kodlikino.top4.ui.YuzGramSearchBar.height(), Gravity.LEFT | Gravity.TOP,
-                    0, yuzSearchBarTopMargin(), 0, 0));
+            // YuzGram #93 fix: LayoutHelper.createFrame musbat sonlarni DP deb
+            // hisoblab density'ga ko'paytiradi — bu yerda o'lchov va marginlar
+            // allaqachon px. Shuning uchun FrameLayout.LayoutParams to'g'ridan
+            // to'g'ri quriladi (aks holda reyka butun ekran kengligiga yoyilardi).
+            FrameLayout.LayoutParams sbLp = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    uz.kodlikino.top4.ui.YuzGramSearchBar.height(),
+                    Gravity.LEFT | Gravity.TOP);
+            sbLp.topMargin = yuzSearchBarTopMargin();
+            contentView.addView(yuzSearchBar, sbLp);
             // YuzGram #93: filtr reykasi — maketdagi kabi O'NG CHEKKADAGI yarim
             // aylanadigan vertikal ustun (sarlavha bloki emas). Ro'yxat unga
             // o'ng padding bilan chekinadi.
@@ -5231,9 +5238,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             yuzChatRail.setActionListener(this::onYuzGramRailAction);
             // Kamera plitasi olib tashlangan — hikoya joylash Reels tepasida (#70).
             yuzChatRail.setActions(true, false);
-            contentView.addView(yuzChatRail, LayoutHelper.createFrame(
-                    uz.kodlikino.top4.ui.YuzGramChatWheel.width(), LayoutHelper.MATCH_PARENT,
-                    Gravity.RIGHT | Gravity.TOP, 0, yuzChatRailTopMargin(), 0, 0));
+            FrameLayout.LayoutParams railLp = new FrameLayout.LayoutParams(
+                    uz.kodlikino.top4.ui.YuzGramChatWheel.width(),
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    Gravity.RIGHT | Gravity.TOP);
+            railLp.topMargin = yuzChatRailTopMargin();
+            contentView.addView(yuzChatRail, railLp);
             // YuzGram #85: nebula fon — ContentView'ning birinchi bolasi (index 0),
             // shunda chat qatorlari shu nur ustidan o'tadi. Tekis qora o'rniga
             // brend ko'kida chuqurlik.
