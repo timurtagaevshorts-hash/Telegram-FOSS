@@ -26,9 +26,9 @@ import org.telegram.messenger.R;
  */
 public class YuzGramSearchBar extends View {
 
-    /** Tasma balandligi: pill (40dp) + tepa/past nafasi. */
-    public static final int HEIGHT_DP = 52;
-    private static final float PILL_H_DP = 40f;
+    /** Tasma balandligi: pill (38dp) + tepa/past nafasi — ixcham (maket #93b). */
+    public static final int HEIGHT_DP = 46;
+    private static final float PILL_H_DP = 38f;
     private static final float SIDE_DP = 14f;
     /** Pill ichidagi sliders zonasi kengligi va uning markazi. */
     private static final float BTN_ZONE_DP = 46f;

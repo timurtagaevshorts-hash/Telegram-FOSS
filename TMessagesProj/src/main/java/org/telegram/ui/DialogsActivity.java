@@ -2149,21 +2149,18 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     additionalPadding += authHintCell.getMeasuredHeight();
                 }
                 final int yuzBottomPad = hasYuzGramBottomBar ? uz.kodlikino.top4.ui.YuzGramBottomBar.height() : 0;
-                // YuzGram #93: filtr reykasi — o'ng chekkadagi vertikal ustun.
-                // Chatlar ro'yxati unga o'ngdan chekinadi; tepada faqat qidiruv
-                // pill'i qoladi.
-                int yuzRightPad = 0;
+                // YuzGram #93b: gumbaz reyka ENDI suzuvchi — chatlar ro'yxati
+                // butun kenglikda (maketdagi kabi), shisha gumbaz ostidan o'tadi.
                 if (yuzChatRail != null && yuzChatRail.getVisibility() == VISIBLE) {
                     int headerBottom = yuzChatHeaderBottom();
                     if (headerBottom > t) {
                         t = headerBottom;
                     }
-                    yuzRightPad = uz.kodlikino.top4.ui.YuzGramChatWheel.width() - dp(12);
                 }
                 if (t != getPaddingTop() || yuzBottomPad != getPaddingBottom()
-                        || yuzRightPad != getPaddingRight()) {
+                        || 0 != getPaddingRight()) {
                     setTopGlowOffset(t);
-                    setPadding(0, t, yuzRightPad, yuzBottomPad);
+                    setPadding(0, t, 0, yuzBottomPad);
                     if (hasStories) {
                         parentPage.progressView.setPaddingTop(Math.max(0, t - dp(DialogStoriesCell.HEIGHT_IN_DP)));
                     } else {
@@ -2779,9 +2776,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         return top + dp(10);
     }
 
-    /** Reyka ustuni qidiruv satri ostidan boshlanadi (pill soyasi bilan tutashadi). */
-    private int yuzChatRailTopMargin() {
-        return yuzChatHeaderBottom() - dp(4);
+    /** YuzGram #93b: gumbaz pastki-o'ng burchakda, nav bar ustida turadi. */
+    private int yuzChatRailBottomMargin() {
+        return uz.kodlikino.top4.ui.YuzGramBottomBar.height() + dp(6);
     }
 
     /**
@@ -2852,11 +2849,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             return;
         }
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) yuzChatRail.getLayoutParams();
-        int top = yuzChatRailTopMargin();
-        int wantGravity = Gravity.RIGHT | Gravity.TOP;
-        if (lp != null && (lp.gravity != wantGravity || lp.topMargin != top)) {
+        int bottom = yuzChatRailBottomMargin();
+        int wantGravity = Gravity.RIGHT | Gravity.BOTTOM;
+        if (lp != null && (lp.gravity != wantGravity || lp.bottomMargin != bottom)) {
             lp.gravity = wantGravity;
-            lp.topMargin = top;
+            lp.bottomMargin = bottom;
             yuzChatRail.setLayoutParams(lp);
         }
         if (yuzSearchBar != null) {
@@ -5240,9 +5237,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             yuzChatRail.setActions(true, false);
             FrameLayout.LayoutParams railLp = new FrameLayout.LayoutParams(
                     uz.kodlikino.top4.ui.YuzGramChatWheel.width(),
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    Gravity.RIGHT | Gravity.TOP);
-            railLp.topMargin = yuzChatRailTopMargin();
+                    uz.kodlikino.top4.ui.YuzGramChatWheel.height(),
+                    Gravity.RIGHT | Gravity.BOTTOM);
+            railLp.bottomMargin = yuzChatRailBottomMargin();
             contentView.addView(yuzChatRail, railLp);
             // YuzGram #85: nebula fon — ContentView'ning birinchi bolasi (index 0),
             // shunda chat qatorlari shu nur ustidan o'tadi. Tekis qora o'rniga
