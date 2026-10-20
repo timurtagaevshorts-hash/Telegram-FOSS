@@ -2132,13 +2132,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 }
                 if (hasStories && !actionModeFullyShowed) {
                     if (isYuzGramMainRoot()) {
-                        // YuzGram: storylar + sarlavha yuqoriga surilganda ro'yxat
-                        // tepasidagi bo'sh joy ham shu qadar qisqaradi — chatlar
-                        // butun ekranni egallaydi (Instagram uslubidagi collapse).
-                        t += dp(DialogStoriesCell.HEIGHT_IN_DP) + (int) scrollYOffset;
-                        if (t < 0) {
-                            t = 0;
-                        }
+                        // YuzGram #93b: storylar chatdan Reels tepasiga ko'chirilgan
+                        // (#70) — asosiy ildizda storiya uchun bo'sh lentani
+                        // ajratmaymiz, chatlar pill'ning tagidan boshlanadi.
                     } else {
                         t += dp(DialogStoriesCell.HEIGHT_IN_DP);
                     }
