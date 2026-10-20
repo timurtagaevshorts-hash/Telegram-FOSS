@@ -20,7 +20,7 @@
     <!-- Sirtlar: bar yuzasi #0A1120 atrofida to'q ko'k-keymish -->
     <color name="home_card">#0D121D</color>
     <color name="modern_border">#202B3C</color>
-    <color name="modern_surface">#0A1120</color>
+    <color name="modern_surface">#000000</color>
     <color name="modern_surface_high">#0D121D</color>
     <color name="surface_elevated">#121925</color>
 
@@ -36,8 +36,8 @@
     <color name="white">#FFFFFFFF</color>
 
     <!-- Fond -->
-    <color name="home_bg">#0A1120</color>
-    <color name="chat_bg_top">#0A1120</color>
+    <color name="home_bg">#000000</color>
+    <color name="chat_bg_top">#000000</color>
     <color name="nav_chat_active">#5B6CF9</color>
     <color name="telegram_white">#FFFFFF</color>
     <color name="telegram_blue">#2AABEE</color>

@@ -4598,7 +4598,7 @@ public class Theme {
         themeInfo = new ThemeInfo();
         themeInfo.name = "YuzGram Neon";
         themeInfo.assetName = "yuzgram_neon.attheme";
-        themeInfo.previewBackgroundColor = 0xff0a1120;
+        themeInfo.previewBackgroundColor = 0xff000000;
         themeInfo.previewInColor = 0xff121925;
         themeInfo.previewOutColor = 0xff16324d;
         // MUHIM: firstAccentIsDefault=FALSE. Bu true bo'lsa + accent 99

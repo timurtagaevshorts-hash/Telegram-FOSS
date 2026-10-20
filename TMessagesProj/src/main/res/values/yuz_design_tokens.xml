@@ -27,7 +27,7 @@
     <color name="yuz_text_muted">#7A8AA0</color>
     <color name="yuz_text_on_accent">#06121C</color>
 
-    <color name="yuz_bg">#0A1120</color>
+    <color name="yuz_bg">#000000</color>
     <color name="yuz_surface">#0D121D</color>
     <color name="yuz_surface_raised">#121925</color>
     <color name="yuz_field">#121824</color>
