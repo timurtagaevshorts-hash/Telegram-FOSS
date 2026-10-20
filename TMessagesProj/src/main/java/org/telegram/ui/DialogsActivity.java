@@ -2890,7 +2890,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
      * .onMeasure'dagi t hisobining yuz ildiz uchun kerakli qismi.
      */
     private int yuzListTopBase() {
-        if (hasStories || (filterTabsView != null && filterTabsView.getVisibility() == VISIBLE)) {
+        if (hasStories || (filterTabsView != null && filterTabsView.getVisibility() == View.VISIBLE)) {
             return ActionBar.getCurrentActionBarHeight() + (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0);
         }
         return inPreviewMode && Build.VERSION.SDK_INT >= 21 ? AndroidUtilities.statusBarHeight : 0;
@@ -2902,7 +2902,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
      * uchun qatorlar pill ortiga bir kadrlik kechikish bilan ham chiqmaydi.
      */
     private int yuzLiveHeaderClip() {
-        if (!isYuzGramMainRoot() || yuzChatRail == null || yuzChatRail.getVisibility() != VISIBLE) {
+        if (!isYuzGramMainRoot() || yuzChatRail == null || yuzChatRail.getVisibility() != View.VISIBLE) {
             return 0;
         }
         int header = Math.max(0, yuzChatHeaderBottom() + (int) scrollYOffset);
