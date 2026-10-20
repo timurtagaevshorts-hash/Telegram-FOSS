@@ -43,16 +43,74 @@ object YuzMusicRepository {
     /**
      * Boshlang'ich ekran: ommabop xitlar.
      * YuzGram #63: bu ham YouTube'dan — chart qatorlari ham to'liq eshitiladi.
+     * YuzGram #104: endi SO'ROV QAT'II EMAS — seed havuzidan har safar
+     * aralashtib olinadi, natijalar shufllanadi va ko'proq qator qaytadi.
+     * Shunda "Ommabop" har doim yangi ko'rinishda ochiladi.
      */
+    private val chartSeeds = arrayOf(
+        "eng yaxshi ozbek qoshiklari 2026",
+        "ozbek xit qoshiklar 2026",
+        "trend musiqi 2026",
+        "yangi ozbekcha qoshiklar",
+        "ozbek pop musiqasi 2026",
+        "mashhur qoshiklar kliplar",
+        "ozbekiya hitlari 2026",
+        "eng zo'r qoshiklar"
+    )
+
     fun chart(): List<YuzTrack> {
-        val q = "o'zbek qo'shiqlari 2026"
-        val gw = runCatching { YuzMusicGateway.search(q) }.getOrDefault(emptyList())
+        val order = chartSeeds.toList().shuffled()
+        val out = LinkedHashMap<Long, YuzTrack>()
+        // Birinchi seed odatda yetadi; 15 tadan kam bo'lsa ikkinchisi qo'shiladi.
+        mergeInto(out, pull(order[0], 30), emptySet())
+        if (out.size < 15) mergeInto(out, pull(order[1], 30), emptySet())
+        if (out.isNotEmpty()) return out.values.shuffled().toList()
+        return fetchTracks("$BASE/chart/0/tracks?limit=50")
+    }
+
+    /** #104: scroll oxiri — ko'rilganlardan tashqari yangi ommabop qatorlar. */
+    fun chartMore(exclude: Set<Long>): List<YuzTrack> {
+        val order = chartSeeds.toList().shuffled()
+        val out = LinkedHashMap<Long, YuzTrack>()
+        var i = 0
+        while (out.size < 20 && i < order.size) {
+            mergeInto(out, pull(order[i], 30), exclude)
+            i++
+        }
+        return out.values.toList()
+    }
+
+    /**
+     * #104: qidiruv natijalarini davom ettirish — so'rovga navbatdagi
+     * variant qo'shib qayta qidiriladi (InnerTube'da offset yo'q), ko'rilgan
+     * qatorlar chiqarib tashlanadi.
+     */
+    fun searchMore(query: String, exclude: Set<Long>, round: Int): List<YuzTrack> {
+        val variants = arrayOf(
+            " 2026", " lyrics", " official", " remix", " live", " bass boosted", " cover"
+        )
+        val q = query.trim() + variants[round % variants.size]
+        val out = LinkedHashMap<Long, YuzTrack>()
+        mergeInto(out, pull(q, 30), exclude)
+        return out.values.toList()
+    }
+
+    /** Bitta seedni avval worker (tez), keyin to'g'ridan-to'g'ri YouTube'dan oladi. */
+    private fun pull(seed: String, limit: Int): List<YuzTrack> {
+        val gw = runCatching { YuzMusicGateway.search(seed, limit) }.getOrDefault(emptyList())
         if (gw.isNotEmpty()) return gw
-        val yt = runCatching {
-            YuzYouTubeApi.search(q, limit = 25)
-        }.getOrDefault(emptyList())
-        if (yt.isNotEmpty()) return yt
-        return fetchTracks("$BASE/chart/0/tracks?limit=25")
+        return runCatching { YuzYouTubeApi.search(seed, limit) }.getOrDefault(emptyList())
+    }
+
+    private fun mergeInto(
+        map: LinkedHashMap<Long, YuzTrack>,
+        list: List<YuzTrack>,
+        exclude: Set<Long>
+    ) {
+        for (t in list) {
+            if (t.id in exclude || t.title.isBlank()) continue
+            if (!map.containsKey(t.id)) map[t.id] = t
+        }
     }
 
     private fun fetchTracks(url: String): List<YuzTrack> {

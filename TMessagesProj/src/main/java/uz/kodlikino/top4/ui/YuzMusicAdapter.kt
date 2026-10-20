@@ -29,10 +29,22 @@ class YuzMusicAdapter(
     private var downloadedIds: Set<Long> = emptySet()
     // YuzGram #98: yuklab olinayotgan qatorlar — tugma pulsatsiya qiladi.
     private var downloadingIds: Set<Long> = emptySet()
+    // YuzGram #104: id -> 0..100 foiz; qatorda "↓ 47%" ko'rinishida chiqadi.
+    private val progressById = HashMap<Long, Int>()
 
     fun setDownloading(ids: Set<Long>) {
+        // Tugagan/uzilgan qatorlarning foizini ham tozalaymiz.
+        progressById.keys.retainAll(ids)
         downloadingIds = ids.toSet()
         notifyDataSetChanged()
+    }
+
+    /** #104: faqat shu qatorni qayta bog'laymiz — butun ro'yxatni emas. */
+    fun setProgress(id: Long, pct: Int) {
+        if (id !in downloadingIds) return
+        progressById[id] = pct
+        val pos = items.indexOfFirst { it.id == id }
+        if (pos >= 0) notifyItemChanged(pos)
     }
 
     fun submit(list: List<YuzTrack>) {
@@ -40,6 +52,13 @@ class YuzMusicAdapter(
         items.addAll(list)
         playingPos = -1
         notifyDataSetChanged()
+    }
+
+    /** #104: infinite scroll — ro'yxat oxiriga yangi qatorlar qo'shadi. */
+    fun append(list: List<YuzTrack>) {
+        val start = items.size
+        items.addAll(list)
+        notifyItemRangeInserted(start, list.size)
     }
 
     fun setPlaying(pos: Int) {
@@ -74,8 +93,6 @@ class YuzMusicAdapter(
             sub.append(t.album)
         }
         holder.artist.text = sub
-        holder.dur.text = if (t.durationSec <= 0) "" else
-            String.format("%d:%02d", t.durationSec / 60, t.durationSec % 60)
         if (t.coverUrl.isNotBlank()) {
             Glide.with(holder.cover).load(t.coverUrl).into(holder.cover)
         } else {
@@ -86,6 +103,12 @@ class YuzMusicAdapter(
         )
         val has = t.id in downloadedIds
         val busy = t.id in downloadingIds
+        // #104: yuklanayotgan qatorda davomiylik o'rniga foiz chiqadi.
+        holder.dur.text = when {
+            busy -> "↓ ${progressById[t.id] ?: 0}%"
+            t.durationSec <= 0 -> ""
+            else -> String.format("%d:%02d", t.durationSec / 60, t.durationSec % 60)
+        }
         if (busy) {
             if (holder.pulse == null) {
                 holder.pulse = ObjectAnimator.ofFloat(holder.dl, "alpha", 0.9f, 0.18f).apply {

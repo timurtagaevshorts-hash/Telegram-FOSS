@@ -79,11 +79,29 @@ object YuzMusicCache {
 
     fun isDownloaded(context: Context, id: Long): Boolean = localFile(context, id) != null
 
-    /** Yo'ldan boshlab [onDone] UI ipida chaqiriladi (true = muvaffaqiyat). */
-    fun download(context: Context, track: YuzTrack, onDone: (Boolean) -> Unit) {
+    // YuzGram #104: single-flight — bir id uchun ikkinchi so'rov kelib tutsa
+    // yangi oqim ochilmaydi (foydalanuvchi tugmasi + fon prebuffer bir vaqtda
+    // tushib, faylni buzmasligi kerak).
+    private val active = java.util.Collections.synchronizedSet(HashSet<Long>())
+
+    /** Yo'ldan boshlab [onDone] UI ipida chaqiriladi (true = muvaffaqiyat).
+     * [onProgress] 0..99 foizni asosiy ipda beradi. */
+    fun download(context: Context, track: YuzTrack, onProgress: ((Int) -> Unit)? = null, onDone: (Boolean) -> Unit) {
+        if (!active.add(track.id)) return
         val app = context.applicationContext
+        var lastPct = -1
+        val raw: (Long, Long) -> Unit = { got, expect ->
+            if (expect > 0L) {
+                val pct = ((got * 100) / expect).toInt().coerceIn(0, 99)
+                if (pct != lastPct) {
+                    lastPct = pct
+                    main.post { onProgress?.invoke(pct) }
+                }
+            }
+        }
         Thread {
-            val ok = runCatching { downloadBlocking(app, track) }.getOrDefault(false)
+            val ok = runCatching { downloadBlocking(app, track, null, raw) }.getOrDefault(false)
+            active.remove(track.id)
             main.post { onDone(ok) }
         }.start()
     }
@@ -101,9 +119,17 @@ object YuzMusicCache {
      * YuzGram #86: [gate] — FON yuklashini ijro uchun to'xtatib turish
      * imkoni (masalan keyingi trek jim yuklanayotganda ijro buffering'ga
      * kirsa). null = to'siqsiz (foydalanuvchi bosgan "yuklab olish").
+     * YuzGram #104: [progress] har ~1% da (got, expect) asosiy IP'dan EMAS —
+     * chaqiruvchi o'zi post qiladi; 24 soatdan eski .tmp qoldiqlari tozalanadi.
      */
-    fun downloadBlocking(context: Context, track: YuzTrack, gate: (() -> Long)? = null): Boolean {
+    fun downloadBlocking(
+        context: Context,
+        track: YuzTrack,
+        gate: (() -> Long)? = null,
+        progress: ((Long, Long) -> Unit)? = null
+    ): Boolean {
         if (isDownloaded(context, track.id)) return true
+        cleanupStaleTmp(context)
         val streams = try {
             YuzYouTubeApi.resolveStreamCandidates(track, 8)
         } catch (_: Exception) {
@@ -117,7 +143,7 @@ object YuzMusicCache {
         }
         for (s in attempts) {
             if (s.url.contains("googlevideo")) {
-                val r = fetchRanges(context, track.id, s, track.videoId, gate)
+                val r = fetchRanges(context, track.id, s, track.videoId, gate, progress)
                 if (r == CANCELED) {
                     Log.i(TAG, "download canceled ${track.videoId} (ijro yo'l so'radi)")
                     return false
@@ -126,12 +152,22 @@ object YuzMusicCache {
                     addToIndex(context, track)
                     return true
                 }
-            } else if (fetchPlain(context, track.id, s)) {
+            } else if (fetchPlain(context, track.id, s, progress)) {
                 addToIndex(context, track)
                 return true
             }
         }
         return false
+    }
+
+    /** #104: tugallanmagan .tmp qoldiqlari (eski nom va yangi "id-<nano>.tmp"). */
+    private fun cleanupStaleTmp(context: Context) {
+        runCatching {
+            val cutoff = System.currentTimeMillis() - 86_400_000L
+            dir(context).listFiles()?.forEach { f ->
+                if (f.name.endsWith(".tmp") && f.lastModified() < cutoff) f.delete()
+            }
+        }
     }
 
     /** Bayt joyi bo'yicha shu videoId'ning (shu itag'da) yangi URL'ini qaytaradi. */
@@ -144,9 +180,12 @@ object YuzMusicCache {
         id: Long,
         stream: YuzAudioStream,
         videoId: String,
-        gate: (() -> Long)?
+        gate: (() -> Long)?,
+        progress: ((Long, Long) -> Unit)?
     ): Int {
-        val tmp = File(dir(context), "$id.tmp")
+        // #104: har urinishga O'Z tmp nomi — ikki ip bir faylga yozib,
+        // uni buzishi endi imkonsiz.
+        val tmp = File(dir(context), "$id-${System.nanoTime()}.tmp")
         runCatching { if (tmp.exists()) tmp.delete() }
         // refresh FAQAT shu videoId uchun: muqobil videoning baytlari
         // yarim faylga aralashib ketmasligi kerak.
@@ -161,6 +200,7 @@ object YuzMusicCache {
             reader.open()
             val expect = reader.length
             var got = 0L
+            var lastEmit = 0L
             tmp.outputStream().use { out ->
                 val buf = ByteArray(64 * 1024)
                 var guard = 0
@@ -169,6 +209,13 @@ object YuzMusicCache {
                     if (n <= 0) break
                     out.write(buf, 0, n)
                     got += n
+                    // #104: ~1% qadamlar bilan foizni xabar qilamiz.
+                    if (progress != null && expect > 0 &&
+                        got - lastEmit >= expect / 100 + 8192
+                    ) {
+                        lastEmit = got
+                        progress(got, expect)
+                    }
                     // #86: fon yuklashi ham taroq tezligini o'lchaydi —
                     // oyna/deadline/format shundan hisoblanadi.
                     YuzNetPulse.add(n)
@@ -194,8 +241,13 @@ object YuzMusicCache {
     }
 
     /** Oddiy HTTPS (Deezer preview) — bitta GET, hajm kichik. */
-    private fun fetchPlain(context: Context, id: Long, stream: YuzAudioStream): Boolean {
-        val tmp = File(dir(context), "$id.tmp")
+    private fun fetchPlain(
+        context: Context,
+        id: Long,
+        stream: YuzAudioStream,
+        progress: ((Long, Long) -> Unit)?
+    ): Boolean {
+        val tmp = File(dir(context), "$id-${System.nanoTime()}.tmp")
         var conn: HttpURLConnection? = null
         return try {
             conn = (URL(stream.url).openConnection() as HttpURLConnection).apply {
@@ -212,6 +264,9 @@ object YuzMusicCache {
                 Log.i(TAG, "download HTTP $code ext=${stream.ext} url=${stream.url.take(60)}")
                 return false
             }
+            val expect = conn.contentLength
+            var got = 0L
+            var lastEmit = 0L
             conn.inputStream.use { input ->
                 tmp.outputStream().use { out ->
                     val buf = ByteArray(32 * 1024)
@@ -219,6 +274,13 @@ object YuzMusicCache {
                         val n = input.read(buf)
                         if (n <= 0) break
                         out.write(buf, 0, n)
+                        got += n
+                        if (progress != null && expect > 0 &&
+                            got - lastEmit >= expect / 100 + 4096
+                        ) {
+                            lastEmit = got
+                            progress(got, expect.toLong())
+                        }
                         YuzNetPulse.add(n)
                     }
                 }
@@ -234,14 +296,30 @@ object YuzMusicCache {
         }
     }
 
+    /**
+     * #104: tayyor tmp'ni saqlangan faylga aylantirish. oldin dst band bo'lsa
+     * renameTo false qaytarar edi — yuklash "muvaffaqiyatsiz" bo'lib, yarim
+     * fayl qolib ketishi mumkin edi. Endi: dst'ni o'chiramiz, rename bo'lmasa
+     * nusxa bilan qoplaymiz.
+     */
     private fun promote(context: Context, tmp: File, id: Long, ext: String): Boolean {
-        val dst = File(dir(context), "$id.$ext")
-        if (!tmp.renameTo(dst)) {
-            tmp.delete()
+        if (tmp.length() <= 0L) {
+            runCatching { tmp.delete() }
             return false
         }
-        Log.i(TAG, "download OK ${dst.length()}B -> ${dst.name}")
-        return true
+        val dst = File(dir(context), "$id.$ext")
+        if (dst.exists()) runCatching { dst.delete() }
+        if (runCatching { tmp.renameTo(dst) }.getOrDefault(false)) {
+            Log.i(TAG, "download OK ${dst.length()}B -> ${dst.name}")
+            return true
+        }
+        val copied = runCatching {
+            tmp.copyTo(dst, overwrite = true)
+            dst.length() > 0L
+        }.getOrDefault(false)
+        runCatching { tmp.delete() }
+        if (copied) Log.i(TAG, "download OK (copy) ${dst.length()}B -> ${dst.name}")
+        return copied
     }
 
     fun remove(context: Context, id: Long) {

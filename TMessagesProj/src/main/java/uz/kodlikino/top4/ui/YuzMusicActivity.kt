@@ -68,6 +68,15 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private var offlineMode = false
     private var statusLabel = ""
 
+    // YuzGram #104: ro'yxat manbai + "ko'proq yuklash" holati.
+    // listSource: 0 = Kolleksiyalar (loadMore o'chiq), 1 = qidiruv, 2 = ommabop.
+    private var destroyed = false
+    private var listSource = 0
+    private var lastQuery: String? = null
+    private val shownIds = HashSet<Long>()
+    private var moreRound = 0
+    private var moreAvailable = true
+
     private var playerBar: View? = null
     private var ivPlayerCover: ImageView? = null
     private var tvPlayerTitle: TextView? = null
@@ -135,6 +144,14 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         )
         rv.adapter = adapter
         adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
+        // YuzGram #104: ro'yxat oxiriga yaqlashsa yangi qatorlar yuklanadi.
+        rv.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                if (dy <= 0) return
+                val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                if (lm.findLastVisibleItemPosition() >= adapter.itemCount - 6) loadMore()
+            }
+        })
 
         root.findViewById<View>(R.id.btnMusiqaSearch)?.setOnClickListener { runSearch() }
         etQuery.setOnEditorActionListener { _, actionId, _ ->
@@ -345,6 +362,8 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
                 list.isEmpty() -> setStatus(R.string.musiqa_empty)
                 else -> {
                     setStatus(R.string.musiqa_results)
+                    lastQuery = q
+                    listSource = 1
                     applyList(list)
                 }
             }
@@ -366,6 +385,8 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             setLoading(skeleton = false, center = false)
             if (list != null && list.isNotEmpty()) {
                 setStatus(R.string.musiqa_trending)
+                lastQuery = null
+                listSource = 2
                 applyList(list)
             } else {
                 setStatus(R.string.musiqa_error)
@@ -393,7 +414,45 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         // #67: fon ijrosi qat'iy to'xtamaydi — faqat belgilash yangilanadi.
         currentList = list
         adapter.submit(list)
+        shownIds.clear()
+        shownIds.addAll(list.map { it.id })
+        moreRound = 0
+        moreAvailable = true
         syncPlayingMark()
+    }
+
+    /**
+     * YuzGram #104: pastki navigatsiya — oxiriga yaqlashganda qo'shimcha
+     * qatorlar tortiladi (qidiruv variantlari yoki boshqa ommabop seedlar),
+     * ko'rilgan qatorlar takrorlanmaydi.
+     */
+    private fun loadMore() {
+        if (busy || !moreAvailable || offlineMode || listSource == 0 || currentList.isEmpty()) return
+        busy = true
+        moreRound++
+        val round = moreRound
+        val q = lastQuery
+        val exclude = HashSet(shownIds)
+        scope.launch {
+            val more = try {
+                withContextIo {
+                    if (q != null) YuzMusicRepository.searchMore(q, exclude, round)
+                    else YuzMusicRepository.chartMore(exclude)
+                }
+            } catch (_: Exception) {
+                null
+            }
+            busy = false
+            if (destroyed) return@launch
+            if (more.isNullOrEmpty()) {
+                if (more != null) moreAvailable = false
+            } else {
+                shownIds.addAll(more.map { it.id })
+                currentList = currentList + more
+                adapter.append(more)
+                syncPlayingMark()
+            }
+        }
     }
 
     // ------------------------------------------------------- collections UI
@@ -413,6 +472,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
                 when {
                     which == 0 -> {
                         offlineMode = true
+                        listSource = 0
                         setStatus(if (downloaded.isEmpty()) R.string.musiqa_saved_empty
                         else R.string.musiqa_saved_btn)
                         applyList(downloaded)
@@ -420,6 +480,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
                     which <= playlists.size -> {
                         val pl = playlists[which - 1]
                         offlineMode = false
+                        listSource = 0
                         statusLabel = pl.name
                         statusView.text = "${pl.name} (${pl.tracks.size})"
                         applyList(pl.tracks)
@@ -526,8 +587,13 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         Toast.makeText(ctx, R.string.musiqa_dl_started, Toast.LENGTH_SHORT).show()
         downloadingIds.add(track.id)
         adapter.setDownloading(downloadingIds)
-        YuzMusicCache.download(ctx, track) { ok ->
+        // YuzGram #104: foizli progress — qatordagi davomiylik o'rnida jonli
+        // yangilanadi; tugaganda holat tozalanadi.
+        YuzMusicCache.download(ctx, track, { pct ->
+            if (!destroyed) adapter.setProgress(track.id, pct)
+        }) { ok ->
             downloadingIds.remove(track.id)
+            if (destroyed) return@download
             adapter.setDownloading(downloadingIds)
             adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
             syncPlayingMark()
@@ -610,6 +676,8 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
 
     override fun onFragmentDestroy() {
         super.onFragmentDestroy()
+        // #104: fondagi yuklash tugaganda bu sahifa uchun UI ishlar qilmasin.
+        destroyed = true
         ui.removeCallbacks(tick)
         scope.cancel()
         YuzMusicEngine.removeObserver(observer)
