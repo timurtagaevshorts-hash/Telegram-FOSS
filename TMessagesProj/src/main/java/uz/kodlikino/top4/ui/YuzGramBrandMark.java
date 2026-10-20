@@ -1,10 +1,10 @@
 package uz.kodlikino.top4.ui;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
-import android.graphics.LinearGradient;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -18,6 +18,8 @@ import org.telegram.messenger.R;
  * YuzGram #60: chat tepasidagi brend belgisi — oddiy matnli sarlavha o'rniga.
  * YuzGram #85: maketdagi ko'rinishga moslandi — dumaloq gradient nishon
  * (qog'oz samolyot) + ikki rangli "YuzGram" palavrasi + ostida tagline.
+ * YuzGram #101: nishon ENDI haqiqiy brend logotipi (UZ + samolyot,
+ * R.drawable.yuz_logo) — launcher ikonkasi bilan bir xil rasm.
  *
  * Palavras ENDI gradient emas: "Yuz" oq, "Gram" to'q ko'k (#38B6FF). Bir xil
  * rangli sirtga gradient matn qo'yish o'qishni buzadi; vazn va rang ajratmasi
@@ -28,8 +30,6 @@ import org.telegram.messenger.R;
  */
 public class YuzGramBrandMark extends View {
 
-    private static final int PILL_START = 0xFF38B6FF;
-    private static final int PILL_END = 0xFF5B6CF9;
     private static final int WORD_PRIMARY = 0xFFFFFFFF;
     private static final int WORD_ACCENT = 0xFF38B6FF;
     private static final int TAGLINE = 0xFF93AECB;
@@ -42,7 +42,7 @@ public class YuzGramBrandMark extends View {
     private final Paint wordPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint tagPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF badgeRect = new RectF();
-    private final Path planePath = new Path();
+    private final Bitmap logo;
     private final String tagline;
     private String tagText = "";
 
@@ -51,15 +51,16 @@ public class YuzGramBrandMark extends View {
     private float badgeSize = 30f;
     /** Tor ekranlarda tagline action bar tugmalari bilan urishadi — shunda chizilmaydi. */
     private boolean showTagline = true;
-    // Gradientlar har kadrda yaratilmaydi: markaz (status bar + bar balandligi)
+    // Nur har kadrda yaratilmaydi: markaz (status bar + bar balandligi)
     // o'zgargandagina qayta tiklanadi.
-    private LinearGradient badgeShader;
     private RadialGradient haloShader;
     private float shaderCy = Float.MIN_VALUE;
 
     public YuzGramBrandMark(Context context) {
         super(context);
         tagline = context.getString(R.string.yuz_chat_tagline);
+        logo = BitmapFactory.decodeResource(context.getResources(), R.drawable.yuz_logo);
+        badgePaint.setFilterBitmap(true);
         badgeSize = AndroidUtilities.dp(30f);
         Typeface bold = Typeface.create(Typeface.DEFAULT, Typeface.BOLD);
         wordPaint.setTextSize(AndroidUtilities.dp(20f));
@@ -67,15 +68,6 @@ public class YuzGramBrandMark extends View {
         tagPaint.setTextSize(AndroidUtilities.dp(10.5f));
         tagPaint.setColor(TAGLINE);
         tagPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        // Material "send" yo'li (24x24 katak: x 2..23, y 3..21) 0..1 box'ga
-        // keltirilgan — nishon hajmi o'zgarganda qayta hisoblamaymiz.
-        planePath.moveTo(0.001f, 1.000f);
-        planePath.lineTo(1.000f, 0.500f);
-        planePath.lineTo(0.001f, 0.000f);
-        planePath.lineTo(0.000f, 0.389f);
-        planePath.lineTo(0.714f, 0.500f);
-        planePath.lineTo(0.000f, 0.611f);
-        planePath.close();
     }
 
     /** DialogsActivity har sync'da haqiqiy o'lchamlarni uzatadi. */
@@ -127,8 +119,6 @@ public class YuzGramBrandMark extends View {
             shaderCy = cx;
             haloShader = new RadialGradient(bx + badgeSize / 2f, by + badgeSize * 0.62f,
                     badgeSize * 0.95f, 0x4038B6FF, 0, Shader.TileMode.CLAMP);
-            badgeShader = new LinearGradient(bx, by, bx + badgeSize, by + badgeSize,
-                    PILL_START, PILL_END, Shader.TileMode.CLAMP);
         }
 
         // Nishon ostidagi nur — tekis doira emas, chuqurlik (ofset + yumshatish).
@@ -136,21 +126,9 @@ public class YuzGramBrandMark extends View {
         canvas.drawCircle(bx + badgeSize / 2f, by + badgeSize * 0.62f, badgeSize * 0.95f, glowPaint);
         glowPaint.setShader(null);
 
-        badgePaint.setShader(badgeShader);
+        // Brend logotipi — doira kesilgan bitmap, to'g'ridan-to'g'ri chiziladi.
         badgeRect.set(bx, by, bx + badgeSize, by + badgeSize);
-        canvas.drawOval(badgeRect, badgePaint);
-        badgePaint.setShader(null);
-
-        // Qog'oz samolyot
-        float gw = badgeSize * 0.55f;
-        float gh = gw * 18f / 21f;
-        canvas.save();
-        canvas.translate(bx + (badgeSize - gw) / 2f, cx - gh / 2f);
-        canvas.scale(gw, gh);
-        badgePaint.setColor(WORD_PRIMARY);
-        canvas.drawPath(planePath, badgePaint);
-        canvas.restore();
-        badgePaint.setColor(0);
+        canvas.drawBitmap(logo, null, badgeRect, badgePaint);
 
         // Palavra: "Yuz" oq + "Gram" ko'k — gradient matn emas.
         float tx = bx + badgeSize + AndroidUtilities.dp(9);
