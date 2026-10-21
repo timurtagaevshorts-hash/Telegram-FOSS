@@ -72,21 +72,18 @@ object YuzAiCloud {
 
     /**
      * DNS+TLS+edge "isitish": birinchi haqiqiy so'rov handshake to'lovini to'lamaydi.
-     * /chat'ga bo'sh POST — worker darol {"a":""} qaytaradi (Gemini chaqilmaydi).
+     * OPTIONS — worker darhol javob beradi (Gemini chaqilmaydi, rate-limit sanalmaydi).
      */
     suspend fun warmup() = withContext(Dispatchers.IO) {
         try {
             val c = (URL("$BASE/chat").openConnection() as HttpURLConnection).apply {
                 connectTimeout = 4000
                 readTimeout = 4000
-                requestMethod = "POST"
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                setRequestProperty("User-Agent", "YuzGram-AI/2.0")
+                requestMethod = "OPTIONS"
             }
-            c.outputStream.use { it.write("{}".toByteArray()) }
             // Body TO'LIQ o'qilsa Android socket'ni pool'da saqlaydi (keep-alive).
-            c.inputStream.bufferedReader().use { it.readText() }
+            c.inputStream.use { it.readBytes() }
+            Unit
         } catch (_: Exception) {
         }
         // disconnect() YO'Q — pool socket'ni keyingi /voice o'rib oladi.
