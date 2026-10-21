@@ -589,9 +589,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     private int folderId;
 
-    // YuzGram pastki navigatsiya uchun ro'yxat pastida joy bo'shatish bayrog'i
-    // (bar o'zi LaunchActivity darajasida chiziladi)
-    private boolean hasYuzGramBottomBar;
     // YuzGram: gorizontal papka chizig'i (FilterTabsView) o'rniga o'ng chetidagi
     // aylanadigan dumaloq filtr gildiragi. Gildirak ishlatilganda papka tanlash
     // shu yerdan boshqariladi.
@@ -2222,7 +2219,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     t += authHintCell.getMeasuredHeight();
                     additionalPadding += authHintCell.getMeasuredHeight();
                 }
-                final int yuzBottomPad = hasYuzGramBottomBar ? uz.kodlikino.top4.ui.YuzGramBottomBar.height() : 0;
+                // YuzGram #112: ro'yxat ostidan bar uchun joy AJRATILMAYDI —
+                // chatlar ekran tagigacha o'tadi, shunda yarim shaffof bar
+                // orqasida doim qator ko'rinadi va scroll tugagan paytda bar
+                // ostida bo'sh qora lenta qolmaydi.
+                final int yuzBottomPad = 0;
                 // YuzGram #93b: gumbaz reyka ENDI suzuvchi — chatlar ro'yxati
                 // butun kenglikda (maketdagi kabi), shisha gumbaz ostidan o'tadi.
                 if (yuzChatRail != null && yuzChatRail.getVisibility() == VISIBLE) {
@@ -2239,11 +2240,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         || 0 != getPaddingRight()) {
                     setTopGlowOffset(t);
                     setPadding(0, t, 0, yuzBottomPad);
-                    // YuzGram #108: bar mavjud bo'lsa ro'yxat pastdan kesilmaydi —
-                    // qatorlar shaffof bar ORTIDAN o'tadi (pastki padding endi
-                    // faqat scroll-tugashigi joy: oxirgi qator bar ustiga
-                    // ko'tariladi). Tepa kesim avvalgiday dispatchDraw'dagi
-                    // yuzLiveHeaderClip bilan himoyalangan.
+                    // YuzGram #108/#112: pastki padding 0 — qatorlar ekran
+                    // tugigacha chiziladi, bar ular ustiga shaffof qatlam bo'lib
+                    // o'tiradi (har bir scroll pozitsiyasida, yakunda ham).
                     setClipToPadding(yuzBottomPad == 0);
                     if (hasStories) {
                         parentPage.progressView.setPaddingTop(Math.max(0, t - dp(DialogStoriesCell.HEIGHT_IN_DP)));
@@ -5581,12 +5580,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (!onlySelect) {
             animatedStatusView = new DrawerProfileCell.AnimatedStatusView(context, 20, 60);
             contentView.addView(animatedStatusView, LayoutHelper.createFrame(20, 20, Gravity.LEFT | Gravity.TOP));
-        }
-
-        if (isYuzGramMainRoot()) {
-            // Bar LaunchActivity darajasida (doimiy) chiziladi; bu yerda faqat
-            // ro'yxat ostida bar uchun joy bo'shatamiz.
-            hasYuzGramBottomBar = true;
         }
 
         if (searchString == null && initialDialogsType == DIALOGS_TYPE_DEFAULT) {
