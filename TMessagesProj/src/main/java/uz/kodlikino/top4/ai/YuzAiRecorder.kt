@@ -8,7 +8,7 @@ import kotlin.math.sqrt
 
 /**
  * Mikrofonni oddiy WAV (16 kHz mono PCM16) fayliga yozadi — Gemini STT uchun.
- * RMS-based VAD: gap boshlanib ~1.1 s jimlik bo'lsa to'xtaydi, maksimum 8 s.
+ * RMS-based VAD: gap boshlanib ~0.75 s jimlik bo'lsa to'xtaydi, maksimum 8 s.
  * Umuman gap bo'lmasa null qaytadi (birinchi 4 s ichida) — kvota tejash uchun.
  */
 class YuzAiRecorder {
@@ -74,7 +74,9 @@ class YuzAiRecorder {
                     lastVoiceAt = now
                 }
                 if (!voiceSeen && totalMs > 4000L) break
-                if (voiceSeen && now - lastVoiceAt > 1100L) break
+                // 1100 -> 750 ms: gap tugashini kutish qisqardi (so'z orasi
+                // pauzalar 500 ms'dan kam, xavfsiz; ~0.35 s tezkor his).
+                if (voiceSeen && now - lastVoiceAt > 750L) break
                 if (totalMs > 8000L) break
                 for (i in 0 until n) {
                     val v = chunk[i].toInt()

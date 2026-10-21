@@ -127,6 +127,9 @@ class YuzAiActivity : BaseFragment() {
         // #79: AI hovuzi faqat yuklangan dialoglardan to'planadi — ro'yxatni
         // oldindan chuqurroq yuklab, uzoqroqdagi chatlardagi odamlarni ham topiladigan qilamiz.
         runCatching { MessagesController.getInstance(currentAccount).loadDialogs(0, 0, 200, false) }
+        // #127 tezlik: ochilishda DNS+TLS+edge "isitamiz" — mikrofon bosilganda
+        // handshake (~300-600 ms) foydalanuvchi kutmaydi.
+        scope.launch { runCatching { YuzAiCloud.warmup() } }
         return root
     }
 
@@ -170,6 +173,10 @@ class YuzAiActivity : BaseFragment() {
         statusView.text = ctx.getString(R.string.ai_listening)
         startRing()
         val s = scope
+        val acc = currentAccount
+        // #127: nomlar hovuzi foydalanuvchi GAPIRGUNCHA IO'da quriladi — yozuv
+        // tugagach /voice so'rovi hovuzni kutmaydi (asosiy oqim block bo'lmaydi).
+        s.launch { withContext(Dispatchers.IO) { runCatching { YuzAiEngine.peers(acc) } } }
         s.launch {
             val wav = try {
                 withContext(Dispatchers.IO) { recorder.recordBlocking() }
@@ -186,9 +193,12 @@ class YuzAiActivity : BaseFragment() {
             }
             if (parentActivity == null) { cloudBusy = false; return@launch }
             statusView.text = ctx.getString(R.string.ai_processing)
-            val names = YuzAiEngine.peers(currentAccount).map { it.name }.take(250)
             val res = try {
-                withContext(Dispatchers.IO) { YuzAiCloud.voice(wav, names) }
+                // Hovuz + so'rov bitta IO blokada: main thread nom qurishda qotmaydi.
+                withContext(Dispatchers.IO) {
+                    val names = YuzAiEngine.peers(acc).map { it.name }.take(120)
+                    YuzAiCloud.voice(wav, names)
+                }
             } catch (_: Exception) {
                 null
             }

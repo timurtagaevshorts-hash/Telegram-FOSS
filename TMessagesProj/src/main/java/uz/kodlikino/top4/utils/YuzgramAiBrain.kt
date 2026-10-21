@@ -54,6 +54,7 @@ object YuzgramAiBrain {
 
     private fun httpPostJson(url: String, jsonBody: String): String? {
         var connection: HttpURLConnection? = null
+        var healthy = false
         return try {
             connection = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 6000
@@ -65,11 +66,17 @@ object YuzgramAiBrain {
             }
             connection.outputStream.use { it.write(jsonBody.toByteArray(Charsets.UTF_8)) }
             if (connection.responseCode !in 200..299) return null
-            connection.inputStream.bufferedReader().use { it.readText() }
+            val text = connection.inputStream.bufferedReader().use { it.readText() }
+            healthy = true
+            text
         } catch (_: Exception) {
             null
         } finally {
-            connection?.disconnect()
+            // holdiskiy so'rovlar (worker keep-alive, wikipedia zanjiri) socket'ni
+            // qayta topsin — muvaffaqiyatli javobda disconnect yo'q.
+            if (!healthy) {
+                try { connection?.disconnect() } catch (_: Exception) { }
+            }
         }
     }
 
@@ -172,6 +179,7 @@ object YuzgramAiBrain {
 
     private fun httpGet(url: String): String? {
         var connection: HttpURLConnection? = null
+        var healthy = false
         return try {
             connection = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 5000
@@ -181,11 +189,15 @@ object YuzgramAiBrain {
                 instanceFollowRedirects = true
             }
             if (connection.responseCode !in 200..299) return null
-            connection.inputStream.bufferedReader().use { it.readText() }
+            val text = connection.inputStream.bufferedReader().use { it.readText() }
+            healthy = true
+            text
         } catch (_: Exception) {
             null
         } finally {
-            connection?.disconnect()
+            if (!healthy) {
+                try { connection?.disconnect() } catch (_: Exception) { }
+            }
         }
     }
 }

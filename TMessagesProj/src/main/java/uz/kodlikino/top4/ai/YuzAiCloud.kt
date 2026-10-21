@@ -33,7 +33,9 @@ object YuzAiCloud {
             try {
                 val body = JSONObject()
                     .put("audio_b64", Base64.encodeToString(wav, Base64.NO_WRAP))
-                    .put("peers", JSONArray(peers.take(250)))
+                    // Worker FAQAT birinchi 120 nomni ishlatadi — ko'p yuborish
+                    // so'rovni uldirab, Gemini prompt'ini uzaytiradi.
+                    .put("peers", JSONArray(peers.take(120)))
                     // Tezlik: /voice ichida TTS kutmaymiz — javob ovozi keyin /speak'dan olinadi.
                     .put("speak", false)
                 val resp = post("$BASE/voice", body.toString(), 8000, 30000) ?: return@withContext null
@@ -68,8 +70,31 @@ object YuzAiCloud {
         }
     }
 
+    /**
+     * DNS+TLS+edge "isitish": birinchi haqiqiy so'rov handshake to'lovini to'lamaydi.
+     * /chat'ga bo'sh POST — worker darol {"a":""} qaytaradi (Gemini chaqilmaydi).
+     */
+    suspend fun warmup() = withContext(Dispatchers.IO) {
+        try {
+            val c = (URL("$BASE/chat").openConnection() as HttpURLConnection).apply {
+                connectTimeout = 4000
+                readTimeout = 4000
+                requestMethod = "POST"
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("User-Agent", "YuzGram-AI/2.0")
+            }
+            c.outputStream.use { it.write("{}".toByteArray()) }
+            // Body TO'LIQ o'qilsa Android socket'ni pool'da saqlaydi (keep-alive).
+            c.inputStream.bufferedReader().use { it.readText() }
+        } catch (_: Exception) {
+        }
+        // disconnect() YO'Q — pool socket'ni keyingi /voice o'rib oladi.
+    }
+
     private fun post(url: String, jsonBody: String, connectMs: Int, readMs: Int): String? {
         var connection: HttpURLConnection? = null
+        var healthy = false
         return try {
             connection = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = connectMs
@@ -81,11 +106,18 @@ object YuzAiCloud {
             }
             connection.outputStream.use { it.write(jsonBody.toByteArray(Charsets.UTF_8)) }
             if (connection.responseCode !in 200..299) return null
-            connection.inputStream.bufferedReader().use { it.readText() }
+            val text = connection.inputStream.bufferedReader().use { it.readText() }
+            healthy = true
+            text
         } catch (_: Exception) {
             null
         } finally {
-            connection?.disconnect()
+            // Muvaffaqiyatli so'rovda disconnect QILMAYMIZ — Android HTTPS
+            // keep-alive pooli keyingi socket'ni qayta ishlatadi (~300-500 ms
+            // TLS handshake tejaldi: /voice -> /speak ketma-ketligida).
+            if (!healthy) {
+                try { connection?.disconnect() } catch (_: Exception) { }
+            }
         }
     }
 }

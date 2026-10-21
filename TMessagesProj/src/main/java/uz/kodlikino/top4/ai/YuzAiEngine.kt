@@ -21,7 +21,8 @@ import kotlin.math.min
  * #105: nomlar hovuzi endi FAQAT dialoglar emas — TELEFON KONTAKTLARI ham
  * qatnashadi (hech suhbat qilmagan "Azam" ham topiladi); natijalar 5 soniyalik
  * kesh bilan tez; tipografa chidamli ("azom" -> "Azam"); bir xil hovuz cloud
- * nomini yechishda ham ishlatiladi (findByName).
+ * nomini yechishda ham ishlatiladi (findByName). #127: TTL 30 s — hovuz yozuv
+ * davomida qizdiriladi va so'rovga yetib boradi.
  */
 object YuzAiEngine {
 
@@ -79,13 +80,15 @@ object YuzAiEngine {
     /**
      * Dialoglar + TELEFON KONTAKTLARI nomlari hovuzi.
      * #105: kontaktda hali chat bo'lmagan odam ham topiladi (dialogId = user_id);
-     * natija 5 soniyalik kesh — bitta parse() ichida bir necha marta qurilmaydi.
+     * natija 30 soniyalik kesh — bitta AI oqimi ichida ikki marta qurilmaydi.
      * (Shifrlangan va papka dialoglari tashlanadi.)
      */
     fun peers(account: Int): List<Peer> {
         val now = System.currentTimeMillis()
         val cached = cachedPeers
-        if (cached != null && cachedAccount == account && now - cachedAt < 5_000L) return cached
+        // 5s -> 30s: hovuz mikrofon bosilganda (yozib turganda) oldindan quriladi,
+        // yozuv tugagach ham tirik qolishi uchun TTL uzaytirildi.
+        if (cached != null && cachedAccount == account && now - cachedAt < 30_000L) return cached
         val controller = MessagesController.getInstance(account)
         val result = ArrayList<Peer>()
         val userIds = HashSet<Long>()
