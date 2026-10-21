@@ -1922,7 +1922,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
                 final float stories = Math.min(1f, 1f - Math.abs(sharedMediaLayout.getTabProgress() - SharedMediaLayout.TAB_STORIES));
                 final float archivedStories = Math.min(1f, 1f - Math.abs(sharedMediaLayout.getTabProgress() - SharedMediaLayout.TAB_ARCHIVED_STORIES));
-                return (int) (dp(72) - bottomButtonsContainer.getTranslationY() - archivedStories * bottomButtonContainer[1].getTranslationY() - stories * bottomButtonContainer[0].getTranslationY());
+                return (int) (yuzNavClearance() + dp(72) - bottomButtonsContainer.getTranslationY() - archivedStories * bottomButtonContainer[1].getTranslationY() - stories * bottomButtonContainer[0].getTranslationY());
             }
 
             @Override
@@ -2843,10 +2843,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     int paddingBottom;
                     if (isInLandscapeMode || AndroidUtilities.isTablet()) {
                         paddingTop = AndroidUtilities.dp(88f);
-                        paddingBottom = 0;
+                        paddingBottom = yuzNavClearance();
                     } else {
                         paddingTop = listView.getMeasuredWidth();
-                        paddingBottom = Math.max(0, getMeasuredHeight() - (listContentHeight + AndroidUtilities.dp(88) + actionBarHeight));
+                        // YuzGram #119: oxirgi qatorlar 68dp nav bar OSTIDA
+                        // qolib ketmasligi chekinish padding'ga qo'shiladi.
+                        paddingBottom = Math.max(0, getMeasuredHeight() - (listContentHeight + AndroidUtilities.dp(88) + actionBarHeight)) + yuzNavClearance();
                     }
                     if (banFromGroup != 0) {
                         paddingBottom += AndroidUtilities.dp(48);
@@ -4445,10 +4447,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             textView.setText(LocaleController.getString("BanFromTheGroup", R.string.BanFromTheGroup));
             frameLayout1.addView(textView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 0, 1, 0, 0));
 
-            listView.setPadding(0, AndroidUtilities.dp(88), 0, AndroidUtilities.dp(48));
+            listView.setPadding(0, AndroidUtilities.dp(88), 0, AndroidUtilities.dp(48) + yuzNavClearance());
             listView.setBottomGlowOffset(AndroidUtilities.dp(48));
         } else {
-            listView.setPadding(0, AndroidUtilities.dp(88), 0, 0);
+            listView.setPadding(0, AndroidUtilities.dp(88), 0, yuzNavClearance());
         }
 
         topView = new TopView(context);
@@ -5042,7 +5044,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
         if (myProfile) {
             bottomButtonsContainer = new FrameLayout(context);
-            contentView.addView(bottomButtonsContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 72 + (1 / AndroidUtilities.density), Gravity.BOTTOM | Gravity.FILL_HORIZONTAL));
+            // YuzGram #119: story "post qo'shish" paneli 68dp pastki navigatsiya
+            // barining ORQASIGA tushib qoladi — ularni bar ustiga ko'taramiz.
+            contentView.addView(bottomButtonsContainer, LayoutHelper.createFrameMarginPx(LayoutHelper.MATCH_PARENT, 72 + (1 / AndroidUtilities.density), Gravity.BOTTOM | Gravity.FILL_HORIZONTAL, 0, 0, 0, yuzNavClearance()));
 
             bottomButtonContainer = new FrameLayout[2];
             bottomButton = new ButtonWithCounterView[2];
@@ -5169,11 +5173,21 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (bottomButtonsContainer == null) {
             return;
         }
-        bottomButtonsContainer.setTranslationY(sharedMediaLayout.isAttachedToWindow() ? Math.max(0, dp(72 + 64 + 48) - (listView.getMeasuredHeight() - sharedMediaLayout.getY())) : dp(72));
+        bottomButtonsContainer.setTranslationY(sharedMediaLayout.isAttachedToWindow() ? Math.max(0, dp(72 + 64 + 48) + yuzNavClearance() - (listView.getMeasuredHeight() - sharedMediaLayout.getY())) : dp(72) + yuzNavClearance());
         Bulletin bulletin = Bulletin.getVisibleBulletin();
         if (bulletin != null) {
             bulletin.updatePosition();
         }
+    }
+
+    /**
+     * YuzGram #119: pastki navigatsiya bar faqat bizning profil tab'ida
+     * (myProfile) ko'rinadi — shu holda pastki tugmalar/ro'yxat uchun
+     * chekinish (clearance) px'da qaytaramiz. Boshqa profillar oddiy
+     * Telegram joylashuvida qoladi.
+     */
+    private int yuzNavClearance() {
+        return myProfile ? uz.kodlikino.top4.ui.YuzGramBottomBar.height() : 0;
     }
 
     FrameLayout floatingButtonContainer;
