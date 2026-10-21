@@ -24,10 +24,12 @@ import androidx.media3.common.Player
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.AlertDialog
 import org.telegram.ui.ActionBar.BaseFragment
+import uz.kodlikino.top4.utils.YuzAnim
 import uz.kodlikino.top4.utils.YuzMusicCache
 import uz.kodlikino.top4.utils.YuzMusicEffects
 import uz.kodlikino.top4.utils.YuzMusicEngine
@@ -90,7 +92,9 @@ class YuzPlayerActivity : BaseFragment() {
         }
 
         override fun onPlayingChanged(playing: Boolean) {
-            btnPlay?.setImageResource(
+            // #128: uzluksiz ikon almashinuvi + pop.
+            YuzAnim.swapIcon(
+                btnPlay,
                 if (playing) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
             )
         }
@@ -236,13 +240,48 @@ class YuzPlayerActivity : BaseFragment() {
         tvArtist?.text = YuzMusicEngine.lastStatusText() ?: t.artist
         tvDur?.text = fmt(t.durationSec)
         if (t.coverUrl.isNotBlank()) {
-            ivCover?.let { Glide.with(it).load(t.coverUrl).into(it) }
+            // #128: muqova yangi qo'shiqqa silliq "erib" o'tadi.
+            ivCover?.let {
+                Glide.with(it).load(t.coverUrl)
+                    .transition(DrawableTransitionOptions.withCrossFade(260))
+                    .into(it)
+            }
         }
         ivHeart?.setImageResource(
             if (inFavorites(t)) R.drawable.ic_yuz_heart_filled else R.drawable.ic_yuz_heart
         )
         qAdapter?.notifyDataSetChanged()
         syncQueueEmpty()
+        syncDlState()
+    }
+
+    /**
+     * #128: yuklab olish tugmasining uch holati — "Yuklash" (oddiy),
+     * "Bekor" (ketayotgan, X ikon) va "Yuklangan" (taqicha, aktsent rangi).
+     */
+    private fun syncDlState() {
+        val t = YuzMusicEngine.currentTrack()
+        val icon = runCatching { root.findViewById<ImageView>(R.id.ivPlDlIcon) }.getOrNull()
+        val label = runCatching { root.findViewById<TextView>(R.id.tvPlDlLabel) }.getOrNull()
+        val busy = t != null && YuzMusicCache.isInflight(t.id)
+        val has = t != null && !busy && YuzMusicCache.isDownloaded(ctx, t.id)
+        icon?.setImageResource(
+            when {
+                busy -> R.drawable.ic_yuz_close
+                has -> R.drawable.ic_yuz_check
+                else -> R.drawable.ic_yuz_download
+            }
+        )
+        icon?.imageTintList =
+            ColorStateList.valueOf(color(if (has) R.color.yuz_action else R.color.yuz_text))
+        label?.text = ctx.getString(
+            when {
+                busy -> R.string.musiqa_pl_dl_cancel
+                has -> R.string.musiqa_pl_dl_done
+                else -> R.string.musiqa_pl_dl
+            }
+        )
+        label?.setTextColor(color(if (has) R.color.yuz_action else R.color.yuz_text_secondary))
     }
 
     private fun syncButtons() {
@@ -274,6 +313,7 @@ class YuzPlayerActivity : BaseFragment() {
         if (cur != null) ivHeart?.setImageResource(
             if (inFavorites(cur)) R.drawable.ic_yuz_heart_filled else R.drawable.ic_yuz_heart
         )
+        syncDlState()
     }
 
     private fun color(res: Int) = ContextCompat.getColor(ctx, res)
@@ -304,7 +344,8 @@ class YuzPlayerActivity : BaseFragment() {
         val sp = speedPanel ?: return
         val show = sp.visibility != View.VISIBLE
         if (show) syncSpeedChips(sp)
-        sp.visibility = if (show) View.VISIBLE else View.GONE
+        // #128: panel alfavit + kichik masshtab bilan silliq ochiladi/yopiladi.
+        YuzAnim.fadePanel(sp, show)
     }
 
     private fun buildSpeedPanel() {
@@ -348,10 +389,14 @@ class YuzPlayerActivity : BaseFragment() {
     private fun toggleQueuePanel() {
         val qp = queuePanel ?: return
         val show = qp.visibility != View.VISIBLE
-        qp.visibility = if (show) View.VISIBLE else View.GONE
+        // #128: navbat paneli pastdan "shirib" kiradi, pastga tushib chiqadi.
+        val px = qp.height.takeIf { it > 0 } ?: qp.layoutParams.height.toFloat()
         if (show) {
             qAdapter?.notifyDataSetChanged()
             syncQueueEmpty()
+            YuzAnim.slideInUp(qp, px.toFloat(), 320L)
+        } else {
+            YuzAnim.slideOutDown(qp, px.toFloat())
         }
     }
 
@@ -463,6 +508,8 @@ class YuzPlayerActivity : BaseFragment() {
         }
         Toast.makeText(ctx, R.string.musiqa_dl_started, Toast.LENGTH_SHORT).show()
         dlCanceled = false
+        // #128: tugma darhol "Bekor" + X holatiga o'tadi.
+        syncButtons()
         val btn = root.findViewById<View>(R.id.btnPlDl)
         dlPulse?.cancel()
         dlPulse = if (btn != null) ObjectAnimator.ofFloat(btn, "alpha", 0.95f, 0.2f).apply {
@@ -478,7 +525,15 @@ class YuzPlayerActivity : BaseFragment() {
             btn?.alpha = 1f
             if (dlCanceled && !ok) {
                 dlCanceled = false
+                // #128: bekor qilishdan keyin tugma oddiy ↓ holatiga qaytadi.
+                syncDlState()
                 return@download
+            }
+            syncDlState()
+            if (ok) {
+                // #128: yuklangandan so'ng tugma "Yuklangan" + check bo'lib
+                // neon pop bilan yangilanadi.
+                root.findViewById<View>(R.id.btnPlDl)?.let { YuzAnim.pop(it) }
             }
             Toast.makeText(ctx,
                 if (ok) R.string.musiqa_dl_done else R.string.musiqa_dl_fail,

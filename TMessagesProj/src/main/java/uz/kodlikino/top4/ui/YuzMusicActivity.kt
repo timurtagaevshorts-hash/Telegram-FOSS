@@ -32,6 +32,7 @@ import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.AlertDialog
 import org.telegram.ui.ActionBar.BaseFragment
+import uz.kodlikino.top4.utils.YuzAnim
 import uz.kodlikino.top4.utils.YuzMusicCache
 import uz.kodlikino.top4.utils.YuzMusicEffects
 import uz.kodlikino.top4.utils.YuzMusicEngine
@@ -118,7 +119,12 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         }
 
         override fun onPlayingChanged(playing: Boolean) {
-            btnPlayPause?.setImageResource(if (playing) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play)
+            // #128: play/pause almashinuvi uzluksiz — ikon so'nadi, yangisi
+            // "pop" bilan chiqadi.
+            YuzAnim.swapIcon(
+                btnPlayPause,
+                if (playing) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
+            )
             syncPlayingMark()
         }
 
@@ -173,7 +179,12 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
                 true
             } else false
         }
-        root.findViewById<View>(R.id.btnMusiqaSaved)?.setOnClickListener { showCollections() }
+        // #128: "Yuklanganlar" endi alohida chiroyli papka ekrani;
+        // kolleksiyalar (playlistlar/radio) qo'shni ikon tugmada qoldi.
+        root.findViewById<View>(R.id.btnMusiqaSaved)?.setOnClickListener {
+            presentFragment(YuzDownloadsActivity(), false)
+        }
+        root.findViewById<View>(R.id.btnMusiqaCollections)?.setOnClickListener { showCollections() }
 
         // YuzGram #116: tayyor qidiruv tugmalari.
         chipGroup = root.findViewById(R.id.chipGroupMusiqaPreset)
@@ -332,20 +343,53 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         }
         val pos = currentList.indexOfFirst { it.id == cur.id }
         adapter.setPlaying(pos)
-        btnDl?.alpha = if (YuzMusicCache.isDownloaded(ctx, cur.id)) 1.0f else 0.6f
+        syncDlBtn(cur.id)
+    }
+
+    /**
+     * #128: plerdagi yuklab olish tugmasining uch holati — Yuklab olish /
+     * Bekor qilish (X) / Yuklangan (taqicha, aktsent rangi).
+     */
+    private fun syncDlBtn(id: Long) {
+        val b = btnDl ?: return
+        val busy = id in downloadingIds || YuzMusicCache.isInflight(id)
+        val has = !busy && YuzMusicCache.isDownloaded(ctx, id)
+        b.setImageResource(
+            when {
+                busy -> R.drawable.ic_yuz_close
+                has -> R.drawable.ic_yuz_check
+                else -> R.drawable.ic_yuz_download
+            }
+        )
+        b.imageTintList = android.content.res.ColorStateList.valueOf(
+            androidx.core.content.ContextCompat.getColor(
+                ctx, if (has) R.color.yuz_action else R.color.yuz_text
+            )
+        )
+        b.alpha = if (busy || has) 1.0f else 0.6f
     }
 
     private fun updateBarTrack(track: YuzTrack) {
-        playerBar?.visibility = View.VISIBLE
+        val bar = playerBar ?: return
+        if (bar.visibility != View.VISIBLE) {
+            // #128: bar birinchi marta paydo bo'lganda pastdan silliq ko'tariladi.
+            YuzAnim.slideInUp(bar, AndroidUtilities.dp(96f))
+        } else {
+            bar.visibility = View.VISIBLE
+        }
         tvPlayerTitle?.text = track.title
         tvPlayerArtist?.text = YuzMusicEngine.lastStatusText() ?: track.artist
         tvPlayerDur?.text = String.format("%d:%02d", track.durationSec / 60, track.durationSec % 60)
         seek?.progress = 0
         tvPlayerPos?.text = "0:00"
-        btnDl?.alpha = if (YuzMusicCache.isDownloaded(ctx, track.id)) 1.0f else 0.6f
+        syncDlBtn(track.id)
         btnLoop?.alpha = if (looping) 1.0f else 0.45f
         if (track.coverUrl.isNotBlank()) {
-            ivPlayerCover?.let { Glide.with(it).load(track.coverUrl).into(it) }
+            ivPlayerCover?.let {
+                Glide.with(it).load(track.coverUrl)
+                    .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade(240))
+                    .into(it)
+            }
         } else {
             ivPlayerCover?.setImageDrawable(null)
         }
@@ -585,11 +629,8 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             .setItems(labels.toTypedArray()) { _, which ->
                 when {
                     which == 0 -> {
-                        offlineMode = true
-                        listSource = 0
-                        setStatus(if (downloaded.isEmpty()) R.string.musiqa_saved_empty
-                        else R.string.musiqa_saved_btn)
-                        applyList(downloaded)
+                        // #128: yuklanganlar — endi chiroyli mustaqil papka ekrani.
+                        presentFragment(YuzDownloadsActivity(), false)
                     }
                     which <= playlists.size -> {
                         val pl = playlists[which - 1]
@@ -727,9 +768,15 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             val wasCancel = canceledIds.remove(track.id) && !ok
             if (destroyed) return@download
             adapter.setDownloading(downloadingIds)
-            if (wasCancel) return@download
+            if (wasCancel) {
+                syncDlBtn(track.id)
+                return@download
+            }
             adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
             syncPlayingMark()
+            // #128: tugagan yuklash tugmani "Yuklangan"ga aylantirib, pop qiladi.
+            syncDlBtn(track.id)
+            if (ok) YuzAnim.pop(btnDl)
             Toast.makeText(ctx,
                 if (ok) R.string.musiqa_dl_done else R.string.musiqa_dl_fail,
                 Toast.LENGTH_SHORT).show()

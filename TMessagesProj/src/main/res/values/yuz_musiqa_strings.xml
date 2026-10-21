@@ -88,4 +88,11 @@
     <string name="musiqa_chip_ommabop">Ommabop</string>
     <string name="musiqa_chip_most">Eng ko\u2019p eshitilgan</string>
     <string name="musiqa_chip_ru">Russian xitlari</string>
+    <!-- YuzGram #128: silliq animatsiyalar + yuklangan holat + papka ekrani -->
+    <string name="musiqa_pl_dl_cancel">Bekor</string>
+    <string name="musiqa_pl_dl_done">Yuklangan</string>
+    <string name="musiqa_dl_folder_title">Yuklab olinganlar</string>
+    <string name="musiqa_dl_summary">%1$d trek \u2022 %2$s</string>
+    <string name="musiqa_dl_folder_empty">Hali yuklangan trek yo\'q</string>
+    <string name="musiqa_dl_folder_hint">Pleyerdagi tugma bilan qo\'shiqni keshga saqlang — ular shu papkada offline ijro etiladi.</string>
 </resources>

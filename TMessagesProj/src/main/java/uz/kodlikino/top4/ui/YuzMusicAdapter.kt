@@ -1,11 +1,13 @@
 package uz.kodlikino.top4.ui
 
+import android.content.res.ColorStateList
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import org.telegram.messenger.R
@@ -148,10 +150,19 @@ class YuzMusicAdapter(
         }
         // #109: busy holatda tugma — bekor qilish (X), qator ostida esa
         // gradient progress chizig'i foiz bo'yicha cho'ziladi.
+        // #128: yuklangan qator endi ANIQL ko'rinadi — taqicha (check) aktsent
+        // rangida; yuklanayotgan — X; oddiy — pastki nuqta yo'q shakl.
         h.dl.setImageResource(
-            if (busy) R.drawable.ic_yuz_close else R.drawable.ic_yuz_download
+            when {
+                busy -> R.drawable.ic_yuz_close
+                has -> R.drawable.ic_yuz_check
+                else -> R.drawable.ic_yuz_download
+            }
         )
         h.dl.alpha = if (busy || has) 1.0f else 0.55f
+        h.dl.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(
+            h.dl.context, if (has) R.color.yuz_action else R.color.yuz_text_secondary
+        ))
         h.dlBox.visibility = if (busy) View.VISIBLE else View.GONE
         if (busy) h.dlFill.scaleX = pct / 100f
         h.dl.setOnClickListener { onDownload(t, h.adapterPosition) }

@@ -40,6 +40,14 @@
             android:textSize="@dimen/yuz_text_title"
             android:textStyle="bold" />
 
+        <!-- YuzGram #128: kolleksiyalar (playlistlar/radio) — ikon tugma -->
+        <ImageButton
+            android:id="@+id/btnMusiqaCollections"
+            style="@style/YuzIconButton"
+            android:contentDescription="@string/musiqa_collections"
+            android:src="@drawable/ic_yuz_box"
+            app:tint="@color/yuz_text_secondary" />
+
         <!-- YuzGram #62: keshdagi qo'shiqlar ro'yxatiga o'tish tugmasi -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnMusiqaSaved"

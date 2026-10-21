@@ -285,6 +285,7 @@
                 android:paddingVertical="@dimen/yuz_space_2">
 
                 <ImageView
+                    android:id="@+id/ivPlDlIcon"
                     android:layout_width="@dimen/yuz_icon"
                     android:layout_height="@dimen/yuz_icon"
                     android:contentDescription="@null"
@@ -292,6 +293,7 @@
                     app:tint="@color/yuz_text" />
 
                 <TextView
+                    android:id="@+id/tvPlDlLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/yuz_space_1"
