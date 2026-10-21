@@ -96,9 +96,14 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private val tick = object : Runnable {
         override fun run() {
             updateProgress()
+            // #115: yuklanayotgan qatorlar (shu sahifa yoki boshqa ekran
+            // boshlagan) foizi jonli yuradi; tugaganlari ro'yxatdan
+            // chiqariladi — "Yuklanganlar" ham shu orqali yangilanadi.
+            refreshDownloading()
             ui.postDelayed(this, 500)
         }
     }
+    private var fxListener: Player.Listener? = null
 
     private val observer = object : YuzMusicEngine.Observer {
         override fun onItemChanged(item: MediaItem?) {
@@ -168,11 +173,17 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         setupPlayerBar(root)
 
         YuzMusicEngine.ensurePlayer(ctx).apply {
-            addListener(object : Player.Listener {
+            val l = object : Player.Listener {
                 override fun onPlaybackStateChanged(state: Int) {
+                    if (destroyed) return
                     if (state == Player.STATE_READY) attachEffects()
                 }
-            })
+            }
+            // #115: listener singleton pleyerga qo'shiladi — o'chirmasa
+            // bu sahifa butun umrini yodda ushlab, buzilgan view'larga
+            // urilar edi.
+            fxListener = l
+            addListener(l)
             if (playbackState == Player.STATE_READY) attachEffects()
         }
         YuzMusicEngine.addObserver(observer)
@@ -342,6 +353,28 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         tvPlayerDur?.text = String.format("%d:%02d", d / 60, d % 60)
     }
 
+    /**
+     * YuzGram #115: yuklanayotgan qatorlarni reyestr bo'yicha jonli ushlab
+     * turadi: yangi foizni qatorga yetkazadi, reyestrdan chiqqan (tugagan)
+     * id'larni holatdan tushirib "Yuklanganlar"ni qayta chizadi. Boshqa
+     * ekrandan (pler) boshlangan yuklash ham shu yerda tirik ko'rinadi.
+     */
+    private fun refreshDownloading() {
+        val live = YuzMusicCache.inflightIds()
+        val stale = ArrayList<Long>()
+        for (id in downloadingIds) if (id !in live) stale.add(id)
+        if (stale.isNotEmpty()) {
+            downloadingIds.removeAll(stale.toSet())
+            // canceledIds'ga tegmaymiz — uni faqat yuklashning o'z onDone
+            // callback'i iste'mol qiladi (bekor qilish toast-suppression'i).
+            adapter.setDownloading(downloadingIds)
+            adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
+            if (offlineMode) applyList(YuzMusicCache.downloadedTracks(ctx))
+            syncPlayingMark()
+        }
+        for (id in downloadingIds) adapter.setProgress(id, YuzMusicCache.inflightPct(id))
+    }
+
     // -------------------------------------------------------------- search
 
     private fun runSearch() {
@@ -467,6 +500,11 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private fun showCollections() {
         val playlists = YuzMusicEngine.playlists(ctx)
         val downloaded = YuzMusicCache.downloadedTracks(ctx)
+        // YuzGram #115: yuklanayotgan qatorlar bu ro'yxatning tepasida
+        // jonli holat (foiz+tezlik) bilan chiziladi — reyestrdagi id'larni
+        // UI ham "davom etmoqda" deb bilishi kerak.
+        downloadingIds.addAll(YuzMusicCache.inflightIds())
+        adapter.setDownloading(downloadingIds)
         val labels = ArrayList<String>()
         labels.add(ctx.getString(R.string.musiqa_saved_btn) + " (${downloaded.size})")
         for (pl in playlists) labels.add("${pl.name} (${pl.tracks.size})")
@@ -580,21 +618,21 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     // -------------------------------------------------------------- download
 
     private fun downloadTrack(track: YuzTrack) {
+        // YuzGram #115: davom etayotgan yuklash — har doim AVVAL bekor
+        // qilish tekshiriladi (oflayn rejimda turganda ham): boshqa ekrandan
+        // boshlangan yuklash "Yuklanganlar"dagi qatorda X bo'lib chiqadi.
+        if (track.id in downloadingIds || YuzMusicCache.isInflight(track.id)) {
+            if (track.id in downloadingIds && track.id !in canceledIds) {
+                canceledIds.add(track.id)
+            }
+            YuzMusicCache.cancel(track.id)
+            Toast.makeText(ctx, R.string.musiqa_dl_canceling, Toast.LENGTH_SHORT).show()
+            return
+        }
         if (offlineMode) {
             YuzMusicCache.remove(ctx, track.id)
             adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
             Toast.makeText(ctx, R.string.musiqa_dl_removed, Toast.LENGTH_SHORT).show()
-            return
-        }
-        // YuzGram #109: davom etayotgan qatorda tugma endi X — bosilsa
-        // yuklash bekor qilinadi. Qator reader gate'dan o'tib haqiqiy
-        // tugaguncha "davom etmoqda" bo'lib qoladi (takroriy bosish no-op).
-        if (track.id in downloadingIds) {
-            if (track.id !in canceledIds) {
-                canceledIds.add(track.id)
-                YuzMusicCache.cancel(track.id)
-                Toast.makeText(ctx, R.string.musiqa_dl_canceling, Toast.LENGTH_SHORT).show()
-            }
             return
         }
         if (YuzMusicCache.isDownloaded(ctx, track.id)) {
@@ -700,6 +738,9 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         ui.removeCallbacks(tick)
         scope.cancel()
         YuzMusicEngine.removeObserver(observer)
+        // #115: qo'shilgan pleyer listener'ini ham qaytaramiz.
+        fxListener?.let { YuzMusicEngine.playerOrNull()?.removeListener(it) }
+        fxListener = null
         // Player va ekvalayzer ENGINE'da qoladi — fon ijrosi uzilmasligi uchun
         // bu yerda release QILINMAYDI.
     }

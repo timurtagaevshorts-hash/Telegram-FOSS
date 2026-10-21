@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import org.telegram.messenger.R
+import uz.kodlikino.top4.utils.YuzMusicCache
 import uz.kodlikino.top4.utils.YuzTrack
 
 /**
@@ -60,6 +61,9 @@ class YuzMusicAdapter(
     /** #104: faqat shu qatorni qayta bog'laymiz — butun ro'yxatni emas. */
     fun setProgress(id: Long, pct: Int) {
         if (id !in downloadingIds) return
+        // #115: o'zgarmagan foizga qayta-bog'lash so'rovini yubormaymiz —
+        // jonli yangilanish (500ms tick) endi bir xil qiymatni ham beradi.
+        if (progressById[id] == pct) return
         progressById[id] = pct
         val pos = items.indexOfFirst { it.id == id }
         if (pos >= 0) notifyItemChanged(pos)
@@ -132,8 +136,13 @@ class YuzMusicAdapter(
         val has = t.id in downloadedIds
         val busy = t.id in downloadingIds
         // #104: yuklanayotgan qatorda davomiylik o'rniga foiz chiqadi.
+        // #115: yoniga taroq tezligi qo'shiladi — "↓ 47% 384K/s".
+        // Foiz/tezlik reyestrdan o'qiladi: boshqa ekrandan boshlangan
+        // yuklash ham shu ro'yxatda to'g'ri holatda chiziladi.
+        val pct = progressById[t.id] ?: YuzMusicCache.inflightPct(t.id)
+        val rate = YuzMusicCache.rateLabel(t.id)
         h.dur.text = when {
-            busy -> "↓ ${progressById[t.id] ?: 0}%"
+            busy -> if (rate.isEmpty()) "↓ $pct%" else "↓ $pct% $rate"
             t.durationSec <= 0 -> ""
             else -> String.format("%d:%02d", t.durationSec / 60, t.durationSec % 60)
         }
@@ -144,7 +153,7 @@ class YuzMusicAdapter(
         )
         h.dl.alpha = if (busy || has) 1.0f else 0.55f
         h.dlBox.visibility = if (busy) View.VISIBLE else View.GONE
-        if (busy) h.dlFill.scaleX = (progressById[t.id] ?: 0) / 100f
+        if (busy) h.dlFill.scaleX = pct / 100f
         h.dl.setOnClickListener { onDownload(t, h.adapterPosition) }
         h.itemView.setOnClickListener { onPlay(t, h.adapterPosition) }
         h.itemView.setOnLongClickListener {

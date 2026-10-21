@@ -96,6 +96,43 @@ object YuzMusicCache {
     private val cancelFlags =
         java.util.concurrent.ConcurrentHashMap<Long, java.util.concurrent.atomic.AtomicBoolean>()
 
+    // YuzGram #115: davom etayotgan yuklashlar reyestri. "Yuklanganlar"
+    // ro'yxati endi tugallanganlarni EMAS, balki yarim ketayotgan qo'shiqlarni
+    // ham shu yerdan ko'radi; qatorlar foiz va tezlikni (KB/s) shu holatdan
+    // o'qiydi. Tezlik — EMA: birinchi namunadan so'ng 3:1 siljiyma o'rtacha.
+    private class Inflight(val track: YuzTrack) {
+        @JvmField var pct = 0
+        @JvmField var rate = 0
+        private var lastGot = 0L
+        private var lastAt = 0L
+        fun update(got: Long, expect: Long) {
+            if (expect > 0L) pct = ((got * 100) / expect).toInt().coerceIn(0, 99)
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (lastAt > 0L && got >= lastGot) {
+                val dt = now - lastAt
+                if (dt > 0L) {
+                    val inst = ((got - lastGot) * 1000L / dt).toInt()
+                    rate = if (rate == 0) inst else (rate * 3 + inst) / 4
+                }
+            }
+            lastGot = got
+            lastAt = now
+        }
+    }
+    private val inflight = java.util.concurrent.ConcurrentHashMap<Long, Inflight>()
+
+    fun isInflight(id: Long): Boolean = inflight.containsKey(id)
+    fun inflightIds(): Set<Long> = inflight.keys.toSet()
+    fun inflightPct(id: Long): Int = inflight[id]?.pct ?: 0
+
+    /** "128K/s" / "1.4M/s"; tezlik hali o'lchanmagan bo'lsa bo'sh satr. */
+    fun rateLabel(id: Long): String {
+        val b = inflight[id]?.rate ?: 0
+        if (b <= 0) return ""
+        val kb = b / 1024
+        return if (kb >= 1000) String.format("%.1fM/s", kb / 1000.0) else "$kbK/s"
+    }
+
     /** #109: davom etayotgan foydalanuvchi yuklashini to'xtatish. */
     fun cancel(id: Long) {
         cancelFlags[id]?.set(true)
@@ -108,13 +145,19 @@ object YuzMusicCache {
         val app = context.applicationContext
         val cancel = java.util.concurrent.atomic.AtomicBoolean(false)
         cancelFlags[track.id] = cancel
+        val st = Inflight(track)
+        inflight[track.id] = st
         var lastPct = -1
         val raw: (Long, Long) -> Unit = { got, expect ->
+            st.update(got, expect)
             if (expect > 0L) {
                 val pct = ((got * 100) / expect).toInt().coerceIn(0, 99)
                 if (pct != lastPct) {
                     lastPct = pct
-                    main.post { onProgress?.invoke(pct) }
+                    // #115: UI qayta bog'lash istisnosiy bekor qilingan
+                    // qatorda process'ni ushlab qolmasin — post tanasi
+                    // har doim qalqan ostida.
+                    main.post { runCatching { onProgress?.invoke(pct) } }
                 }
             }
         }
@@ -123,9 +166,13 @@ object YuzMusicCache {
             // reader har oyna ochishda tekshiradi va -1'da to'xtaydi.
             val gate = { if (cancel.get()) -1L else 0L }
             val ok = runCatching { downloadBlocking(app, track, gate, raw) }.getOrDefault(false)
-            cancelFlags.remove(track.id)
+            // #115: bayroq/faqat O'ZIMIZniki bilan birga o'chiriladi — foydalanuvchi
+            // yuklashni qayta boshlasa yangi ro'yxatdan o'tgan bayroq buzilmasin
+            // (eski ketma-ketlik bekor qilishni o'ldirar edi).
+            cancelFlags.remove(track.id, cancel)
+            inflight.remove(track.id, st)
             active.remove(track.id)
-            main.post { onDone(ok) }
+            main.post { runCatching { onDone(ok) } }
         }.start()
     }
 
@@ -330,7 +377,10 @@ object YuzMusicCache {
             runCatching { tmp.delete() }
             return CANCELED
         }
-        return if (complete && promote(context, tmp, id, stream.ext)) OK else FAIL
+        if (complete && promote(context, tmp, id, stream.ext)) return OK
+        // #115: FAIL yo'li — yarim yozilgan tmp qolmasligi kerak.
+        runCatching { tmp.delete() }
+        return FAIL
     }
 
     /** #109: bitta yarmni oxirigacha o'qib, to'g'ri offsetga yozadi. */
@@ -420,6 +470,14 @@ object YuzMusicCache {
                 }
             }
             Log.i(TAG, "download plain ${tmp.length()}B ext=${stream.ext}")
+            // YuzGram #115: tugallanmagan fayl qabul QILINMAYDI (range yo'li
+            // bilan bir xil qoida) — kesilgan mp3 keyin ijroda qotadi yoki
+            // xato beradi.
+            if (expect > 0 && got < expect) {
+                Log.i(TAG, "download plain truncated got=$got expect=$expect")
+                runCatching { tmp.delete() }
+                return false
+            }
             promote(context, tmp, id, stream.ext)
         } catch (e: Exception) {
             Log.i(TAG, "download plain ERR ${e.javaClass.simpleName} ${stream.url.take(60)}")
@@ -483,7 +541,18 @@ object YuzMusicCache {
                 )
             )
         }
-        return out.asReversed()
+        // YuzGram #115: yuklanayotgan (hali tugallanmagan) qo'shiqlar ham shu
+        // ro'yxatning tepasida ko'rinadi — UI ularni inflightPct/rateLabel
+        // orqali jonli holat bilan chizadi.
+        val doneIds = HashSet<Long>()
+        for (t in out) doneIds.add(t.id)
+        val live = ArrayList<YuzTrack>()
+        for ((id, s) in inflight) {
+            if (id in doneIds) continue
+            live.add(s.track)
+        }
+        live.sortByDescending { inflight[it.id]?.pct ?: 0 }
+        return live + out.asReversed()
     }
 
     fun downloadedIds(context: Context): Set<Long> {

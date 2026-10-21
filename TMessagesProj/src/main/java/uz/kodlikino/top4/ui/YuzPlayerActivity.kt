@@ -48,6 +48,11 @@ class YuzPlayerActivity : BaseFragment() {
     private var ivCover: ImageView? = null
     private var plPulse: View? = null
     private var dlPulse: ObjectAnimator? = null
+    // YuzGram #115: sahifa yopilgandan keyin fondagi yuklash tugashi UI'ni
+    // qayta urg'anda crash bo'lmasligi uchun holat bayroqlari.
+    private var destroyed = false
+    private var dlCanceled = false
+    private var plListener: Player.Listener? = null
     private var tvTitle: TextView? = null
     private var tvArtist: TextView? = null
     private var seek: SeekBar? = null
@@ -199,12 +204,17 @@ class YuzPlayerActivity : BaseFragment() {
 
         val p = YuzMusicEngine.ensurePlayer(ctx)
         if (p.playbackState == Player.STATE_READY) attachEffects()
-        p.addListener(object : Player.Listener {
+        val l = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
+                // #115: listener singleton pleyerga qo'shiladi — sahifa
+                // o'lgach undagi view'larga urilish xavfli.
+                if (destroyed) return
                 if (state == Player.STATE_READY) attachEffects()
                 showBuffering(state == Player.STATE_BUFFERING)
             }
-        })
+        }
+        plListener = l
+        p.addListener(l)
         YuzMusicEngine.addObserver(observer)
 
         YuzMusicEngine.currentTrack()?.let { bind(it) }
@@ -426,11 +436,20 @@ class YuzPlayerActivity : BaseFragment() {
 
     private fun download() {
         val t = YuzMusicEngine.currentTrack() ?: return
+        // YuzGram #115: yuklash ketayotgan bo'lsa — tugma uni bekor qiladi
+        // (avval "allready yuklangan" toasti bilan chalkash no-op edi).
+        if (YuzMusicCache.isInflight(t.id)) {
+            dlCanceled = true
+            YuzMusicCache.cancel(t.id)
+            Toast.makeText(ctx, R.string.musiqa_dl_canceling, Toast.LENGTH_SHORT).show()
+            return
+        }
         if (YuzMusicCache.isDownloaded(ctx, t.id)) {
             Toast.makeText(ctx, R.string.musiqa_dl_exists, Toast.LENGTH_SHORT).show()
             return
         }
         Toast.makeText(ctx, R.string.musiqa_dl_started, Toast.LENGTH_SHORT).show()
+        dlCanceled = false
         val btn = root.findViewById<View>(R.id.btnPlDl)
         dlPulse?.cancel()
         dlPulse = if (btn != null) ObjectAnimator.ofFloat(btn, "alpha", 0.95f, 0.2f).apply {
@@ -440,9 +459,14 @@ class YuzPlayerActivity : BaseFragment() {
             start()
         } else null
         YuzMusicCache.download(ctx, t) { ok ->
+            if (destroyed) return@download
             dlPulse?.cancel()
             dlPulse = null
             btn?.alpha = 1f
+            if (dlCanceled && !ok) {
+                dlCanceled = false
+                return@download
+            }
             Toast.makeText(ctx,
                 if (ok) R.string.musiqa_dl_done else R.string.musiqa_dl_fail,
                 Toast.LENGTH_SHORT).show()
@@ -530,7 +554,13 @@ class YuzPlayerActivity : BaseFragment() {
 
     override fun onFragmentDestroy() {
         super.onFragmentDestroy()
+        // #115: fondagi yuklash/ijro callback'lari bu sahifaga urilmasin.
+        destroyed = true
         ui.removeCallbacks(tick)
+        runCatching { dlPulse?.cancel() }
+        dlPulse = null
         YuzMusicEngine.removeObserver(observer)
+        plListener?.let { YuzMusicEngine.playerOrNull()?.removeListener(it) }
+        plListener = null
     }
 }

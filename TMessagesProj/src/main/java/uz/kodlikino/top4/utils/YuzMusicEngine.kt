@@ -102,7 +102,12 @@ object YuzMusicEngine {
     @Volatile
     var radio = true
 
-    private val seenIds = HashSet<Long>()
+    // YuzGram #115: main IP (playQueue/enqueue) VA extendQueue ipi bir vaqtda
+    // tegadi — oddiy HashSet ConcurrentModificationException bilan crash
+    // berishi mumkin edi; concurrent set shu poygani yopadi.
+    private val seenIds = java.util.Collections.newSetFromMap(
+        java.util.concurrent.ConcurrentHashMap<Long, Boolean>()
+    )
     private var extending = false
     // YuzGram #98: radio navbatni cheksiz davom ettiradi — urinishlar soni
     // va qaysi "hit" so'rovi bilan davom etgani shu yerda yuritiladi.
@@ -535,14 +540,20 @@ object YuzMusicEngine {
         val seeds = ArrayList<String>()
         if (artist.isNotEmpty()) seeds.add(artist)
         if (artist.isNotEmpty() && anchor != null) seeds.add((artist + " " + anchor.title).trim())
-        seeds.add(hitSeeds[seedRotate++ % hitSeeds.size])
+        // #115: seedRotate'ni modlusida aylantiramiz — cheksiz o'sib Int
+        // chegarasidan o'tsa manfiy qoldiq (negative index) crash berar edi.
+        seeds.add(hitSeeds[seedRotate])
+        seedRotate = (seedRotate + 1) % hitSeeds.size
         Log.i(TAG, "extendQueue seeds=$seeds attempt=$extendAttempts")
         val appended = ArrayList<YuzTrack>()
         Thread {
             var i = 0
             while (appended.size < 10 && i < seeds.size) {
                 val q = seeds[i++]
-                val more = YuzMusicGateway.search(q, 20)
+                // #115: gateway izlanuvlisi istisno otsa butun ip crash
+                // bo'lardi — har urinish alohida qalq ostida.
+                val more = runCatching { YuzMusicGateway.search(q, 20) }
+                    .getOrDefault(emptyList())
                     .ifEmpty { runCatching { YuzYouTubeApi.search(q, 20) }.getOrDefault(emptyList()) }
                 for (t in more) {
                     if (appended.size >= 10) break
@@ -550,28 +561,32 @@ object YuzMusicEngine {
                 }
             }
             ui.post {
-                extending = false
-                if (appended.isEmpty()) {
-                    // navbat bo'sh qolmasin — bir marta kechikib qayta urinadi
-                    val p = player
-                    if (radio && p != null && p.playbackState == Player.STATE_ENDED) {
-                        ui.postDelayed({
-                            val pp = player ?: return@postDelayed
-                            if (pp.playbackState == Player.STATE_ENDED) extendQueue(retryStart = true)
-                        }, 3000L)
+                // #115: post tanasidagi istisno bevosita process crash bo'ladi —
+                // butun holatlashuv qalq ostida.
+                runCatching {
+                    extending = false
+                    if (appended.isEmpty()) {
+                        // navbat bo'sh qolmasin — bir marta kechikib qayta urinadi
+                        val p = player
+                        if (radio && p != null && p.playbackState == Player.STATE_ENDED) {
+                            ui.postDelayed({
+                                val pp = player ?: return@postDelayed
+                                if (pp.playbackState == Player.STATE_ENDED) extendQueue(retryStart = true)
+                            }, 3000L)
+                        }
+                        return@post
                     }
-                    return@post
+                    val p = player ?: return@post
+                    extendAttempts = 0
+                    queueTracks = queueTracks + appended
+                    p.addMediaItems(appended.map { buildItem(it) })
+                    if (retryStart) {
+                        postStatus(null)
+                        p.prepare()
+                        p.playWhenReady = true
+                    }
+                    for (o in observers) runCatching { o.onItemChanged(p.currentMediaItem) }
                 }
-                val p = player ?: return@post
-                extendAttempts = 0
-                queueTracks = queueTracks + appended
-                runCatching { p.addMediaItems(appended.map { buildItem(it) }) }
-                if (retryStart) {
-                    postStatus(null)
-                    p.prepare()
-                    p.playWhenReady = true
-                }
-                for (o in observers) runCatching { o.onItemChanged(p.currentMediaItem) }
             }
         }.start()
     }
