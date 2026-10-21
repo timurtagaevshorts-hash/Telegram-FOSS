@@ -373,7 +373,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         val bar = playerBar ?: return
         if (bar.visibility != View.VISIBLE) {
             // #128: bar birinchi marta paydo bo'lganda pastdan silliq ko'tariladi.
-            YuzAnim.slideInUp(bar, AndroidUtilities.dp(96f))
+            YuzAnim.slideInUp(bar, AndroidUtilities.dp(96f).toFloat())
         } else {
             bar.visibility = View.VISIBLE
         }
