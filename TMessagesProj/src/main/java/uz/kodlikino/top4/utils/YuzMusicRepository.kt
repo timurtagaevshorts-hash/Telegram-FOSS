@@ -80,6 +80,31 @@ object YuzMusicRepository {
         return out.values.toList()
     }
 
+    // YuzGram #116: tezkor qidiruv tugmalari seed hovuzlari.
+    val seedsMostPlayed = arrayOf(
+        "eng kop eshitilgan qoshiklar",
+        "most listened songs 2026",
+        "top hits most played",
+        "eng mashhur qoshiklar 2026"
+    )
+    val seedsRussianHits = arrayOf(
+        "russkie hity 2026",
+        "top russian hits",
+        "russkaya pop muzyka novinki 2026",
+        "russkie pop qoshiklar"
+    )
+
+    /** #116: seed ro'yxatini birmarom ko'rib, exclude'dan tashqari qatorlar. */
+    fun preset(seeds: Array<String>, exclude: Set<Long>, target: Int): List<YuzTrack> {
+        val out = LinkedHashMap<Long, YuzTrack>()
+        var i = 0
+        while (out.size < target && i < seeds.size) {
+            mergeInto(out, pull(seeds[i], 30), exclude)
+            i++
+        }
+        return out.values.toList()
+    }
+
     /**
      * #104: qidiruv natijalarini davom ettirish — so'rovga navbatdagi
      * variant qo'shib qayta qidiriladi (InnerTube'da offset yo'q), ko'rilgan

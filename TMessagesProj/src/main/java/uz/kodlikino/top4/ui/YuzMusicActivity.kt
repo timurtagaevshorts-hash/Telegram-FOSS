@@ -75,6 +75,11 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     // listSource: 0 = Kolleksiyalar (loadMore o'chiq), 1 = qidiruv, 2 = ommabop.
     private var destroyed = false
     private var listSource = 0
+    // YuzGram #116: tezkor qidiruv chiplari. presetIndex: 0=Ommabop,
+    // 1=Eng ko'p eshitilgan, 2=Russian xitlari, -1=foydalanuvchi qidiruvi.
+    private var chipGroup: com.google.android.material.chip.ChipGroup? = null
+    private var presetIndex = 0
+    private var presetSeeds: Array<String>? = null
     private var lastQuery: String? = null
     private val shownIds = HashSet<Long>()
     private var moreRound = 0
@@ -169,6 +174,10 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             } else false
         }
         root.findViewById<View>(R.id.btnMusiqaSaved)?.setOnClickListener { showCollections() }
+
+        // YuzGram #116: tayyor qidiruv tugmalari.
+        chipGroup = root.findViewById(R.id.chipGroupMusiqaPreset)
+        renderPresets()
 
         setupPlayerBar(root)
 
@@ -400,6 +409,12 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
                     setStatus(R.string.musiqa_results)
                     lastQuery = q
                     listSource = 1
+                    // #116: maxsus qidiruv — chip tanlanmasini olib tashlaymiz.
+                    if (presetIndex != -1) {
+                        presetIndex = -1
+                        presetSeeds = null
+                        renderPresets()
+                    }
                     applyList(list)
                 }
             }
@@ -410,6 +425,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         if (busy) return
         busy = true
         offlineMode = false
+        presetSeeds = null
         setLoading(skeleton = false, center = true)
         scope.launch {
             val list = try {
@@ -421,6 +437,56 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             setLoading(skeleton = false, center = false)
             if (list != null && list.isNotEmpty()) {
                 setStatus(R.string.musiqa_trending)
+                lastQuery = null
+                listSource = 2
+                applyList(list)
+            } else {
+                setStatus(R.string.musiqa_error)
+            }
+        }
+    }
+
+    /** #116: chip qatorini chizish — tanlangan tugma bo'lg'ab o'ladi. */
+    private fun renderPresets() {
+        val g = chipGroup ?: return
+        val items = listOf(
+            YuzChips.Item("ommabop", ctx.getString(R.string.musiqa_chip_ommabop)),
+            YuzChips.Item("most", ctx.getString(R.string.musiqa_chip_most)),
+            YuzChips.Item("ru", ctx.getString(R.string.musiqa_chip_ru))
+        )
+        YuzChips.fill(ctx, g, items, presetIndex) { idx -> presetClicked(idx) }
+    }
+
+    private fun presetClicked(idx: Int) {
+        if (busy || idx == presetIndex) return
+        presetIndex = idx
+        renderPresets()
+        when (idx) {
+            0 -> loadChart()
+            1 -> loadPreset(YuzMusicRepository.seedsMostPlayed, R.string.musiqa_chip_most)
+            else -> loadPreset(YuzMusicRepository.seedsRussianHits, R.string.musiqa_chip_ru)
+        }
+    }
+
+    /** #116: tanlangan tugmaning seed hovuzi bilan ro'yxat yuklash. */
+    private fun loadPreset(seeds: Array<String>, labelRes: Int) {
+        if (busy) return
+        busy = true
+        offlineMode = false
+        presetSeeds = seeds
+        etQuery.setText("")
+        setLoading(skeleton = false, center = true)
+        scope.launch {
+            val list = try {
+                withContextIo { YuzMusicRepository.preset(seeds, emptySet(), 25) }
+            } catch (_: Exception) {
+                null
+            }
+            busy = false
+            setLoading(skeleton = false, center = false)
+            if (list != null && list.isNotEmpty()) {
+                statusLabel = ctx.getString(labelRes)
+                statusView.text = statusLabel
                 lastQuery = null
                 listSource = 2
                 applyList(list)
@@ -470,12 +536,16 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         adapter.setLoadingMore(true)
         val round = moreRound
         val q = lastQuery
+        val seeds = presetSeeds
         val exclude = HashSet(shownIds)
         scope.launch {
             val more = try {
                 withContextIo {
-                    if (q != null) YuzMusicRepository.searchMore(q, exclude, round)
-                    else YuzMusicRepository.chartMore(exclude)
+                    when {
+                        q != null -> YuzMusicRepository.searchMore(q, exclude, round)
+                        seeds != null -> YuzMusicRepository.preset(seeds, exclude, 20)
+                        else -> YuzMusicRepository.chartMore(exclude)
+                    }
                 }
             } catch (_: Exception) {
                 null

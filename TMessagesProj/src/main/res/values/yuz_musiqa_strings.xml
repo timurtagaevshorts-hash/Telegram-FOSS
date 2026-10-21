@@ -84,4 +84,8 @@
     <!-- YuzGram #98: yuklanish animatsiyalari -->
     <string name="musiqa_hits_loading">Ommabop xitlar yuklanmoqda\u2026</string>
     <string name="musiqa_searching">Qo\u2019shiqlar qidirilmoqda\u2026</string>
+    <!-- YuzGram #116: tezkor qidiruv tugmalari -->
+    <string name="musiqa_chip_ommabop">Ommabop</string>
+    <string name="musiqa_chip_most">Eng ko\u2019p eshitilgan</string>
+    <string name="musiqa_chip_ru">Russian xitlari</string>
 </resources>

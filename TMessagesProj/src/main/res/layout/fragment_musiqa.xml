@@ -89,6 +89,27 @@
             app:cornerRadius="@dimen/yuz_radius_field" />
     </LinearLayout>
 
+    <!-- YuzGram #116: tayyor qidiruv tugmalari — bosish tegishli seed
+         so'rovi bilan ro'yxatni yuklaydi. -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipToPadding="false"
+        android:overScrollMode="never"
+        android:paddingStart="@dimen/yuz_space_4"
+        android:paddingEnd="@dimen/yuz_space_4"
+        android:scrollbars="none">
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chipGroupMusiqaPreset"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingBottom="@dimen/yuz_space_2"
+            app:chipSpacingHorizontal="8dp"
+            app:singleLine="true"
+            app:singleSelection="true" />
+    </HorizontalScrollView>
+
     <TextView
         android:id="@+id/tvMusiqaStatus"
         android:layout_width="match_parent"
