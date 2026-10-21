@@ -8187,6 +8187,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (fragmentView != null) {
             fragmentView.invalidate();
         }
+        // YuzGram #118: so'ng — qidiruv paneli ochilganda brend wordmark
+        // alpha'si shu yerda ham qayta hisoblanadi. Avval faqat
+        // scroll/action-mode sinxronida yangilanardi: shunda oq "Yuz"
+        // yorqin qidiruv paneli ustida qolib, native sarlavha bilan
+        // ustma-ust (oq+qora) chizilardi.
+        syncYuzBrandMark(1f - progressToActionMode);
         if (dialogsHintCell != null) {
             dialogsHintCell.setAlpha(1f - progress);
             if (dialogsHintCellVisible) {
