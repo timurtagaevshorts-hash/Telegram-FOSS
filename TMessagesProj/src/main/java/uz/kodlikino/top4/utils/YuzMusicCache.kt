@@ -130,7 +130,7 @@ object YuzMusicCache {
         val b = inflight[id]?.rate ?: 0
         if (b <= 0) return ""
         val kb = b / 1024
-        return if (kb >= 1000) String.format("%.1fM/s", kb / 1000.0) else "$kbK/s"
+        return if (kb >= 1000) String.format("%.1fM/s", kb / 1000.0) else "${kb}K/s"
     }
 
     /** #109: davom etayotgan foydalanuvchi yuklashini to'xtatish. */
