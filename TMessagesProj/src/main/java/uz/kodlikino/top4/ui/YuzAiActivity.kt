@@ -174,9 +174,11 @@ class YuzAiActivity : BaseFragment() {
         startRing()
         val s = scope
         val acc = currentAccount
-        // #127: nomlar hovuzi foydalanuvchi GAPIRGUNCHA IO'da quriladi — yozuv
-        // tugagach /voice so'rovi hovuzni kutmaydi (asosiy oqim block bo'lmaydi).
-        s.launch { withContext(Dispatchers.IO) { runCatching { YuzAiEngine.peers(acc) } } }
+        // #127: hovuz foydalanuvchi GAPIRGUNCHA main thread'da quriladi (scope —
+        // Main; kontrollerlar main'da chaqilishi shart). Yozuv tugaganda kesh
+        // TIRIK (30 s TTL) — /voice hovuzni kutmaydi, UI qotish yozuvda, ko'z
+        // tegmaydigan paytda bo'ladi.
+        s.launch { runCatching { YuzAiEngine.peers(acc) } }
         s.launch {
             val wav = try {
                 withContext(Dispatchers.IO) { recorder.recordBlocking() }
@@ -193,12 +195,9 @@ class YuzAiActivity : BaseFragment() {
             }
             if (parentActivity == null) { cloudBusy = false; return@launch }
             statusView.text = ctx.getString(R.string.ai_processing)
+            val names = YuzAiEngine.peers(acc).map { it.name }.take(120)
             val res = try {
-                // Hovuz + so'rov bitta IO blokada: main thread nom qurishda qotmaydi.
-                withContext(Dispatchers.IO) {
-                    val names = YuzAiEngine.peers(acc).map { it.name }.take(120)
-                    YuzAiCloud.voice(wav, names)
-                }
+                withContext(Dispatchers.IO) { YuzAiCloud.voice(wav, names) }
             } catch (_: Exception) {
                 null
             }
