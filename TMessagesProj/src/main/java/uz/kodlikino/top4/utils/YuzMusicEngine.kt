@@ -109,6 +109,12 @@ object YuzMusicEngine {
         java.util.concurrent.ConcurrentHashMap<Long, Boolean>()
     )
     private var extending = false
+    // #120: navbat generatsiyasi — playQueue/enqueue-swap'ida o'sadi.
+    // extendQueue fon qidiruvi tugaydigacha navbat butunlay almashtirilsa,
+    // eski ro'yxat urug'laridan yig'ilgan qo'shiqlar YANGI navbat oxiriga
+    // ilinib qolardi — generaatsiya farqlansa natija tashlab yuboriladi.
+    @Volatile
+    private var queueGen = 0
     // YuzGram #98: radio navbatni cheksiz davom ettiradi — urinishlar soni
     // va qaysi "hit" so'rovi bilan davom etgani shu yerda yuritiladi.
     private var extendAttempts = 0
@@ -283,6 +289,7 @@ object YuzMusicEngine {
         val bounded = list.take(150)
         val idx = startIndex.coerceIn(0, (bounded.size - 1).coerceAtLeast(0))
         queueTracks = bounded
+        queueGen++
         seenIds.clear()
         for (t in bounded) seenIds.add(t.id)
         YuzYouTubeApi.resetRotation()
@@ -301,6 +308,7 @@ object YuzMusicEngine {
         val item = buildItem(track)
         if (p.currentMediaItem == null) {
             queueTracks = listOf(track)
+            queueGen++
             p.setMediaItem(item)
             p.prepare()
             p.playWhenReady = true
@@ -383,7 +391,7 @@ object YuzMusicEngine {
         val index = from + 1
         Thread {
             val ok = runCatching {
-                YuzMusicCache.downloadBlocking(appCtx, t, ::backgroundGate)
+                YuzMusicCache.downloadBlockingExclusive(appCtx, t, ::backgroundGate)
             }.getOrDefault(false)
             Log.i(
                 TAG, "prebuffer vid=${t.videoId} ok=$ok " +
@@ -481,6 +489,14 @@ object YuzMusicEngine {
                 p.prepare()
                 p.playWhenReady = true
             }
+            // #120: STATE_BUFFERING ichida seekTo/prepare qayta
+            // onPlaybackStateChanged UYGMAYDI — watchdog qayta qurollansa
+            // yangi nomzod ham tiqilsa stall aniqlanadi, aks holda pleyer
+            // abadiy BUFFERING'da qolardi (give-up yo'li esa hech qachon
+            // ishlamasdi).
+            stallMark = android.os.SystemClock.elapsedRealtime()
+            ui.removeCallbacks(bufferingWatchdog)
+            ui.postDelayed(bufferingWatchdog, 2000L)
             return
         }
         itemRetries = 0
@@ -517,7 +533,7 @@ object YuzMusicEngine {
             // #86: shu yuklash KEYINGI qo'shiqni ijrosi bilan raqobatlashadi
             // — eshik ijroga birinchi navbat beradi.
             val ok = runCatching {
-                YuzMusicCache.downloadBlocking(appCtx, t, ::backgroundGate)
+                YuzMusicCache.downloadBlockingExclusive(appCtx, t, ::backgroundGate)
             }.getOrDefault(false)
             Log.i(TAG, "silentDownload vid=${t.videoId} ok=$ok")
             dlInFlight = false
@@ -567,6 +583,7 @@ object YuzMusicEngine {
             ?.let { if (it !in seeds) seeds.add(it) }
         Log.i(TAG, "extendQueue seeds=$seeds attempt=$extendAttempts")
         val appended = ArrayList<YuzTrack>()
+        val gen = queueGen
         Thread {
             var i = 0
             while (appended.size < 10 && i < seeds.size) {
@@ -593,6 +610,10 @@ object YuzMusicEngine {
                 // butun holatlashuv qalq ostida.
                 runCatching {
                     extending = false
+                    // #120: qidiruv ketayotganda navbat almashtirilsa (yangi
+                    // playQueue) — eski urug' natijalari yangi navbatga
+                    // ilinmasin.
+                    if (gen != queueGen) return@post
                     if (appended.isEmpty()) {
                         // navbat bo'sh qolmasin — bir marta kechikib qayta urinadi
                         val p = player

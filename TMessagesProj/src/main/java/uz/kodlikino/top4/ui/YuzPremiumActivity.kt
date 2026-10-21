@@ -194,8 +194,11 @@ class YuzPremiumActivity : BaseFragment() {
         override fun onPurchaseCompleted(planId: String, purchase: Purchase) {
             if (handledFinalStatus) return
             handledFinalStatus = true
-            val themed = themedContext ?: return
-            YuzPremiumManager.from(themed).setPlanType(currentAccount, planId)
+            // #120: callback destroy'dan keyin ham kelishi mumag — themedContext
+            // bo'lmasa ham grant'ni TO'XATMASLIK kerak (pullanuvchi pul to'lagan).
+            // Manager applicationContext bilan ishlaydi, shuning uchun xavfsiz.
+            val ctx = themedContext ?: org.telegram.messenger.ApplicationLoader.getContext()
+            YuzPremiumManager.from(ctx).setPlanType(currentAccount, planId)
             mainHandler.post {
                 if (fragmentView == null) return@post
                 showApproved(planId)
@@ -211,7 +214,8 @@ class YuzPremiumActivity : BaseFragment() {
         }
 
         override fun onExistingPurchaseRestored(planId: String) {
-            val themed = themedContext ?: return
+            // #120: restore ham destroy-keyin kelishi mumkin — app context fallback.
+            val themed = themedContext ?: org.telegram.messenger.ApplicationLoader.getContext()
             val manager = YuzPremiumManager.from(themed)
             // Premium Kino ustuniga To'liq Premium yetar — pastga tushirmaymiz.
             if (manager.isFullPremium(currentAccount) &&

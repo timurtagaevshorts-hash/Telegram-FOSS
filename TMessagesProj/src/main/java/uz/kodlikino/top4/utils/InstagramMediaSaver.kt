@@ -39,8 +39,12 @@ object InstagramMediaSaver {
 
     private fun displayName(fileName: String): String {
         val cleaned = fileName.trim().replace(Regex("[^A-Za-z0-9._-]"), "_")
+        // #120: non-latin nomlar tozalanaganda bo'sh qoladi — eski tekshiruv
+        // ".mp4" qo'shilgandan KEYINGI qiymatga qaragani uchun hech qachon
+        // bo'sh bo'lmadi va fayl shunchaki ".mp4" deb saqlanardi.
+        if (cleaned.isEmpty()) return "yuzgram_video.mp4"
         val withExt = if (cleaned.endsWith(".mp4", ignoreCase = true)) cleaned else "$cleaned.mp4"
-        return if (withExt.isBlank()) "yuzgram_video.mp4" else withExt
+        return if (withExt.equals(".mp4", ignoreCase = true)) "yuzgram_video.mp4" else withExt
     }
 
     private fun insertVideo(

@@ -65,11 +65,14 @@ object YuzReelPreloader {
         // Butun ish IO oqimida: [YuzVideoCache.cache] birinchi chaqiruvda
         // SimpleCache'ni disk + SQLite bilan ochadi — main thread'da bu
         // birinchi kadrni sekinlashtirishi mumkin.
+        // #120: NetworkReachability.kind() tizim IPC'si (ConnectivityManager) —
+        // uni ham main IP'da chaqirish snap paytida kadrni tortib
+        // qo'ymasligi uchun butun tekshiruv IO ichiga ko'chirildi.
         // Uzilgan tarmoqda keraksiz urinish va trafik sarfini oldini olamiz.
-        if (NetworkReachability.kind(context) == NetworkReachability.NetKind.NONE) return
         val gen = ++generation
         scope.launch {
             val app = context.applicationContext
+            if (NetworkReachability.kind(app) == NetworkReachability.NetKind.NONE) return@launch
             val limit = when (NetworkReachability.kind(app)) {
                 NetworkReachability.NetKind.WIFI -> WARM_BYTES_WIFI
                 NetworkReachability.NetKind.CELLULAR -> WARM_BYTES_CELLULAR

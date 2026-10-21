@@ -24,6 +24,21 @@ class YuzMusicEffects(private val context: Context) {
 
         private const val PREFS = "yuz_music_eq"
 
+        // #120: yagona ulashiladigan nusxa — avval har sahifa (pleyer,
+        // ro'yxat) o'z `YuzMusicEffects()`ini yaratar, chiqishda esa
+        // Equalizer/BassBoost release qilinmasdi: har safar audio session'ga
+        // yangi native effekt qo'shilib yig'ilib qarardi. Shared nusxa bir
+        // marta ochiladi, session o'zgarganda ensureSession o'zi qayta
+        // ulanadi, fon ijrosidagi EQ sozlamasi ham saqlanadi.
+        @Volatile
+        private var shared: YuzMusicEffects? = null
+
+        fun shared(context: Context): YuzMusicEffects {
+            return shared ?: synchronized(this) {
+                shared ?: YuzMusicEffects(context.applicationContext).also { shared = it }
+            }
+        }
+
         fun presetName(preset: Int): String = when (preset) {
             PRESET_FLAT -> "Flat"
             PRESET_BASS -> "Bass"

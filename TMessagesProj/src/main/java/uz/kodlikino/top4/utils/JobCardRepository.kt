@@ -126,23 +126,36 @@ object JobCardRepository {
         onUpdate: (List<JobCard>) -> Unit
     ): ListenerRegistration {
         val category = JobCardCategories.fromListingType(listingType)
-        val query = db.collection(COLLECTION_NAME)
+        // #120: fallback registration avval chiqindiga tushib qolardi —
+        // endi u ham qaytariladigan o'ram orqali remove() qilinadi.
+        val fallbackRef = java.util.concurrent.atomic.AtomicReference<ListenerRegistration?>(null)
+        val primary = db.collection(COLLECTION_NAME)
             .whereEqualTo("category", category)
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .limit(limit)
-
-        return query.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                Log.e(TAG, "listenActiveCards: ${error.message}", error)
-                if (error.message?.contains("index", ignoreCase = true) == true) {
-                    listenActiveCardsFallback(listingType, myUid, limit, onUpdate)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "listenActiveCards: ${error.message}", error)
+                    if (error.message?.contains("index", ignoreCase = true) == true &&
+                        fallbackRef.get() == null
+                    ) {
+                        fallbackRef.set(listenActiveCardsFallback(listingType, myUid, limit, onUpdate))
+                    }
+                    return@addSnapshotListener
                 }
-                return@addSnapshotListener
+                val list = snapshot?.documents?.mapNotNull { parseCard(it) }
+                    ?.filter { it.isPubliclyVisible() }
+                    ?: emptyList()
+                onUpdate(orderForFeed(list, myUid))
             }
-            val list = snapshot?.documents?.mapNotNull { parseCard(it) }
-                ?.filter { it.isPubliclyVisible() }
-                ?: emptyList()
-            onUpdate(orderForFeed(list, myUid))
+        return object : ListenerRegistration {
+            override fun remove() {
+                primary.remove()
+                fallbackRef.get()?.remove()
+            }
+
+            override fun areAllListenersComplete(): Boolean =
+                primary.areAllListenersComplete() && fallbackRef.get()?.areAllListenersComplete() != false
         }
     }
 

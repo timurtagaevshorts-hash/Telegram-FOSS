@@ -179,7 +179,9 @@ class JobCardDetailActivity(
         val themed = themedContext ?: return
         AlertDialog.Builder(themed)
             .setTitle(R.string.classified_delete_confirm_title)
-            .setMessage(R.string.classified_delete_confirm_message)
+            // #120: string'da %1$s placeholder bor — formatsiz "%1$s" deb
+            // ko'rinardi; kartaning nomi bilan to'ldiramiz.
+            .setMessage(themed.getString(R.string.classified_delete_confirm_message, card.title))
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.classified_delete) { _, _ -> deleteCard(card) }
             .show()

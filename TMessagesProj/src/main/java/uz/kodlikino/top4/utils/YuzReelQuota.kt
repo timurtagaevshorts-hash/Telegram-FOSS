@@ -7,7 +7,6 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
-import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
 
@@ -49,14 +48,21 @@ object YuzReelQuota {
     fun maxFileSizeLabel(isPremium: Boolean): String =
         if (isPremium) "${PREMIUM_MAX_FILE_MB} MB" else "${REGULAR_MAX_FILE_MB} MB"
 
-    /** Dushanbadan boshlanadigan hafta bucket'i (Toshkent vaqti). */
+    /**
+     * Dushanbadan boshlanadigan hafta bucket'i (Toshkent vaqti).
+     * #120: oldin Calendar.YEAR + WEEK_OF_YEAR ishlatilgani uchun yangi yil
+     * atrofida (29-31 dek = ISO W01 keyingi yil) yil/hafta RAHMAGI kelib,
+     * hafta o'rtasida kvot ertaga "siftarib" nolga tushardi. Endi epoch
+     * dushanbalaridan sanoqchi yagona butun son — chegaralar bir xil.
+     */
     fun weekKey(): String {
-        val cal = Calendar.getInstance(tashkentZone, Locale.US)
-        cal.firstDayOfWeek = Calendar.MONDAY
-        cal.minimalDaysInFirstWeek = 4
-        val year = cal.get(Calendar.YEAR)
-        val week = cal.get(Calendar.WEEK_OF_YEAR)
-        return String.format(Locale.US, "%d-W%02d", year, week)
+        val now = System.currentTimeMillis()
+        val localMs = now + tashkentZone.getOffset(now)
+        // 1970-01-01 — payshanba; birinchi DUSHANBA epoch'dan 4 kun keyin
+        // (1970-01-05). Zamonaviy sanalarda ayirmani musbat — butun bo'lish
+        // (floorDiv, API 24) o'rniga oddiy '/' xuddi shu natijani beradi.
+        val weekIndex = (localMs - 4L * 86_400_000L) / (7L * 86_400_000L)
+        return "W$weekIndex"
     }
 
     /** Joriy haftada ishlatilganlar soni (xatoda 0 — limitni sun'iy qisqartirmaydi). */

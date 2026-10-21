@@ -68,7 +68,14 @@ object YuzYouTubeApi {
         if (l.isEmpty()) return null
         val i = attempt[videoId] ?: 0
         // Rotatsiya rejimida (oldingisi 403 berdi) tartib bo'yicha keyingisi.
-        if (i > 0) return l[i % l.size]
+        // #120: bir martalik 403 video uchun rotatsiyani MAG'ULI QILIB
+        // qo'ymasligi uchun har bir muvaffaqiyatli resolve counter'ni
+        // pasaytiradi — uzluks ijro etilganda #86 throughput-tanlovga
+        // qaytamiz; yangi 403 noteBadStream() counter'ni yana ko'taradi.
+        if (i > 0) {
+            attempt[videoId] = i - 1
+            return l[i % l.size]
+        }
         return fitThroughput(l)
     }
 

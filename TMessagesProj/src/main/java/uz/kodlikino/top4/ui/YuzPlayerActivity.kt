@@ -43,7 +43,7 @@ class YuzPlayerActivity : BaseFragment() {
 
     private lateinit var ctx: Context
     private lateinit var root: View
-    private val effects by lazy { YuzMusicEffects(ctx) }
+    private val effects by lazy { YuzMusicEffects.shared(ctx) }
 
     private var ivCover: ImageView? = null
     private var plPulse: View? = null

@@ -105,6 +105,9 @@ class ReelsAdapter(
     var fullscreen = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    // #120: release() dan keyin post etilgan retry Runnable'lar faollashuvni
+    // qayta boshlab, o'lib ketgan ekranda yangi ExoPlayer yaratardi.
+    private var released = false
 
     // #99: xato/urinish holati — faol sahifa bo'yicha saqlanadi.
     private var playAttempts = 0
@@ -331,6 +334,7 @@ class ReelsAdapter(
     fun setActivePosition(pos: Int) = setActivePosition(pos, 0)
 
     private fun setActivePosition(pos: Int, attempt: Int) {
+        if (released) return
         if (pos < 0 || pos >= itemCount) return
         if (pos == activePos && activeHolder != null) return
         activePos = pos
@@ -531,6 +535,7 @@ class ReelsAdapter(
     }
 
     fun release() {
+        released = true
         mainHandler.removeCallbacks(progressTicker)
         cancelPendingRetry()
         cancelStoryPoll()
@@ -608,8 +613,10 @@ class ReelsAdapter(
         recyclerView?.findViewHolderForAdapterPosition(pos) as? PageHolder
 
     private fun compactCount(count: Int): String = when {
-        count >= 1_000_000 -> String.format("%.1fM", count / 1_000_000f)
-        count >= 1_000 -> String.format("%.1fk", count / 1_000f)
+        // #120: vergulli lokallarda (ru/uz) "%.1f" "1,2M" berar edi —
+        // loyihadagi boshqa son formatlari kabi Locale.US.
+        count >= 1_000_000 -> String.format(java.util.Locale.US, "%.1fM", count / 1_000_000f)
+        count >= 1_000 -> String.format(java.util.Locale.US, "%.1fk", count / 1_000f)
         else -> count.toString()
     }
 

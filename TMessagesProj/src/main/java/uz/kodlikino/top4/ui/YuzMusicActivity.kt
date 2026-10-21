@@ -63,7 +63,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     // "muvaffaqiyatsiz" toastini chiqmaslik uchun belgilanadi.
     private val canceledIds = HashSet<Long>()
 
-    private val effects by lazy { YuzMusicEffects(ctx) }
+    private val effects by lazy { YuzMusicEffects.shared(ctx) }
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var busy = false
 

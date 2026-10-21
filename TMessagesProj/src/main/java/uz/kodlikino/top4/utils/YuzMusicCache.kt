@@ -84,6 +84,11 @@ object YuzMusicCache {
     // tushib, faylni buzmasligi kerak).
     private val active = java.util.Collections.synchronizedSet(HashSet<Long>())
 
+    // #120: index (SharedPreferences JSON) read-modify-write — yuklash ipidagi
+    // addToIndex va main ipdagi touch bir vaqtda o'qisa, biri yo'qolardi
+    // ("Yuklanganlar"da qo'shiq tushib qolishi). Barcha RMW'lar shu lock ostida.
+    private val indexLock = Any()
+
     // YuzGram #109: shu hajmdan katta googlevideo fayllari IKKI ulanishda
     // parallel tortiladi (quyi va yuqori yarmi) — throttle har bir
     // alohida ulanishga qo'yiladi, shuning uchun taxminan 2 barobar tez.
@@ -101,8 +106,10 @@ object YuzMusicCache {
     // ham shu yerdan ko'radi; qatorlar foiz va tezlikni (KB/s) shu holatdan
     // o'qiydi. Tezlik — EMA: birinchi namunadan so'ng 3:1 siljiyma o'rtacha.
     private class Inflight(val track: YuzTrack) {
-        @JvmField var pct = 0
-        @JvmField var rate = 0
+        // #120: pct/rate yuklash ipida yoziladi, main ipda o'qiladi —
+        // volatile bo'lmasa UI eski qiymatni uzoq vaqt ko'rsatib qolishi mumkin.
+        @Volatile var pct = 0
+        @Volatile var rate = 0
         private var lastGot = 0L
         private var lastAt = 0L
         fun update(got: Long, expect: Long) {
@@ -141,7 +148,26 @@ object YuzMusicCache {
     /** Yo'ldan boshlab [onDone] UI ipida chaqiriladi (true = muvaffaqiyat).
      * [onProgress] 0..99 foizni asosiy ipda beradi. */
     fun download(context: Context, track: YuzTrack, onProgress: ((Int) -> Unit)? = null, onDone: (Boolean) -> Unit) {
-        if (!active.add(track.id)) return
+        if (!active.add(track.id)) {
+            // #120: id band (takror bosish yoki muhandislik fon yuklashi) —
+            // yangi oqim ochilmaydi, lekin qator "yuklanmoqda"da qotib
+            // qolmasin: fonga ketkazib, band bo'shayotganda natijani
+            // shu so'rovga yetkazamiz.
+            val app = context.applicationContext
+            val tid = track.id
+            Thread {
+                while (active.contains(tid)) {
+                    try {
+                        Thread.sleep(400L)
+                    } catch (_: InterruptedException) {
+                        break
+                    }
+                }
+                val ok = isDownloaded(app, tid)
+                main.post { runCatching { onDone(ok) } }
+            }.start()
+            return
+        }
         val app = context.applicationContext
         val cancel = java.util.concurrent.atomic.AtomicBoolean(false)
         cancelFlags[track.id] = cancel
@@ -174,6 +200,34 @@ object YuzMusicCache {
             active.remove(track.id)
             main.post { runCatching { onDone(ok) } }
         }.start()
+    }
+
+    /**
+     * #120: muhandislik (fon) yuklashlari ham single-flight'dan o'tadi.
+     * Avval prebuffer/silentDownload `downloadBlocking`ni to'g'ridan-to'g'ri
+     * chaqib, [active] ni aylanib o'tardi — foydalanuvchi tugmasi bilan bir
+     * vaqtda tushsa bitta .tmp'ga ikki oqim yozib faylni buzishi mumkin edi.
+     * Band bo'lsa false qaytaradi (chaqiruvchi keyinroq qayta urinadi).
+     */
+    fun downloadBlockingExclusive(
+        context: Context,
+        track: YuzTrack,
+        gate: (() -> Long)? = null
+    ): Boolean {
+        if (!active.add(track.id)) return false
+        // #120: UI "cancel" fon yuklashiga ham yetib boradi — qatorni bosib
+        // bekor qilsa fayl yarim holida keraksiz tortilmasligi kerak.
+        val cancel = java.util.concurrent.atomic.AtomicBoolean(false)
+        cancelFlags[track.id] = cancel
+        val g: () -> Long = {
+            if (cancel.get()) -1L else gate?.invoke() ?: 0L
+        }
+        try {
+            return downloadBlocking(context, track, g)
+        } finally {
+            cancelFlags.remove(track.id, cancel)
+            active.remove(track.id)
+        }
     }
 
     /**
@@ -368,8 +422,13 @@ object YuzMusicCache {
         upper.start()
         val lowerOk = runCatching { readHalf(ra, raf, got, lastEmit, total, progress) }
             .getOrDefault(false)
-        upper.join()
-        runCatching { raf.close() }
+        // #120: join uzilsa (InterruptedException) raf yopilmay FD sizib
+        // chiqardi — close'ni finally'ga o'tkazamiz.
+        try {
+            upper.join()
+        } finally {
+            runCatching { raf.close() }
+        }
         val canceled = ra.canceled || rb.canceled
         val complete = lowerOk && !upperFailed.get() && got.get() >= total
         Log.i(TAG, "download split got=${got.get()} expect=$total cancel=$canceled ok=$complete")
@@ -378,8 +437,10 @@ object YuzMusicCache {
             return CANCELED
         }
         if (complete && promote(context, tmp, id, stream.ext)) return OK
-        // #115: FAIL yo'li — yarim yozilgan tmp qolmasligi kerak.
-        runCatching { tmp.delete() }
+        // #120: FAIL yo'lida tmp'ni O'CHIRMAYMIZ — chaqiruvchi (271-277)
+        // tmp.length() orqali "bayt keldi-yo'qmi"ni ko'radi va o'zi
+        // tozalaydi. Eski ertalabki o'chirish check'ni doim-yolg'on
+        // qilib, 90% tortilgan faylni noldan ketma-ket qayta tortdirardi.
         return FAIL
     }
 
@@ -571,7 +632,7 @@ object YuzMusicCache {
         return if (f != null) f.toURI().toString() else track.previewUrl
     }
 
-    private fun addToIndex(context: Context, track: YuzTrack) {
+    private fun addToIndex(context: Context, track: YuzTrack) = synchronized(indexLock) {
         val arr = index(context)
         for (i in 0 until arr.length()) {
             if (arr.optJSONObject(i)?.optLong("id") == track.id) return
@@ -597,7 +658,7 @@ object YuzMusicCache {
      * LRU shu son bo'yicha qaror qiladi (eng kam eshitilgan birinchi ketadi).
      * Har trek boshlanishida bitta async prefs yozuvi — arzon.
      */
-    fun touch(context: Context, id: Long) {
+    fun touch(context: Context, id: Long) = synchronized(indexLock) {
         val arr = index(context)
         var changed = false
         for (i in 0 until arr.length()) {
@@ -643,7 +704,7 @@ object YuzMusicCache {
         return freed
     }
 
-    private fun removeIndex(context: Context, id: Long) {
+    private fun removeIndex(context: Context, id: Long) = synchronized(indexLock) {
         val arr = index(context)
         for (i in arr.length() - 1 downTo 0) {
             if (arr.optJSONObject(i)?.optLong("id") == id) arr.remove(i)

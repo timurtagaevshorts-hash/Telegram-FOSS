@@ -60,9 +60,15 @@ public final class YuzStories {
         ArrayList<TL_stories.PeerStories> list = controller.getDialogListStories();
         if (list != null) {
             for (TL_stories.PeerStories ps : list) {
-                long dialogId = DialogObject.getPeerDialogId(ps.peer);
-                if (dialogId != selfId && controller.hasStories(dialogId)) {
-                    peerIds.add(dialogId);
+                // #120: noto'g'ri/buzilgan peer butun "Hikoyalar" ko'rishni
+                // yiqitmasligi kerak — har bir peer alohida himoyalangan
+                // (YuzStoryFeed.buildFeed'dagi kabi).
+                try {
+                    long dialogId = DialogObject.getPeerDialogId(ps.peer);
+                    if (dialogId != selfId && controller.hasStories(dialogId)) {
+                        peerIds.add(dialogId);
+                    }
+                } catch (Exception ignore) {
                 }
             }
         }

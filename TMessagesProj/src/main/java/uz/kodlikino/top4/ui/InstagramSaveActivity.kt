@@ -156,7 +156,10 @@ class InstagramSaveActivity : BaseFragment() {
             setBusy(true, getString(R.string.instagram_save_downloading, 0))
             val downloaded = runCatching {
                 InstagramMediaResolver.downloadToCache(ctx, media) { percent ->
-                    tvProgress?.text = getString(R.string.instagram_save_downloading, percent)
+                    // #120: onProgress IO-dispatcher'dan keladi — TextView
+                    // faqat main thread'da yangilanadi.
+                    val v = tvProgress ?: return@downloadToCache
+                    v.post { v.text = getString(R.string.instagram_save_downloading, percent) }
                 }
             }
             setBusy(false, "")

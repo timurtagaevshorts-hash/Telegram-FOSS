@@ -453,7 +453,9 @@ class KinoAdminActivity : BaseFragment() {
                 .setPositiveButton(R.string.kino_admin_delete) { _, _ -> deleteMovie(movie) }
                 .show()
         } catch (_: Exception) {
-            deleteMovie(movie)
+            // #120: dialog ko'rsatib bo'lmasa, tasdiqsiz O'CHIRISH xavfli —
+            // beep va fail toast, delete emas.
+            toast(R.string.kino_admin_delete_dlg_failed)
         }
     }
 
@@ -498,7 +500,8 @@ class KinoAdminActivity : BaseFragment() {
                 .setPositiveButton(R.string.kino_admin_delete) { _, _ -> deleteReel(reel) }
                 .show()
         } catch (_: Exception) {
-            deleteReel(reel)
+            // #120: tasdiq dialogi ochilmasa — reel o'chirilmaydi (yuqoridagi kabi)
+            toast(R.string.kino_admin_delete_dlg_failed)
         }
     }
 
