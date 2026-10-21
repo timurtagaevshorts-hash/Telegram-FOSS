@@ -867,7 +867,11 @@ class ReelsAdapter(
                 storyThumb.clearImage()
                 return
             }
-            val filter = "yuzreel"
+            // #121: filter DOIM "kenglik_balandlik..." raqamli formatda
+            // bo'lishi shart — ImageLoader CacheOutTask animatsiya yo'lida
+            // args[0]/args[1]ni Float.parseFloat qiladi; "yuzreel" filtri
+            // NumberFormatException bilan fon ipini yiqqan edi.
+            val filter = "1000_1000"
             try {
                 if (reel.storyIsVideo) {
                     val doc = item.media?.getDocument()

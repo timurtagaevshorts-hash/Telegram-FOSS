@@ -888,10 +888,12 @@ public class ImageLoader {
                 if (cacheImage.filter != null) {
                     String[] args = cacheImage.filter.split("_");
                     if (args.length >= 2) {
-                        float w_filter = Float.parseFloat(args[0]);
-                        float h_filter = Float.parseFloat(args[1]);
-                        w = (int) (w_filter * AndroidUtilities.density);
-                        h = (int) (h_filter * AndroidUtilities.density);
+                        try { // #121: nomagnit filtr fon ipini yiqmasin
+                            float w_filter = Float.parseFloat(args[0]);
+                            float h_filter = Float.parseFloat(args[1]);
+                            w = (int) (w_filter * AndroidUtilities.density);
+                            h = (int) (h_filter * AndroidUtilities.density);
+                        } catch (NumberFormatException ignore) { }
                     }
                 }
                 Bitmap bitmap = null;
@@ -919,15 +921,17 @@ public class ImageLoader {
                 if (cacheImage.filter != null) {
                     String[] args = cacheImage.filter.split("_");
                     if (args.length >= 2) {
-                        float w_filter = Float.parseFloat(args[0]);
-                        float h_filter = Float.parseFloat(args[1]);
-                        w = Math.min(512, (int) (w_filter * AndroidUtilities.density));
-                        h = Math.min(512, (int) (h_filter * AndroidUtilities.density));
-                        if (w_filter <= 90 && h_filter <= 90 && !cacheImage.filter.contains("nolimit")) {
-                            w = Math.min(w, 160);
-                            h = Math.min(h, 160);
-                            limitFps = true;
-                        }
+                        try { // #121: nomagnit filtr fon ipini yiqmasin
+                            float w_filter = Float.parseFloat(args[0]);
+                            float h_filter = Float.parseFloat(args[1]);
+                            w = Math.min(512, (int) (w_filter * AndroidUtilities.density));
+                            h = Math.min(512, (int) (h_filter * AndroidUtilities.density));
+                            if (w_filter <= 90 && h_filter <= 90 && !cacheImage.filter.contains("nolimit")) {
+                                w = Math.min(w, 160);
+                                h = Math.min(h, 160);
+                                limitFps = true;
+                            }
+                        } catch (NumberFormatException ignore) { }
                         if (args.length >= 3 && "pcache".equals(args[2])) {
                             precache = true;
                         } else {
@@ -1050,13 +1054,17 @@ public class ImageLoader {
                 boolean pframe = false;
                 if (cacheImage.filter != null) {
                     String[] args = cacheImage.filter.split("_");
-                    if (args.length >= 2) {
-                        float w_filter = Float.parseFloat(args[0]);
-                        float h_filter = Float.parseFloat(args[1]);
-                        if (w_filter <= 90 && h_filter <= 90 && !cacheImage.filter.contains("nolimit")) {
-                            limitFps = true;
+                    // #121: nomagnit filtr fon ipini yiqmasin — CacheOutTask
+                    // pool ipida parseFloat crashni yutish kerak.
+                    try {
+                        if (args.length >= 2) {
+                            float w_filter = Float.parseFloat(args[0]);
+                            float h_filter = Float.parseFloat(args[1]);
+                            if (w_filter <= 90 && h_filter <= 90 && !cacheImage.filter.contains("nolimit")) {
+                                limitFps = true;
+                            }
                         }
-                    }
+                    } catch (NumberFormatException ignore) { }
                     for (int i = 0; i < args.length; i++) {
                         if ("pcache".equals(args[i])) {
                             precache = true;
@@ -1115,12 +1123,15 @@ public class ImageLoader {
                     int h = 0;
                     if (cacheImage.filter != null) {
                         String[] args = cacheImage.filter.split("_");
-                        if (args.length >= 2) {
-                            float w_filter = Float.parseFloat(args[0]);
-                            float h_filter = Float.parseFloat(args[1]);
-                            w = (int) (w_filter * AndroidUtilities.density);
-                            h = (int) (h_filter * AndroidUtilities.density);
-                        }
+                        // #121: nomagnit filtr fon ipini yiqmasin
+                        try {
+                            if (args.length >= 2) {
+                                float w_filter = Float.parseFloat(args[0]);
+                                float h_filter = Float.parseFloat(args[1]);
+                                w = (int) (w_filter * AndroidUtilities.density);
+                                h = (int) (h_filter * AndroidUtilities.density);
+                            }
+                        } catch (NumberFormatException ignore) { }
                     }
                     boolean createDecoder = fistFrame || (cacheImage.filter != null && ("d".equals(cacheImage.filter) || cacheImage.filter.contains("_d")));
                     TLRPC.Document document = notCreateStream ? null : cacheImage.imageLocation.document;
