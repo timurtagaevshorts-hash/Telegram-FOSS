@@ -192,7 +192,10 @@ class ReelsActivity @JvmOverloads constructor(
             })
             // Pastki bar: keyingi reel'ga o'tganda (pastga) g'oyib, oldingisiga
             // qaytganda (tepaga) darhol ko'rinadi — butun ilovadagi yagona xulq.
-            YuzGramBarAutoHide.attachTo(list, this)
+            try {
+                YuzGramBarAutoHide.attachTo(list, this)
+            } catch (_: Exception) {
+            }
         }
 
         root.findViewById<View>(R.id.btnPostReel)?.setOnClickListener { openCreate() }
@@ -233,9 +236,16 @@ class ReelsActivity @JvmOverloads constructor(
                 // Kesh ochilmasa ham feed islaydi — player oddiy network'ga chiqadi.
             }
         }
-        setupComments(root, themed)
+        // #113: izoh paneli buzilsa ham VIDEO TASMASI ishlaveradi.
+        try {
+            setupComments(root, themed)
+        } catch (_: Exception) {
+        }
         loadReels()
-        warmUpAuth()
+        try {
+            warmUpAuth()
+        } catch (_: Exception) {
+        }
         registerNetworkWatch()
         registerStoryWatch()
         return root
@@ -378,19 +388,24 @@ class ReelsActivity @JvmOverloads constructor(
 
     /** Snap tugagach: faol sahifani aniqlaymiz va videoni almashtiramiz. */
     private fun onPageSettled() {
-        val lm = layoutManager ?: return
-        val snap = snapHelper ?: return
-        val view = snap.findSnapView(lm) ?: return
-        val position = lm.getPosition(view)
-        if (position < 0 || position == selectedPosition) return
-        selectedPosition = position
-        // Boshqa reel'ga o'tdik: eski reel izohlari endi kerak emas.
-        if (commentsOpen) closeComments()
-        adapter?.setActivePosition(position)
-        refreshLikeState(currentReels.getOrNull(position)?.id)
-        // Eski loyiha mexanizmi: snap bo'lgach qo'shni reel'larni oldindan
-        // keshga tortamiz — keyingi o'tish deyarli lagsiz bo'ladi.
-        preloadNeighbours(position)
+        // #113: snap listener'i RecyclerView layout'idan CHAQILADI — bu yerdagi
+        // xato try/catch'li chaqiruv zanjiridan tashqarida crash bo'ladi.
+        try {
+            val lm = layoutManager ?: return
+            val snap = snapHelper ?: return
+            val view = snap.findSnapView(lm) ?: return
+            val position = lm.getPosition(view)
+            if (position < 0 || position == selectedPosition) return
+            selectedPosition = position
+            // Boshqa reel'ga o'tdik: eski reel izohlari endi kerak emas.
+            if (commentsOpen) closeComments()
+            adapter?.setActivePosition(position)
+            refreshLikeState(currentReels.getOrNull(position)?.id)
+            // Eski loyiha mexanizmi: snap bo'lgach qo'shni reel'larni oldindan
+            // keshga tortamiz — keyingi o'tish deyarli lagsiz bo'ladi.
+            preloadNeighbours(position)
+        } catch (_: Exception) {
+        }
     }
 
     private fun openCreate() {
@@ -580,7 +595,11 @@ class ReelsActivity @JvmOverloads constructor(
             // Eski Firebase reel'lar feed'da qolmadi — kalit story bo'lmasa chiqamiz.
             return
         }
-        val ok = YuzStoryFeed.likeStory(currentAccount, key.first, key.second, likedNow)
+        val ok = try {
+            YuzStoryFeed.likeStory(currentAccount, key.first, key.second, likedNow)
+        } catch (_: Exception) {
+            false
+        }
         if (!ok) {
             adapter?.applyLikeState(reelId, !likedNow)
             toast(R.string.reels_like_failed)
@@ -590,7 +609,10 @@ class ReelsActivity @JvmOverloads constructor(
     /** #106: "ko'rish" — Telegram max_read_id (Firestore increment o'rniga). */
     private fun registerView(reelId: String) {
         val key = YuzStoryFeed.parseKey(reelId) ?: return
-        YuzStoryFeed.markViewed(currentAccount, key.first, key.second)
+        try {
+            YuzStoryFeed.markViewed(currentAccount, key.first, key.second)
+        } catch (_: Exception) {
+        }
     }
 
     /**

@@ -281,17 +281,34 @@ class ReelsAdapter(
 
     override fun onBindViewHolder(holder: PageHolder, position: Int) {
         val reel = items.getOrNull(position) ?: return
-        holder.bind(reel)
+        // #113: bind RecyclerView LAYOUT pass'ida ishlaydi — tashqaridagi
+        // try/catch'lar bunga yetmaydi, shuning uchun shu cho'qqida ushlaymiz.
+        try {
+            holder.bind(reel)
+        } catch (_: Exception) {
+            holder.itemView.setBackgroundColor(android.graphics.Color.BLACK)
+            runCatching {
+                holder.errorRow.visibility = View.GONE
+                holder.pageProgress.visibility = View.GONE
+            }
+        }
         // Faqat faol sahifa player'ga ega bo'ladi — qolganlari bo'sh qoladi.
         if (holder !== activeHolder) {
-            holder.playerView.player = null
+            try {
+                holder.playerView.player = null
+            } catch (_: Exception) {
+            }
         }
     }
 
     override fun onViewRecycled(holder: PageHolder) {
         super.onViewRecycled(holder)
-        holder.playerView.player = null
-        holder.storyThumb.clearImage()
+        // #113: recycling ham layout-dispatch'da yuradi.
+        try {
+            holder.playerView.player = null
+            holder.storyThumb.clearImage()
+        } catch (_: Exception) {
+        }
         if (holder === activeHolder) activeHolder = null
     }
 

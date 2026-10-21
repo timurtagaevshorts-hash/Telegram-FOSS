@@ -488,6 +488,13 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 LayoutHelper.MATCH_PARENT, uz.kodlikino.top4.ui.YuzGramBottomBar.height(), Gravity.BOTTOM));
         drawerLayoutContainer.onDrawerAnimationChanged = this::updateYuzGramBottomBar;
 
+        // YuzGram #113: crash-yig'uvchi — oldingi (Telegram) handler buzilmaydi,
+        // shunchaki stack-trace faylga yoziladi va keyingi ochilishda dialog'da
+        // ko'rsatiladi. Telefon USB'siz holatda sababni topish uchun yagona yo'l.
+        uz.kodlikino.top4.utils.YuzCrashJar.install(this);
+        getWindow().getDecorView().postDelayed(
+                () -> uz.kodlikino.top4.utils.YuzCrashJar.showLastCrashIfAny(LaunchActivity.this), 1500L);
+
         if (Build.VERSION.SDK_INT >= 21) {
             themeSwitchSunView = new View(this) {
                 @Override
