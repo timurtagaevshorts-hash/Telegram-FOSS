@@ -19,6 +19,7 @@ import okhttp3.OkHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
 import org.telegram.messenger.R
+import uz.kodlikino.top4.ui.YuzMusicNotification
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
@@ -674,6 +675,20 @@ object YuzMusicEngine {
     /** #122: YuzMusicService'ni faqat bir marta, player READY bo'lganda ko'taradi. */
     private fun startMusicServiceOnce() {
         if (musicServiceStarted || !::appCtx.isInitialized) return
+        // #122b: bildirishnoma yo'q bo'lsa media3 startForeground()ni
+        // HECH QACHON chaqirmaydi (DefaultMediaNotificationProvider
+        // areNotificationsEnabled()==false da null qaytadi) — 5s'dan
+        // so'ng ForegroundServiceDidNotStartInTimeException crash.
+        // Shuning uchun kanal bloklangan/permatsiya yo'q holda xizmatni
+        // umuman ko'tarmaymiz (ijro ilova ichida davom etaveradi).
+        val nm = appCtx.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+        val chanOk = nm?.getNotificationChannel(YuzMusicNotification.CHANNEL_ID)?.let {
+            it.importance != android.app.NotificationManager.IMPORTANCE_NONE
+        } ?: true
+        if (!androidx.core.app.NotificationManagerCompat.from(appCtx).areNotificationsEnabled() || !chanOk) {
+            Log.i(TAG, "music service skipped: notifications disabled/blocked")
+            return
+        }
         musicServiceStarted = true
         runCatching {
             androidx.core.content.ContextCompat.startForegroundService(
