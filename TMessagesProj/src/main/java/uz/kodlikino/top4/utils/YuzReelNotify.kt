@@ -104,8 +104,15 @@ object YuzReelNotify {
                     try {
                         if (ringtone.isPlaying) ringtone.stop()
                         // #126: release() chaqirilmasa har signalda native
-                        // AudioTrack tutib qolardi (API 28+).
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) ringtone.release()
+                        // AudioTrack tutib qolardi. Fork'ning patchlangan
+                        // android.jar'ida release() compile-time yo'q —
+                        // refleksiya bilan chaqiramiz (API 28+).
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            try {
+                                ringtone.javaClass.getMethod("release").invoke(ringtone)
+                            } catch (_: Exception) {
+                            }
+                        }
                     } catch (_: Exception) {
                     }
                 }, 900L)
