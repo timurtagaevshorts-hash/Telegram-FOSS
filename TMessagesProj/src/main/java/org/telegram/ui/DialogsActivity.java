@@ -2293,21 +2293,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         private void toggleArchiveHidden(boolean action, DialogCell dialogCell) {
-            // YuzGram #103: YuzGram asosiy ro'yxatida "Arxiv" qatorini yashirish
-            // taqiqlangan — avvalgi pull-to-open mexanizmi yuz header/pill bilan
-            // mo'jaralanadi va qatorni yashirgan boshqa chatlar ham ekrandan
-            // chiqib ketadi. Boshqa sahifalarda (filtrlar, papkalar) avvalgi kabi
-            // ishlaydi.
-            if (isYuzGramMainRoot()) {
-                updatePullState();
-                if (dialogCell != null) {
-                    dialogCell.resetPinnedArchiveState();
-                    dialogCell.invalidate();
-                }
-                return;
-            }
-            // YuzGram #95: #61 qulfi olib tashlandi — arxivlash Telegram'ning
-            // avvalgidek ishlaydi: bo'shaganda "Arxiv" papkasi g'oyib bo'ladi.
+            // YuzGram #114: yuz ildizidagi #103 taqiqi bekor qilindi — arxivni
+            // yashirish/pinnlash Telegram'ning xuddi o'zi kabi ishlaydi.
             SharedConfig.toggleArchiveHidden();
             final UndoView undoView = getUndoView();
             if (SharedConfig.archiveHidden) {
@@ -2338,10 +2325,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         private void updatePullState() {
-            // YuzGram #95: avvalgi holatga qaytarish — papka yashirin rejimda
-            // tepadan tortish bilan ochiladi, bo'sh arxivda qator ko'rinmaydi.
-            // YuzGram #103: yuz ildizida state doim PINNED (qator yashirinmaydi).
-            parentPage.archivePullViewState = SharedConfig.archiveHidden && !isYuzGramMainRoot()
+            // YuzGram #114: Telegram parity — yashirin rejimda "Arxiv" papkasi
+            // tepadan tortish bilan ochiladi (barcha sahifalarda, yuz ildizi ham).
+            parentPage.archivePullViewState = SharedConfig.archiveHidden
                     ? ARCHIVE_ITEM_STATE_HIDDEN : ARCHIVE_ITEM_STATE_PINNED;
             if (parentPage.pullForegroundDrawable != null) {
                 parentPage.pullForegroundDrawable.setWillDraw(parentPage.archivePullViewState != ARCHIVE_ITEM_STATE_PINNED);
@@ -2673,14 +2659,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 DialogCell dialogCell = (DialogCell) viewHolder.itemView;
                 long dialogId = dialogCell.getDialogId();
                 if (DialogObject.isFolderDialogId(dialogId)) {
-                    if (isYuzGramMainRoot()) {
-                        // YuzGram #103: yuz ildizida "Arxiv" qatorini svayp bilan
-                        // yashirish taqiqlangan — qator o'rniga qaytadi.
-                        dialogCell.swipeCanceled = true;
-                        dialogCell.resetPinnedArchiveState();
-                        parentPage.dialogsAdapter.notifyItemChanged(viewHolder.getAdapterPosition());
-                        return;
-                    }
+                    // YuzGram #114: svayp bilan yashirish yuz ildizida ham
+                    // Telegram'dagidek ishlaydi (eski #103 taqiqi olib tashlandi).
                     parentPage.listView.toggleArchiveHidden(false, dialogCell);
                     return;
                 }
@@ -4782,15 +4762,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 }
             });
 
-            // YuzGram #61: pull-mode holati YuzGram asosiy ro'yxatida doim PINNED —
-            // arxiv qatori skroll yuqoriga yetganda ham tepada ko'rinib turadi.
-            // YuzGram #103: boshqa sahifada yashirilgan bo'lsa ham, yuz ildiziga
-            // kirganda flag'ni tozalaymiz — "Arxiv" qatori bu ro'yxatda doim bo'ladi.
-            if (isYuzGramMainRoot() && SharedConfig.archiveHidden) {
-                SharedConfig.archiveHidden = false;
-                SharedConfig.saveConfig();
-            }
-            viewPage.archivePullViewState = SharedConfig.archiveHidden && !isYuzGramMainRoot()
+            // YuzGram #114: "Arxiv"ni yashirish Telegram bilan bir xil — flag
+            // o'zgartirilmaydi, yashirin bo'lsa qator ko'rinmaydi va tepadan
+            // tortish bilan ochiladi.
+            viewPage.archivePullViewState = SharedConfig.archiveHidden
                     ? ARCHIVE_ITEM_STATE_HIDDEN : ARCHIVE_ITEM_STATE_PINNED;
             if (viewPage.pullForegroundDrawable == null && folderId == 0) {
                 viewPage.pullForegroundDrawable = new PullForegroundDrawable(LocaleController.getString("AccSwipeForArchive", R.string.AccSwipeForArchive), LocaleController.getString("AccReleaseForArchive", R.string.AccReleaseForArchive)) {
