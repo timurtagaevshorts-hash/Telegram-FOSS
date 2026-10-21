@@ -680,9 +680,15 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     }
 
     private fun addToPlaylist(name: String, track: YuzTrack) {
-        YuzMusicEngine.playlistAdd(ctx, name, track)
-        Toast.makeText(ctx, ctx.getString(R.string.musiqa_added_playlist, name),
-            Toast.LENGTH_SHORT).show()
+        // #126: playlist faylini to'liq qayta yozish — disk IO, UI ipini
+        // bloklamasligi uchun fon ipiga ko'chirildi.
+        scope.launch {
+            kotlinx.coroutines.withContext(Dispatchers.IO) {
+                YuzMusicEngine.playlistAdd(ctx, name, track)
+            }
+            Toast.makeText(ctx, ctx.getString(R.string.musiqa_added_playlist, name),
+                Toast.LENGTH_SHORT).show()
+        }
     }
 
     // -------------------------------------------------------------- download

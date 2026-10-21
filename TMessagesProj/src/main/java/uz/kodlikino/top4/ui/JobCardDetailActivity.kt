@@ -157,16 +157,17 @@ class JobCardDetailActivity(
         )
 
         val url = card.displayImageUrl()
-        ivHero?.visibility = View.VISIBLE
+        val hero = ivHero ?: return
+        hero.visibility = View.VISIBLE
         if (url.isNotBlank()) {
             Glide.with(themed)
                 .load(url)
                 .centerCrop()
                 .placeholder(R.drawable.bg_classified_image_placeholder)
                 .error(R.drawable.bg_classified_image_placeholder)
-                .into(ivHero!!)
+                .into(hero)
         } else {
-            ivHero?.setImageResource(R.drawable.bg_classified_image_placeholder)
+            hero.setImageResource(R.drawable.bg_classified_image_placeholder)
         }
 
         val isOwner = myUid.isNotBlank() && card.ownerUid == myUid

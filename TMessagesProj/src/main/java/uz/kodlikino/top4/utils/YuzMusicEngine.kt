@@ -577,26 +577,30 @@ object YuzMusicEngine {
         extendAttempts++
         val anchor = currentTrack() ?: queueTracks.lastOrNull()
         val artist = anchor?.artist?.trim().orEmpty()
-        val seeds = ArrayList<String>()
-        if (artist.isNotEmpty()) seeds.add(artist)
-        if (artist.isNotEmpty() && anchor != null) seeds.add((artist + " " + anchor.title).trim())
+        val anchorLc = artist.lowercase()
+        val baseSeeds = ArrayList<String>()
+        if (artist.isNotEmpty()) baseSeeds.add(artist)
+        if (artist.isNotEmpty() && anchor != null) baseSeeds.add((artist + " " + anchor.title).trim())
         // #115: seedRotate'ni modlusida aylantiramiz — cheksiz o'sib Int
         // chegarasidan o'tsa manfiy qoldiq (negative index) crash berar edi.
-        seeds.add(hitSeeds[seedRotate])
+        baseSeeds.add(hitSeeds[seedRotate])
         seedRotate = (seedRotate + 1) % hitSeeds.size
-        // #117: tinglov profili — foydalanuvchi ENG KO'P eshitgan ijrochi
-        // va qo'shiqlariga o'xshashlar shu seedlar orqali keladi.
-        val anchorLc = artist.lowercase()
-        for (a in YuzListenStats.topArtists(appCtx, 2, setOf(anchorLc))) {
-            val s = a + " qoshiklari"
-            if (s !in seeds) seeds.add(s)
-        }
-        YuzListenStats.topTracks(appCtx, 1).firstOrNull { !it.lowercase().startsWith(anchorLc) }
-            ?.let { if (it !in seeds) seeds.add(it) }
-        Log.i(TAG, "extendQueue seeds=$seeds attempt=$extendAttempts")
         val appended = ArrayList<YuzTrack>()
         val gen = queueGen
         Thread {
+            // #117: tinglov profili seed'lari — #126: bu qism SharedPreferences
+            // JSON o'qishini qiladi, shuning uchun UI emas, fon ipida quriladi
+            // (iyova qotib qolmasligi uchun).
+            val seeds = ArrayList(baseSeeds)
+            runCatching {
+                for (a in YuzListenStats.topArtists(appCtx, 2, setOf(anchorLc))) {
+                    val s = a + " qoshiklari"
+                    if (s !in seeds) seeds.add(s)
+                }
+                YuzListenStats.topTracks(appCtx, 1).firstOrNull { !it.lowercase().startsWith(anchorLc) }
+                    ?.let { if (it !in seeds) seeds.add(it) }
+            }
+            Log.i(TAG, "extendQueue seeds=$seeds attempt=$extendAttempts")
             var i = 0
             while (appended.size < 10 && i < seeds.size) {
                 val q = seeds[i++]

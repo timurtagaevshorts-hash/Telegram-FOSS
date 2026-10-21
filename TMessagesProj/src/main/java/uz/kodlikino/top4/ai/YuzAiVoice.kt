@@ -240,6 +240,11 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
         stopSpeakingInternal()
         mainHandler.removeCallbacksAndMessages(null)
         try {
+            listenTone?.release()
+        } catch (_: Exception) {
+        }
+        listenTone = null
+        try {
             recognizer?.destroy()
         } catch (_: Exception) {
         }
@@ -254,14 +259,21 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
         muteRecognizerCue(false)
     }
 
+    // #126: postDelayed tone.release() mainHandler.removeCallbacksAndMessages
+    // bilan o'chirib qo'yilmasi uchun aktiv ToneGenerator maydonida ushlanadi.
+    private var listenTone: ToneGenerator? = null
+
     private fun playListenSignal() {
         try {
             val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 60)
+            listenTone = tone
             tone.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
             mainHandler.postDelayed({
                 try {
                     tone.release()
                 } catch (_: Exception) {
+                } finally {
+                    if (listenTone === tone) listenTone = null
                 }
             }, 150)
         } catch (_: Exception) {

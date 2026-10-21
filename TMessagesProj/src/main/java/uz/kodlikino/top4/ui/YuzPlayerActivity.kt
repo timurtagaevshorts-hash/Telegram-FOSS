@@ -413,25 +413,38 @@ class YuzPlayerActivity : BaseFragment() {
             ?.tracks?.any { it.id == t.id } == true
     }
 
+    // #126: Sevimli playlist fayli har qo'shishda to'liq qayta yoziladi —
+    // katta ro'yxatda bu UI ipida ANR berishi mumkin, shuning uchun fon
+    // ipida; heartBusy qo'sh bosishda parallel rewrite oldini oladi.
+    private var heartBusy = false
+
     private fun heart() {
+        if (heartBusy) return
         val t = YuzMusicEngine.currentTrack() ?: return
-        val was = inFavorites(t)
-        if (was) {
-            val pl = YuzMusicEngine.playlists(ctx).firstOrNull { it.name == "Sevimli" }
-            if (pl != null) {
-                val rest = pl.tracks.filter { it.id != t.id }
-                YuzMusicEngine.playlistRemove(ctx, "Sevimli")
-                for (x in rest) YuzMusicEngine.playlistAdd(ctx, "Sevimli", x)
+        heartBusy = true
+        Thread {
+            val was = inFavorites(t)
+            if (was) {
+                val pl = YuzMusicEngine.playlists(ctx).firstOrNull { it.name == "Sevimli" }
+                if (pl != null) {
+                    val rest = pl.tracks.filter { it.id != t.id }
+                    YuzMusicEngine.playlistRemove(ctx, "Sevimli")
+                    for (x in rest) YuzMusicEngine.playlistAdd(ctx, "Sevimli", x)
+                }
+            } else {
+                YuzMusicEngine.playlistAdd(ctx, "Sevimli", t)
             }
-        } else {
-            YuzMusicEngine.playlistAdd(ctx, "Sevimli", t)
-        }
-        Toast.makeText(ctx,
-            ctx.getString(
-                if (was) R.string.musiqa_fav_removed else R.string.musiqa_fav_added
-            ),
-            Toast.LENGTH_SHORT).show()
-        syncButtons()
+            ui.post {
+                heartBusy = false
+                if (isFinishing) return@post
+                Toast.makeText(ctx,
+                    ctx.getString(
+                        if (was) R.string.musiqa_fav_removed else R.string.musiqa_fav_added
+                    ),
+                    Toast.LENGTH_SHORT).show()
+                syncButtons()
+            }
+        }.start()
     }
 
     private fun download() {

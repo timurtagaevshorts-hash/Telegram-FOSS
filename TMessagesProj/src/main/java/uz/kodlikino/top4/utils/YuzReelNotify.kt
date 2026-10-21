@@ -103,6 +103,9 @@ object YuzReelNotify {
                 mainHandler.postDelayed({
                     try {
                         if (ringtone.isPlaying) ringtone.stop()
+                        // #126: release() chaqirilmasa har signalda native
+                        // AudioTrack tutib qolardi (API 28+).
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) ringtone.release()
                     } catch (_: Exception) {
                     }
                 }, 900L)

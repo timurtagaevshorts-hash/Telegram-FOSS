@@ -172,7 +172,11 @@ class ClassifiedAdDetailActivity(
             vpImages?.visibility = View.VISIBLE
             tabImageIndicator?.visibility = if (images.size > 1) View.VISIBLE else View.GONE
             imageAdapter.submit(images)
-            TabLayoutMediator(tabImageIndicator!!, vpImages!!) { _, _ -> }.attach()
+            val tab = tabImageIndicator
+            val vp = vpImages
+            if (tab != null && vp != null) {
+                TabLayoutMediator(tab, vp) { _, _ -> }.attach()
+            }
         }
     }
 
