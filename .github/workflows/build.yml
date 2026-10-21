@@ -109,7 +109,7 @@ jobs:
           # push/PR doim debug; workflow_dispatch tanlangan variant'ni hurmat qiladi.
           VAR="${{ github.event.inputs.variant }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$VAR" = "release" ]; then
-            TASK=:TMessagesProj_App:assembleAfatRelease
+            TASK=:TMessagesProj_App:bundleAfatRelease
             LABEL=release
             FILTERS='"armeabi-v7a", "arm64-v8a"'
             ABIS=arm64-arm
@@ -273,16 +273,17 @@ jobs:
       - name: Build APK
         run: ./gradlew --no-daemon $GRADLE_EXTRA "$GRADLE_TASK"
 
-      - name: Collect APKs
+      - name: Collect artifacts (APK va/ya AAB)
         run: |
           mkdir -p /tmp/artifacts
-          find TMessagesProj_App/build/outputs/apk -name '*.apk' -exec cp -v {} /tmp/artifacts/ \;
+          find TMessagesProj_App/build/outputs -name '*.apk' -exec cp -v {} /tmp/artifacts/ \; || true
+          find TMessagesProj_App/build/outputs -name '*.aab' -exec cp -v {} /tmp/artifacts/ \; || true
           ls -la /tmp/artifacts
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: YuzGram-APK-${{ env.APK_LABEL }}
-          path: /tmp/artifacts/*.apk
+          path: /tmp/artifacts/*
           if-no-files-found: error
           retention-days: 30
