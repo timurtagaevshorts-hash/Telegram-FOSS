@@ -147,6 +147,12 @@ object YuzMusicEngine {
     @Volatile private var gateBuffering = false
     @Volatile private var gatePlaying = false
     @Volatile private var gateAhead = 0L
+    // #122: YuzMusicService'ni har "playing" signalida EMAS, faqat trek
+    // haqiqatan o'ynala boshlaganda (STATE_READY) va bir marta ko'taramiz.
+    // startForegroundService chaqirilib, media3 5s ichida startForeground()
+    // qila olmasa (player BUFFERING/IDLE — bildirishnoma hali yo'q), Android
+    // 14 main thread'da ForegroundServiceDidNotStartInTimeException otadi.
+    @Volatile private var musicServiceStarted = false
     private var gateTickerOn = false
     private val gateTicker = object : Runnable {
         override fun run() {
@@ -236,6 +242,10 @@ object YuzMusicEngine {
                         // #86: qo'shiq o'ynala boshladi demak tarmoq tirik —
                         // skip-bo'ron tozaladi, keyingisini yuklashni boshlaydi.
                         consecutiveSkips = 0
+                        // #122: foreground xizmatni aynan SHU yerda ko'taramiz:
+                        // player READY => media3 bildirishnomasi bor va
+                        // startForeground() 5s ichida albatta chaqiriladi.
+                        if (p.isPlaying) startMusicServiceOnce()
                         notifyItemChanged(p.currentMediaItem)
                         prefetchNext(p, p.currentMediaItemIndex)
                         prebufferNext(p, p.currentMediaItemIndex)
@@ -252,6 +262,7 @@ object YuzMusicEngine {
                         ui.postDelayed(bufferingWatchdog, 2000L)
                     }
                     Player.STATE_ENDED -> {
+                        musicServiceStarted = false // #122: keyingi READY'da qayta ko'tariladi
                         // YuzGram #98: navbat tugashi — tugash emas. Radio
                         // yoqilgan bo'lsa o'xshash/ommabop qo'shiqlar
                         // qo'shib ijro davom etadi.
@@ -647,28 +658,29 @@ object YuzMusicEngine {
     }
 
     private fun notifyPlaying(playing: Boolean) {
-        // #78: ijro boshlanishi bilan MediaSessionService'ni ham yoqamiz —
-        // shunda ilovadan chiqib ketganda bildirishnomadagi MediaStyle
-        // pleyer (sarlavha/bajarguvchi/rasm + tugmalar) har doim chiqadi,
-        // qaysi oynadan boshlanganiga qaramay (mini pleyer, pler, ro'yxat).
-        // #87: startForegroundService — Android 8+ ilova fonida oddiy
-        // startService'ni rad etadi; shunda xizmat foreground bo'la olmaydi
-        // va qulf ekranidagi boshqaruv yo'qoladi.
-        // #86: eshik holati shu ipdan yangilanadi (player'ni fon ipidan
-        // o'qib bo'lmaydi).
+        // #78: ijro holati bildirishnomaga ham yoziladi. #122: xizmatni
+        // ko'tarish ENDI SHU YERDA EMAS — "playing" BUFFERING paytda ham
+        // true bo'lib qolsa, media3 startForeground()ni 5s ichida qila
+        // olmay ForegroundServiceDidNotStartInTimeException crash bo'ladi.
+        // Ko'tarish STATE_READY'da: startMusicServiceOnce().
         if (playing) ensureGateTicker() else {
             gatePlaying = false
             gateBuffering = false
-        }
-        if (playing && ::appCtx.isInitialized) {
-            runCatching {
-                androidx.core.content.ContextCompat.startForegroundService(
-                    appCtx,
-                    android.content.Intent(appCtx, uz.kodlikino.top4.ui.YuzMusicService::class.java)
-                )
-            }
+            musicServiceStarted = false // #122: to'xtagach qayta ko'tarish mumkin
         }
         for (o in observers) runCatching { o.onPlayingChanged(playing) }
+    }
+
+    /** #122: YuzMusicService'ni faqat bir marta, player READY bo'lganda ko'taradi. */
+    private fun startMusicServiceOnce() {
+        if (musicServiceStarted || !::appCtx.isInitialized) return
+        musicServiceStarted = true
+        runCatching {
+            androidx.core.content.ContextCompat.startForegroundService(
+                appCtx,
+                android.content.Intent(appCtx, uz.kodlikino.top4.ui.YuzMusicService::class.java)
+            )
+        }
     }
 
     private fun postStatus(text: String?) {
