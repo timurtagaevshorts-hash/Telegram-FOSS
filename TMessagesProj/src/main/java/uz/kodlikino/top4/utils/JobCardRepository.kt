@@ -153,9 +153,8 @@ object JobCardRepository {
                 primary.remove()
                 fallbackRef.get()?.remove()
             }
-
-            override fun areAllListenersComplete(): Boolean =
-                primary.areAllListenersComplete() && fallbackRef.get()?.areAllListenersComplete() != false
+            // #120: bu Firestore versiyasida ListenerRegistration'da
+            // areAllListenersComplete() yo'q — faqat remove() abstrakt.
         }
     }
 
