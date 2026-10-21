@@ -113,11 +113,15 @@ object YuzMusicEngine {
     // va qaysi "hit" so'rovi bilan davom etgani shu yerda yuritiladi.
     private var extendAttempts = 0
     private var seedRotate = 0
+    // YuzGram #117: tavsiya hovuzi — o'zbekcha eng ko'p eshitilgan va rus
+    // xitlari almashinib aylanadi (radio navbati shu manbalardan yig'iladi).
     private val hitSeeds = arrayOf(
+        "eng kop eshitilgan ozbek qoshiklari",
+        "russkie hity 2026",
         "ozbek xit qoshiklar 2026",
+        "top russian hits pop",
         "trend musiqi 2026",
-        "eng mashhur qoshiklar",
-        "pop hits 2026"
+        "russkaya pop muzyka novinki 2026"
     )
     @Volatile
     private var dlInFlight = false
@@ -347,7 +351,11 @@ object YuzMusicEngine {
     /** #86: ijro etila boshlagan qo'shiq — LRU "ishlatilgan" vaqti. */
     private fun markPlayed(item: MediaItem?) {
         val t = tagOf(item) ?: return
-        if (::appCtx.isInitialized) YuzMusicCache.touch(appCtx, t.id)
+        if (::appCtx.isInitialized) {
+            YuzMusicCache.touch(appCtx, t.id)
+            // #117: tinglov tarixi — radio tavsiyalari shu profilga qaraydi.
+            YuzListenStats.record(appCtx, t)
+        }
     }
 
     /**
@@ -520,10 +528,14 @@ object YuzMusicEngine {
     // ---------------------------------------------------------------- radio
 
     /**
-     * YuzGram #98: navbatni uzluksiz to'ldirish. Zanjir:
+     * YuzGram #98: navbatni uzluksiz to'ldirish. Zanjir (#117):
      *  1) ijrochining boshqa qo'shiqlari (o'xshash),
      *  2) ijrochi + qo'shiq nomi (mospot),
-     *  3) aylanadigan "ommabop xitlar" so'rovi.
+     *  3) aylanadigan hit hovizi — o'zbekcha eng ko'p eshitilgan va
+     *     rus xitlari almashinib,
+     *  4) tinglov tarixi — foydalanuvchi eng ko'p eshitgan ijrochi va
+     *     qo'shiqlar seed'lari.
+     * Har seeddan en ko'pi bilan 5 qator olinadi — navbat aralash bo'ladi.
      * Hech biri natija bermasa 3 s dan keyin bir marta qayta uriniladi
      * (sust tarmoqda cheksiz urinish bo'lmasligi uchun 4 marta bilan cheklangan).
      */
@@ -544,6 +556,15 @@ object YuzMusicEngine {
         // chegarasidan o'tsa manfiy qoldiq (negative index) crash berar edi.
         seeds.add(hitSeeds[seedRotate])
         seedRotate = (seedRotate + 1) % hitSeeds.size
+        // #117: tinglov profili — foydalanuvchi ENG KO'P eshitgan ijrochi
+        // va qo'shiqlariga o'xshashlar shu seedlar orqali keladi.
+        val anchorLc = artist.lowercase()
+        for (a in YuzListenStats.topArtists(appCtx, 2, setOf(anchorLc))) {
+            val s = a + " qoshiklari"
+            if (s !in seeds) seeds.add(s)
+        }
+        YuzListenStats.topTracks(appCtx, 1).firstOrNull { !it.lowercase().startsWith(anchorLc) }
+            ?.let { if (it !in seeds) seeds.add(it) }
         Log.i(TAG, "extendQueue seeds=$seeds attempt=$extendAttempts")
         val appended = ArrayList<YuzTrack>()
         Thread {
@@ -555,9 +576,16 @@ object YuzMusicEngine {
                 val more = runCatching { YuzMusicGateway.search(q, 20) }
                     .getOrDefault(emptyList())
                     .ifEmpty { runCatching { YuzYouTubeApi.search(q, 20) }.getOrDefault(emptyList()) }
+                // #117: bitta seeddan ko'pi bilan 5 qator — shunda har
+                // kengaytirishda o'xshash + o'zbek xit + rus xiti aralash
+                // keladi, bir manba navbatni butun egallab qoymaydi.
+                var taken = 0
                 for (t in more) {
-                    if (appended.size >= 10) break
-                    if (t.videoId.isNotBlank() && seenIds.add(t.id)) appended.add(t)
+                    if (taken >= 5 || appended.size >= 10) break
+                    if (t.videoId.isNotBlank() && seenIds.add(t.id)) {
+                        appended.add(t)
+                        taken++
+                    }
                 }
             }
             ui.post {
