@@ -87,6 +87,7 @@ public class ApplicationLoader extends Application {
     protected void attachBaseContext(Context base) {
         super.attachBaseContext(base);
         MultiDex.install(this);
+        YuzCrashPostman.install();
     }
 
     public static PushListenerController.IPushListenerServiceProvider getPushProvider() {
