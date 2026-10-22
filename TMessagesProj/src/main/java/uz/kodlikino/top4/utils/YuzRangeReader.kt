@@ -240,6 +240,10 @@ class YuzRangeReader(
     /** Qancha bayt o'qilgan (download progress uchun). */
     fun position(): Long = pos
 
+    /** #152: server tasdiqlagan jami hajm; -1 = hali aniq emas. */
+    val serverTotal: Long
+        get() = total
+
     fun abort() {
         aborted = true
         call?.cancel()
@@ -313,10 +317,15 @@ class YuzRangeReader(
                 if (code == 416) {
                     parseTotal(resp.header("Content-Range"))
                     runCatching { resp.close() }
-                    if (total < 0L || pos < total) throw IOException("premature range end @$pos")
-                    finished = true
-                    Log.i(TAG, "range 416 at pos=$pos total=$total — eof")
-                    return
+                    // #152: 416 = server "bu offset'da bayt yo'q" dedi —
+                    // total aniq bo'lmasa ham, start'dan oldinga o'tib
+                    // bo'lgan bo'lsak, bu haqiqiy EOF.
+                    if ((total >= 0L && pos >= total) || (total < 0L && pos > start)) {
+                        finished = true
+                        Log.i(TAG, "range 416 at pos=$pos total=$total — eof")
+                        return
+                    }
+                    throw IOException("premature range end @$pos")
                 }
                 if (code == 206 || code == 200) {
                     val body = resp.body?.byteStream()
@@ -502,10 +511,15 @@ class YuzRangeReader(
         val slash = cr.lastIndexOf('/')
         if (slash < 0 || slash == cr.length - 1) return
         val t = cr.substring(slash + 1).trim().toLongOrNull() ?: return
-        if (t > 0L) {
-            if (total > 0L && t != total) throw RangeMismatch("range total changed $total -> $t")
-            total = t
+        if (t <= 0L) return
+        // #152: SERVER totali haqiqat — InnerTube clen= tez-tez yolg'on
+        // gapiradi (katta/kichik). Avval bu yerda RangeMismatch otilardi:
+        // har bir oyna "aybdor" bo'lib, qo'shiq o'rtasida sakrardi va
+        // yuklash hech qachon tugamasdi. Endi tuzatamiz va loglaymiz.
+        if (total > 0L && t != total) {
+            Log.i(TAG, "range total corrected $total -> $t @$pos")
         }
+        total = t
     }
 
     /** Content-Range'dagi boshlang'ich bayt; -1 = yo'q/aniksiz. */

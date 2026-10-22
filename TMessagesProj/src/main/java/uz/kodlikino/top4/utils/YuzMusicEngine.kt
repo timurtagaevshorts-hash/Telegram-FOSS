@@ -171,6 +171,14 @@ object YuzMusicEngine {
     @Volatile private var gateBuffering = false
     @Volatile private var gatePlaying = false
     @Volatile private var gateAhead = 0L
+    // #152: "qo'shiq HAQIQATAN tugadimi" nazorati — so'nggi tick'dagi
+    // indeks/pozitsiya/davomiylik. Oqim muddatidan oldin uzilsa (truncated
+    // EOF) media3 buni oddiy AUTO o'tish deb hisoblaydi; shunda orqaga
+    // qaytib oqim nomzodini almashtiramiz.
+    private var tickIndex = -1
+    private var tickPos = 0L
+    private var tickDur = 0L
+    private var tickItem: MediaItem? = null
     // #122: YuzMusicService'ni har "playing" signalida EMAS, faqat trek
     // haqiqatan o'ynala boshlaganda (STATE_READY) va bir marta ko'taramiz.
     // startForegroundService chaqirilib, media3 5s ichida startForeground()
@@ -188,6 +196,10 @@ object YuzMusicEngine {
             gateBuffering = p.playbackState == Player.STATE_BUFFERING
             gatePlaying = p.playWhenReady
             gateAhead = (p.bufferedPosition - p.currentPosition).coerceAtLeast(0L)
+            tickIndex = p.currentMediaItemIndex
+            tickPos = p.currentPosition
+            tickDur = p.duration
+            tickItem = p.currentMediaItem
             if (gatePlaying) ui.postDelayed(this, 2000L) else gateTickerOn = false
         }
     }
@@ -275,6 +287,14 @@ object YuzMusicEngine {
         p.setWakeMode(C.WAKE_MODE_NETWORK)
         p.addListener(object : Player.Listener {
             override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
+                // #152: AUTO o'tish — media3 "qo'shiq tugadi" degani. Lekin
+                // oqim muddatidan oldin uzilganda (truncated EOF) ham AUTO
+                // keladi: pozitsiya davomiylikdan 20+ sekund orqada bo'lsa,
+                // o'tishni BEKOR qilib oqim nomzodini almashtiramiz.
+                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO &&
+                    tickItem !== item &&
+                    retryEarlyEnd(p, tickItem, tickIndex)
+                ) return
                 ui.removeCallbacks(bufferingWatchdog)
                 postStatus(null)
                 itemRetries = 0
@@ -315,6 +335,11 @@ object YuzMusicEngine {
                         ui.postDelayed(bufferingWatchdog, 2000L)
                     }
                     Player.STATE_ENDED -> {
+                        // #152: oxirgi qo'shiq ham muddatidan oldin "tugasa"
+                        // — radio-uzaytirish o'rniga avval oqimni tiklaymiz.
+                        if (retryEarlyEnd(p, p.currentMediaItem, p.currentMediaItemIndex)) {
+                            return
+                        }
                         musicServiceStarted = false // #122: keyingi READY'da qayta ko'tariladi
                         // YuzGram #98: navbat tugashi — tugash emas. Radio
                         // yoqilgan bo'lsa o'xshash/ommabop qo'shiqlar
@@ -555,6 +580,38 @@ object YuzMusicEngine {
             Log.i(TAG, "buffering stall vid=${tagOf(p.currentMediaItem)?.videoId}")
             handleItemFailure(p.currentMediaItem)
         }
+    }
+
+    /**
+     * #152: qo'shiq HAQIQATAN tugamagan bo'lsa (oxirgi tick pozitsiyasi
+     * davomiylikdan 20+ sekund orqada) — o'tishni bekor qilib shu joydan
+     * boshqa oqim nomzodi bilan davom etamiz. [itemRetries] chegarasi (2)
+     * cheksiz qaytish halqasini oldini oladi: uchinchi erta tugashda
+     * qo'shiq oddiy o'tadi. true = qaytish bajarildi.
+     */
+    private fun retryEarlyEnd(p: ExoPlayer, item: MediaItem?, index: Int): Boolean {
+        if (item == null || tickDur <= 0L || tickPos <= 0L) return false
+        if (tickPos >= tickDur - 20_000L) return false
+        if (index !in 0 until p.mediaItemCount) return false
+        if (itemRetries >= 2) return false
+        itemRetries++
+        Log.i(
+            TAG,
+            "early end pos=$tickPos/$tickDur vid=${tagOf(item)?.videoId} " +
+                "-> retry#$itemRetries (oqim almashtirish)"
+        )
+        tagOf(item)?.videoId?.let { YuzYouTubeApi.noteBadStream(it) }
+        tickItem = null
+        tickDur = 0L
+        runCatching {
+            p.seekTo(index, tickPos)
+            p.prepare()
+            p.playWhenReady = true
+        }
+        stallMark = android.os.SystemClock.elapsedRealtime()
+        ui.removeCallbacks(bufferingWatchdog)
+        ui.postDelayed(bufferingWatchdog, 2000L)
+        return true
     }
 
     private fun handleItemFailure(item: MediaItem?) {

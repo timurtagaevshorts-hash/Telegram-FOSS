@@ -372,9 +372,12 @@ object YuzMusicCache {
             attempt++
             var knownTotal = total
             var sawEof = false
+            // #152: limit=-1 — clen= taxminiga EMAS, serverning haqiqiy
+            // EOF'iga (416/Content-Range total) qadar o'qiydi. Avval limit
+            // yolg'on clen'dan hisoblanardi: kichik clen'da fayl yarim
+            // holda "tugallangan" deb qabul qilinardi.
             val reader = YuzRangeReader(
-                http, stream.url, stream.ua, got,
-                if (total > 0L) (total - got).coerceAtLeast(0L) else -1L,
+                http, stream.url, stream.ua, got, -1L,
                 stream.approxBytes, refresh, true, gate, cancellation
             )
             var raf: java.io.RandomAccessFile? = null
@@ -410,6 +413,10 @@ object YuzMusicCache {
                     YuzNetPulse.add(n)
                 }
                 if (knownTotal > 0L) total = knownTotal
+                // #152: 416/total tuzatilgandan keyin reader.length ham
+                // server hajmini aks ettiradi — urinish oxirida yangilaymiz.
+                val st = reader.serverTotal
+                if (st > 0L) total = st
                 Log.i(
                     TAG,
                     "download seq try=$attempt got=$got expect=${if (total > 0) total else -1} " +
@@ -429,7 +436,11 @@ object YuzMusicCache {
                 runCatching { tmp.delete() }
                 return CANCELED
             }
-            val complete = if (total > 0L) got >= total else sawEof && got > 0L
+            // #152: sawEof endi FAQAT haqiqiy oxirda true (416 yoki server
+            // totali) — yolg'on clen katta bo'lganda "got >= total" hech
+            // qachon bajarilmasdi va yuklash 6 urinishdan keyin o'chib
+            // ketardi ("yarimida to'xtab qolmoqda" sababi).
+            val complete = got > 0L && (sawEof || (total > 0L && got >= total))
             if (complete && publish(context, tmp, track, stream.ext, cancellation)) return OK
         }
         Log.i(TAG, "download seq FAIL got=$got expect=${if (total > 0) total else -1}")
@@ -511,7 +522,13 @@ object YuzMusicCache {
         }
         if (interrupted) throw IOException("split download interrupted")
         val canceled = ra.canceled || rb.canceled || cancellation.canceled
-        val complete = lowerOk && !upperFailed.get() && got.get() >= total
+        // #152: yakun mezonlari — ikkala yarm o'z HAAQIQIY EOF'iga yetdi
+        // (readHalf reader.isEof() qaytaradi) VA yig'indi server tasdiqlagan
+        // hajmga yetdi. Avval faqat `got >= total` (clen) tekshirilardi:
+        // clen yolg'on bo'lganda to'liq tortilgan fayl ham FAIL bo'lardi.
+        val realTotal = maxOf(ra.serverTotal, rb.serverTotal)
+        val complete = lowerOk && !upperFailed.get() && got.get() > 0L &&
+            (realTotal <= 0L || got.get() >= realTotal)
         val lowerEnd = lowerWritten.get().coerceIn(0L, mid)
         Log.i(
             TAG,
@@ -772,7 +789,10 @@ object YuzMusicCache {
         val entries = ArrayList<JSONObject>()
         for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { entries.add(it) }
         var size = 0L
-        d.listFiles()?.forEach { size += it.length() }
+        // #152: .tmp (hali yozilayotgan) fayllar LRU hajmiga KIRMAYDI —
+        // aks holda bitta katta yuklash 220MB chegarani "yeb", saqlangan
+        // qo'shiqlarni muddatidan oldin o'chirardi.
+        d.listFiles()?.forEach { if (!it.name.endsWith(".tmp")) size += it.length() }
         if (size <= MAX_BYTES) return
         entries.sortBy { it.optLong("at") }
         for (o in entries) {
@@ -786,16 +806,10 @@ object YuzMusicCache {
     }
 
     private fun removeFiles(d: File, id: Long): Long {
+        // #152: bitta listFiles sikli — avval EXT sikli + listFiles sikli
+        // bir faylni IKKI marta sanardi (EXT ⊂ KNOWN_EXT), evict hisobi
+        // buzilib chegara oshib ketardi.
         var freed = 0L
-        for (e in EXT) {
-            val f = File(d, "$id.$e")
-            if (f.exists()) {
-                freed += f.length()
-                runCatching { f.delete() }
-            }
-        }
-        // #133: eski/noma'lum kengaytmali nusxalarni ham o'chiramiz —
-        // aks holda "o'chirildi" deyilib, fayl diskda qolib ketardi.
         d.listFiles()?.forEach { f ->
             if (f.isFile && f.name.startsWith("$id.") &&
                 f.name.substringAfterLast('.', "").lowercase() in KNOWN_EXT
