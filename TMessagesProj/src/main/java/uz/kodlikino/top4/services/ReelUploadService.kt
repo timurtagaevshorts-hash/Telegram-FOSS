@@ -13,12 +13,9 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import com.google.firebase.storage.UploadTask
 import kotlinx.coroutines.*
-import org.telegram.messenger.ApplicationLoader
 import org.telegram.messenger.FileLog
-import org.telegram.messenger.NotificationCenter
 import org.telegram.messenger.R
 import org.telegram.messenger.UserConfig
-import org.telegram.tgnet.TLRPC
 import uz.kodlikino.top4.models.Reel
 import uz.kodlikino.top4.utils.ReelStorageHelper
 import uz.kodlikino.top4.utils.ReelsRepository
@@ -252,9 +249,6 @@ class ReelUploadService : android.app.Service() {
 
                 // Muvaffaqiyat
                 showSuccessNotification()
-                NotificationCenter.getInstance().postNotificationName(
-                    NotificationCenter.didReceiveNewMessage, 0, 0
-                ) // Reels feed'ni yangilash
             } catch (e: Exception) {
                 FileLog.e(e)
                 reservedUid?.let {
@@ -311,11 +305,11 @@ class ReelUploadService : android.app.Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Reel yuklanmoqda")
             .setContentText(text)
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(R.drawable.ic_close_white)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setProgress(100, progress, false)
-            .addAction(R.drawable.ic_close, "Bekor qilish", cancelPendingIntent)
+            .addAction(R.drawable.ic_close_white, "Bekor qilish", cancelPendingIntent)
             .build()
     }
 
@@ -336,7 +330,7 @@ class ReelUploadService : android.app.Service() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Reel joylandi")
             .setContentText("Reel profilingizga qo'shildi")
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(R.drawable.ic_close_white)
             .setContentIntent(pendingIntent)
             .setOngoing(false)
             .setAutoCancel(true)
@@ -358,7 +352,7 @@ class ReelUploadService : android.app.Service() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Reel joylanmadi")
             .setContentText(message)
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(R.drawable.ic_close_white)
             .setContentIntent(pendingIntent)
             .setOngoing(false)
             .setAutoCancel(true)

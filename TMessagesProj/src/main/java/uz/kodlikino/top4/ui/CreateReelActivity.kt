@@ -14,6 +14,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.widget.Toolbar
 import com.google.android.material.button.MaterialButton
@@ -357,8 +358,6 @@ class CreateReelActivity : BaseFragment() {
     }
 
     override fun onFragmentDestroy() {
-        publishCanceled = true
-        scope?.cancel()
         scope = null
         YuzUploadUi.keepScreenOn(parentActivity, false)
         super.onFragmentDestroy()
