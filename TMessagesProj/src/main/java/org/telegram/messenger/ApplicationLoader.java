@@ -86,8 +86,8 @@ public class ApplicationLoader extends Application {
     @Override
     protected void attachBaseContext(Context base) {
         super.attachBaseContext(base);
+        YuzCrashPostman.install(base);
         MultiDex.install(this);
-        YuzCrashPostman.install();
     }
 
     public static PushListenerController.IPushListenerServiceProvider getPushProvider() {
@@ -244,6 +244,26 @@ public class ApplicationLoader extends Application {
 
         super.onCreate();
 
+        // Diagnostics must stay alive even if loading the messenger kills its process.
+        String processName = null;
+        if (Build.VERSION.SDK_INT >= 28) {
+            processName = getProcessName();
+        } else {
+            android.app.ActivityManager manager = (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
+            java.util.List<android.app.ActivityManager.RunningAppProcessInfo> processes = manager.getRunningAppProcesses();
+            if (processes != null) {
+                for (android.app.ActivityManager.RunningAppProcessInfo process : processes) {
+                    if (process.pid == android.os.Process.myPid()) {
+                        processName = process.processName;
+                        break;
+                    }
+                }
+            }
+        }
+        if ((getPackageName() + ":diagnostics").equals(processName)) {
+            return;
+        }
+
         if (BuildVars.LOGS_ENABLED) {
             FileLog.d("app start time = " + (startTime = SystemClock.elapsedRealtime()));
             try {
@@ -260,7 +280,7 @@ public class ApplicationLoader extends Application {
         try {
             ConnectionsManager.native_setJava(false);
         } catch (UnsatisfiedLinkError error) {
-            throw new RuntimeException("can't load native libraries " +  Build.CPU_ABI + " lookup folder " + NativeLoader.getAbiFolder());
+            throw new RuntimeException("can't load native libraries " +  Build.CPU_ABI + " lookup folder " + NativeLoader.getAbiFolder(), error);
         }
         new ForegroundDetector(this) {
             @Override

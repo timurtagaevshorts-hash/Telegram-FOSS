@@ -26,6 +26,16 @@
         android:requestLegacyExternalStorage="true"
         tools:replace="android:supportsRtl">
 
+        <activity
+            android:name="org.telegram.messenger.YuzCrashRecoveryActivity"
+            android:process=":diagnostics"
+            android:exported="false"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+        <activity-alias
+            android:name="org.telegram.messenger.DefaultIcon"
+            android:targetActivity="org.telegram.messenger.YuzCrashRecoveryActivity"
+            tools:replace="android:targetActivity" />
+
     </application>
 
 </manifest>
