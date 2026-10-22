@@ -64,6 +64,26 @@
         android:layout_gravity="bottom"
         android:background="@drawable/bg_classified_ad_scrim" />
 
+    <!--
+      Markaziy ovoz holati belgisi: ovoz o'chiq/yoniqligini ko'rsatadi.
+      Bosilganda ovoz yonadi va reel to'liq ekranga o'tadi (kichik holatdagi
+      videoni bosish bilan bir xil). Fullscreen'da yashiriladi — u yerda
+      yuqoridagi ovoz tugmasi ishlaydi. Spinner ustida ko'rinishi uchun
+      ProgressBar'dan OLDIN chiziladi.
+    -->
+    <ImageView
+        android:id="@+id/btnSoundCenter"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="center"
+        android:alpha="0.9"
+        android:background="@drawable/bg_yuz_reel_badge"
+        android:contentDescription="@string/reels_sound_off"
+        android:foreground="?attr/selectableItemBackgroundBorderless"
+        android:padding="16dp"
+        android:src="@drawable/ic_yuz_volume_off"
+        android:tint="@color/yuz_on_media" />
+
     <ProgressBar
         android:id="@+id/pageProgress"
         android:layout_width="44dp"
@@ -289,6 +309,7 @@
             android:paddingBottom="@dimen/yuz_space_1">
 
             <FrameLayout
+                android:id="@+id/reelAvatarHost"
                 android:layout_width="34dp"
                 android:layout_height="34dp"
                 android:background="@drawable/bg_classified_premium_fab">
@@ -302,6 +323,15 @@
                     android:textColor="@color/yuz_text"
                     android:textSize="@dimen/yuz_text_body"
                     android:textStyle="bold" />
+
+                <!-- YuzGram profilidagi rasm (Telegram avatari topilmasa) -->
+                <ImageView
+                    android:id="@+id/ivAvatarPhoto"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone" />
             </FrameLayout>
 
             <TextView

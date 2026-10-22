@@ -12,6 +12,7 @@ import org.telegram.messenger.UserObject
 import org.telegram.tgnet.TLObject
 import org.telegram.tgnet.TLRPC
 import org.telegram.tgnet.tl.TL_stories
+import org.telegram.ui.Components.AvatarDrawable
 import org.telegram.ui.Components.Reactions.ReactionsLayoutInBubble
 import org.telegram.ui.Stories.StoriesController
 import uz.kodlikino.top4.models.Reel
@@ -266,6 +267,36 @@ object YuzStoryFeed {
         } catch (_: Exception) {
             null
         }
+    }
+
+    /** BackupImageView.setForUserOrChat uchun peer + drawable; topilmasa null. */
+    @JvmStatic
+    fun avatarFor(account: Int, dialogId: Long): Pair<TLObject, AvatarDrawable>? {
+        val peer = peerObject(account, dialogId) ?: return null
+        val drawable = when (peer) {
+            is TLRPC.User -> AvatarDrawable(peer)
+            is TLRPC.Chat -> AvatarDrawable(peer)
+            else -> return null
+        }
+        return peer to drawable
+    }
+
+    /**
+     * Hikoyaning ochiq Telegram havolasi: `t.me/<username>/s/<story_id>`.
+     * Peer'da username bo'lmasa (yopiq profil) bo'sh qaytadi.
+     */
+    @JvmStatic
+    fun storyShareLink(account: Int, reel: Reel): String {
+        if (!reel.isStory || reel.storyId <= 0) return ""
+        val username = try {
+            val mc = MessagesController.getInstance(account)
+            if (reel.storyDialogId > 0) mc.getUser(reel.storyDialogId)?.username
+            else mc.getChat(-reel.storyDialogId)?.username
+        } catch (_: Exception) {
+            null
+        }
+        if (username.isNullOrBlank()) return ""
+        return "https://t.me/$username/s/${reel.storyId}"
     }
 
     /**

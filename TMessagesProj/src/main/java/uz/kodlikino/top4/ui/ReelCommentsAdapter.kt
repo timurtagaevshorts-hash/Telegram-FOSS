@@ -4,6 +4,7 @@ import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
@@ -12,7 +13,9 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
+import org.telegram.ui.Components.BackupImageView
 import uz.kodlikino.top4.models.ReelComment
+import uz.kodlikino.top4.utils.YuzStoryFeed
 import java.util.Locale
 
 /**
@@ -33,6 +36,7 @@ import java.util.Locale
  */
 class ReelCommentsAdapter(
     private val appContext: Context,
+    private val account: Int,
     private val onReply: (ReelComment) -> Unit,
     /** Izoh muallifi (avatar/ism) bosilganda — uning YuzGram profili. */
     private val onOpenProfile: (ReelComment) -> Unit = {}
@@ -121,12 +125,29 @@ class ReelCommentsAdapter(
     }
 
     inner class CommentHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val avatarHost: FrameLayout = itemView.findViewById(R.id.commentAvatarWrap)
         private val tvAvatar: TextView = itemView.findViewById(R.id.tvCommentAvatar)
         private val ivAvatar: ImageView = itemView.findViewById(R.id.ivCommentAvatar)
+        // Telegram avatari: XML'da yaratilmaydi (faqat Context konstruktori),
+        // ImageReceiver'ga akkaunt berilmasa rasm yuklanmaydi.
+        private val tgAvatar = BackupImageView(itemView.context)
         private val tvAuthor: TextView = itemView.findViewById(R.id.tvCommentAuthor)
         private val tvText: TextView = itemView.findViewById(R.id.tvCommentText)
         private val tvTime: TextView = itemView.findViewById(R.id.tvCommentTime)
         private val tvReplyHint: TextView = itemView.findViewById(R.id.tvCommentReplyHint)
+
+        init {
+            tgAvatar.setRoundRadius(AndroidUtilities.dp(15f))
+            tgAvatar.getImageReceiver().setCurrentAccount(account)
+            tgAvatar.visibility = View.GONE
+            avatarHost.addView(
+                tgAvatar,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            )
+        }
 
         fun bind(comment: ReelComment) {
             // Javoblar root ostiga chekinib ko'rinadi (daraxt vizuali).
@@ -140,18 +161,33 @@ class ReelCommentsAdapter(
             tvTime.text = relativeTime(comment.createdAt)
             tvAvatar.text = name.take(1).uppercase(Locale.getDefault())
 
+            // Avatar: Telegram rasmi -> YuzGram rasm -> bosh harf.
+            val dialogId = comment.userId.removePrefix("tg_").toLongOrNull() ?: 0L
+            val pair = if (dialogId != 0L) YuzStoryFeed.avatarFor(account, dialogId) else null
             val photo = comment.authorPhotoUrl
-            if (photo.isNotBlank()) {
-                ivAvatar.visibility = View.VISIBLE
-                Glide.with(ivAvatar)
-                    .load(photo)
-                    .apply(RequestOptions.circleCropTransform())
-                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
-                    .error(R.drawable.bg_classified_image_placeholder)
-                    .into(ivAvatar)
-            } else {
+            if (pair != null) {
+                tgAvatar.visibility = View.VISIBLE
+                tgAvatar.setForUserOrChat(pair.first, pair.second)
                 ivAvatar.visibility = View.GONE
                 ivAvatar.setImageDrawable(null)
+                tvAvatar.visibility = View.GONE
+            } else {
+                tgAvatar.visibility = View.GONE
+                tgAvatar.clearImage()
+                if (photo.isNotBlank()) {
+                    ivAvatar.visibility = View.VISIBLE
+                    tvAvatar.visibility = View.GONE
+                    Glide.with(ivAvatar)
+                        .load(photo)
+                        .apply(RequestOptions.circleCropTransform())
+                        .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                        .error(R.drawable.bg_classified_image_placeholder)
+                        .into(ivAvatar)
+                } else {
+                    ivAvatar.visibility = View.GONE
+                    ivAvatar.setImageDrawable(null)
+                    tvAvatar.visibility = View.VISIBLE
+                }
             }
 
             if (comment.isReply) {
@@ -180,6 +216,8 @@ class ReelCommentsAdapter(
             tvAuthor.setOnClickListener(openProfile)
             tvAvatar.setOnClickListener(openProfile)
             ivAvatar.setOnClickListener(openProfile)
+            tgAvatar.setOnClickListener(openProfile)
+            avatarHost.setOnClickListener(openProfile)
         }
 
         /** Nisbiy vaqt — eski loyihadagi kabi o'zbekcha ("5 daqiqa oldin"). */

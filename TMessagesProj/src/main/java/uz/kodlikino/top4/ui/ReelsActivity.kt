@@ -472,6 +472,7 @@ class ReelsActivity @JvmOverloads constructor(
 
         val commentsRvAdapter = ReelCommentsAdapter(
             appContext = themed,
+            account = currentAccount,
             onReply = { comment -> setReplyTarget(comment) },
             onOpenProfile = { comment -> openCommentProfile(comment) }
         )

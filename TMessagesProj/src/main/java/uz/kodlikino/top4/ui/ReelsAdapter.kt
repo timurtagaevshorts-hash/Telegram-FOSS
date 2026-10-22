@@ -25,8 +25,8 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.FileDataSource
+import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
@@ -35,6 +35,7 @@ import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.request.RequestOptions
 import org.telegram.messenger.R
 import uz.kodlikino.top4.models.Reel
 import org.telegram.messenger.AndroidUtilities
@@ -47,7 +48,9 @@ import org.telegram.messenger.SharedConfig
 import org.telegram.messenger.YuzStoryStreamDataSource
 import org.telegram.ui.Components.BackupImageView
 import uz.kodlikino.top4.utils.NetworkReachability
+import uz.kodlikino.top4.utils.YuzReelPreloader
 import uz.kodlikino.top4.utils.YuzStoryFeed
+import uz.kodlikino.top4.utils.YuzVideoCache
 import uz.kodlikino.top4.utils.YuzViewedReels
 import java.io.File
 
@@ -104,6 +107,12 @@ class ReelsAdapter(
      * fullscreen; fullscreen holatda bosish = play/pause (eski xulqiyat).
      */
     var fullscreen = false
+        set(value) {
+            if (field == value) return
+            field = value
+            // Markaziy ovoz belgisi faqat kichik ko'rinishda ko'rinadi.
+            activeHolder?.refreshSoundUi()
+        }
 
     private val mainHandler = Handler(Looper.getMainLooper())
     // #120: release() dan keyin post etilgan retry Runnable'lar faollashuvni
@@ -353,6 +362,21 @@ class ReelsAdapter(
             )
         )
         holder.storyThumb = biv
+        // Telegram avatari: BackupImageView XML'da yaratilmaydi (faqat Context
+        // konstruktori bor), shuning uchun code'da qo'shamiz. ImageReceiver
+        // akkauntni bilishi shart — aks holda avatar yuklanmaydi.
+        val avatar = BackupImageView(parent.context)
+        avatar.setRoundRadius(AndroidUtilities.dp(17f))
+        avatar.getImageReceiver().setCurrentAccount(account)
+        avatar.visibility = View.GONE
+        holder.avatarHost.addView(
+            avatar,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        holder.avatarImage = avatar
         return holder
     }
 
@@ -452,6 +476,11 @@ class ReelsAdapter(
             playAttempts = 0
             activePos = pos
         }
+        // Keyingi/oldingi reel'larning bosh qismini oldindan keshga tortamiz —
+        // sahifa almashtirilganda video darhol boshlanadi (hikoyalar bu yerda
+        // videoUrl bo'sh bo'lgani uchun o'tkazib yuboriladi; ularni
+        // YuzStoryFeed.prepareNeighbours alohida tayyorlaydi).
+        YuzReelPreloader.preloadAround(appContext, items, pos)
         if (playbackEnabled) bindActive(pos, generation, 0)
     }
 
@@ -513,7 +542,9 @@ class ReelsAdapter(
             return
         }
         try {
-            val source = ProgressiveMediaSource.Factory(httpDataSourceFactory())
+            // Disk kesh: oldindan yuklangan bo'laklar keshdan o'qiladi, qolgani
+            // oqim davomida yoziladi. Qayta ko'rishda video deyarli darhol ochiladi.
+            val source = ProgressiveMediaSource.Factory(remoteDataSourceFactory())
                 .createMediaSource(
                     MediaItem.Builder()
                         .setUri(Uri.parse(reel.videoUrl))
@@ -664,17 +695,17 @@ class ReelsAdapter(
         mainHandler.post(progressTicker)
     }
 
-    private var httpFactory: DefaultHttpDataSource.Factory? = null
+    private var remoteFactory: CacheDataSource.Factory? = null
 
-    /** Firebase Storage/HTTP uchun ulanish sozlamalari (sekin tarmoqqa chidamli). */
-    private fun httpDataSourceFactory(): DefaultHttpDataSource.Factory {
-        httpFactory?.let { return it }
-        val factory = DefaultHttpDataSource.Factory()
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(15_000)
-            .setAllowCrossProtocolRedirects(true)
-            .setUserAgent("YuzGram")
-        httpFactory = factory
+    /**
+     * Firebase Storage/HTTP uchun keshli manba. [YuzVideoCache] bilan bir xil
+     * disk keshi [YuzReelPreloader] ham ishlatadi — oldindan yuklangan videolar
+     * pleyerga keshdan darhol beriladi.
+     */
+    private fun remoteDataSourceFactory(): CacheDataSource.Factory {
+        remoteFactory?.let { return it }
+        val factory = YuzVideoCache.dataSourceFactory(appContext)
+        remoteFactory = factory
         return factory
     }
 
@@ -810,6 +841,7 @@ class ReelsAdapter(
         muted = !muted
         val h = activeHolder
         player?.volume = if (muted || userPaused || h == null || !canPlay(h)) 0f else 1f
+        h?.refreshSoundUi()
         return muted
     }
 
@@ -844,7 +876,11 @@ class ReelsAdapter(
         val playbackBar: ProgressBar = itemView.findViewById(R.id.playbackBar)
         private val tvPlayPauseBadge: ImageView = itemView.findViewById(R.id.tvPlayPauseBadge)
         private val tvUploaderName: TextView = itemView.findViewById(R.id.tvUploaderName)
+        val avatarHost: FrameLayout = itemView.findViewById(R.id.reelAvatarHost)
         private val tvAvatarInitial: TextView = itemView.findViewById(R.id.tvAvatarInitial)
+        private val ivAvatarPhoto: ImageView = itemView.findViewById(R.id.ivAvatarPhoto)
+        private val btnSoundCenter: ImageView = itemView.findViewById(R.id.btnSoundCenter)
+        lateinit var avatarImage: BackupImageView
         private val uploaderRow: View = itemView.findViewById(R.id.uploaderRow)
         private val tvCaption: TextView = itemView.findViewById(R.id.tvCaption)
         private val btnLike: ImageView = itemView.findViewById(R.id.btnLike)
@@ -889,6 +925,58 @@ class ReelsAdapter(
         init {
             playerView.useController = false
             bindTouch()
+            // Markazdagi ovoz belgisi — kichik ko'rinishda bosilganda ovoz
+            // yonadi va reel to'liq ekranga o'tadi (videoni bosish bilan bir xil).
+            btnSoundCenter.setOnClickListener {
+                if (muted) toggleMute()
+                onExpandTap()
+            }
+        }
+
+        /** Markaziy ovoz belgisini joriy holatga moslaydi (fullscreen'da yashirin). */
+        fun refreshSoundUi() {
+            if (fullscreen) {
+                btnSoundCenter.visibility = View.GONE
+                return
+            }
+            btnSoundCenter.visibility = View.VISIBLE
+            btnSoundCenter.setImageResource(
+                if (muted) R.drawable.ic_yuz_volume_off else R.drawable.ic_yuz_volume_on
+            )
+            btnSoundCenter.contentDescription = appContext.getString(
+                if (muted) R.string.reels_sound_off else R.string.reels_sound_on
+            )
+        }
+
+        /** Muallif avatari: Telegram avatari -> YuzGram rasm -> bosh harf. */
+        private fun bindAvatar(reel: Reel) {
+            val dialogId = if (reel.isStory) reel.storyDialogId
+            else reel.uploadedByUid.removePrefix("tg_").toLongOrNull() ?: 0L
+            val pair = if (dialogId != 0L) YuzStoryFeed.avatarFor(account, dialogId) else null
+            if (pair != null) {
+                avatarImage.visibility = View.VISIBLE
+                avatarImage.setForUserOrChat(pair.first, pair.second)
+                ivAvatarPhoto.visibility = View.GONE
+                ivAvatarPhoto.setImageDrawable(null)
+                tvAvatarInitial.visibility = View.GONE
+                return
+            }
+            avatarImage.visibility = View.GONE
+            avatarImage.clearImage()
+            val photo = reel.uploadedByPhotoUrl
+            if (photo.isNotBlank()) {
+                ivAvatarPhoto.visibility = View.VISIBLE
+                tvAvatarInitial.visibility = View.GONE
+                Glide.with(ivAvatarPhoto)
+                    .load(photo)
+                    .apply(RequestOptions.circleCropTransform())
+                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                    .into(ivAvatarPhoto)
+            } else {
+                ivAvatarPhoto.visibility = View.GONE
+                ivAvatarPhoto.setImageDrawable(null)
+                tvAvatarInitial.visibility = View.VISIBLE
+            }
         }
 
         /**
@@ -934,12 +1022,15 @@ class ReelsAdapter(
                 .start()
         }
 
-        /** Reel'ni tizim ulashish menyusiga chiqaradi (sarlavha + hashtag + URL). */
+        /** Reel'ni tizim ulashish menyusiga chiqaradi (sarlavha + hashtag + havola). */
         private fun shareReel() {
             val r = reel ?: return
-            // #106: hikoyada URL yo'q — matnli ulashish (sarlavha + muallif).
             if (r.videoUrl.isBlank() && !r.isStory) return
             val header = r.title.ifBlank { appContext.getString(R.string.reels_title) }
+            // Hikoya Telegram'da mavjud — ochiq havola yuboriladi (ochilganda
+            // hikoya Telegram'ning o'z oynasida ko'rinadi). Username yo'q
+            // (yopiq profil) bo'lsa matnli ulashish bilan cheklanamiz.
+            val storyLink = if (r.isStory) YuzStoryFeed.storyShareLink(account, r) else ""
             val body = buildString {
                 append(header)
                 if (r.hashtags.isNotBlank()) {
@@ -949,7 +1040,9 @@ class ReelsAdapter(
                 if (by != null) {
                     append("\n"); append("— ").append(by)
                 }
-                if (r.videoUrl.isNotBlank()) {
+                if (storyLink.isNotBlank()) {
+                    append("\n"); append(storyLink)
+                } else if (r.videoUrl.isNotBlank()) {
                     append("\n"); append(r.videoUrl)
                 }
             }
@@ -998,6 +1091,7 @@ class ReelsAdapter(
             val name = reel.uploadedByName.ifBlank { "YuzGram" }
             tvUploaderName.text = name
             tvAvatarInitial.text = name.take(1).uppercase()
+            bindAvatar(reel)
             uploaderRow.setOnClickListener {
                 val r = this.reel ?: return@setOnClickListener
                 if (r.uploadedByUid.isNotBlank()) onOpenProfile(r)
@@ -1059,6 +1153,7 @@ class ReelsAdapter(
                 btnReelMenu.isClickable = false
             }
             bindCta(reel)
+            refreshSoundUi()
         }
 
         /**
