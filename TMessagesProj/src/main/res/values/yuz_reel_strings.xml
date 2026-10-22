@@ -37,6 +37,8 @@
     <string name="reels_video_too_large">Video 200 MB dan katta — boshqa video tanlang</string>
     <string name="reels_video_not_readable">Video o\'qilmadi. Qaytadan tanlang</string>
     <string name="reels_uploading_video">Video yuklanmoqda…</string>
+    <string name="reels_preparing_video">Video tayyorlanmoqda…</string>
+    <string name="reels_compressing_progress">Siqilmoqda… %1$d%%</string>
     <string name="reels_saving">Reel saqlanmoqda…</string>
 
     <!-- #76 professional upload: monetizatsiya tugmasi -->

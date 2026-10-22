@@ -35,8 +35,10 @@ import uz.kodlikino.top4.utils.ReelStorageHelper
 import uz.kodlikino.top4.utils.ReelsRepository
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzPremiumManager
+import uz.kodlikino.top4.utils.YuzReelCompressor
 import uz.kodlikino.top4.utils.YuzReelQuota
 import uz.kodlikino.top4.utils.YuzUploadUi
+import java.io.File
 
 /**
  * "Reel joylash" — video tanlash, Firebase Storage'ga yuklash va Firestore `reels`
@@ -64,6 +66,10 @@ class CreateReelActivity : BaseFragment() {
     companion object {
         private const val REQ_PICK_VIDEO = 4481
         private const val MAX_VIDEO_BYTES = 200L * 1024L * 1024L
+
+        /** Siqilgan chiqish maqsadi: oddiy 12 MB, premium 24 MB. */
+        private const val COMPRESS_TARGET_BYTES = 12L * 1024L * 1024L
+        private const val COMPRESS_TARGET_PREMIUM_BYTES = 24L * 1024L * 1024L
 
         /** Preview kadri ekranda chiqishi yetarli — memory uchun kichraytiriladi. */
         private const val MAX_PREVIEW_PX = 540
@@ -93,6 +99,7 @@ class CreateReelActivity : BaseFragment() {
 
     private var scope: CoroutineScope? = null
     private var publishing = false
+    @Volatile private var publishCanceled = false
 
     override fun createView(context: Context): View {
         val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
@@ -197,11 +204,10 @@ class CreateReelActivity : BaseFragment() {
         val s = scope ?: return
         s.launch {
             val info = withContext(Dispatchers.IO) {
-                val size = try {
-                    ctx.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
-                } catch (e: Exception) {
-                    -1L
-                }
+                // ContentResolver'dan aniq hajm: OpenableColumns.SIZE + fd.statSize.
+                // Eski openAssetFileDescriptor.length ba'zi provayderlarda -1
+                // qaytarardi — hajm limiti va siqish qarori buzilardi.
+                val size = YuzReelQuota.resolveUriSizeBytes(ctx, uri)
                 var durationMs = 0L
                 var frame: Bitmap? = null
                 try {
@@ -344,6 +350,7 @@ class CreateReelActivity : BaseFragment() {
         ).joinToString(" ").orEmpty()
 
         publishing = true
+        publishCanceled = false
         btnPublish?.isEnabled = false
         uploadProgress?.visibility = View.VISIBLE
         uploadProgress?.progress = 0
@@ -366,6 +373,7 @@ class CreateReelActivity : BaseFragment() {
             // Slot transaction bilan OLINDI — upload/save xatosida rollback
             // qilinadi (donor UserReelUploadManager xatti-harakati).
             var reservedUid: String? = null
+            var compressedFile: File? = null
             val boosted = premiumBoost()
             try {
                 val uid = YuzGramAdsAuth.ensureSignedIn(account)
@@ -383,9 +391,34 @@ class CreateReelActivity : BaseFragment() {
                     return@launch
                 }
                 reservedUid = uid
-                val url = ReelStorageHelper.uploadVideo(
-                    uid, "$id.$ext", uri
-                ) { pct, transferred, total ->
+                // 2026-10-22: sekin internetda 40–50 MB xom video 10+ daqiqa
+                // yuklanardi. Avval 720p H.264 ga siqamiz (~3–5 barobar kichik),
+                // so'ng yuklaymiz — xuddi shu tarmoqda publish bir necha barobar
+                // tez tugaydi. Siqish imkonsiz bo'lsa asl fayl yuklanadi.
+                tvUploadStatus?.text = getString(R.string.reels_preparing_video)
+                uploadProgress?.progress = 0
+                val appCtx = (context ?: return@launch).applicationContext
+                compressedFile = try {
+                    YuzReelCompressor.compress(
+                        context = appCtx,
+                        uri = uri,
+                        sizeBytes = videoSizeBytes,
+                        targetBytes = if (boosted) COMPRESS_TARGET_PREMIUM_BYTES
+                        else COMPRESS_TARGET_BYTES,
+                        onProgress = { pct ->
+                            AndroidUtilities.runOnUIThread {
+                                uploadProgress?.progress = pct
+                                tvUploadStatus?.text =
+                                    getString(R.string.reels_compressing_progress, pct)
+                            }
+                        },
+                        isCanceled = { publishCanceled }
+                    )
+                } catch (e: Exception) {
+                    null
+                }
+                tvUploadStatus?.text = getString(R.string.reels_uploading_video)
+                val uploadProgressListener: (Int, Long, Long) -> Unit = { pct, transferred, total ->
                     uploadProgress?.progress = pct
                     tvUploadStatus?.text = getString(
                         R.string.reels_upload_progress,
@@ -393,6 +426,13 @@ class CreateReelActivity : BaseFragment() {
                         YuzUploadUi.humanBytes(transferred),
                         YuzUploadUi.humanBytes(total)
                     )
+                }
+                val url = if (compressedFile != null) {
+                    ReelStorageHelper.uploadVideo(
+                        uid, "$id.mp4", compressedFile!!, uploadProgressListener
+                    )
+                } else {
+                    ReelStorageHelper.uploadVideo(uid, "$id.$ext", uri, uploadProgressListener)
                 }
                 tvUploadStatus?.text = getString(R.string.reels_saving)
                 val reel = Reel(
@@ -421,6 +461,11 @@ class CreateReelActivity : BaseFragment() {
                 val reason = e.message ?: getString(R.string.reels_publish_failed)
                 // Uzun sabab 2 soniyalik toast'da o'qilmaydi — dialog + qayta urinish.
                 YuzUploadUi.showError(themedContext ?: context, reason) { publishReel() }
+            } finally {
+                try {
+                    compressedFile?.delete()
+                } catch (_: Exception) {
+                }
             }
         }
     }
@@ -454,6 +499,7 @@ class CreateReelActivity : BaseFragment() {
     }
 
     override fun onFragmentDestroy() {
+        publishCanceled = true
         scope?.cancel()
         scope = null
         YuzUploadUi.keepScreenOn(parentActivity, false)

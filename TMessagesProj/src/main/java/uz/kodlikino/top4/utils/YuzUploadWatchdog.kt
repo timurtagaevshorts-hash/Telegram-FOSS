@@ -28,7 +28,10 @@ import java.util.concurrent.atomic.AtomicLong
 object YuzUploadWatchdog {
 
     private const val TAG = "YuzUploadWatchdog"
-    const val STALL_MS = 45_000L
+    // 2026-10-22: 45s juda qattiq edi — sekin 3G'da bitta 256 KB chunk 60–80
+    // soniya olishi mumkin, natijada sog'lom yuklash bekor qilinib, boshidan
+    // qayta boshlanardi. 90s — haqiqiy uzilishni baribir ushlaydi.
+    const val STALL_MS = 90_000L
     private const val WATCHDOG_TICK_MS = 5_000L
 
     /**

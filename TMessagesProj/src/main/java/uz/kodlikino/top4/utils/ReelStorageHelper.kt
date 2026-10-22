@@ -8,6 +8,7 @@ import com.google.firebase.storage.StorageMetadata
 import com.google.firebase.storage.UploadTask
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
+import java.io.File
 
 /**
  * Reel videosini Cloud Storage'ga yuklaydi (`user_reels/{uid}/{file}`).
@@ -42,6 +43,25 @@ object ReelStorageHelper {
         fileName: String,
         uri: Uri,
         onProgress: (percent: Int, transferred: Long, total: Long) -> Unit = { _, _, _ -> }
+    ): String = upload(uid, fileName, uri, onProgress)
+
+    /**
+     * Siqilgan lokal faylni yuklash (2026-10-22). [CreateReelActivity]
+     * videoni 720p ga kichraytirgach shu yo'ldan yuboradi — xom content URI
+     * o'rniga tayyor fayl, progress esa aniq `totalByteCount` bilan.
+     */
+    suspend fun uploadVideo(
+        uid: String,
+        fileName: String,
+        file: File,
+        onProgress: (percent: Int, transferred: Long, total: Long) -> Unit = { _, _, _ -> }
+    ): String = upload(uid, fileName, Uri.fromFile(file), onProgress)
+
+    private suspend fun upload(
+        uid: String,
+        fileName: String,
+        uri: Uri,
+        onProgress: (percent: Int, transferred: Long, total: Long) -> Unit
     ): String {
         if (uid.isBlank() || fileName.isBlank()) {
             throw IllegalStateException("Reel yuklash uchun uid/fileName kerak")
@@ -60,11 +80,11 @@ object ReelStorageHelper {
             try {
                 val task = ref.putFile(uri, metadata)
                 awaitWithStallWatchdog(task, attempt) { snap ->
-                    val total = snap.totalByteCount.coerceAtLeast(1L)
+                    val total = snap.totalByteCount
                     onProgress(
-                        ((snap.bytesTransferred * 100) / total).toInt().coerceIn(0, 100),
+                        if (total > 0L) ((snap.bytesTransferred * 100) / total).toInt().coerceIn(0, 100) else 0,
                         snap.bytesTransferred,
-                        snap.totalByteCount
+                        total
                     )
                 }
                 return ref.downloadUrl.await().toString()
