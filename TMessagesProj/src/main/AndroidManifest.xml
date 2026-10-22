@@ -480,7 +480,7 @@
             android:foregroundServiceType="location"
             android:enabled="true"
             android:exported="true"/>
-        <service android:name=".voip.VoIPService" android:enabled="true" android:foregroundServiceType="mediaProjection|camera|microphone|mediaPlayback"/>
+        <service android:name=".voip.VoIPService" android:enabled="true" android:foregroundServiceType="mediaProjection|camera|mediaPlayback"/>
         <service android:name=".MusicPlayerService" android:exported="true" android:enabled="true" android:foregroundServiceType="mediaPlayback"/>
         <!-- YuzGram #67: musika fon ijrosi (media3 MediaSessionService) —
              ekran bloklanganda ham qo'shiq tugamaydi, qulf ekranida tugmalar. -->
