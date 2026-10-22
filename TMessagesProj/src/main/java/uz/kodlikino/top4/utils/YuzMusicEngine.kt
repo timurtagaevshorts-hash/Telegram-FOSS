@@ -829,11 +829,16 @@ object YuzMusicEngine {
 
     private fun plFile(context: Context) = File(context.filesDir, "yuzplaylists.json")
 
-    fun playlists(context: Context): MutableList<Playlist> {
+    // #149: playlist fayliga UI (o'qish), "Sevimli" tugmasi (fon ipida qayta
+    // yozish) va playlist qo'shish (IO) bir vaqtda tegar edi — yozuvlar
+    // aralashib JSON buzilib, butun ro'yxat yo'qolishi mumkin.
+    private val plLock = Any()
+
+    fun playlists(context: Context): MutableList<Playlist> = synchronized(plLock) {
         val out = ArrayList<Playlist>()
         try {
             val f = plFile(context)
-            if (!f.exists()) return out
+            if (!f.exists()) return@synchronized out
             val arr = JSONArray(f.readText())
             for (i in 0 until arr.length()) {
                 val o = arr.optJSONObject(i) ?: continue
@@ -863,22 +868,23 @@ object YuzMusicEngine {
             }
         } catch (_: Exception) {
         }
-        return out
+        out
     }
 
     /** Bor playlist'ga qo'shadi; yo'q bo'lsa — yangi yaratadi. */
-    fun playlistAdd(context: Context, name: String, track: YuzTrack): Boolean {
+    fun playlistAdd(context: Context, name: String, track: YuzTrack): Boolean = synchronized(plLock) {
         val all = playlists(context)
         val existing = all.indexOfFirst { it.name == name }
         val tracks =
             if (existing >= 0) all[existing].tracks.filterNot { it.id == track.id } + track
             else listOf(track)
         if (existing >= 0) all[existing] = Playlist(name, tracks) else all.add(Playlist(name, tracks))
-        return savePlaylists(context, all)
+        savePlaylists(context, all)
     }
 
-    fun playlistRemove(context: Context, name: String): Boolean =
+    fun playlistRemove(context: Context, name: String): Boolean = synchronized(plLock) {
         savePlaylists(context, playlists(context).filter { it.name != name })
+    }
 
     private fun savePlaylists(context: Context, list: List<Playlist>): Boolean {
         return try {

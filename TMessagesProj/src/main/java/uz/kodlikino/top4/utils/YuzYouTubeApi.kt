@@ -135,6 +135,11 @@ object YuzYouTubeApi {
     private const val CACHE_TTL = 5 * 60 * 1000L
     private val streamCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<YuzAudioStream>>>()
     private val attempt = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    // #149: bitta video uchun bir vaqtda bitta resolve. Ilgari loader
+    // (ijro), prefetch va yuklash iplari kesh tekshiruvidan birgalikda
+    // o'tib, bitta videoId uchun 2-3 marta NPE + InnerTube zanjirini
+    // boshlardi — sekin taroqda bu ijro boshlanishini ham kechiktirardi.
+    private val resolveLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
 
     // #84: bitta URL ko'pincha bir range so'rovini o'tkazadi — refresh
     // takroran bir xil URL'ni qaytarmasligi uchun ishlatilganlarni belgilaymiz.
@@ -155,18 +160,24 @@ object YuzYouTubeApi {
         cancellation?.check()
         if (videoId.isBlank()) return emptyList()
         cached(videoId).let { if (it.isNotEmpty()) return it }
-        val out = ArrayList<YuzAudioStream>()
-        val seen = HashSet<String>()
-        for (s in YuzNpeExtractor.audioStreams(videoId, 2)) if (seen.add(s.url)) out.add(s)
-        cancellation?.check()
-        for (c in PLAYERS) {
+        // #149: kesh tekshiruvidan so'ng bitta ip zanjirni bajaradi, qolganlari
+        // tayyor natijani olish uchun kutadi — takroriy so'rovlar yo'q.
+        val lock = resolveLocks.computeIfAbsent(videoId) { Any() }
+        synchronized(lock) {
+            cached(videoId).let { if (it.isNotEmpty()) return it }
+            val out = ArrayList<YuzAudioStream>()
+            val seen = HashSet<String>()
+            for (s in YuzNpeExtractor.audioStreams(videoId, 2)) if (seen.add(s.url)) out.add(s)
             cancellation?.check()
-            collectFromVideo(videoId, c, out, seen, 6)
+            for (c in PLAYERS) {
+                cancellation?.check()
+                collectFromVideo(videoId, c, out, seen, 6)
+            }
+            cancellation?.check()
+            val streams = out.map { it.copy(sourceVideoId = videoId) }
+            streamCache[videoId] = System.currentTimeMillis() to streams
+            return streams
         }
-        cancellation?.check()
-        val streams = out.map { it.copy(sourceVideoId = videoId) }
-        streamCache[videoId] = System.currentTimeMillis() to streams
-        return streams
     }
 
     /** Dvigatel prefetch'i: navbatdagi qo'shiq URL'ini oldinden ochib qo'yamiz. */

@@ -125,9 +125,11 @@ object YuzMiniPlayer : Application.ActivityLifecycleCallbacks, YuzMusicEngine.Ob
     }
 
     private fun toggle() {
-        val p = YuzMusicEngine.playerOrNull() ?: return
-        if (p.currentMediaItem == null) return
-        if (p.isPlaying) p.pause() else p.playWhenReady = true
+        // #149: oqim xatosidan keyin pleyer IDLE/ENDED holatda qolsa oddiy
+        // playWhenReady hech narsa qilmasdi ("o'lik" tugma). Dvigatel yo'li
+        // holatni tiklab, kerak bo'lsa fon xizmatini ham ko'taradi.
+        val ctx = host ?: return
+        YuzMusicEngine.togglePlay(ctx)
     }
 
     private fun openPlayer() {
