@@ -113,7 +113,7 @@ object YuzNpeExtractor {
                 out.add(
                     YuzAudioStream(
                         url = url,
-                        ext = s.format?.name?.lowercase() ?: "m4a",
+                        ext = npeExt(s.format?.name),
                         approxBytes = clenOf(url),
                         ua = WEB_UA,
                         bitrate = s.averageBitrate
@@ -125,6 +125,21 @@ object YuzNpeExtractor {
         } catch (e: Throwable) {
             Log.i(TAG, "npe fail $videoId ${e.javaClass.simpleName}: ${e.message?.take(120)}")
             emptyList()
+        }
+    }
+
+    /**
+     * #133: NewPipe format nomi "WEBMA_OPUS"/"OGG" bo'lishi mumkin. Kash
+     * ro'yxati faqat m4a/mp3/webm biladi — normallashtirilmasa fayl
+     * "$id.webma" bo'lib saqlanardi va keyin "yuklangan" deb topilmasdi.
+     */
+    private fun npeExt(name: String?): String {
+        val n = name?.lowercase().orEmpty()
+        return when {
+            n.contains("webm") || n.contains("opus") || n.contains("ogg") ||
+                n.contains("vorbis") -> "webm"
+            n.contains("mp3") || n.contains("mpeg") -> "mp3"
+            else -> "m4a"
         }
     }
 

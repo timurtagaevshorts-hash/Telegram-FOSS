@@ -6,9 +6,13 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.ToneGenerator
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -134,6 +138,17 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
 
     fun isListening(): Boolean = listening
 
+    fun isSpeaking(): Boolean = speaking
+
+    /**
+     * #134: "endi eshitaman" signali — qisqa beep + vibratsiya.
+     * Kirishda va har bir yozuv boshida chaqiriladi; ovozli salom YO'Q.
+     */
+    fun playReadySignal() {
+        playListenSignal()
+        vibrateShort()
+    }
+
     fun canListen(): Boolean = try {
         SpeechRecognizer.isRecognitionAvailable(appContext)
     } catch (_: Exception) {
@@ -146,7 +161,7 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
             if (released || speaking || listening) return@post
             languageIndex = 0
             ignoreNextError = false
-            playListenSignal()
+            playReadySignal()
             if (!canListen() || !ensureRecognizer()) {
                 callbacks.onListenError("Mikrofon mavjud emas.", false)
                 return@post
@@ -262,6 +277,10 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
     // #126: postDelayed tone.release() mainHandler.removeCallbacksAndMessages
     // bilan o'chirib qo'yilmasi uchun aktiv ToneGenerator maydonida ushlanadi.
     private var listenTone: ToneGenerator? = null
+    // #135: muteRecognizerCue(false) har speak'da chaqiriladi — holatni
+    // eslab qolmasak, foydalanuvchining bildirishnoma ovozi majburan
+    // yoqilib qoladi. Endi faqat haqiqatan o'zgartirilganda tegadi.
+    private var cueMuted = false
 
     private fun playListenSignal() {
         try {
@@ -280,7 +299,29 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
         }
     }
 
+    private fun vibrateShort() {
+        try {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                (appContext.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)
+                    ?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                appContext.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            } ?: return
+            if (!vibrator.hasVibrator()) return
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(28L, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(28L)
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     private fun muteRecognizerCue(mute: Boolean) {
+        if (mute == cueMuted) return
+        cueMuted = mute
         try {
             val am = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {

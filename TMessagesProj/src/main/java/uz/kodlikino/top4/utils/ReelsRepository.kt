@@ -3,6 +3,7 @@ package uz.kodlikino.top4.utils
 import android.util.Log
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.tasks.await
 import uz.kodlikino.top4.models.Reel
@@ -168,22 +169,29 @@ object ReelsRepository {
      */
     suspend fun setLiked(reelId: String, uid: String, liked: Boolean, actorName: String = "", actorPhoto: String = "") {
         if (reelId.isBlank() || uid.isBlank()) return
-        val likeRef = db.collection(COLLECTION).document(reelId)
-            .collection(LIKES).document(uid)
-        val delta = if (liked) 1L else -1L
-        if (liked) {
-            likeRef.set(hashMapOf<String, Any>("userId" to uid, "createdAt" to System.currentTimeMillis()))
-                .await()
-        } else {
-            likeRef.delete().await()
-        }
-        try {
-            db.collection(COLLECTION).document(reelId)
-                .update(mapOf("likeCount" to FieldValue.increment(delta))).await()
-        } catch (e: Exception) {
-            Log.e(TAG, "likeCount $reelId: ${e.message}", e)
-        }
-        if (liked) {
+        val reelRef = db.collection(COLLECTION).document(reelId)
+        val likeRef = reelRef.collection(LIKES).document(uid)
+        // Tranzaksiya — sonni ikki marta oshirib/kamaytirib yubormaslik
+        // kafolati (tez ikki marta bosish, qayta urinish, ikki qurilma).
+        // Qoidalar `likes/{uid}` create/delete va `likeCount` increment'ni
+        // ruxsat etadi; boshqa maydonlarga tegmaymiz.
+        val changed = db.runTransaction { tx ->
+            val alreadyLiked = tx.get(likeRef).exists()
+            if (alreadyLiked == liked) return@runTransaction false
+            val current = tx.get(reelRef).getLong("likeCount") ?: 0L
+            if (liked) {
+                tx.set(
+                    likeRef,
+                    hashMapOf<String, Any>("userId" to uid, "createdAt" to System.currentTimeMillis())
+                )
+                tx.update(reelRef, "likeCount", current + 1L)
+            } else {
+                tx.delete(likeRef)
+                tx.update(reelRef, "likeCount", (current - 1L).coerceAtLeast(0L))
+            }
+            true
+        }.await()
+        if (changed && liked) {
             try {
                 val reel = reelMeta(reelId)
                 if (reel != null && reel.uploadedByUid.isNotBlank() && reel.uploadedByUid != uid) {
@@ -211,6 +219,41 @@ object ReelsRepository {
                 .update(mapOf("views" to FieldValue.increment(1L))).await()
         } catch (e: Exception) {
             Log.e(TAG, "registerView $reelId: ${e.message}", e)
+        }
+    }
+
+    /** Reel'ning haqiqiy sonlari (Firestore hujjatidan). */
+    data class Stats(val views: Int, val likeCount: Int, val commentCount: Int)
+
+    /**
+     * Faol reel uchun jonli statistika: boshqa qurilmada qo'yilgan layk,
+     * ko'rish yoki izoh shu listener orqali darhol ko'rinadi. Reels ekrani
+     * faqat bitta (ko'rinib turgan) sahifa uchun ulaydi.
+     */
+    fun observeStats(reelId: String, onChange: (Stats?) -> Unit): ListenerRegistration? {
+        if (reelId.isBlank()) return null
+        return try {
+            db.collection(COLLECTION).document(reelId)
+                .addSnapshotListener { snap, error ->
+                    if (error != null) {
+                        Log.e(TAG, "observeStats $reelId: ${error.message}", error)
+                        return@addSnapshotListener
+                    }
+                    if (snap == null || !snap.exists()) {
+                        onChange(null)
+                        return@addSnapshotListener
+                    }
+                    onChange(
+                        Stats(
+                            views = (snap.getLong("views") ?: 0L).toInt(),
+                            likeCount = (snap.getLong("likeCount") ?: 0L).toInt(),
+                            commentCount = (snap.getLong("commentCount") ?: 0L).toInt()
+                        )
+                    )
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "observeStats $reelId: ${e.message}", e)
+            null
         }
     }
 

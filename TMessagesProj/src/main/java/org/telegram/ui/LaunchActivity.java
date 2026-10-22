@@ -845,6 +845,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         Theme.loadWallpaper(true);
 
         checkCurrentAccount();
+        // YuzGram: Firebase sessiyasi (tg_<id>) faol Telegram akkauntiga ergashsin.
+        uz.kodlikino.top4.utils.YuzGramAccountSync.syncActiveAccount(UserConfig.selectedAccount);
         updateCurrentConnectionState(currentAccount);
         NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.closeOtherAppActivities, this);
 
@@ -1427,6 +1429,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         UserConfig.getInstance(0).saveConfig(false);
 
         checkCurrentAccount();
+        // YuzGram: akkaunt almashdi — Firebase Auth ham o'sha akkauntga o'tadi.
+        uz.kodlikino.top4.utils.YuzGramAccountSync.syncActiveAccount(account);
         if (AndroidUtilities.isTablet()) {
             layersActionBarLayout.removeAllFragments();
             rightActionBarLayout.removeAllFragments();
@@ -1488,6 +1492,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 layersActionBarLayout.rebuildLogout();
                 rightActionBarLayout.rebuildLogout();
             }
+            // YuzGram: Telegram akkaunt qolmadi — Firebase sessiyasi ham yopiladi.
+            uz.kodlikino.top4.utils.YuzGramAccountSync.clear();
             presentFragment(new IntroActivity().setOnLogout());
         }
     }

@@ -38,7 +38,14 @@ data class Reel(
     /** hikoya videomi (false = foto hikoya) */
     val storyIsVideo: Boolean = false,
     /** arxiv/profilga saqlangan hikoya (muddati tugagan) */
-    val storyArchived: Boolean = false
+    val storyArchived: Boolean = false,
+    /**
+     * Ko'rish/reaksiya sonlari manbada mavjudmi. Telegram boshqa odamning
+     * oddiy hikoyasida bu sonlarni bermaydi (`StoryItem.views == null`) —
+     * bunday holatda soxta 0 ko'rsatmaymiz. Firebase reel'larida doim true.
+     * Faqat UI — Firestore'da saqlanmaydi.
+     */
+    val statsAvailable: Boolean = true
 ) : Serializable {
     /** Sarlavha + hashtag'lardan iborat caption. */
     fun caption(): String {

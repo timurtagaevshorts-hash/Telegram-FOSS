@@ -258,6 +258,7 @@
             android:tint="@color/yuz_text" />
 
         <LinearLayout
+            android:id="@+id/viewsRow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/yuz_space_4"

@@ -100,8 +100,31 @@ object YuzMusicEngine {
     var queueTracks: List<YuzTrack> = emptyList()
         private set
 
+    private const val PREFS = "yuz_music_prefs"
+    private const val KEY_RADIO = "radio_extend"
+
+    // #133: radio = "keyingi musiqalarni avto topish". Holat endi saqlanadi
+    // va faqat [setRadio] orqali o'zgaradi — ilova qayta ochilganda
+    // foydalanuvchi tanlovi saqlanib qoladi.
     @Volatile
     var radio = true
+        private set
+
+    /** #133: radio kaliti — holatni saqlaydi; yoqilganda navbat oxiriga yaqin bo'lsa darhol uzaytiradi. */
+    fun setRadio(context: Context, enabled: Boolean) {
+        radio = enabled
+        runCatching {
+            context.applicationContext
+                .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_RADIO, enabled).apply()
+        }
+        if (!enabled) return
+        val p = player ?: return
+        if (queueTracks.isEmpty()) return
+        if (p.currentMediaItemIndex >= queueTracks.size - 2) {
+            extendQueue(retryStart = p.playbackState == Player.STATE_ENDED)
+        }
+    }
 
     // YuzGram #115: main IP (playQueue/enqueue) VA extendQueue ipi bir vaqtda
     // tegadi — oddiy HashSet ConcurrentModificationException bilan crash
@@ -185,9 +208,34 @@ object YuzMusicEngine {
 
     fun currentTrack(): YuzTrack? = tagOf(player?.currentMediaItem)
 
+    /**
+     * Ijro/pauza tugmasi (mini-pleyer, to'liq pleyer, bildirishnoma).
+     * Ilgari chaqiruvchilar faqat `playWhenReady` almashtirardi — IDLE yoki
+     * ENDED holatdagi pleyerda bu hech narsa qilmasdi (qo'shiq "o'lik"
+     * qolardi). Bu yerda holat to'g'irlanadi va xizmat qayta ko'tariladi.
+     */
+    fun togglePlay(context: Context) {
+        val p = player ?: return
+        if (p.currentMediaItem == null) return
+        if (p.isPlaying) {
+            p.pause()
+            return
+        }
+        if (p.playbackState == Player.STATE_ENDED) {
+            p.seekTo(p.currentMediaItemIndex, 0L)
+        }
+        if (p.playbackState == Player.STATE_IDLE) {
+            p.prepare()
+        }
+        p.playWhenReady = true
+        startMusicServiceOnce()
+    }
+
     fun ensurePlayer(context: Context): ExoPlayer {
         player?.let { return it }
         appCtx = context.applicationContext
+        radio = appCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_RADIO, true)
         // #69: mini-pleyer butun ilova bo'ylab ko'rinishi uchun LaunchActivity
         // lifecycle'ini kuzatamiz (bir marta).
         if (!miniInstalled) {
@@ -221,6 +269,10 @@ object YuzMusicEngine {
                 .build(),
             true
         )
+        // Quloqchin uzilganda pauza (AudioManager ACTION_AUDIO_BECOMING_NOISY)
+        // va ekran o'chganda tarmoq oqimini ushlab turish uchun wake lock.
+        p.setHandleAudioBecomingNoisy(true)
+        p.setWakeMode(C.WAKE_MODE_NETWORK)
         p.addListener(object : Player.Listener {
             override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
                 ui.removeCallbacks(bufferingWatchdog)
@@ -316,9 +368,10 @@ object YuzMusicEngine {
     }
 
     /** Qo'shiqni navbat oxiriga qo'shadi; hozir bo'sh bo'lsa — shu bilan boshlaydi. */
-    fun enqueue(context: Context, track: YuzTrack) {
+    fun enqueue(context: Context, track: YuzTrack): Boolean {
         val p = ensurePlayer(context)
-        if (!seenIds.add(track.id)) return
+        // #133: takroriy qator "qo'shildi" deb yolg'on xabar bermasin.
+        if (!seenIds.add(track.id)) return false
         val item = buildItem(track)
         if (p.currentMediaItem == null) {
             queueTracks = listOf(track)
@@ -331,6 +384,7 @@ object YuzMusicEngine {
             p.addMediaItem(item)
         }
         notifyItemChanged(p.currentMediaItem)
+        return true
     }
 
     // ---------------------------------------------------------------- items
@@ -339,7 +393,10 @@ object YuzMusicEngine {
     private fun buildItem(t: YuzTrack): MediaItem {
         val local = if (::appCtx.isInitialized) YuzMusicCache.localFile(appCtx, t.id) else null
         val uri = when {
-            local != null -> local.toURI().toString()
+            // #133: File.toURI() "file:/..." (bir slash) beradi — media3
+            // DataSource buni avval HTTP manba deb ochib, ijro etolmasdi.
+            // Uri.fromFile() to'g'ri "file:///..." shaklini beradi.
+            local != null -> Uri.fromFile(local).toString()
             t.videoId.isNotBlank() -> YuzStreamDataSource.URI_PREFIX + t.videoId
             else -> t.previewUrl
         }
@@ -449,6 +506,19 @@ object YuzMusicEngine {
         return if (gateAhead < 15_000L) 1200L else 0L
     }
 
+    /**
+     * #133: foydalanuvchi boshlagan yuklash uchun YUMSHOQ eshik. Fon
+     * eshigidan farqi — hech qachon bekor qilmaydi; faqat pleyer
+     * buffering'da bo'lsa yoki zaxirasi 10s'dan kam bo'lsa qisqa dam
+     * beradi. Shu bilan sekin tarmoqda yuklash ijroni bo'g'maydi va
+     * ikkalasi ham bir-birini o'ldirmaydi.
+     */
+    fun softDownloadGate(): Long {
+        if (gateBuffering) return 1500L
+        if (!gatePlaying) return 0L
+        return if (gateAhead < 10_000L) 800L else 0L
+    }
+
     /** Navbatdagi [index]-qo'shiqqa sakrash (keyingi o'tishda prefetch bo'ladi). */
     fun playAt(index: Int) {
         val p = player ?: return
@@ -488,8 +558,34 @@ object YuzMusicEngine {
     }
 
     private fun handleItemFailure(item: MediaItem?) {
-        val t = tagOf(item) ?: return
+        val mediaItem = item ?: return
+        val t = tagOf(mediaItem) ?: return
         val p = player ?: return
+        // #133: yuklangan fayl buzilgan/yarim bo'lsa pleyer uni qayta-qayta
+        // ochishga urinardi va hech qachon ijro etmasdi. Bunday faylni
+        // keshdan olib tashlab, SHU index'da oqim manbasini quramiz.
+        if (mediaItem.localConfiguration?.uri?.scheme == "file" &&
+            (t.videoId.isNotBlank() || t.previewUrl.isNotBlank()) &&
+            YuzMusicCache.localFile(appCtx, t.id) != null
+        ) {
+            Log.i(TAG, "local corrupt -> re-stream id=${t.id} vid=${t.videoId}")
+            YuzMusicCache.remove(appCtx, t.id)
+            itemRetries = 0
+            val idx = p.currentMediaItemIndex
+            if (idx in 0 until p.mediaItemCount) {
+                runCatching {
+                    p.removeMediaItem(idx)
+                    p.addMediaItem(idx, buildItem(t))
+                    p.seekTo(idx, 0L)
+                    p.prepare()
+                    p.playWhenReady = true
+                }
+                stallMark = android.os.SystemClock.elapsedRealtime()
+                ui.removeCallbacks(bufferingWatchdog)
+                ui.postDelayed(bufferingWatchdog, 2000L)
+                return
+            }
+        }
         // #78: bir qo'shiq uchun avval 2 marta boshqa oqim nomzodini aylantir
         // (npe/ANDROID/IOS zanjirlari) — darrov keyingi qo'shiqqa o'tmaymiz.
         if (t.videoId.isNotBlank() && itemRetries < 2) {
@@ -646,9 +742,14 @@ object YuzMusicEngine {
                     val p = player ?: return@post
                     extendAttempts = 0
                     queueTracks = queueTracks + appended
+                    val startIndex = p.mediaItemCount
                     p.addMediaItems(appended.map { buildItem(it) })
                     if (retryStart) {
                         postStatus(null)
+                        // #133: STATE_ENDED'dan keyin prepare() joriy (oxirgi)
+                        // eski elementda qolib, yangi qatorlar boshlanmasdi.
+                        // Endi birinchi YANGI qatorga aniq o'tamiz.
+                        p.seekTo(startIndex, 0L)
                         p.prepare()
                         p.playWhenReady = true
                     }
@@ -701,7 +802,16 @@ object YuzMusicEngine {
                 appCtx,
                 android.content.Intent(appCtx, uz.kodlikino.top4.ui.YuzMusicService::class.java)
             )
+        }.onFailure {
+            // Ko'tarilmasa flag "yopishib" qolmasin — keyingi READY'da qayta urinamiz.
+            musicServiceStarted = false
+            Log.e(TAG, "music service start failed: ${it.message}", it)
         }
+    }
+
+    /** Xizmat o'chganda chaqiriladi — keyingi READY'da qayta ko'tarish mumkin bo'lsin. */
+    fun onMusicServiceStopped() {
+        musicServiceStarted = false
     }
 
     private fun postStatus(text: String?) {

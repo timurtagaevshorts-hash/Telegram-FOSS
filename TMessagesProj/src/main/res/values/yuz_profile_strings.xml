@@ -10,4 +10,7 @@
     <string name="profile_manage_hint">O\'chirish uchun rasm ustidagi belgini bosing</string>
 
     <string name="profile_sign_in_required">Profilni ko\'rish uchun Telegram orqali kiring</string>
+
+    <string name="yuz_accounts_title">Akkauntlar</string>
+    <string name="yuz_account_add">Yangi akkaunt qo\'shish</string>
 </resources>

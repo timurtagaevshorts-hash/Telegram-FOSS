@@ -326,6 +326,9 @@ public class NotificationCenter {
     public static final int onDatabaseReset = totalEvents++;
     public static final int wallpaperSettedToUser = totalEvents++;
     public static final int storiesUpdated = totalEvents++;
+    // YuzGram: mavjud hikoyaning statistikasi (ko'rishlar/reaksiyalar) yangilandi —
+    // storiesUpdated'dan alohida, chunki feed'ni qayta qurish shart emas.
+    public static final int storyStatsUpdated = totalEvents++;
     public static final int storiesListUpdated = totalEvents++;
     public static final int storiesDraftsUpdated = totalEvents++;
     public static final int chatlistFolderUpdate = totalEvents++;

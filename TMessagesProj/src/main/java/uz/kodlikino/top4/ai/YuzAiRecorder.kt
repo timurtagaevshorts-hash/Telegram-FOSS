@@ -11,19 +11,29 @@ import kotlin.math.sqrt
  * RMS-based VAD: gap boshlanib ~0.75 s jimlik bo'lsa to'xtaydi, maksimum 8 s.
  * Umuman gap bo'lmasa null qaytadi (birinchi 4 s ichida) — kvota tejash uchun.
  */
-class YuzAiRecorder {
+class YuzAiRecorder(
+    /** Xom RMS darajasi (0..1), orb animatsiyasi uchun — IO thread'idan keladi. */
+    private val onLevel: ((Float) -> Unit)? = null
+) {
 
     @Volatile private var cancelled = false
+    @Volatile private var cancelRequested = false
     @Volatile private var recording = false
 
     fun isRecording(): Boolean = recording
 
+    /** Foydalanuvchi mikrofonni o'zi to'xtatganmi (jimlikdan farqlash uchun). */
+    fun wasCancelled(): Boolean = cancelRequested
+
     fun cancel() {
         cancelled = true
+        cancelRequested = true
     }
 
     /** Blocking — faqat IO thread'ida chaqiriladi. */
     fun recordBlocking(): ByteArray? {
+        cancelled = false
+        cancelRequested = false
         val rate = 16000
         val minBuf = try {
             AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
@@ -48,6 +58,7 @@ class YuzAiRecorder {
         val pcm = ByteArrayOutputStream()
         val chunk = ShortArray(320) // 20 ms
         var voiceSeen = false
+        var levelTick = 0
         try {
             cancelled = false
             rec.startRecording()
@@ -68,6 +79,9 @@ class YuzAiRecorder {
                     acc += (s * s).toDouble()
                 }
                 val rms = sqrt(acc / n)
+                if (++levelTick % 3 == 0) {
+                    onLevel?.invoke((rms / 5000.0).toFloat().coerceIn(0f, 1f))
+                }
                 val totalMs = now - startedAt
                 if (rms > 500.0) {
                     voiceSeen = true

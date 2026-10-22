@@ -49,6 +49,11 @@ class YuzPlayerActivity : BaseFragment() {
     private var ivCover: ImageView? = null
     private var plPulse: View? = null
     private var lastDownloadState: Pair<Long?, Int>? = null
+    // Disk tekshiruvi qimmat (noma'lum kengaytmada papka skani) — 400ms'lik
+    // progress tick'ida har safar chaqirmaymiz, faqat trek/o'zgarish sanoqi
+    // o'zgarganda qayta o'qiymiz.
+    private var dlCacheKey: Pair<Long, Long>? = null
+    private var dlCacheValue = false
     // Download workers outlive this screen; callbacks must not touch destroyed views.
     private var destroyed = false
     private var plListener: Player.Listener? = null
@@ -146,7 +151,7 @@ class YuzPlayerActivity : BaseFragment() {
         btnPlay?.setOnClickListener {
             val p = YuzMusicEngine.playerOrNull() ?: return@setOnClickListener
             if (p.currentMediaItem == null) return@setOnClickListener
-            if (p.isPlaying) p.pause() else p.playWhenReady = true
+            YuzMusicEngine.togglePlay(ctx)
         }
         root.findViewById<View>(R.id.btnPlPrev).setOnClickListener {
             YuzMusicEngine.playerOrNull()?.seekToPrevious()
@@ -196,7 +201,15 @@ class YuzPlayerActivity : BaseFragment() {
         root.findViewById<View>(R.id.btnPlEq).setOnClickListener { showEq() }
         root.findViewById<View>(R.id.btnPlSleep).setOnClickListener { showSleep() }
         tvRadio?.setOnClickListener {
-            YuzMusicEngine.radio = !YuzMusicEngine.radio
+            // #133: endi "AUTO" — keyingi musiqalarni avto topish. Holat
+            // saqlanadi, toast esa nima bo'lganini aniq aytadi.
+            YuzMusicEngine.setRadio(ctx, !YuzMusicEngine.radio)
+            val on = YuzMusicEngine.radio
+            Toast.makeText(
+                ctx,
+                if (on) R.string.musiqa_radio_on else R.string.musiqa_radio_off,
+                Toast.LENGTH_SHORT
+            ).show()
             syncButtons()
         }
 
@@ -262,7 +275,7 @@ class YuzPlayerActivity : BaseFragment() {
         val t = YuzMusicEngine.currentTrack()
         val busy = t != null && YuzMusicCache.isInflight(t.id)
         val canceling = t != null && YuzMusicCache.isCanceling(t.id)
-        val has = t != null && !busy && YuzMusicCache.isDownloaded(ctx, t.id)
+        val has = t != null && !busy && !canceling && isDownloadedCached(t.id)
         val state = Pair(t?.id, when {
             canceling -> 3
             busy -> 2
@@ -294,6 +307,15 @@ class YuzPlayerActivity : BaseFragment() {
         button?.isEnabled = t != null && !canceling
         button?.alpha = 1f
         button?.contentDescription = if (t == null) text else "$text: ${t.title}"
+    }
+
+    private fun isDownloadedCached(id: Long): Boolean {
+        val key = id to YuzMusicCache.doneVersion()
+        if (dlCacheKey == key) return dlCacheValue
+        val value = YuzMusicCache.isDownloaded(ctx, id)
+        dlCacheKey = key
+        dlCacheValue = value
+        return value
     }
 
     private fun syncButtons() {

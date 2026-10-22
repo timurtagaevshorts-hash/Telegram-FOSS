@@ -32,7 +32,8 @@ import java.io.RandomAccessFile
  * qaytarmaydi.
  *
  * Uch xil manba: marker (YouTube oqimi), oddiy https (Deezer preview),
- * file:// (keshdagi local fayl).
+ * file: (keshdagi local fayl — File.toURI() "file:/..." bir slash bilan
+ * yozadi, shuning uchun "file://" emas, "file:" tekshiriladi).
  */
 class YuzStreamDataSource(private val http: OkHttpClient) : DataSource {
 
@@ -56,7 +57,13 @@ class YuzStreamDataSource(private val http: OkHttpClient) : DataSource {
     override fun open(dataSpec: DataSpec): Long {
         currentSpec = dataSpec
         val raw = dataSpec.uri.toString()
-        if (raw.startsWith("file://")) return openFile(dataSpec)
+        // #133: to'g'ridan-to'g'ri "file://" EMAS — Java File.toURI() va
+        // eski kesh yozuvlari "file:/data/..." ko'rinishida keladi. Avval
+        // shu tekshiruv tufayli yuklangan qo'shiqlar HTTP manba deb ochilib,
+        // OkHttp file sxemasini rad etardi va hech qachon ijro etilmasdi.
+        if (raw.startsWith("file:") || dataSpec.uri.scheme == "file") {
+            return openFile(dataSpec)
+        }
         return openHttp(dataSpec, raw)
     }
 

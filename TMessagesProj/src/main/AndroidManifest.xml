@@ -104,6 +104,15 @@
         <package android:name="com.kiwibrowser.browser" />
         <package android:name="com.UCMobile.intl" />
         <package android:name="org.torproject.torbrowser" />
+
+        <!-- Android 11+ paket ko'rinishi: ovozli yordamchi STT/TTS
+             xizmatlarini topa olishi uchun. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
     </queries>
 
     <application
@@ -480,6 +489,12 @@
                 <action android:name="androidx.media3.session.MediaSessionService"/>
             </intent-filter>
         </service>
+        <!-- #135: AI tezkor tugmasi — boshqa ilovalar ustida suzuvchi orb. -->
+        <service
+            android:name="uz.kodlikino.top4.ai.YuzAiOverlayService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
         <service android:name=".MusicBrowserService" android:exported="true">
             <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService"/>

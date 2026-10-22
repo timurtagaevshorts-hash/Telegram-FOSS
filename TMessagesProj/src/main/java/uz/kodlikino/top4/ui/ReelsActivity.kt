@@ -20,6 +20,7 @@ import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.PagerSnapHelper
 import androidx.recyclerview.widget.RecyclerView
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -32,7 +33,6 @@ import org.telegram.messenger.MessagesController
 import org.telegram.messenger.NotificationCenter
 import org.telegram.messenger.R
 import org.telegram.messenger.UserConfig
-import org.telegram.tgnet.TLRPC
 import org.telegram.ui.ActionBar.BaseFragment
 import org.telegram.ui.LaunchActivity
 import org.telegram.ui.Stories.StoriesController
@@ -112,6 +112,8 @@ class ReelsActivity @JvmOverloads constructor(
 
     private var commentsOpen = false
     private var commentsLoading = false
+    private var commentsJob: Job? = null
+    private var commentsLoadSeq = 0
     private var sendingComment = false
     private var commentsReelId = ""
     private var loadedCommentCount = 0
@@ -132,6 +134,11 @@ class ReelsActivity @JvmOverloads constructor(
     // #106: Telegram hikoyalari signalidan keyin tasmani kechiktirib qayta
     // qurish (har bir storiesUpdated'da emas — debounce).
     private var storyRefresh: Runnable? = null
+
+    // Faol Firebase reel'ining haqiqiy hisoblagichlari — Firestore snapshot
+    // listener'i (kolleksiya emas, bitta hujjat).
+    private var firebaseStatsRegistration: ListenerRegistration? = null
+    private var firebaseStatsFor = ""
 
     // #99: tarmoq qayta urilganda feed/videoni avto-tiklash.
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
@@ -395,6 +402,7 @@ class ReelsActivity @JvmOverloads constructor(
         try {
             val nc = NotificationCenter.getInstance(currentAccount)
             nc.addObserver(storyObserver, NotificationCenter.storiesUpdated)
+            nc.addObserver(storyObserver, NotificationCenter.storyStatsUpdated)
             nc.addObserver(storyObserver, NotificationCenter.storiesListUpdated)
             NotificationCenter.getGlobalInstance().addObserver(storyObserver, NotificationCenter.passcodeDismissed)
         } catch (_: Exception) {
@@ -405,10 +413,12 @@ class ReelsActivity @JvmOverloads constructor(
         try {
             val nc = NotificationCenter.getInstance(currentAccount)
             nc.removeObserver(storyObserver, NotificationCenter.storiesUpdated)
+            nc.removeObserver(storyObserver, NotificationCenter.storyStatsUpdated)
             nc.removeObserver(storyObserver, NotificationCenter.storiesListUpdated)
             NotificationCenter.getGlobalInstance().removeObserver(storyObserver, NotificationCenter.passcodeDismissed)
         } catch (_: Exception) {
         }
+        detachFirebaseStats()
         storyRefresh?.let { fragmentView?.removeCallbacks(it) }
         storyRefresh = null
     }
@@ -421,8 +431,38 @@ class ReelsActivity @JvmOverloads constructor(
             return@NotificationCenterDelegate
         }
         if (account != currentAccount) return@NotificationCenterDelegate
+        if (id == NotificationCenter.storyStatsUpdated) {
+            refreshActiveStoryStats()
+            return@NotificationCenterDelegate
+        }
         if (id == NotificationCenter.storiesUpdated || id == NotificationCenter.storiesListUpdated) {
             scheduleStoryRefresh()
+        }
+    }
+
+    /**
+     * Hikoyaning ko'rish/reaksiya soni Telegram'da yangilandi — feed'ni qayta
+     * qurmasdan faqat faol sahifadagi sonlarni almashtiramiz.
+     */
+    private fun refreshActiveStoryStats() {
+        val reel = currentReels.getOrNull(selectedPosition) ?: return
+        val key = YuzStoryFeed.parseKey(reel.id) ?: return
+        val stats = try {
+            YuzStoryFeed.liveStats(currentAccount, key.first, key.second)
+        } catch (_: Exception) {
+            null
+        } ?: return
+        adapter?.applyStoryStats(reel.id, stats.views, stats.likes, stats.likedByMe, stats.available)
+        val idx = currentReels.indexOfFirst { it.id == reel.id }
+        if (idx >= 0) {
+            currentReels = currentReels.toMutableList().also {
+                it[idx] = reel.copy(
+                    views = stats.views,
+                    likeCount = stats.likes,
+                    isLikedByMe = stats.likedByMe,
+                    statsAvailable = stats.available
+                )
+            }
         }
     }
 
@@ -699,7 +739,11 @@ class ReelsActivity @JvmOverloads constructor(
                 )
             }
             // Tarkib o'zgarmagan — qayta submit playback'ni bekor restart qiladi.
+            // Sonlar (ko'rish/layk/izoh) esa o'zgargan bo'lishi mumkin — ularni
+            // adapter ichida, faol videoga tegmasdan almashtiramiz.
             if (currentReels.isNotEmpty() && sameFeed(currentReels, reels)) {
+                currentReels = reels
+                adapter?.applyStats(reels)
                 progressBar?.visibility = View.GONE
                 if (reels.isEmpty()) {
                     emptyView?.visibility = View.VISIBLE
@@ -803,15 +847,19 @@ class ReelsActivity @JvmOverloads constructor(
         val rid = reelId ?: return
         val key = YuzStoryFeed.parseKey(rid)
         if (key != null) {
+            detachFirebaseStats()
             try {
-                val item = YuzStoryFeed.findStoryItem(currentAccount, key.first, key.second) ?: return
-                val liked = item.sent_reaction != null && item.sent_reaction !is TLRPC.TL_reactionEmpty
-                adapter?.applyLikeState(rid, liked, item.views?.reactions_count ?: 0)
+                val stats = YuzStoryFeed.liveStats(currentAccount, key.first, key.second) ?: return
+                adapter?.applyStoryStats(rid, stats.views, stats.likes, stats.likedByMe, stats.available)
             } catch (_: Exception) {
             }
             return
         }
-        if (currentUid().isBlank()) return
+        if (currentUid().isBlank()) {
+            detachFirebaseStats()
+            return
+        }
+        attachFirebaseStats(rid)
         val s = scope ?: return
         val account = currentAccount
         s.launch {
@@ -827,6 +875,30 @@ class ReelsActivity @JvmOverloads constructor(
     }
 
     /**
+     * Faol Firebase reel'ining `views`/`likeCount`/`commentCount` maydonlarini
+     * jonli kuzatadi. Hikoyalarda manba Telegram (NotificationCenter), shuning
+     * uchun listener faqat Firebase hujjati uchun ulanadi.
+     */
+    private fun attachFirebaseStats(reelId: String) {
+        if (firebaseStatsRegistration != null && firebaseStatsFor == reelId) return
+        detachFirebaseStats()
+        firebaseStatsFor = reelId
+        firebaseStatsRegistration = ReelsRepository.observeStats(reelId) { stats ->
+            if (stats == null) return@observeStats
+            adapter?.applyServerStats(reelId, stats.views, stats.likeCount, stats.commentCount)
+        }
+    }
+
+    private fun detachFirebaseStats() {
+        try {
+            firebaseStatsRegistration?.remove()
+        } catch (_: Exception) {
+        }
+        firebaseStatsRegistration = null
+        firebaseStatsFor = ""
+    }
+
+    /**
      * Like/unlike: hikoya — Telegram reaksiyasi (`❤`), Firebase reel —
      * Firestore `likes` hujjati va `likeCount` increment.
      */
@@ -839,14 +911,17 @@ class ReelsActivity @JvmOverloads constructor(
                 false
             }
             if (!ok) {
-                adapter?.applyLikeState(reelId, !likedNow)
+                adapter?.revertLike(reelId, !likedNow)
                 toast(R.string.reels_like_failed)
+            } else {
+                // Telegram javobini kutmasdan o'z item'idagi yangi sonni olamiz.
+                refreshLikeState(reelId)
             }
             return
         }
         val uid = currentUid()
         if (uid.isBlank()) {
-            adapter?.applyLikeState(reelId, !likedNow)
+            adapter?.revertLike(reelId, !likedNow)
             toast(R.string.reels_sign_in_required)
             return
         }
@@ -857,9 +932,11 @@ class ReelsActivity @JvmOverloads constructor(
                 awaitAuth()
                 val signedUid = YuzGramAdsAuth.ensureSignedIn(account)
                 ReelsRepository.setLiked(reelId, signedUid, likedNow, authorName(account))
+                // Firestore tranzaksiyasi yakunlandi — server sonini qayta o'qiymiz.
+                refreshLikeState(reelId)
             } catch (_: Exception) {
                 if (fragmentView == null) return@launch
-                adapter?.applyLikeState(reelId, !likedNow)
+                adapter?.revertLike(reelId, !likedNow)
                 toast(R.string.reels_like_failed)
             }
         }
@@ -875,9 +952,15 @@ class ReelsActivity @JvmOverloads constructor(
             }
             return
         }
+        // Firestore qoidasi `views` yangilanishini faqat autentifikatsiya
+        // qilingan foydalanuvchiga ruxsat beradi — avval sessiya tiklanadi.
+        if (currentUid().isBlank()) return
         val s = scope ?: return
+        val account = currentAccount
         s.launch {
             try {
+                awaitAuth()
+                if (YuzGramAdsAuth.ensureSignedIn(account).isBlank()) return@launch
                 ReelsRepository.registerView(reelId)
             } catch (_: Exception) {
             }
@@ -921,6 +1004,18 @@ class ReelsActivity @JvmOverloads constructor(
                 ReelsRepository.deleteReel(reel.id)
                 ReelStorageHelper.deleteVideo(signedUid, reel.videoUrl)
                 if (fragmentView == null) return@launch
+                // currentReels/selectedPosition adapter bilan birga yangilanadi —
+                // aks holda o'chirilgan reel indeksi bo'yicha "arvoh" sahifa qoladi.
+                val idx = currentReels.indexOfFirst { it.id == reel.id }
+                if (idx >= 0) {
+                    currentReels = currentReels.toMutableList().also { it.removeAt(idx) }
+                    selectedPosition = when {
+                        currentReels.isEmpty() -> 0
+                        idx < selectedPosition -> selectedPosition - 1
+                        selectedPosition >= currentReels.size -> currentReels.size - 1
+                        else -> selectedPosition
+                    }
+                }
                 adapter?.removeById(reel.id)
                 adapter?.reactivate()
                 toast(R.string.reels_deleted)
@@ -967,33 +1062,40 @@ class ReelsActivity @JvmOverloads constructor(
 
     /** Izohlarni Firestore'dan o'qiydi (`null` = xato, bo'sh ro'yxat = izoh yo'q). */
     private fun loadComments(reelId: String) {
-        if (commentsLoading) return
         val s = scope ?: return
+        // Oldingi so'rov bekor qilinadi: boshqa reel ochilsa eski javob
+        // spinner'ni abadiy qoldirib ketmasligi kerak.
+        commentsJob?.cancel()
+        val seq = ++commentsLoadSeq
         commentsLoading = true
-        if (loadedCommentCount == 0) commentsProgress?.visibility = View.VISIBLE
-        s.launch {
-            val comments = ReelsRepository.getComments(reelId)
-            commentsLoading = false
-            if (fragmentView == null || commentsReelId != reelId) return@launch
-            commentsProgress?.visibility = View.GONE
-            if (comments == null) {
-                commentsAdapter?.clear()
-                loadedCommentCount = 0
-                commentsList?.visibility = View.GONE
-                commentsEmpty?.visibility = View.VISIBLE
-                commentsEmpty?.text = getString(R.string.reels_comments_load_failed)
+        commentsProgress?.visibility =
+            if (loadedCommentCount == 0) View.VISIBLE else View.GONE
+        commentsJob = s.launch {
+            try {
+                val comments = ReelsRepository.getComments(reelId)
+                if (fragmentView == null || commentsReelId != reelId || seq != commentsLoadSeq) return@launch
+                commentsProgress?.visibility = View.GONE
+                if (comments == null) {
+                    commentsAdapter?.clear()
+                    loadedCommentCount = 0
+                    commentsList?.visibility = View.GONE
+                    commentsEmpty?.visibility = View.VISIBLE
+                    commentsEmpty?.text = getString(R.string.reels_comments_load_failed)
+                    updateCommentsTitle()
+                    return@launch
+                }
+                commentsAdapter?.submit(comments)
+                loadedCommentCount = comments.size
+                commentsList?.visibility = if (comments.isEmpty()) View.GONE else View.VISIBLE
+                commentsEmpty?.visibility = if (comments.isEmpty()) View.VISIBLE else View.GONE
+                commentsEmpty?.text = getString(R.string.reels_comments_empty)
                 updateCommentsTitle()
-                return@launch
-            }
-            commentsAdapter?.submit(comments)
-            loadedCommentCount = comments.size
-            commentsList?.visibility = if (comments.isEmpty()) View.GONE else View.VISIBLE
-            commentsEmpty?.visibility = if (comments.isEmpty()) View.VISIBLE else View.GONE
-            commentsEmpty?.text = getString(R.string.reels_comments_empty)
-            updateCommentsTitle()
-            if (comments.isNotEmpty()) {
-                // Eng yangi izoh ko'rinsin (ro'yxat eskidana yangi tartibida).
-                commentsLayoutManager?.scrollToPositionWithOffset(comments.size - 1, 0)
+                if (comments.isNotEmpty()) {
+                    // Eng yangi izoh ko'rinsin (ro'yxat eskidana yangi tartibida).
+                    commentsLayoutManager?.scrollToPositionWithOffset(comments.size - 1, 0)
+                }
+            } finally {
+                if (seq == commentsLoadSeq) commentsLoading = false
             }
         }
     }
@@ -1235,6 +1337,8 @@ class ReelsActivity @JvmOverloads constructor(
         if (fragmentView != null) {
             refreshStoryStrip()
             loadReels()
+            // Ekranga qaytganda faol reel'ning jonli statistikasi qayta ulanadi.
+            refreshLikeState(currentReels.getOrNull(selectedPosition)?.id)
             if (reelsList?.scrollState == RecyclerView.SCROLL_STATE_IDLE) adapter?.resumePlayback()
             preloadNeighbours(selectedPosition)
         }
@@ -1263,6 +1367,8 @@ class ReelsActivity @JvmOverloads constructor(
 
     override fun onPause() {
         playbackVisible = false
+        // Fon rejimida Firestore snapshot'i kerak emas — batareya/trafik.
+        detachFirebaseStats()
         adapter?.pausePlayback()
         exitReelFullscreen()
         super.onPause()

@@ -1,6 +1,7 @@
 package uz.kodlikino.top4.utils
 
 import android.content.Context
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -27,6 +28,9 @@ object YuzMusicCache {
     private const val TAG = "YuzMusic"
     private val main = Handler(Looper.getMainLooper())
     private val EXT = arrayOf("m4a", "mp3", "webm")
+    // Eski versiyalar "webma"/"opus" kabi xom kengaytmalarni yozgan —
+    // ularni ham tan olamiz, aks holda fayl bor-u, ilova "yuklanmagan" derdi.
+    private val KNOWN_EXT = EXT + arrayOf("webma", "opus", "ogg", "mp4", "aac")
 
     // fetchRanges natijalari (foydalanuvchi xatosi / bekor qilish ajraladi).
     private const val FAIL = 0
@@ -72,9 +76,17 @@ object YuzMusicCache {
         val d = dir(context)
         for (e in EXT) {
             val f = File(d, "$id.$e")
-            if (f.exists()) return f
+            // Bo'sh fayl yuklangan hisoblanmaydi — aks holda pleyer uni
+            // ochishga urinib, "ijro etilmayapti" holatiga qulflanardi.
+            if (f.isFile && f.length() > 0L) return f
         }
-        return null
+        // #133: noma'lum/eski kengaytma (webma, opus...) — nom "$id."
+        // bilan boshlansa va audio kengaytmasi bo'lsa, faylni tan olamiz.
+        return d.listFiles()?.firstOrNull { f ->
+            f.isFile && f.length() > 0L && !f.name.endsWith(".tmp") &&
+                f.name.startsWith("$id.") &&
+                f.name.substringAfterLast('.', "").lowercase() in KNOWN_EXT
+        }
     }
 
     fun isDownloaded(context: Context, id: Long): Boolean = localFile(context, id) != null
@@ -84,6 +96,11 @@ object YuzMusicCache {
     private val indexLock = Any()
     private const val PAR_MIN = 512L * 1024
     private val sequence = java.util.concurrent.atomic.AtomicLong()
+    // #133: UI 500ms'lik tick'da faqat shu sanoqni solishtiradi — disk IO
+    // va prefs JSON o'qishsiz yakunlangan yuklashni payqaydi.
+    private val doneSeq = java.util.concurrent.atomic.AtomicLong()
+
+    fun doneVersion(): Long = doneSeq.get()
 
     private class Inflight(val track: YuzTrack) {
         val cancellation = YuzDownloadCancellation()
@@ -170,7 +187,12 @@ object YuzMusicCache {
         val cancellation = operation.cancellation
         val gate = {
             cancellation.check()
-            val wait = backgroundGate?.invoke() ?: 0L
+            // #133: foydalanuvchi ochgan yuklash ham ijro bilan bir xil
+            // tarmoqni bo'lishadi. Fon yo'li o'z eshigini beradi; oldingi
+            // rejimda esa Yumshoq eshik hech qachon bekor qilmaydi, faqat
+            // pleyer buffering'da yoki zaxirasi kam bo'lganda qisqa dam
+            // beradi — sekin internetda ikkalasi ham ishlaydi.
+            val wait = backgroundGate?.invoke() ?: YuzMusicEngine.softDownloadGate()
             if (wait < 0L) cancellation.cancel()
             wait
         }
@@ -190,6 +212,7 @@ object YuzMusicCache {
             operation.progressListeners.clear()
             operation.completions.toList().also { operation.completions.clear() }
         }
+        if (result == DownloadResult.DONE) doneSeq.incrementAndGet()
         main.post { for (listener in listeners) runCatching { listener(result) } }
         return result
     }
@@ -292,66 +315,126 @@ object YuzMusicCache {
         val refresh: ((Long, String) -> YuzAudioStream?)? =
             if (videoId.isNotBlank()) sameVideo(videoId, stream) else null
         // #109: hajmi aniq katta faylni avval ikki parallel ulanishda
-        // tortib ko'ramiz. Muvaffaqiyatsizlik bo'lib birorta bayt kelmasa
-        // — oddiy ketma-ket yo'lga qaytamiz (arzon); o'rtada uzilsa —
-        // keyingi nomzodga o'tamiz (ketma-ket ham shu joyni bosar edi).
+        // tortib ko'ramiz.
+        // #133: split uzilsa ham pastki yarmdan yozilgan UZLUKSIZ prefiks
+        // saqlanadi — ketma-ket yo'l o'sha joydan davom etadi. Avval bu
+        // yerda tmp o'chirilardi va sekin tarmoqda 90% tortilgan fayl
+        // noldan qayta boshlanardi ("to'liq yuklanmayapti" sababi).
+        var resumeAt = 0L
         if (stream.approxBytes > PAR_MIN) {
-            val r = fetchRangesSplit(context, tmp, track, stream, refresh, gate, progress, cancellation)
-            if (r != FAIL) return r
-            if (tmp.length() > 0L) {
-                runCatching { tmp.delete() }
-                return FAIL
-            }
-            runCatching { tmp.delete() }
+            val split = fetchRangesSplit(context, tmp, track, stream, refresh, gate, progress, cancellation)
+            if (split.code != FAIL) return split.code
+            resumeAt = split.lowerEnd
+            if (resumeAt <= 0L) runCatching { tmp.delete() }
         }
-        val reader = YuzRangeReader(
-            http, stream.url, stream.ua, 0L, -1L, stream.approxBytes, refresh,
-            windows = true, gate = gate, cancellation = cancellation
+        return fetchRangesSequential(
+            context, tmp, track, stream, refresh, gate, progress, cancellation, resumeAt
         )
-        var complete = false
-        try {
-            reader.open()
-            val expect = reader.length
-            var got = 0L
-            var lastEmit = 0L
-            tmp.outputStream().use { out ->
+    }
+
+    /** Split natijasi: kod + qayta boshlash mumkin bo'lgan uzluksiz prefiks. */
+    private class SplitOutcome(val code: Int, val lowerEnd: Long, val total: Long)
+
+    /**
+     * #133: ketma-ket, UZILISHGA CHIDAMLI yuklash. Har urinish tmp fayldagi
+     * uzluksiz prefiksdан ([startAt]) davom etadi; URL rad etilsa reader
+     * o'zi yangi URL oladi, umuman uzilsa tashqi tsikl backoff bilan qayta
+     * ochadi. Faqat bekor qilinganda fayl o'chiriladi — tarmoq xatosi
+     * progressni yo'qotmaydi.
+     */
+    private fun fetchRangesSequential(
+        context: Context,
+        tmp: File,
+        track: YuzTrack,
+        stream: YuzAudioStream,
+        refresh: ((Long, String) -> YuzAudioStream?)?,
+        gate: (() -> Long)?,
+        progress: ((Long, Long) -> Unit)?,
+        cancellation: YuzDownloadCancellation,
+        startAt: Long
+    ): Int {
+        var got = startAt.coerceAtLeast(0L)
+        var total = stream.approxBytes
+        var lastEmit = 0L
+        var attempt = 0
+        val maxAttempts = 6
+        while (attempt < maxAttempts) {
+            cancellation.check()
+            if (attempt > 0) {
+                awaitGate(gate, cancellation)
+                try {
+                    Thread.sleep((700L shl (attempt - 1).coerceAtMost(3)).coerceAtMost(6000L))
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    throw IOException("download interrupted")
+                }
+            }
+            attempt++
+            var knownTotal = total
+            var sawEof = false
+            val reader = YuzRangeReader(
+                http, stream.url, stream.ua, got,
+                if (total > 0L) (total - got).coerceAtLeast(0L) else -1L,
+                stream.approxBytes, refresh, true, gate, cancellation
+            )
+            var raf: java.io.RandomAccessFile? = null
+            try {
+                reader.open()
+                val remaining = reader.length
+                if (remaining >= 0L) knownTotal = got + remaining
+                raf = java.io.RandomAccessFile(tmp, "rw")
                 // #109: 256KB buffer — chaqiruvlar sonini 4 barobar qisqartiradi.
                 val buf = ByteArray(256 * 1024)
                 var guard = 0
                 while (guard++ < 65536) {
                     val n = reader.read(buf, 0, buf.size)
-                    if (n <= 0) break
-                    out.write(buf, 0, n)
-                    got += n
+                    if (n <= 0) {
+                        sawEof = reader.isEof()
+                        break
+                    }
+                    val at = reader.position() - n
+                    synchronized(raf) {
+                        raf.seek(at)
+                        raf.write(buf, 0, n)
+                    }
+                    got = at + n
                     // #104: ~1% qadamlar bilan foizni xabar qilamiz.
-                    if (progress != null && expect > 0 &&
-                        got - lastEmit >= expect / 100 + 8192
+                    if (progress != null && knownTotal > 0L &&
+                        got - lastEmit >= knownTotal / 100 + 8192
                     ) {
                         lastEmit = got
-                        progress(got, expect)
+                        progress(got, knownTotal)
                     }
                     // #86: fon yuklashi ham taroq tezligini o'lchaydi —
                     // oyna/deadline/format shundan hisoblanadi.
                     YuzNetPulse.add(n)
                 }
+                if (knownTotal > 0L) total = knownTotal
+                Log.i(
+                    TAG,
+                    "download seq try=$attempt got=$got expect=${if (total > 0) total else -1} " +
+                        "ext=${stream.ext} eof=$sawEof"
+                )
+            } catch (e: Exception) {
+                Log.i(
+                    TAG,
+                    "download seq ERR try=$attempt ${e.javaClass.simpleName} got=$got " +
+                        "${e.message?.take(48)}"
+                )
+            } finally {
+                runCatching { raf?.close() }
+                reader.close()
             }
-            complete = got > 0L && (expect < 0L || got >= expect)
-            Log.i(TAG, "download ranges got=$got expect=$expect ext=${stream.ext} ok=$complete")
-        } catch (e: Exception) {
-            Log.i(TAG, "download range ERR ${e.javaClass.simpleName} ${stream.url.take(60)}")
-        } finally {
-            reader.close()
+            if (reader.canceled || cancellation.canceled) {
+                runCatching { tmp.delete() }
+                return CANCELED
+            }
+            val complete = if (total > 0L) got >= total else sawEof && got > 0L
+            if (complete && publish(context, tmp, track, stream.ext, cancellation)) return OK
         }
-        if (reader.canceled || cancellation.canceled) {
-            runCatching { tmp.delete() }
-            return CANCELED
-        }
-        return if (complete) {
-            if (publish(context, tmp, track, stream.ext, cancellation)) OK else FAIL
-        } else {
-            runCatching { tmp.delete() }
-            FAIL
-        }
+        Log.i(TAG, "download seq FAIL got=$got expect=${if (total > 0) total else -1}")
+        runCatching { tmp.delete() }
+        return FAIL
     }
 
     /**
@@ -359,7 +442,9 @@ object YuzMusicCache {
      * (alohida HTTP ulanish) bilan tortadi. Yozishlar bitta
      * RandomAccessFile'ga seek+synchronized bilan tushadi — o'rtada
      * baytlar aralashmaydi. To'liqlik: jami bayt >= kutilgan hajm.
-     * Bekor qilish: biror reader gate'dan -1 ollsa CANCELED.
+     * Bekor qilish: biror reader gate'dan -1 olsa CANCELED.
+     * #133: [SplitOutcome.lowerEnd] — pastki yarmdan yozilgan uzluksiz
+     * prefiks; split yiqilsa ketma-ket yuklash shu joydan davom etadi.
      */
     private fun fetchRangesSplit(
         context: Context,
@@ -370,7 +455,7 @@ object YuzMusicCache {
         gate: (() -> Long)?,
         progress: ((Long, Long) -> Unit)?,
         cancellation: YuzDownloadCancellation
-    ): Int {
+    ): SplitOutcome {
         val total = stream.approxBytes
         val mid = total / 2
         val ra = YuzRangeReader(
@@ -382,24 +467,31 @@ object YuzMusicCache {
         val got = java.util.concurrent.atomic.AtomicLong(0L)
         val lastEmit = java.util.concurrent.atomic.AtomicLong(0L)
         val upperFailed = java.util.concurrent.atomic.AtomicBoolean(false)
-        // setLength QO'YMAYMIZ: fayl hajmi yozilgan baytlardan o'sadi —
-        // chaqiruvchi "birorta bayt keldi-yo'qmi"ni tmp.length() bo'yicha
-        // adashmasdan biladi (seek EOF ortiga yozish ham kengaytiradi).
+        // #133: yozilgan UZLUKSIZ prefiksni alohida kuzatamiz — bayt o'qilib
+        // yozishdan oldin uzilish bo'lsa, progress oshib ketmasin.
+        val lowerWritten = java.util.concurrent.atomic.AtomicLong(0L)
+        val upperWritten = java.util.concurrent.atomic.AtomicLong(mid)
+        // setLength QO'YMAYMIZ: fayl hajmi yozilgan baytlardan o'sadi.
         val raf = try {
             java.io.RandomAccessFile(tmp, "rw")
         } catch (_: Exception) {
-            return FAIL
+            ra.close()
+            rb.close()
+            return SplitOutcome(FAIL, 0L, total)
         }
         val upper = Thread {
             val ok = runCatching {
-                cancellation.scoped { readHalf(rb, raf, got, lastEmit, total, progress) }
+                cancellation.scoped {
+                    readHalf(rb, raf, upperWritten, got, lastEmit, total, progress)
+                }
             }.getOrDefault(false)
             upperFailed.set(!ok)
             if (!ok) ra.abort()
         }
         upper.start()
-        val lowerOk = runCatching { readHalf(ra, raf, got, lastEmit, total, progress) }
-            .getOrDefault(false)
+        val lowerOk = runCatching {
+            readHalf(ra, raf, lowerWritten, got, lastEmit, total, progress)
+        }.getOrDefault(false)
         if (!lowerOk) rb.abort()
         var interrupted = false
         try {
@@ -420,23 +512,28 @@ object YuzMusicCache {
         if (interrupted) throw IOException("split download interrupted")
         val canceled = ra.canceled || rb.canceled || cancellation.canceled
         val complete = lowerOk && !upperFailed.get() && got.get() >= total
-        Log.i(TAG, "download split got=${got.get()} expect=$total cancel=$canceled ok=$complete")
+        val lowerEnd = lowerWritten.get().coerceIn(0L, mid)
+        Log.i(
+            TAG,
+            "download split got=${got.get()} expect=$total cancel=$canceled " +
+                "ok=$complete lowerEnd=$lowerEnd"
+        )
         if (canceled) {
             runCatching { tmp.delete() }
-            return CANCELED
+            return SplitOutcome(CANCELED, 0L, total)
         }
-        if (complete && publish(context, tmp, track, stream.ext, cancellation)) return OK
-        // #120: FAIL yo'lida tmp'ni O'CHIRMAYMIZ — chaqiruvchi (271-277)
-        // tmp.length() orqali "bayt keldi-yo'qmi"ni ko'radi va o'zi
-        // tozalaydi. Eski ertalabki o'chirish check'ni doim-yolg'on
-        // qilib, 90% tortilgan faylni noldan ketma-ket qayta tortdirardi.
-        return FAIL
+        if (complete && publish(context, tmp, track, stream.ext, cancellation)) {
+            return SplitOutcome(OK, total, total)
+        }
+        // #133: tmp O'CHIRILMAYDI — chaqiruvchi [lowerEnd]'dan davom etadi.
+        return SplitOutcome(FAIL, lowerEnd, total)
     }
 
     /** #109: bitta yarmni oxirigacha o'qib, to'g'ri offsetga yozadi. */
     private fun readHalf(
         reader: YuzRangeReader,
         raf: java.io.RandomAccessFile,
+        written: java.util.concurrent.atomic.AtomicLong,
         got: java.util.concurrent.atomic.AtomicLong,
         lastEmit: java.util.concurrent.atomic.AtomicLong,
         total: Long,
@@ -454,6 +551,7 @@ object YuzMusicCache {
                     raf.seek(at)
                     raf.write(buf, 0, n)
                 }
+                written.set(at + n)
                 val g = got.addAndGet(n.toLong())
                 YuzNetPulse.add(n)
                 if (progress != null && g - lastEmit.get() >= total / 100 + 8192) {
@@ -549,10 +647,27 @@ object YuzMusicCache {
         }
     }
 
+    /**
+     * #133: server/format nomidan kelgan kengaytmani kesh tanaydigan
+     * uchlikka keltiramiz. Ilgari "webma"/"opus" xom yozilardi va
+     * [localFile] bunday faylni topa olmasdi — yuklangan qo'shiq
+     * yo'qolgan ko'rinardi.
+     */
+    private fun normalizeExt(ext: String): String {
+        val e = ext.lowercase().trim()
+        return when {
+            e.contains("webm") || e.contains("opus") || e.contains("ogg") ||
+                e.contains("vorbis") -> "webm"
+            e.contains("mp3") || e.contains("mpeg") -> "mp3"
+            else -> "m4a"
+        }
+    }
+
     private fun promote(context: Context, tmp: File, id: Long, ext: String): Boolean {
         if (tmp.length() <= 0L) return false
-        val dst = File(dir(context), "$id.$ext")
+        val dst = File(dir(context), "$id.${normalizeExt(ext)}")
         // Both paths share a directory; only an atomic rename exposes saved audio.
+        if (dst.exists()) runCatching { dst.delete() }
         if (!tmp.renameTo(dst)) return false
         Log.i(TAG, "download OK ${dst.length()}B -> ${dst.name}")
         return true
@@ -561,6 +676,8 @@ object YuzMusicCache {
     fun remove(context: Context, id: Long) {
         removeFiles(dir(context), id)
         removeIndex(context, id)
+        // UI keshi "yuklangan" holatini shu sanoq orqali yangilaydi.
+        doneSeq.incrementAndGet()
     }
 
     /** Saqlangan ro'yxat (eng yangi tepada). */
@@ -602,10 +719,10 @@ object YuzMusicCache {
         return s
     }
 
-    /** Local file:// URI yoki network preview URI. */
+    /** Local file URI yoki network preview URI. */
     fun playUri(context: Context, track: YuzTrack): String {
         val f = localFile(context, track.id)
-        return if (f != null) f.toURI().toString() else track.previewUrl
+        return if (f != null) Uri.fromFile(f).toString() else track.previewUrl
     }
 
     private fun addToIndex(context: Context, track: YuzTrack) = synchronized(indexLock) {
@@ -673,6 +790,16 @@ object YuzMusicCache {
         for (e in EXT) {
             val f = File(d, "$id.$e")
             if (f.exists()) {
+                freed += f.length()
+                runCatching { f.delete() }
+            }
+        }
+        // #133: eski/noma'lum kengaytmali nusxalarni ham o'chiramiz —
+        // aks holda "o'chirildi" deyilib, fayl diskda qolib ketardi.
+        d.listFiles()?.forEach { f ->
+            if (f.isFile && f.name.startsWith("$id.") &&
+                f.name.substringAfterLast('.', "").lowercase() in KNOWN_EXT
+            ) {
                 freed += f.length()
                 runCatching { f.delete() }
             }

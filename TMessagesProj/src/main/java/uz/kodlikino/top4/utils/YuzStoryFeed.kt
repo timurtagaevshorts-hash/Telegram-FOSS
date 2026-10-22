@@ -222,6 +222,8 @@ object YuzStoryFeed {
         val isVideo = doc != null && FileLoader.isVideoMimeType(doc.mime_type)
         val name = peerName(account, dialogId)
         val liked = item.sent_reaction != null && item.sent_reaction !is TLRPC.TL_reactionEmpty
+        // Telegram ko'rishlar/reaksiyalar sonini faqat hikoya egasi va kanal
+        // obunachilariga beradi; boshqalarda `views` null — soxta 0 yozmaymiz.
         val views = item.views
         return Reel(
             id = storyKey(dialogId, item.id),
@@ -237,7 +239,8 @@ object YuzStoryFeed {
             storyDialogId = dialogId,
             storyId = item.id,
             storyIsVideo = isVideo,
-            storyArchived = archived
+            storyArchived = archived,
+            statsAvailable = views != null
         )
     }
 
@@ -340,10 +343,31 @@ object YuzStoryFeed {
         return null
     }
 
+    /** Hikoyaning joriy Telegram statistikasi (in-memory [TL_stories.StoryItem]dan). */
+    data class StoryStats(
+        val views: Int,
+        val likes: Int,
+        val likedByMe: Boolean,
+        val available: Boolean
+    )
+
+    @JvmStatic
+    fun liveStats(account: Int, dialogId: Long, storyId: Int): StoryStats? {
+        val item = findStoryItem(account, dialogId, storyId) ?: return null
+        val views = item.views
+        return StoryStats(
+            views = views?.views_count ?: 0,
+            likes = views?.reactions_count ?: 0,
+            likedByMe = item.sent_reaction != null && item.sent_reaction !is TLRPC.TL_reactionEmpty,
+            available = views != null
+        )
+    }
+
     /** Layk/unlike — Telegram reaksiyasi (`❤` emoji). Muvaffaqiyatda true. */
     @JvmStatic
     fun likeStory(account: Int, dialogId: Long, storyId: Int, liked: Boolean): Boolean {
         val item = findStoryItem(account, dialogId, storyId) ?: return false
+        val wasLiked = item.sent_reaction != null && item.sent_reaction !is TLRPC.TL_reactionEmpty
         return try {
             val vr = if (liked) {
                 ReactionsLayoutInBubble.VisibleReaction().apply { emojicon = "\u2764\ufe0f" }
@@ -351,6 +375,13 @@ object YuzStoryFeed {
                 null
             }
             MessagesController.getInstance(account).getStoriesController().setStoryReaction(dialogId, item, vr)
+            // Telegram'ning o'z klienti kabi sonni darhol moslaymiz (serverdan
+            // keyingi updateStory aniq qiymatni yuboradi va uni almashtiradi).
+            if (liked != wasLiked) {
+                item.views?.let { v ->
+                    v.reactions_count = (v.reactions_count + if (liked) 1 else -1).coerceAtLeast(0)
+                }
+            }
             true
         } catch (_: Exception) {
             false

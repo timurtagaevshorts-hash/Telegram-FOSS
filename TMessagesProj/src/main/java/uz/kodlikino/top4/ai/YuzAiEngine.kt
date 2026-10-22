@@ -37,6 +37,7 @@ object YuzAiEngine {
         data class OpenChat(val peer: Peer) : Intent()
         data class Call(val peer: Peer, val video: Boolean) : Intent()
         data class Goto(val section: Section) : Intent()
+        data class PlayMusic(val query: String) : Intent()
         data class Ask(val question: String) : Intent()
     }
 
@@ -68,10 +69,30 @@ object YuzAiEngine {
     )
     private val EXTRA_STOP = setOf("men", "menga", "deb", "des", "qil", "video", "msg", "ayt", "ber")
 
+    // #134: "musiqa qo'y", "Ummon — sokin tun qo'shig'ini top" kabi buyruqlar
+    // endi bo'limga o'tish emas — darhol qidiruv + ijro. Atamalar norm()dan
+    // o'tkaziladi (apostrof, kirill, registr).
+    private val MUSIC_WORDS_RAW = listOf(
+        "musiqa", "muzika", "qo'shiq", "qoshiq", "ashula", "trek", "song", "music", "audio"
+    )
+    private val PLAY_WORDS_RAW = listOf(
+        "qo'y", "qoy", "chal", "ijro", "top", "izla", "qidir", "yoq", "yondir", "boshlab",
+        "kuyla", "yangra", "eshittir", "eshit"
+    )
+    private val MUSIC_STOP_RAW = listOf(
+        "menga", "meni", "uchun", "iltimos", "deb", "des", "desa", "de", "deyish",
+        "aytsa", "aytish", "ayt", "ayting", "aytib", "bir", "ozgina",
+        "yaxshi", "yaxshiroq", "hozir", "endi", "keyin", "qilib", "ber", "bering",
+        "mumkin", "mumkinmi", "please", "och", "ochib", "ochish", "bo'limini", "bolimini"
+    )
+
     private val SEND_WORDS: List<String> = SEND_WORDS_RAW.map { norm(it) }
     private val CALL_WORDS: List<String> = CALL_WORDS_RAW.map { norm(it) }
     private val NAV_MAP: List<Pair<String, Section>> = NAV_WORDS_RAW.map { norm(it.first) to it.second }
     private val QUESTION_SET: Set<String> = QUESTION_WORDS.map { norm(it) }.toSet()
+    private val MUSIC_WORDS: List<String> = MUSIC_WORDS_RAW.map { norm(it) }
+    private val PLAY_WORDS: List<String> = PLAY_WORDS_RAW.map { norm(it) }
+    private val MUSIC_STOP: Set<String> = MUSIC_STOP_RAW.map { norm(it) }.toSet()
 
     @Volatile private var cachedPeers: List<Peer>? = null
     @Volatile private var cachedAt = 0L
@@ -231,6 +252,12 @@ object YuzAiEngine {
                 val body = cleanBody(tokens, match.nameIndices)
                 return if (body.isBlank()) Intent.NeedBody(match.peer) else Intent.SendText(match.peer, body)
             }
+            // "chatni och / kinolarni och" — bu nom emas, bo'lim buyrug'i.
+            // Ilgari bu holat "chatni ismli chat topilmadi" deb xato qaytarardi.
+            if (!hasSend) {
+                val section = findNav(normed)
+                if (section != null && !isQuestion(normed)) return Intent.Goto(section)
+            }
             // Nom topilmadi: "xyz ga xabar yubor" -> "xyz ismli chat topilmadi".
             val guessed = guessNameToken(normed)
             if (guessed != null) return Intent.NotFound(guessed)
@@ -241,19 +268,102 @@ object YuzAiEngine {
             }
         }
 
-        // 2) Navigatsiya kalit so'zlari (reels/taksi/...) — nom bilan aralashmasa.
-        val nav = findNav(normed)
-        if (nav != null && findPeer(tokens, normed, account) == null) return Intent.Goto(nav)
+        // 2) Musiqa buyrug'i: "musiqa qo'y", "sevgi haqida dardli musiqa",
+        // "Ummon — sokin tun qo'shig'ini top" — qidiruv matni ajratiladi.
+        if (!hasSend && !hasCall) {
+            musicIntent(tokens, normed)?.let { return it }
+        }
 
-        // 3) Bilinadigan nom: "sardor qalesan bugun kelasanmi" -> Sardor'ga yuborish.
+        // 3) Navigatsiya kalit so'zlari (reels/taksi/...) — nom bilan aralashmasa.
+        val nav = findNav(normed)
+        if (nav != null && !isQuestion(normed) && findPeer(tokens, normed, account) == null) {
+            return Intent.Goto(nav)
+        }
+
+        // 4) Bilinadigan nom: "sardor qalesan bugun kelasanmi" -> Sardor'ga yuborish.
         val smart = findPeer(tokens, normed, account)
         if (smart != null) {
             val body = cleanBody(tokens, smart.nameIndices)
             return if (body.isBlank()) Intent.NeedBody(smart.peer) else Intent.SendText(smart.peer, body)
         }
 
-        // 4) Savol -> brain.
+        // 5) Savol -> brain.
         return Intent.Ask(raw.trim())
+    }
+
+    /**
+     * #134: musiqa buyrug'ini aniqlaydi va qidiruv matnini ajratadi.
+     * "musiqa bo'limini och" — bo'limga o'tish; qolgan holatlarda ijro.
+     */
+    private fun musicIntent(tokens: List<String>, normed: List<String>): Intent? {
+        val hasMusic = normed.any { t -> MUSIC_WORDS.any { m -> t.startsWith(m) } }
+        if (!hasMusic) return null
+        val wantsPlay = normed.any { t -> PLAY_WORDS.any { p -> t.startsWith(p) } }
+        val wantsOpen = normed.any { t -> t == "och" || t.startsWith("ochib") }
+        val q = musicQueryFrom(tokens, normed)
+        if (wantsOpen && !wantsPlay) return Intent.Goto(Section.MUSIQA)
+        // "musiqa nima?" — savol, ijro emas.
+        if (isQuestion(normed) && !wantsPlay) return null
+        if (wantsPlay || q.isNotBlank()) return Intent.PlayMusic(q)
+        return Intent.Goto(Section.MUSIQA)
+    }
+
+    /** Buyruq/musiqa so'zlarini olib tashlab, qo'shiq nomini qoldiradi. */
+    private fun musicQueryFrom(tokens: List<String>, normed: List<String>): String {
+        val out = ArrayList<String>()
+        for (i in tokens.indices) {
+            val n = normed.getOrElse(i) { "" }
+            if (n.isBlank()) continue
+            if (MUSIC_WORDS.any { n.startsWith(it) }) continue
+            if (PLAY_WORDS.any { n.startsWith(it) }) continue
+            if (n in MUSIC_STOP) continue
+            val raw = tokens[i]
+                .trim()
+                .trim('.', ',', '!', '?', '"', '“', '”', '«', '»', ':')
+                .replace("xaqida", "haqida")
+            if (raw.isBlank()) continue
+            out.add(stripUzSuffix(raw))
+        }
+        return TextUtils.join(" ", out).trim()
+    }
+
+    /**
+     * O'zbekcha kelishik qo'shimchasini ehtiyotkorlik bilan olib tashlaydi:
+     * "ummonni" -> "ummon", "qo'shiqni" -> "qo'shiq". Faqat uzun so'zlarda.
+     */
+    private fun stripUzSuffix(word: String): String {
+        if (word.length < 6) return word
+        for (suffix in arrayOf("ning", "dagi", "dan", "ga", "da", "ni")) {
+            if (word.endsWith(suffix, ignoreCase = true) && word.length - suffix.length >= 4) {
+                return word.dropLast(suffix.length)
+            }
+        }
+        return word
+    }
+
+    /**
+     * Worker qaytargan qidiruv matnini tiniqlashtiradi. Kayfiyat so'rovi
+     * ("sevgi haqida dardli") tegishli qidiruv seediga aylanadi; aniq qo'shiq
+     * nomi esa o'zgartirilmaydi.
+     */
+    fun refineMusicQuery(raw: String): String {
+        var q = raw.trim().replace(Regex("\\s+"), " ")
+        if (q.isBlank()) return ""
+        q = q.replace(Regex("(?iu)\\bxaqida\\b"), "haqida")
+        val n = norm(q)
+        val sad = listOf("dard", "gamgin", "g'amgin", "xafa", "soginch", "sog'inch", "ajral", "yigla", "yig'la")
+        val love = listOf("sevgi", "muhabbat", "ishq", "love")
+        val happy = listOf("quvnoq", "xursand", "bayram", "raqs", "dance", "party")
+        val isSad = sad.any { n.contains(norm(it)) }
+        val isLove = love.any { n.contains(norm(it)) }
+        val isHappy = happy.any { n.contains(norm(it)) }
+        return when {
+            n.contains("haqida") && isSad && isLove -> "sevgi haqida dardli o'zbek qo'shiqlari"
+            n.contains("haqida") && isLove -> "sevgi haqida o'zbek qo'shiqlari"
+            isSad -> "dardli o'zbek qo'shiqlari"
+            isHappy -> "quvnoq o'zbek qo'shiqlari"
+            else -> q
+        }
     }
 
     private class PeerMatch(val peer: Peer, val nameIndices: List<Int>)
@@ -389,13 +499,18 @@ object YuzAiEngine {
         }
         var body = TextUtils.join(" ", parts).trim()
         // Old va qo'shimcha buyruq qoldiqlarini tozalash
-        body = body.replace(Regex("^(menga\\s+|va\\s+)+"), "")
+        body = body.replace(Regex("^(menga\\s+|iltimos\\s+|va\\s+)+"), "")
+        body = body.replace(Regex("^(ayt|ayting|aytib|gapir|gapirib)\\s+"), "")
         body = body.replace(Regex("^(xabar|msg|habar)\\s+"), "")
         body = body.replace(Regex("^(ga|kga|nga|gha|qa)\\s+"), "")
         // Ortidagi wrapper'lar: "... deb yubor", "... deb ayt", "... desang"
         body = body.replace(Regex("\\s+(deb|des|dedi|demoqchiman|demoqchimancha)\\s+(yubor|yoz|ayt|des|qilib\\s+ber|aytib\\s+ber)\\s*$"), "")
         body = body.replace(Regex("\\s+(deb|des|dedi)\\s*$"), "")
         body = body.replace(Regex("\\s+(yubor|jo'nat|jonat|yozib\\s+yubor|aytib\\s+ber|qilib\\s+ber)\\s*$"), "")
+        body = body.replace(Regex("\\s+(ayt|ayting|gapir|gapirib(\\s+ber)?)\\s*$"), "")
+        // "Sardor qalesan deb aytsa" -> "Qalesan" (gap oxiridagi buyruq qobig'i)
+        body = body.replace(Regex("\\s+(deb|des)\\s+(aytsa|aytsang|aytib|desa|desang|de|ayt)\\s*$"), "")
+        body = body.replace(Regex("\\s+(aytsa|aytsang|desa|desang|de)\\s*$"), "")
         body = body.trim().trim('.', ',', '!', '?', ' ')
         // Qolgan buyruq so'zlari ham xabar matni bo'lib qolmasin
         val normBody = norm(body)

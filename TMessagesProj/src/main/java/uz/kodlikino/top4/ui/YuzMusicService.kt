@@ -1,10 +1,16 @@
 package uz.kodlikino.top4.ui
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.media3.common.Player
 import androidx.media3.session.BitmapLoader
@@ -29,53 +35,91 @@ class YuzMusicService : MediaSessionService() {
     private var session: MediaSession? = null
     private var enginePlayer: Player? = null
 
-    // #122b: media3 1.0.2 xizmatni startForeground()ga faqat o'z
-    // bildirishnomasi tuzilganda ko'taradi; session qo'shilgan payt player
-    // ALLAQACHON o'ynayotgan bo'lsa esa updateNotification'ni qayta
-    // ishga tushirmaydi — natijada 5s ichida startForeground() bo'lmaydi va
-    // Android 14 ForegroundServiceDidNotStartInTimeException otadi (pult
-    // skrinshotlari 10:58 va 12:08). MediaSessionService.onStartCommand
-    // FINAL — shuning uchun onCreate'dan o'zimizni-qaayta rejalashtiruvchi
-    // nazoratchi yurgizamiz: 2.5s'da tekshiramiz, kuylayotgan bo'lsa va
-    // media3 hali bildirishnoma qo'ymagan bo'lsa o'zimiz qo'yib
-    // startForeground qilamiz; kuylamayotgan bo'lsa stopSelf (talab bekor).
-    private val fallbackHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private val fallbackStart = object : Runnable {
+    // #141: media3 o'z MediaStyle bildirishnomasini (oldingi/ijro/keyingi
+    // tugmalari bilan) faqat session xizmatga addSession() qilingan bo'lsa
+    // quradi. Ilgari bu chaqiruv yo'q edi — shu sababli ilovadan chiqqach
+    // faqat tugmasiz zaxira bildirishnoma qolardi. Controller ulanishi
+    // asinxron, shuning uchun birinchi soniyalarda bir necha marta
+    // onUpdateNotification bilan majburlaymiz; 5s FGS muddati tugamasidan
+    // oxirgi chora sifatida oddiy bildirishnoma qo'yamiz.
+    private var promoteAttempts = 0
+    private var emergencyPosted = false
+    private var endedSince = 0L
+
+    private val watchdogHandler = Handler(Looper.getMainLooper())
+    private val watchdog = object : Runnable {
         override fun run() {
-            promoteOrStop()
             val p = enginePlayer
-            if (p != null && (p.playWhenReady || p.isPlaying)) {
-                fallbackHandler.postDelayed(this, 2500L)
+            if (p == null || playbackFinished(p)) {
+                runCatching { stopSelf() }
+                return
             }
+            val posted = mediaNotificationPosted()
+            if (posted) {
+                promoteAttempts = 0
+            } else {
+                session?.let { s -> runCatching { onUpdateNotification(s, true) } }
+                promoteAttempts++
+                if (!emergencyPosted && promoteAttempts >= EMERGENCY_AFTER) {
+                    emergencyPosted = true
+                    postEmergencyNotification()
+                }
+            }
+            watchdogHandler.postDelayed(this, if (posted || emergencyPosted) IDLE_POLL_MS else BOOT_POLL_MS)
         }
     }
 
-    private fun promoteOrStop() {
-        val p = enginePlayer
-        if (p == null || !(p.playWhenReady || p.isPlaying) || p.playbackState == Player.STATE_ENDED) {
-            // Kuylamayapti — xizmatni tinch yo'amiz (startForeground
-            // talabi ham shu bilan bekor bo'ladi).
-            runCatching { stopSelf() }
-            return
+    private fun mediaNotificationPosted(): Boolean {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return false
+        val own = runCatching { nm.activeNotifications }
+            .getOrNull()?.firstOrNull { it.id == YuzMusicNotification.ID } ?: return false
+        // Zaxira bildirishnoma ham shu id'da bo'ladi — MediaStyle'da esa
+        // oldingi/ijro/keyingi tugmalari bor.
+        return !emergencyPosted || !own.notification.actions.isNullOrEmpty()
+    }
+
+    private fun playbackFinished(p: Player): Boolean {
+        when (p.playbackState) {
+            Player.STATE_IDLE -> return true
+            Player.STATE_ENDED -> {
+                if (!p.playWhenReady) return true
+                val now = SystemClock.elapsedRealtime()
+                if (endedSince == 0L) endedSince = now
+                // Radio navbatni to'ldirishga ulgursin.
+                return now - endedSince > ENDED_GRACE_MS
+            }
+            else -> endedSince = 0L
         }
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
-        if (nm?.activeNotifications?.any { it.id == YuzMusicNotification.ID } == true) return
-        val ch = android.app.NotificationChannel(
-            YuzMusicNotification.CHANNEL_ID,
-            getString(R.string.musiqa_notif_channel),
-            android.app.NotificationManager.IMPORTANCE_LOW
-        )
-        runCatching { nm?.createNotificationChannel(ch) }
-        val n = androidx.core.app.NotificationCompat.Builder(this, YuzMusicNotification.CHANNEL_ID)
+        return false
+    }
+
+    private fun postEmergencyNotification() {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        runCatching {
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    YuzMusicNotification.CHANNEL_ID,
+                    getString(R.string.musiqa_notif_channel),
+                    NotificationManager.IMPORTANCE_LOW
+                )
+            )
+        }
+        val n = NotificationCompat.Builder(this, YuzMusicNotification.CHANNEL_ID)
             .setSmallIcon(R.drawable.player)
             .setContentTitle(getString(R.string.musiqa_notif_channel))
             .setContentText("YuzGram musiqa")
             .setOngoing(true)
             .setSilent(true)
             .setColor(ContextCompat.getColor(this, R.color.yuz_action))
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    this, 43,
+                    Intent(this, YuzPlayerHostActivity::class.java),
+                    PendingIntent.FLAG_IMMUTABLE
+                )
+            )
             .build()
         runCatching { startForeground(YuzMusicNotification.ID, n) }
-            .onFailure { runCatching { stopSelf() } }
     }
 
     override fun onCreate() {
@@ -84,10 +128,6 @@ class YuzMusicService : MediaSessionService() {
         // build()'dan oldin bo'lishi yetarli.
         setMediaNotificationProvider(YuzMusicNotification(this))
         super.onCreate()
-        // #122b: nazoratchi xizmat yashagan davom ishlaydi (o'zini qayta
-        // rejalashtiradi); startForeground talabi 5s — birinchi tekshiruv
-        // 2.5s'da, yetarli.
-        fallbackHandler.postDelayed(fallbackStart, 2500L)
         val player = YuzMusicEngine.ensurePlayer(applicationContext)
         enginePlayer = player
         // #69: bildirishnoma/qulf ekranidagi qatorga bosish to'liq
@@ -111,28 +151,41 @@ class YuzMusicService : MediaSessionService() {
             override fun decodeBitmap(data: ByteArray): ListenableFuture<Bitmap> =
                 YuzArtwork.decode(data)
         })
-        session = builder.build()
+        val built = builder.build()
+        session = built
+        // #141: media3'ning notification manager'i shu chaqiruvsiz session'ni
+        // umuman tanimaydi — na MediaStyle bildirishnoma, na startForeground.
+        addSession(built)
+        watchdogHandler.postDelayed(watchdog, BOOT_POLL_MS)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         // Foydalanuvchi ilovani "aylanmagan" qilsa ham musiqa to'xtamaydi;
-        // kuylamayotgan bo'lsa xizmatni to'xtatamiz (ijro tugagan=END ham).
+        // pauza qilingan bo'lsa xizmatni to'xtatamiz. ENDED holatda esa
+        // radio navbatni to'ldirishi mumkin — qarorni watchdog qabul qiladi
+        // (STATE_ENDED + playWhenReady u yerda grace bilan kuzatiladi).
         val p = enginePlayer
-        if (session == null || p == null || !p.playWhenReady
-            || p.playbackState == Player.STATE_ENDED
-        ) {
+        if (session == null || p == null || !p.playWhenReady) {
             stopSelf()
         }
         super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
-        fallbackHandler.removeCallbacks(fallbackStart) // #122b
+        watchdogHandler.removeCallbacks(watchdog)
         runCatching { session?.release() }
         session = null
         enginePlayer = null
+        YuzMusicEngine.onMusicServiceStopped()
         super.onDestroy()
+    }
+
+    private companion object {
+        const val BOOT_POLL_MS = 700L
+        const val IDLE_POLL_MS = 4000L
+        const val EMERGENCY_AFTER = 5
+        const val ENDED_GRACE_MS = 20000L
     }
 }

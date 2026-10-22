@@ -29,9 +29,11 @@
     <string name="musiqa_play_failed">Bu qo\'shiqni ijro etib bo\'lmadi — aloqani tekshiring yoki boshqa natijani tanlang</string>
     <!-- YuzGram #67: fon ijrosi, avto-navbat (radio), playlistlar -->
     <string name="musiqa_collections">Kolleksiyalar</string>
-    <string name="musiqa_radio_toggle">Radio davomi: %1$s</string>
-    <string name="musiqa_radio_on">Radio yoqildi — qo\'shiq tugaganda o\'xshashlari topiladi</string>
-    <string name="musiqa_radio_off">Radio o\'chirildi — navbat oxirida to\'xtaydi</string>
+    <string name="musiqa_radio_toggle">Keyingi musiqalarni avto topish: %1$s</string>
+    <string name="musiqa_radio_state_on">YONIQ</string>
+    <string name="musiqa_radio_state_off">O\'CHIQ</string>
+    <string name="musiqa_radio_on">Avto-navbat yoqildi — qo\'shiq tugaganda o\'xshashlari avtomatik topiladi</string>
+    <string name="musiqa_radio_off">Avto-navbat o\'chirildi — navbat oxirida to\'xtaydi</string>
     <string name="musiqa_st_extend">O\'xshash qo\'shiqlar qidirilmoqda…</string>
     <!-- YuzGram #86: sust taroqda urinishlar to\'xtatildi -->
     <string name="musiqa_st_weaknet">Aloqa sust — bir necha qo\'shiq boshlanmadi. Tarmoqni tekshiring yoki qo\'shiqlarni oldindan yuklab oling.</string>
@@ -70,8 +72,8 @@
     <string name="musiqa_pl_dl">Yuklash</string>
     <string name="musiqa_pl_eq">Ekvalayzer</string>
     <string name="musiqa_pl_sleep">Uxlash</string>
-    <string name="musiqa_pl_radio_off">RADIO: OFF</string>
-    <string name="musiqa_pl_radio_on">RADIO: ON</string>
+    <string name="musiqa_pl_radio_off">AUTO: O\'CHIQ</string>
+    <string name="musiqa_pl_radio_on">AUTO: YONIQ</string>
     <string name="musiqa_pl_queue_empty">Navbat bo\'sh. Radio yoqilgan bo\'lsa, qo\'shiq tugaganda o\'xshashlari qo\'shiladi.</string>
     <string name="musiqa_sleep_title">Uyqu taymeri</string>
     <string name="musiqa_sleep_minutes">%1$d daqiqa</string>

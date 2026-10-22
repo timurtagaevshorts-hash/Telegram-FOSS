@@ -165,6 +165,7 @@ import org.telegram.ui.ActionBar.ActionBarPopupWindow;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.OKLCH;
 import org.telegram.ui.ActionBar.SimpleTextView;
@@ -174,6 +175,7 @@ import org.telegram.ui.Business.OpeningHoursActivity;
 import org.telegram.ui.Business.ProfileHoursCell;
 import org.telegram.ui.Business.ProfileLocationCell;
 import org.telegram.ui.Cells.AboutLinkCell;
+import org.telegram.ui.Cells.AccountSelectCell;
 import org.telegram.ui.Cells.CheckBoxCell;
 import org.telegram.ui.Cells.DividerCell;
 import org.telegram.ui.Cells.DrawerProfileCell;
@@ -521,6 +523,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private final static int set_username = 43;
     private final static int open_settings = 44;
     private final static int open_reel_notifications = 45;
+    private final static int open_accounts = 46;
 
     private Rect rect = new Rect();
 
@@ -2296,6 +2299,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 } else if (id == open_reel_notifications) {
                     // YuzGram #76: Reels bildirishnomalari ekrani (qo'ng'iroq).
                     presentFragment(new uz.kodlikino.top4.ui.ReelNotificationsActivity(), false);
+                } else if (id == open_accounts) {
+                    // YuzGram: akkaunt almashtirish va yangi akkaunt qo'shish.
+                    showAccountsBottomSheet();
                 } else if (id == invite_to_group) {
                     final TLRPC.User user = getMessagesController().getUser(userId);
                     if (user == null) {
@@ -3326,6 +3332,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             // YuzGram: drawer'dan olib tashlangan "Sozlamalar"ni profil tepasiga, qalamcha yoniga qo'ydik.
             settingsItem = menu.addItem(open_settings, R.drawable.msg_settings, resourcesProvider);
             settingsItem.setContentDescription(LocaleController.getString("Settings", R.string.Settings));
+            // YuzGram: akkauntlar — almashtirish va yangi akkaunt qo'shish.
+            ActionBarMenuItem accountsItem = menu.addItem(open_accounts, R.drawable.ic_yuz_accounts, resourcesProvider);
+            accountsItem.setContentDescription(LocaleController.getString(R.string.yuz_accounts_title));
         } else {
             editItem = menu.addItem(edit_channel, R.drawable.group_edit_profile);
             editItem.setContentDescription(LocaleController.getString("Edit", R.string.Edit));
@@ -13590,6 +13599,82 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 public void setColorFilter(ColorFilter colorFilter) {}
             };
             editColorItem.setIcon(combinedDrawable);
+        }
+    }
+
+    /**
+     * YuzGram: "Akkauntlar" pastki oynasi — mavjud akkauntlar ro'yxati va
+     * yangi akkaunt qo'shish qatori. Tanlangan akkauntga o'tish LaunchActivity
+     * orqali bo'ladi, u Firebase sessiyasini ham yangi akkauntga bog'laydi.
+     */
+    private void showAccountsBottomSheet() {
+        if (getParentActivity() == null) return;
+        Context context = getParentActivity();
+        LinearLayout content = new LinearLayout(context);
+        content.setOrientation(LinearLayout.VERTICAL);
+
+        final BottomSheet[] sheetRef = new BottomSheet[1];
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+            if (!UserConfig.getInstance(a).isClientActivated()) continue;
+            final int account = a;
+            AccountSelectCell cell = new AccountSelectCell(context, false);
+            cell.setAccount(account, true);
+            cell.setBackgroundDrawable(Theme.getSelectorDrawable(false));
+            content.addView(cell, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 56));
+            cell.setOnClickListener(v -> {
+                if (sheetRef[0] != null) sheetRef[0].dismiss();
+                if (account == UserConfig.selectedAccount) return;
+                if (getParentActivity() instanceof LaunchActivity) {
+                    ((LaunchActivity) getParentActivity()).switchToAccount(account, true);
+                }
+            });
+        }
+
+        LinearLayout addRow = new LinearLayout(context);
+        addRow.setOrientation(LinearLayout.HORIZONTAL);
+        addRow.setBackgroundDrawable(Theme.getSelectorDrawable(false));
+        ImageView addIcon = new ImageView(context);
+        addIcon.setImageResource(R.drawable.msg_add);
+        addIcon.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_windowBackgroundWhiteBlueIcon), PorterDuff.Mode.MULTIPLY));
+        addRow.addView(addIcon, LayoutHelper.createLinear(24, 24, Gravity.CENTER_VERTICAL, 10, 0, 14, 0));
+        TextView addText = new TextView(context);
+        addText.setText(LocaleController.getString(R.string.yuz_account_add));
+        addText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        addText.setTypeface(AndroidUtilities.bold());
+        addText.setTextColor(getThemedColor(Theme.key_chats_menuItemText));
+        addRow.addView(addText, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL));
+        addRow.setOnClickListener(v -> {
+            if (sheetRef[0] != null) sheetRef[0].dismiss();
+            addNewAccount();
+        });
+        content.addView(addRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 56));
+
+        BottomSheet sheet = new BottomSheet.Builder(context)
+                .setTitle(LocaleController.getString(R.string.yuz_accounts_title))
+                .setCustomView(content)
+                .create();
+        sheetRef[0] = sheet;
+        showDialog(sheet);
+    }
+
+    /** Bo'sh slot bo'lsa LoginActivity ochiladi, aks holda premium limit oynasi. */
+    private void addNewAccount() {
+        int freeAccounts = 0;
+        Integer availableAccount = null;
+        for (int a = UserConfig.MAX_ACCOUNT_COUNT - 1; a >= 0; a--) {
+            if (!UserConfig.getInstance(a).isClientActivated()) {
+                freeAccounts++;
+                if (availableAccount == null) availableAccount = a;
+            }
+        }
+        if (!UserConfig.hasPremiumOnAccounts()) {
+            freeAccounts -= (UserConfig.MAX_ACCOUNT_COUNT - UserConfig.MAX_ACCOUNT_DEFAULT_COUNT);
+        }
+        if (freeAccounts > 0 && availableAccount != null) {
+            presentFragment(new LoginActivity(availableAccount));
+        } else if (!UserConfig.hasPremiumOnAccounts() && getParentActivity() != null) {
+            LimitReachedBottomSheet sheet = new LimitReachedBottomSheet(this, getParentActivity(), LimitReachedBottomSheet.TYPE_ACCOUNTS, currentAccount, resourcesProvider);
+            showDialog(sheet);
         }
     }
 

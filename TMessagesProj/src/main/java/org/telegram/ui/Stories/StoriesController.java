@@ -806,6 +806,7 @@ public class StoriesController {
             ArrayList<TL_stories.StoryItem> newStoryItems = new ArrayList<>();
             int oldStoriesCount = totalStoriesCount;
             boolean notify = false;
+            boolean statsUpdated = false;
 
             if (currentUserStory != null) {
                 boolean changed = false;
@@ -832,6 +833,7 @@ public class StoriesController {
                             if (newStory.firstFramePath == null) {
                                 newStory.firstFramePath = oldStory.firstFramePath;
                             }
+                            statsUpdated = true;
                             FileLog.d("StoriesController update story id=" + newStory.id);
                         }
                         break;
@@ -896,6 +898,11 @@ public class StoriesController {
             }
             fixDeletedAndNonContactsStories(dialogListStories);
             fixDeletedAndNonContactsStories(hiddenListStories);
+            if (statsUpdated) {
+                // Reels kabi statistikani ko'rsatadigan ekranlar feed'ni qayta
+                // qurmasdan faqat sonlarni yangilay oladi.
+                NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.storyStatsUpdated);
+            }
             if (notify) {
                 NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.storiesUpdated);
             }
@@ -3158,6 +3165,9 @@ public class StoriesController {
             }
             if (changed) {
                 saveCache();
+                // Reels/hikoya statistikasi ekranlari sonlarni qayta qurmasdan
+                // yangilashi uchun (updateStoryViews ham statsUpdated beradi).
+                NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.storyStatsUpdated);
             }
         }
 

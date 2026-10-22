@@ -39,35 +39,93 @@
             android:textColor="@color/yuz_text"
             android:textSize="@dimen/yuz_text_title"
             android:textStyle="bold" />
+
+        <!-- #135: tezkor tugma — boshqa ilovalar ustida suzuvchi orb -->
+        <ImageButton
+            android:id="@+id/btnAiQuick"
+            style="@style/YuzIconButton"
+            android:contentDescription="@string/ai_quick_a11y"
+            android:src="@drawable/ic_yuz_float" />
+    </LinearLayout>
+
+    <!-- Markaz: Gemini uslubidagi jonli orb -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/yuz_gutter"
+        android:paddingEnd="@dimen/yuz_gutter"
+        android:paddingTop="@dimen/yuz_space_3">
+
+        <FrameLayout
+            android:id="@+id/aiOrbWrap"
+            android:layout_width="236dp"
+            android:layout_height="236dp"
+            android:clickable="true"
+            android:contentDescription="@string/ai_tap_to_talk"
+            android:focusable="true">
+
+            <uz.kodlikino.top4.ui.YuzAiOrbView
+                android:id="@+id/aiOrb"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <ImageButton
+                android:id="@+id/btnAiMic"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_ai_mic_glass"
+                android:contentDescription="@string/ai_tap_to_talk"
+                android:elevation="4dp"
+                android:padding="16dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_yuz_mic"
+                app:tint="@color/yuz_text" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tvAiStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/yuz_space_4"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="3"
+            android:text="@string/ai_entry_hint"
+            android:textColor="@color/yuz_text_secondary"
+            android:textSize="@dimen/yuz_text_body" />
     </LinearLayout>
 
     <!-- Suhbat jurnali -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/aiScroll"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="140dp"
         android:clipToPadding="false"
         android:overScrollMode="never"
-        android:paddingBottom="@dimen/yuz_space_3"
+        android:paddingStart="@dimen/yuz_gutter"
+        android:paddingEnd="@dimen/yuz_gutter"
         android:scrollbars="none">
 
         <LinearLayout
             android:id="@+id/aiLog"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingStart="@dimen/yuz_gutter"
-            android:paddingEnd="@dimen/yuz_gutter" />
+            android:gravity="bottom"
+            android:orientation="vertical" />
     </androidx.core.widget.NestedScrollView>
 
     <!-- Tezkor tugmalar qatori -->
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:clipToPadding="false"
         android:paddingStart="@dimen/yuz_space_4"
         android:paddingEnd="@dimen/yuz_space_4"
-        android:clipToPadding="false"
+        android:paddingBottom="@dimen/yuz_space_4"
         android:scrollbars="none">
 
         <LinearLayout
@@ -76,43 +134,4 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal" />
     </HorizontalScrollView>
-
-    <!-- Holat matni + mikrofon -->
-    <TextView
-        android:id="@+id/tvAiStatus"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/yuz_space_3"
-        android:gravity="center"
-        android:paddingStart="@dimen/yuz_space_6"
-        android:paddingEnd="@dimen/yuz_space_6"
-        android:textColor="@color/yuz_text_secondary"
-        android:textSize="@dimen/yuz_text_body" />
-
-    <FrameLayout
-        android:layout_width="120dp"
-        android:layout_height="120dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="@dimen/yuz_space_3"
-        android:layout_marginBottom="28dp">
-
-        <View
-            android:id="@+id/aiMicRing"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/bg_ai_ring"
-            android:alpha="0" />
-
-        <ImageButton
-            android:id="@+id/btnAiMic"
-            android:layout_width="92dp"
-            android:layout_height="92dp"
-            android:layout_gravity="center"
-            android:background="@drawable/bg_ai_mic"
-            android:contentDescription="@string/ai_listening"
-            android:elevation="6dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_yuz_mic"
-            app:tint="@color/yuz_text" />
-    </FrameLayout>
 </LinearLayout>

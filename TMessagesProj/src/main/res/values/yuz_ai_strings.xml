@@ -37,4 +37,25 @@
     <string name="ai_call_start">%1$s ga qo\'ng\'iroq qilyapman.</string>
     <string name="ai_call_no_user">%1$s — bu guruh yoki kanal, unga qo\'ng\'iroq qilib bo\'lmaydi. Faqat odamga telefon qilish mumkin.</string>
     <string name="ai_call_failed">Qo\'ng\'iroq ochilmadi. Internet yoki imkoniyatni tekshiring.</string>
+
+    <!-- #134: orbli yangi oqim -->
+    <string name="ai_entry_hint">Eshitaman… shunchaki gapiring.</string>
+    <string name="ai_tap_to_talk">Gapirish uchun bosing</string>
+    <string name="ai_cancelled">Bekor qilindi.</string>
+    <string name="ai_need_peer">Kimga? Ism yoki nikni ayting.</string>
+    <string name="ai_no_network">Aloqa yo\'q. Keyinroq qayta urining.</string>
+    <string name="ai_music_searching">Qidiryapman: %1$s…</string>
+    <string name="ai_music_playing">Qo\'ydim: %1$s — %2$s</string>
+    <string name="ai_music_empty">Bu so\'rov bo\'yicha musiqa topilmadi. Boshqacha ayting.</string>
+    <string name="ai_music_chart_label">ommabop qo\'shiqlar</string>
+
+    <!-- #135: tezkor (overlay) tugma -->
+    <string name="ai_quick_a11y">Tezkor AI tugmasi</string>
+    <string name="ai_quick_on">Tezkor tugma yoniq — boshqa ilovada ham ekran burchagida turadi. Bosib buyruq ayting.</string>
+    <string name="ai_quick_off">Tezkor tugma o\'chirildi.</string>
+    <string name="ai_quick_permission">Tezkor tugma uchun «Ustidan chizish» ruxsatini bering: Sozlamalar → Ilovalar → YuzGram.</string>
+    <string name="ai_quick_channel">AI tezkor tugma</string>
+    <string name="ai_quick_notif_title">AI tezkor tugma faol</string>
+    <string name="ai_quick_notif_text">Bosing va buyruq ayting — yordamchi bajaradi.</string>
+    <string name="ai_quick_open_app">Ilovada davom eting.</string>
 </resources>

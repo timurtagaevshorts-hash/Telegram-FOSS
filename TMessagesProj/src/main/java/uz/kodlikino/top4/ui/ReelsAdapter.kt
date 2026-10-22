@@ -88,10 +88,9 @@ class ReelsAdapter(
 
     private val items = ArrayList<Reel>()
 
-    /** Optimistik UI holati — Firestore'dan qaytgan to'liq ro'yxatni buzmasligi uchun. */
+    /** Optimistik UI holati — server/Telegram sonlari kelguncha. */
     private val likeShown = HashMap<String, Int>()
     private val liked = HashMap<String, Boolean>()
-    private val viewsShown = HashMap<String, Int>()
     private val commentShown = HashMap<String, Int>()
 
     private var player: ExoPlayer? = null
@@ -242,7 +241,7 @@ class ReelsAdapter(
             holder.errorRow.visibility = View.GONE
             holder.ivThumbnail.visibility = View.GONE
             if (reel.storyIsVideo) holder.storyThumb.visibility = View.GONE
-            markStoryViewedOnce(holder, reel)
+            registerViewOnce(reel)
         }
 
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -305,7 +304,6 @@ class ReelsAdapter(
         items.addAll(list)
         likeShown.clear()
         liked.clear()
-        viewsShown.clear()
         commentShown.keys.retainAll(list.map { it.id }.toSet())
         activePos = retained
         activeHolder = null
@@ -322,7 +320,6 @@ class ReelsAdapter(
         items.removeAt(idx)
         likeShown.remove(reelId)
         liked.remove(reelId)
-        viewsShown.remove(reelId)
         commentShown.remove(reelId)
         if (activePos == idx) {
             silence()
@@ -334,7 +331,10 @@ class ReelsAdapter(
             player?.clearMediaItems()
             activeHolder?.playerView?.player = null
             activeHolder = null
-            activePos = -1
+            // O'chirilgan sahifa o'rniga keyingi (yoki oldingi) reel keladi —
+            // `reactivate()` shu indeksdan davom etadi. Ilgari -1 qolib,
+            // reactivate() hech narsa qilmasdi va feed qorayib qolardi.
+            activePos = if (items.isEmpty()) -1 else idx.coerceAtMost(items.size - 1)
         } else if (activePos > idx) {
             activePos -= 1
         }
@@ -480,7 +480,10 @@ class ReelsAdapter(
         // sahifa almashtirilganda video darhol boshlanadi (hikoyalar bu yerda
         // videoUrl bo'sh bo'lgani uchun o'tkazib yuboriladi; ularni
         // YuzStoryFeed.prepareNeighbours alohida tayyorlaydi).
-        YuzReelPreloader.preloadAround(appContext, items, pos)
+        // Preloader IO koroutinada kechroq o'qiydi — jonli `items` ro'yxatini
+        // berish o'chirish/qo'shish paytida ConcurrentModificationException
+        // beradi, shuning uchun surat (snapshot) uzatamiz.
+        YuzReelPreloader.preloadAround(appContext, items.toList(), pos)
         if (playbackEnabled) bindActive(pos, generation, 0)
     }
 
@@ -585,7 +588,7 @@ class ReelsAdapter(
             h.playerView.player = null
             h.storyThumb.visibility = View.VISIBLE
             h.pageProgress.visibility = View.GONE
-            markStoryViewedOnce(h, reel)
+            registerViewOnce(reel)
             return
         }
         val ready = YuzStoryFeed.resolveVideoFile(account, reel)
@@ -736,12 +739,13 @@ class ReelsAdapter(
         mainHandler.post(progressTicker)
     }
 
-    /** Foto hikoya ko'rishlari — video bilan bir xil dedup (prefs). */
-    private fun markStoryViewedOnce(h: PageHolder, reel: Reel) {
+    /**
+     * Ko'rish dedup'i — bir o'rnatishda bir marta. Ko'rsatilgan sonni bu yerda
+     * o'zgartirmaymiz: hikoyada Telegram `views_count`, Firebase'da Firestore
+     * hisoblagichi yagona manba.
+     */
+    private fun registerViewOnce(reel: Reel) {
         if (!YuzViewedReels.markViewed(appContext, reel.id, account)) return
-        val next = (viewsShown[reel.id] ?: reel.views) + 1
-        viewsShown[reel.id] = next
-        h.tvViews.text = viewsLabel(next)
         onViewed(reel.id)
     }
 
@@ -773,6 +777,86 @@ class ReelsAdapter(
         if (holder?.reel?.id == reelId) {
             holder.refreshLikeUi()
         }
+    }
+
+    /**
+     * Feed qayta yuklanganda (ID'lar o'zgarmagan) yangi sonlarni faol videoni
+     * qayta ochmasdan joyida qo'llaydi. `notifyDataSetChanged` bu yerda
+     * ishlatilmaydi — u pleyer holatini nolga tashlab yuboradi.
+     */
+    fun applyStats(list: List<Reel>) {
+        if (items.isEmpty()) return
+        val byId = list.associateBy { it.id }
+        val activeId = activeHolder?.reel?.id
+        var activeChanged = false
+        for (i in items.indices) {
+            val fresh = byId[items[i].id] ?: continue
+            val old = items[i]
+            if (old.views == fresh.views && old.likeCount == fresh.likeCount &&
+                old.commentCount == fresh.commentCount && old.statsAvailable == fresh.statsAvailable &&
+                old.isLikedByMe == fresh.isLikedByMe
+            ) continue
+            items[i] = fresh
+            likeShown.remove(fresh.id)
+            commentShown.remove(fresh.id)
+            // Hikoyada like holati ham Telegram'dan keladi; Firebase'da
+            // `liked` map'ini saqlaymiz (model bu holatni bilmaydi).
+            if (fresh.isStory) liked.remove(fresh.id)
+            if (fresh.id == activeId) activeChanged = true
+        }
+        if (activeChanged) {
+            items.firstOrNull { it.id == activeId }?.let { activeHolder?.applyStats(it) }
+        }
+    }
+
+    /** Like yozuvi muvaffaqiyatsiz — optimistik sonni ham asl holatiga qaytaramiz. */
+    fun revertLike(reelId: String, isLiked: Boolean) {
+        liked[reelId] = isLiked
+        likeShown.remove(reelId)
+        val holder = activeHolder
+        if (holder?.reel?.id == reelId) holder.refreshLikeUi()
+    }
+
+    /** Firestore snapshot'i keldi — haqiqiy hisoblagichlarni ko'rsatadi. */
+    fun applyServerStats(reelId: String, views: Int, likeCount: Int, commentCount: Int) {
+        val idx = items.indexOfFirst { it.id == reelId }
+        if (idx < 0) return
+        val old = items[idx]
+        if (old.views == views && old.likeCount == likeCount && old.commentCount == commentCount) return
+        items[idx] = old.copy(views = views, likeCount = likeCount, commentCount = commentCount)
+        // Serverdagi son o'zgargan bo'lsa, endi u manba — optimistik qatlam
+        // faqat yozuv hali yetib bormagan holat uchun qoladi.
+        if (old.likeCount != likeCount) likeShown.remove(reelId)
+        if (old.commentCount != commentCount) commentShown.remove(reelId)
+        val holder = activeHolder
+        if (holder?.reel?.id == reelId) holder.applyStats(items[idx])
+    }
+
+    /** Telegram hikoyasining jonli statistikasi (views/reaksiyalar). */
+    fun applyStoryStats(
+        reelId: String,
+        views: Int,
+        likes: Int,
+        likedByMe: Boolean,
+        available: Boolean
+    ) {
+        val idx = items.indexOfFirst { it.id == reelId }
+        if (idx < 0) return
+        val old = items[idx]
+        if (old.views == views && old.likeCount == likes && old.isLikedByMe == likedByMe &&
+            old.statsAvailable == available
+        ) return
+        items[idx] = old.copy(
+            views = views,
+            likeCount = likes,
+            isLikedByMe = likedByMe,
+            statsAvailable = available
+        )
+        // Telegram — yagona manba; optimistik son kerak emas.
+        likeShown.remove(reelId)
+        liked[reelId] = likedByMe
+        val holder = activeHolder
+        if (holder?.reel?.id == reelId) holder.applyStats(items[idx])
     }
 
     /**
@@ -891,6 +975,7 @@ class ReelsAdapter(
         private val tvLikeCount: TextView = itemView.findViewById(R.id.tvLikeCount)
         private val btnComments: ImageView = itemView.findViewById(R.id.btnComments)
         private val tvCommentCount: TextView = itemView.findViewById(R.id.tvCommentCount)
+        private val viewsRow: View = itemView.findViewById(R.id.viewsRow)
         val tvViews: TextView = itemView.findViewById(R.id.tvViews)
         private val btnShare: ImageView = itemView.findViewById(R.id.btnShare)
         private val btnReelMenu: ImageView = itemView.findViewById(R.id.btnReelMenu)
@@ -1105,7 +1190,8 @@ class ReelsAdapter(
                 if (r.uploadedByUid.isNotBlank()) onOpenProfile(r)
             }
             tvCaption.text = reel.caption()
-            tvViews.text = viewsLabel(viewsShown[reel.id] ?: reel.views)
+            tvViews.text = viewsLabel(reel.views)
+            refreshStatsVisibility()
             if (reel.isStory) {
                 // #106: hikoya posti — Telegram'ning o'z ImageReceiver manbasi
                 // (Glide/HTTP yo'q): striped thumb, to'liq rasm, shifrlash.
@@ -1234,6 +1320,26 @@ class ReelsAdapter(
             btnAd.setOnClickListener {
                 if (hasAd) openUrl(reel.adUrl)
             }
+        }
+
+        /**
+         * Telegram boshqa odamning oddiy hikoyasida ko'rish/reaksiya sonini
+         * bermaydi (`StoryItem.views == null`) — soxta 0 ko'rsatmaymiz.
+         */
+        private fun refreshStatsVisibility() {
+            val r = reel ?: return
+            val visible = if (r.statsAvailable) View.VISIBLE else View.GONE
+            viewsRow.visibility = visible
+            tvLikeCount.visibility = visible
+        }
+
+        /** Instagramcha "jonli" yangilanish: pleyer tegilmaydi, faqat sonlar. */
+        fun applyStats(fresh: Reel) {
+            reel = fresh
+            tvViews.text = viewsLabel(fresh.views)
+            refreshStatsVisibility()
+            refreshLikeUi()
+            refreshCommentUi()
         }
 
         /** Izohlar soni — Firestore'dagi `commentCount` yoki lokal optimistik qiymat. */

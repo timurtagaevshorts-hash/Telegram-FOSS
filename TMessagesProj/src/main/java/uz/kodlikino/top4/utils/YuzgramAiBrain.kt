@@ -24,6 +24,9 @@ object YuzgramAiBrain {
      */
     private const val AI_PROXY_URL = "https://yuzgram-ai-proxy.timurtagaevshorts.workers.dev/chat"
 
+    /** Tarmoqsiz, bir zumda javob beriladigan savollar (soat, sana, salomlashuv). */
+    fun quickAnswer(question: String): String? = localAnswer(question.trim())
+
     suspend fun answer(question: String): String = withContext(Dispatchers.IO) {
         val q = question.trim()
         if (q.isBlank()) return@withContext "Ha, eshitaman. Savolingizni ayting."
@@ -81,7 +84,8 @@ object YuzgramAiBrain {
     }
 
     private fun localAnswer(raw: String): String? {
-        val n = raw.lowercase().trim()
+        val n = raw.lowercase().replace('’', '\'').replace('‘', '\'').trim()
+        val flat = n.replace("'", "")
         val now = Date()
         return when {
             n.contains("soat") || n.contains("vagt") || n.contains("vaqt nechchi") -> {
@@ -98,10 +102,41 @@ object YuzgramAiBrain {
                 "Ismni va xabarni ayting. Masalan: «Sardor qayerdasan». Men kontakt yoki chatdan topib yuboraman."
             n.contains("sen kimsan") || n.contains("kim san") || n == "ai" || n.contains("isming") ->
                 "Men YuzGram AI yordamchisiman. Siz bilan ovozda suhbatlashaman, savollarga javob beraman, xabar yuboraman."
+            // #134: odam kabi qisqa suhbat — tarmoq kutmasdan, bir zumda.
+            n == "salom" || n.startsWith("salom ") || n.contains("assalom") || n.contains("salomlar") ->
+                pick(
+                    "Salom! Sizni eshityapman. Gaplashamizmi?",
+                    "Assalomu alaykum! Nima bilan yordam bera olaman?",
+                    "Salom! Men shu yerdaman — marhamat, gapiring."
+                )
+            n.contains("qalesan") || n.contains("qalaysan") || n.contains("qandaysan") ||
+                n.contains("yaxshimisan") || n.contains("tuzukmisan") || n.contains("tuzuqmisan") ->
+                pick(
+                    "Yaxshi, rahmat! Sizga yordam berishga tayyorman. Siz qalaysiz?",
+                    "Zo'r, rahmat! Sizni eshityapman. Kayfiyatingiz qanday?",
+                    "Yaxshi! Doim shu yerdaman. Siz nima qilyapsiz?"
+                )
+            n.contains("rahmat") || n.contains("raxmat") || n.contains("tashakkur") ->
+                pick(
+                    "Arzimaydi, doim yordamga tayyorman.",
+                    "Hechqisi yo'q! Yana savolingiz bo'lsa, ayting."
+                )
+            n == "xayr" || n.startsWith("xayr ") || flat.contains("korishguncha") || flat.contains("sog bo") ->
+                pick(
+                    "Xayr! Yana kerak bo'lsam, shu yerdaman.",
+                    "Ko'rishguncha! Yaxshi kun tilayman."
+                )
+            flat.contains("nimagap") || n.contains("nima gap") || n.contains("nima yangilik") ->
+                pick(
+                    "Hammasi joyida — ishlayapman. Sizda nima yangilik?",
+                    "Tinch, tinch. Sizni eshityapman, gapiring."
+                )
             n.contains("ob-havo") || n.contains("ob havo") || n.contains("havo qanday") -> null
             else -> null
         }
     }
+
+    private fun pick(vararg options: String): String = options.random()
 
     private fun isWeather(raw: String): Boolean {
         val n = raw.lowercase()
