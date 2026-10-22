@@ -519,6 +519,8 @@ class ReelsAdapter(
             )
             h.errorRow.visibility = View.VISIBLE
             h.errorRow.setOnClickListener { retryActive() }
+            // Xato paneli markazda — ovoz belgisi uning ustiga tushmasin.
+            h.hideSoundUi()
         } catch (_: Exception) {
         }
     }
@@ -691,6 +693,7 @@ class ReelsAdapter(
         }
         p.volume = if (muted || userPaused) 0f else 1f
         p.playWhenReady = !userPaused
+        h.refreshSoundUi()
         mainHandler.removeCallbacks(progressTicker)
         mainHandler.post(progressTicker)
     }
@@ -728,6 +731,7 @@ class ReelsAdapter(
         }
         p.volume = if (muted || userPaused) 0f else 1f
         p.playWhenReady = !userPaused
+        h.refreshSoundUi()
         mainHandler.removeCallbacks(progressTicker)
         mainHandler.post(progressTicker)
     }
@@ -931,6 +935,10 @@ class ReelsAdapter(
                 if (muted) toggleMute()
                 onExpandTap()
             }
+        }
+
+        fun hideSoundUi() {
+            btnSoundCenter.visibility = View.GONE
         }
 
         /** Markaziy ovoz belgisini joriy holatga moslaydi (fullscreen'da yashirin). */
