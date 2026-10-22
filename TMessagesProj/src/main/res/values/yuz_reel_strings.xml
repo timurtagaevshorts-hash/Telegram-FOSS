@@ -40,6 +40,7 @@
     <string name="reels_preparing_video">Video tayyorlanmoqda…</string>
     <string name="reels_compressing_progress">Siqilmoqda… %1$d%%</string>
     <string name="reels_saving">Reel saqlanmoqda…</string>
+    <string name="reels_uploading_in_background">Reel fonda yuklanmoqda</string>
 
     <!-- #76 professional upload: monetizatsiya tugmasi -->
     <string name="reels_monetization_title">Daromadga ulash</string>

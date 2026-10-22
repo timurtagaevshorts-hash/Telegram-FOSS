@@ -13,9 +13,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-import android.widget.ProgressBar
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.widget.Toolbar
 import com.google.android.material.button.MaterialButton
@@ -23,22 +21,14 @@ import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
-import org.telegram.messenger.UserConfig
 import org.telegram.ui.ActionBar.BaseFragment
-import uz.kodlikino.top4.models.Reel
-import uz.kodlikino.top4.utils.ReelStorageHelper
-import uz.kodlikino.top4.utils.ReelsRepository
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzPremiumManager
-import uz.kodlikino.top4.utils.YuzReelCompressor
 import uz.kodlikino.top4.utils.YuzReelQuota
 import uz.kodlikino.top4.utils.YuzUploadUi
-import java.io.File
 
 /**
  * "Reel joylash" — video tanlash, Firebase Storage'ga yuklash va Firestore `reels`
@@ -67,10 +57,6 @@ class CreateReelActivity : BaseFragment() {
         private const val REQ_PICK_VIDEO = 4481
         private const val MAX_VIDEO_BYTES = 200L * 1024L * 1024L
 
-        /** Siqilgan chiqish maqsadi: oddiy 12 MB, premium 24 MB. */
-        private const val COMPRESS_TARGET_BYTES = 12L * 1024L * 1024L
-        private const val COMPRESS_TARGET_PREMIUM_BYTES = 24L * 1024L * 1024L
-
         /** Preview kadri ekranda chiqishi yetarli — memory uchun kichraytiriladi. */
         private const val MAX_PREVIEW_PX = 540
     }
@@ -89,8 +75,6 @@ class CreateReelActivity : BaseFragment() {
     private var tvQuota: TextView? = null
     private var etCaption: TextInputEditText? = null
     private var etHashtags: TextInputEditText? = null
-    private var uploadProgress: ProgressBar? = null
-    private var tvUploadStatus: TextView? = null
     private var btnPublish: MaterialButton? = null
 
     private var videoUri: Uri? = null
@@ -99,7 +83,6 @@ class CreateReelActivity : BaseFragment() {
 
     private var scope: CoroutineScope? = null
     private var publishing = false
-    @Volatile private var publishCanceled = false
 
     override fun createView(context: Context): View {
         val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
@@ -124,8 +107,6 @@ class CreateReelActivity : BaseFragment() {
         tvQuota = root.findViewById(R.id.tvQuotaInfo)
         etCaption = root.findViewById(R.id.etCaption)
         etHashtags = root.findViewById(R.id.etHashtags)
-        uploadProgress = root.findViewById(R.id.uploadProgress)
-        tvUploadStatus = root.findViewById(R.id.tvUploadStatus)
         btnPublish = root.findViewById(R.id.btnPublish)
 
         toolbar?.let { bar ->
@@ -343,151 +324,28 @@ class CreateReelActivity : BaseFragment() {
             return
         }
 
-        val user = UserConfig.getInstance(account).currentUser
-        val uploaderName = listOfNotNull(
-            user?.first_name?.takeIf { it.isNotBlank() },
-            user?.last_name?.takeIf { it.isNotBlank() }
-        ).joinToString(" ").orEmpty()
-
+        // Instagram uslubida: yuklash fonda ketadi, ekran darhol yopiladi.
+        // Foydalanuvchi notification'da progress ko'radi, boshqa ish qilishi mumkin.
         publishing = true
-        publishCanceled = false
-        btnPublish?.isEnabled = false
-        uploadProgress?.visibility = View.VISIBLE
-        uploadProgress?.progress = 0
-        tvUploadStatus?.visibility = View.VISIBLE
-        tvUploadStatus?.text = getString(R.string.reels_uploading_video)
-        YuzUploadUi.keepScreenOn(parentActivity, true)
-
-        val s = scope ?: return
-        s.launch {
-            val id = System.currentTimeMillis().toString()
-            // Fayl cho'zzisi tanlangan videodan olinadi — Storage qoidasi
-            // `contentType` video/* bo'lishini talab qiladi, cho'zi esa uni belgilaydi.
-            val rawExt = videoDisplayName.substringAfterLast('.', "mp4")
-                .lowercase()
-                .takeIf { it.length in 2..4 && it.all { c -> c.isLetterOrDigit() } }
-            val ext = when (rawExt) {
-                "mov", "mkv", "webm", "3gp", "mp4" -> rawExt!!
-                else -> "mp4"
-            }
-            // Slot transaction bilan OLINDI — upload/save xatosida rollback
-            // qilinadi (donor UserReelUploadManager xatti-harakati).
-            var reservedUid: String? = null
-            var compressedFile: File? = null
-            val boosted = premiumBoost()
-            try {
-                val uid = YuzGramAdsAuth.ensureSignedIn(account)
-                val reservation = YuzReelQuota.reserveUploadSlot(uid, boosted)
-                if (reservation.isFailure) {
-                    unlockingAfterFailure()
-                    val msg = reservation.exceptionOrNull()?.message
-                        ?: YuzReelQuota.limitExceededMessage(boosted)
-                    // Limit tugasa QAYTA URINISH foydasiz — dialog shunchaki xabar.
-                    YuzUploadUi.showError(themedContext ?: context, msg, onRetry = null)
-                    if (!boosted) {
-                        // Donor'ning upsell yo'li: premium ekraniga o'tkazamiz.
-                        presentFragment(YuzPremiumActivity(), false)
-                    }
-                    return@launch
-                }
-                reservedUid = uid
-                // 2026-10-22: sekin internetda 40–50 MB xom video 10+ daqiqa
-                // yuklanardi. Avval 720p H.264 ga siqamiz (~3–5 barobar kichik),
-                // so'ng yuklaymiz — xuddi shu tarmoqda publish bir necha barobar
-                // tez tugaydi. Siqish imkonsiz bo'lsa asl fayl yuklanadi.
-                tvUploadStatus?.text = getString(R.string.reels_preparing_video)
-                uploadProgress?.progress = 0
-                val appCtx = (context ?: return@launch).applicationContext
-                compressedFile = try {
-                    YuzReelCompressor.compress(
-                        context = appCtx,
-                        uri = uri,
-                        sizeBytes = videoSizeBytes,
-                        targetBytes = if (boosted) COMPRESS_TARGET_PREMIUM_BYTES
-                        else COMPRESS_TARGET_BYTES,
-                        onProgress = { pct ->
-                            AndroidUtilities.runOnUIThread {
-                                uploadProgress?.progress = pct
-                                tvUploadStatus?.text =
-                                    getString(R.string.reels_compressing_progress, pct)
-                            }
-                        },
-                        isCanceled = { publishCanceled }
-                    )
-                } catch (e: Exception) {
-                    null
-                }
-                tvUploadStatus?.text = getString(R.string.reels_uploading_video)
-                val uploadProgressListener: (Int, Long, Long) -> Unit = { pct, transferred, total ->
-                    uploadProgress?.progress = pct
-                    tvUploadStatus?.text = getString(
-                        R.string.reels_upload_progress,
-                        pct,
-                        YuzUploadUi.humanBytes(transferred),
-                        YuzUploadUi.humanBytes(total)
-                    )
-                }
-                val url = if (compressedFile != null) {
-                    ReelStorageHelper.uploadVideo(
-                        uid, "$id.mp4", compressedFile!!, uploadProgressListener
-                    )
-                } else {
-                    ReelStorageHelper.uploadVideo(uid, "$id.$ext", uri, uploadProgressListener)
-                }
-                tvUploadStatus?.text = getString(R.string.reels_saving)
-                val reel = Reel(
-                    id = id,
-                    videoUrl = url,
-                    thumbnailUrl = "",
-                    views = 0,
-                    title = caption,
-                    hashtags = hashtags,
-                    monetizationEnabled = switchMonetization?.isChecked == true,
-                    commentCount = 0,
-                    likeCount = 0,
-                    createdAt = System.currentTimeMillis(),
-                    uploadedByUid = uid,
-                    uploadedByName = uploaderName,
-                    uploadedByPhotoUrl = "",
-                    isUserUpload = true
-                )
-                ReelsRepository.saveReel(reel)
-                YuzUploadUi.keepScreenOn(parentActivity, false)
-                toast(getString(R.string.reels_published))
-                removeSelfFromStack()
-            } catch (e: Exception) {
-                reservedUid?.let { YuzReelQuota.releaseUploadSlot(it, boosted) }
-                unlockingAfterFailure()
-                val reason = e.message ?: getString(R.string.reels_publish_failed)
-                // Uzun sabab 2 soniyalik toast'da o'qilmaydi — dialog + qayta urinish.
-                YuzUploadUi.showError(themedContext ?: context, reason) { publishReel() }
-            } finally {
-                try {
-                    compressedFile?.delete()
-                } catch (_: Exception) {
-                }
-            }
-        }
-    }
-
-    /** UI qulflarini ochish (limit rad etilishi va yuklash xatoda bir xil). */
-    private fun unlockingAfterFailure() {
-        publishing = false
-        btnPublish?.isEnabled = true
-        uploadProgress?.visibility = View.GONE
-        tvUploadStatus?.visibility = View.GONE
-        YuzUploadUi.keepScreenOn(parentActivity, false)
+        uz.kodlikino.top4.services.ReelUploadService.startUpload(
+            context = context ?: return,
+            videoUri = uri,
+            videoName = videoDisplayName,
+            videoSize = videoSizeBytes,
+            caption = caption,
+            hashtags = hashtags,
+            monetization = switchMonetization?.isChecked == true,
+            account = account
+        )
+        toast(getString(R.string.reels_uploading_in_background))
+        removeSelfFromStack()
     }
 
     /**
-     * Yuklash ketayotganda orqaga qaytish scope'ni buzadi — yuklash abadiy
-     * "yuqolgan" bo'ladi. BaseFragment: true = fragment yopiladi, false = bizni.
+     * Yuklash fonda ketadi — ekran yopilishi mumkin.
+     * BaseFragment: true = fragment yopiladi, false = bizni.
      */
     override fun onBackPressed(): Boolean {
-        if (publishing) {
-            toast(getString(R.string.reels_uploading_video))
-            return false
-        }
         return super.onBackPressed()
     }
 

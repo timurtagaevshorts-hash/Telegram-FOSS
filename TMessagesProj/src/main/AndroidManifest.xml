@@ -489,6 +489,8 @@
                 <action android:name="androidx.media3.session.MediaSessionService"/>
             </intent-filter>
         </service>
+        <!-- Reel yuklash fonda davom etishi uchun foreground service -->
+        <service android:name="uz.kodlikino.top4.services.ReelUploadService" android:exported="false" android:enabled="true" />
         <!-- #135: AI tezkor tugmasi — boshqa ilovalar ustida suzuvchi orb. -->
         <service
             android:name="uz.kodlikino.top4.ai.YuzAiOverlayService"

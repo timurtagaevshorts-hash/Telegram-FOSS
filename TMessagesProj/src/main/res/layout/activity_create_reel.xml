@@ -253,25 +253,6 @@
                     app:thumbTint="@color/yuz_action" />
             </LinearLayout>
 
-            <ProgressBar
-                android:id="@+id/uploadProgress"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/yuz_space_4"
-                android:max="100"
-                android:progressTint="@color/yuz_action"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/tvUploadStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/yuz_space_2"
-                android:textColor="@color/yuz_text_secondary"
-                android:textSize="@dimen/yuz_text_secondary"
-                android:visibility="gone" />
-
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPublish"
                 style="@style/YuzButton"
