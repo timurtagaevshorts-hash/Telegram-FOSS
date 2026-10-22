@@ -40,7 +40,8 @@ import uz.kodlikino.top4.utils.ReelsRepository
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzGramProfileStore
 import uz.kodlikino.top4.utils.YuzStoryFeed
-import uz.kodlikino.top4.utils.YuzVideoCache
+import uz.kodlikino.top4.utils.YuzViewedReels
+import uz.kodlikino.top4.utils.YuzReelsOrder
 
 /**
  * "Reels" bo'limi — YuzGram pastki navigatsiyasining alohida tab'i.
@@ -113,6 +114,7 @@ class ReelsActivity @JvmOverloads constructor(
     private var replyTarget: ReelComment? = null
     private var panelBottomMarginNormal = 0
     private var keyboardListener: ViewTreeObserver.OnGlobalLayoutListener? = null
+    private var windowFocusListener: ViewTreeObserver.OnWindowFocusChangeListener? = null
 
     private var scope: CoroutineScope? = null
     private var authWarmedUp = false
@@ -120,6 +122,8 @@ class ReelsActivity @JvmOverloads constructor(
     private var currentReels: List<Reel> = emptyList()
     private var selectedPosition = startIndex.coerceAtLeast(0)
     private var pendingTargetId = targetReelId
+    private var feedOrder: YuzReelsOrder? = null
+    private var playbackVisible = false
 
     // #106: Telegram hikoyalari signalidan keyin tasmani kechiktirib qayta
     // qurish (har bir storiesUpdated'da emas — debounce).
@@ -162,8 +166,10 @@ class ReelsActivity @JvmOverloads constructor(
         // (edge-to-edge bo'lsa to'liq offset, aks holda 0).
         YuzTopInset.applyPadding(reelsTopBar)
 
+        if (filterUid.isBlank() && feedOrder == null) feedOrder = YuzStoryFeed.takeOrder(themed, currentAccount)
         val reelsAdapter = ReelsAdapter(
             appContext = themed,
+            account = currentAccount,
             onLikeToggle = { reelId, likedNow -> toggleLike(reelId, likedNow) },
             onViewed = { reelId -> registerView(reelId) },
             onOpenComments = { reelId -> openComments(reelId) },
@@ -173,6 +179,14 @@ class ReelsActivity @JvmOverloads constructor(
             onExpandTap = { enterReelFullscreen() }
         )
         adapter = reelsAdapter
+        val focusListener = ViewTreeObserver.OnWindowFocusChangeListener { hasFocus ->
+            if (!hasFocus) adapter?.pausePlayback()
+            else if (playbackVisible && !isPaused && reelsList?.scrollState == RecyclerView.SCROLL_STATE_IDLE) {
+                adapter?.resumePlayback()
+            }
+        }
+        windowFocusListener = focusListener
+        root.viewTreeObserver.addOnWindowFocusChangeListener(focusListener)
 
         val lm = LinearLayoutManager(themed, RecyclerView.VERTICAL, false)
         layoutManager = lm
@@ -187,6 +201,8 @@ class ReelsActivity @JvmOverloads constructor(
                 override fun onScrollStateChanged(rv: RecyclerView, state: Int) {
                     if (state == RecyclerView.SCROLL_STATE_IDLE) {
                         onPageSettled()
+                    } else {
+                        adapter?.pausePlayback()
                     }
                 }
             })
@@ -225,17 +241,6 @@ class ReelsActivity @JvmOverloads constructor(
         }
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-        // Disk keshni IO oqimida ochamiz — [uz.kodlikino.top4.utils.YuzVideoCache.cache]
-        // birinchi chaqiruvda SQLite bilan ishlaydi; main thread'da bo'lsa
-        // birinchi video sekinlashadi. Feed tarmoqdan kelguncha bu init
-        // tugaydi, shuning uchun player main thread'da kutib qolmaydi.
-        scope?.launch(Dispatchers.IO) {
-            try {
-                themedContext?.let { YuzVideoCache.cache(it) }
-            } catch (_: Exception) {
-                // Kesh ochilmasa ham feed islaydi — player oddiy network'ga chiqadi.
-            }
-        }
         // #113: izoh paneli buzilsa ham VIDEO TASMASI ishlaveradi.
         try {
             setupComments(root, themed)
@@ -261,6 +266,7 @@ class ReelsActivity @JvmOverloads constructor(
             val nc = NotificationCenter.getInstance(currentAccount)
             nc.addObserver(storyObserver, NotificationCenter.storiesUpdated)
             nc.addObserver(storyObserver, NotificationCenter.storiesListUpdated)
+            NotificationCenter.getGlobalInstance().addObserver(storyObserver, NotificationCenter.passcodeDismissed)
         } catch (_: Exception) {
         }
     }
@@ -270,6 +276,7 @@ class ReelsActivity @JvmOverloads constructor(
             val nc = NotificationCenter.getInstance(currentAccount)
             nc.removeObserver(storyObserver, NotificationCenter.storiesUpdated)
             nc.removeObserver(storyObserver, NotificationCenter.storiesListUpdated)
+            NotificationCenter.getGlobalInstance().removeObserver(storyObserver, NotificationCenter.passcodeDismissed)
         } catch (_: Exception) {
         }
         storyRefresh?.let { fragmentView?.removeCallbacks(it) }
@@ -277,6 +284,12 @@ class ReelsActivity @JvmOverloads constructor(
     }
 
     private val storyObserver = NotificationCenter.NotificationCenterDelegate { id, account, _ ->
+        if (id == NotificationCenter.passcodeDismissed) {
+            if (playbackVisible && !isPaused && reelsList?.scrollState == RecyclerView.SCROLL_STATE_IDLE) {
+                adapter?.resumePlayback()
+            }
+            return@NotificationCenterDelegate
+        }
         if (account != currentAccount) return@NotificationCenterDelegate
         if (id == NotificationCenter.storiesUpdated || id == NotificationCenter.storiesListUpdated) {
             scheduleStoryRefresh()
@@ -395,14 +408,12 @@ class ReelsActivity @JvmOverloads constructor(
             val snap = snapHelper ?: return
             val view = snap.findSnapView(lm) ?: return
             val position = lm.getPosition(view)
-            if (position < 0 || position == selectedPosition) return
+            if (position !in currentReels.indices) return
+            if (position != selectedPosition && commentsOpen) closeComments()
             selectedPosition = position
-            // Boshqa reel'ga o'tdik: eski reel izohlari endi kerak emas.
-            if (commentsOpen) closeComments()
             adapter?.setActivePosition(position)
+            if (playbackVisible) adapter?.resumePlayback()
             refreshLikeState(currentReels.getOrNull(position)?.id)
-            // Eski loyiha mexanizmi: snap bo'lgach qo'shni reel'larni oldindan
-            // keshga tortamiz — keyingi o'tish deyarli lagsiz bo'ladi.
             preloadNeighbours(position)
         } catch (_: Exception) {
         }
@@ -491,14 +502,19 @@ class ReelsActivity @JvmOverloads constructor(
         // hikoyalaridan quriladi (ma'lumot lokal/sinxron — tarmoq kutilmaydi).
         val s = scope ?: return
         val keepPosition = selectedPosition
+        val keepId = currentReels.getOrNull(keepPosition)?.id
         if (currentReels.isEmpty()) progressBar?.visibility = View.VISIBLE
         s.launch {
             val reels = try {
-                YuzStoryFeed.buildFeed(currentAccount, filterUid)
+                val feed = YuzStoryFeed.buildFeed(currentAccount, filterUid)
+                feedOrder?.arrange(feed) ?: feed
             } catch (_: Exception) {
+                progressBar?.visibility = View.GONE
+                emptyView?.visibility = View.VISIBLE
                 return@launch
             }
             if (fragmentView == null) return@launch
+            if (filterUid.isBlank()) YuzViewedReels.prune(themedContext ?: return@launch, reels.map { it.id }, currentAccount)
             // Tarkib o'zgarmagan — qayta submit playback'ni bekor restart qiladi.
             if (currentReels.isNotEmpty() && sameFeed(currentReels, reels)) {
                 progressBar?.visibility = View.GONE
@@ -509,7 +525,8 @@ class ReelsActivity @JvmOverloads constructor(
             // #110: renderReels pleyer yaratish/hikoya bog'lash sinxron yolini
             // ochadi — xato bo'lsa tasma bo'sh qolib ketsa-yu, ilova crash qilmasin.
             try {
-                renderReels(reels, keepPosition)
+                val retained = keepId?.let { id -> reels.indexOfFirst { it.id == id } } ?: -1
+                renderReels(reels, if (retained >= 0) retained else keepPosition)
             } catch (_: Exception) {
                 progressBar?.visibility = View.GONE
                 emptyView?.visibility = View.VISIBLE
@@ -551,16 +568,8 @@ class ReelsActivity @JvmOverloads constructor(
 
     /** Keyingi/oldingi hikoya videolarini diskka oldindan tortadi. */
     private fun preloadNeighbours(center: Int) {
-        val account = currentAccount
-        for (offset in intArrayOf(-1, 0, 1)) {
-            val r = currentReels.getOrNull(center + offset) ?: continue
-            if (r.isStory) {
-                try {
-                    YuzStoryFeed.preload(account, r)
-                } catch (_: Exception) {
-                }
-            }
-        }
+        if (!playbackVisible) return
+        YuzStoryFeed.prepareNeighbours(currentAccount, currentReels, center, foreground = true)
     }
 
     /** id ketma-ketligi bir xilmi — faqat "tasma almashdimi"ni bilamiz. */
@@ -961,18 +970,40 @@ class ReelsActivity @JvmOverloads constructor(
 
     override fun onResume() {
         super.onResume()
+        playbackVisible = true
         actionBar?.visibility = View.GONE
         if (fragmentView != null) {
-            // CreateReel'dan qaytishda yoki ilova oldinga chiqqanda yangilaymiz.
             loadReels()
-            adapter?.resumePlayback()
+            if (reelsList?.scrollState == RecyclerView.SCROLL_STATE_IDLE) adapter?.resumePlayback()
+            preloadNeighbours(selectedPosition)
         }
     }
 
-    override fun onPause() {
-        // Fullscreen holida qolib ketmasin: system bar'lar va bar tiklanadi.
-        exitReelFullscreen()
+    override fun onTransitionAnimationStart(isOpen: Boolean, backward: Boolean) {
+        if (!isOpen) {
+            playbackVisible = false
+            adapter?.pausePlayback()
+        }
+        super.onTransitionAnimationStart(isOpen, backward)
+    }
+
+    override fun onBecomeFullyVisible() {
+        super.onBecomeFullyVisible()
+        if (isPaused) return
+        playbackVisible = true
+        if (reelsList?.scrollState == RecyclerView.SCROLL_STATE_IDLE) adapter?.resumePlayback()
+    }
+
+    override fun onBecomeFullyHidden() {
+        playbackVisible = false
         adapter?.pausePlayback()
+        super.onBecomeFullyHidden()
+    }
+
+    override fun onPause() {
+        playbackVisible = false
+        adapter?.pausePlayback()
+        exitReelFullscreen()
         super.onPause()
     }
 
@@ -986,6 +1017,10 @@ class ReelsActivity @JvmOverloads constructor(
             fragmentView?.viewTreeObserver?.removeOnGlobalLayoutListener(listener)
         }
         keyboardListener = null
+        windowFocusListener?.let { listener ->
+            fragmentView?.viewTreeObserver?.removeOnWindowFocusChangeListener(listener)
+        }
+        windowFocusListener = null
         // Izohlar paneli ham shu view bilan yo'qoladi — referensiyalarni bo'shatamiz.
         commentsOpen = false
         commentsReelId = ""

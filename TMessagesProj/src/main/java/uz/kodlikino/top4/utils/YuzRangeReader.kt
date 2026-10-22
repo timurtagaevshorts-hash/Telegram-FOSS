@@ -1,6 +1,7 @@
 package uz.kodlikino.top4.utils
 
 import android.util.Log
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -73,7 +74,8 @@ class YuzRangeReader(
     expectedTotal: Long,
     private val refresh: ((Long, String) -> YuzAudioStream?)? = null,
     private val windows: Boolean = true,
-    private val gate: (() -> Long)? = null
+    private val gate: (() -> Long)? = null,
+    private val cancellation: YuzDownloadCancellation? = null
 ) {
 
     companion object {
@@ -125,6 +127,8 @@ class YuzRangeReader(
     private var refreshes = 0
     private var response: Response? = null
     private var stream: InputStream? = null
+    @Volatile private var call: Call? = null
+    @Volatile private var aborted = false
 
     /** [gate] yuklashni bekor qildi — chaqiruvchi qayta urinishmasligi kerak. */
     @Volatile
@@ -140,20 +144,32 @@ class YuzRangeReader(
     /** Joriy oyna hajmi uchun ruxsat etilgan vaqt (tezlikdan kelib chiqadi). */
     private fun budgetMs(): Long = YuzNetPulse.windowDeadlineMs(window)
 
-    /**
-     * Eshik javobi: >0 = shuncha ms kutdik, 0 = davom, -1 = bekor.
-     * Bekor qilish [canceled] belgisini qo'yadi — yarim fayl keyingi
-     * urinishda ishlatilmaydi.
-     */
-    private fun holdForGate(): Boolean {
-        val g = gate ?: return false
-        val wait = runCatching { g() }.getOrDefault(0L)
-        if (wait < 0L) {
+    private fun checkCanceled() {
+        if (aborted) throw IOException("range aborted @$pos")
+        if (cancellation?.canceled == true || gate?.invoke()?.let { it < 0L } == true) {
             canceled = true
-            return true
+            throw IOException("download canceled @$pos")
         }
-        if (wait > 0L) runCatching { Thread.sleep(wait.coerceAtMost(3000L)) }
-        return false
+    }
+
+    private fun holdForGate() {
+        while (true) {
+            checkCanceled()
+            val wait = gate?.invoke() ?: 0L
+            if (wait <= 0L) return
+            Thread.sleep(wait.coerceAtMost(100L))
+        }
+    }
+
+    private fun pause(ms: Long) {
+        var remaining = ms
+        while (remaining > 0L) {
+            checkCanceled()
+            val slice = remaining.coerceAtMost(100L)
+            Thread.sleep(slice)
+            remaining -= slice
+        }
+        checkCanceled()
     }
 
     /** start'dan qolgan jami bayt; -1 = hali aniq emas. */
@@ -176,6 +192,7 @@ class YuzRangeReader(
         if (count <= 0) return 0
         var guard = 0
         while (guard++ < 64) {
+            checkCanceled()
             if (isEof()) return -1
             val s = stream ?: run {
                 openWindow()
@@ -192,16 +209,22 @@ class YuzRangeReader(
                 s.read(buffer, offset, room)
             } catch (e: IOException) {
                 Log.i(TAG, "range read broke pos=$pos ${e.javaClass.simpleName}")
-                if (singleShot) return -1
+                checkCanceled()
+                if (singleShot) throw e
                 openWindow()
                 continue
             }
+            checkCanceled()
             if (n > 0) {
                 pos += n
                 return n
             }
             // Jism tugadi, lekin oyna to'lmagan — uzilgan ulanish.
-            if (singleShot || isEof()) return -1
+            if (isEof()) return -1
+            if (singleShot) {
+                if (total >= 0L && pos < total) throw IOException("short body @$pos")
+                return -1
+            }
             Log.i(TAG, "window short at pos=$pos end=$windowEnd — reopen")
             openWindow()
         }
@@ -217,7 +240,17 @@ class YuzRangeReader(
     /** Qancha bayt o'qilgan (download progress uchun). */
     fun position(): Long = pos
 
+    fun abort() {
+        aborted = true
+        call?.cancel()
+    }
+
     fun close() {
+        call?.let {
+            it.cancel()
+            cancellation?.detach(it)
+        }
+        call = null
         runCatching { stream?.close() }
         runCatching { response?.close() }
         stream = null
@@ -233,7 +266,7 @@ class YuzRangeReader(
             finished = true
             return
         }
-        if (holdForGate()) throw IOException("gated @$pos")
+        holdForGate()
         // #86: chegara va deadline har oyni ochishda tezlikdan qayta
         // hisoblanadi — sekin taroqda kichik oyna, lekin yetarli vaqt.
         ceiling = YuzNetPulse.windowCeiling(CEIL_MAX)
@@ -244,6 +277,7 @@ class YuzRangeReader(
         val t0 = System.nanoTime() / 1_000_000L
         val tried = HashSet<String>()
         while (attempt < MAX_TRIES && elapsedMs(t0) < budgetMs()) {
+            holdForGate()
             var move: Move? = nextMove(tried)
             if (move == null) {
                 // Barcha til/URL variantlari rad etildi. Google throttle'i
@@ -258,12 +292,12 @@ class YuzRangeReader(
                 headerFailed = false
                 last = IOException("stalled")
                 Log.i(TAG, "range stall @$pos win=${window / 1024}KB — ${stallMs(stalls)}ms dam")
-                Thread.sleep(stallMs(stalls))
+                pause(stallMs(stalls))
                 move = nextMove(tried) ?: break
             }
             if (attempt > 0 && last != null) {
                 Log.i(TAG, "  retry: ${last.message}")
-                Thread.sleep(backoff(attempt))
+                pause(backoff(attempt))
             }
             attempt++
             tried.add(key(move))
@@ -279,6 +313,7 @@ class YuzRangeReader(
                 if (code == 416) {
                     parseTotal(resp.header("Content-Range"))
                     runCatching { resp.close() }
+                    if (total < 0L || pos < total) throw IOException("premature range end @$pos")
                     finished = true
                     Log.i(TAG, "range 416 at pos=$pos total=$total — eof")
                     return
@@ -294,7 +329,7 @@ class YuzRangeReader(
                     // 200 javobni faqat hajmi to'g'ri kelganda qabul qilamiz
                     // (chunked = tekshirib bo'lmaydi → rad).
                     val honored = when {
-                        code == 206 -> crStart < 0L || crStart == pos
+                        code == 206 -> crStart == pos
                         pos == 0L -> true
                         !windows -> false
                         else -> cl == want
@@ -326,10 +361,13 @@ class YuzRangeReader(
                 last = IOException("HTTP $code")
                 Log.i(TAG, "range HTTP $code pos=$pos win=${window / 1024}KB q=${move.query} ${hostOf(move.url)}")
             } catch (e: Exception) {
+                close()
+                checkCanceled()
                 last = e
                 netErr = e !is RangeMismatch
                 Log.i(TAG, "range ERR ${e.javaClass.simpleName} ${e.message?.take(48)} pos=$pos")
             }
+            close()
             if (move.query) queryFailed = true else headerFailed = true
             if (!netErr) {
                 sizeFails++
@@ -399,14 +437,19 @@ class YuzRangeReader(
         } else if (start > 0L) {
             builder.header("Range", "bytes=$start-")
         }
-        return http.newCall(builder.build()).execute()
+        checkCanceled()
+        val requestCall = http.newCall(builder.build())
+        call = requestCall
+        cancellation?.attach(requestCall)
+        checkCanceled()
+        return requestCall.execute()
     }
 
     /** yt-dlp usuli: bitta URL'da range'ni query param bilan davom ettirish. */
     private fun queryUrl(end: Long, u: String): String {
         rn++
         val sep = if (u.contains('?')) "&" else "?"
-        return "$u$sep=rn=$rn&range=$pos-$end"
+        return "${u}${sep}rn=$rn&range=$pos-$end"
     }
 
     private fun key(m: Move): String = "${window}_${pos}_${m.query}_${m.url.hashCode()}"
@@ -419,8 +462,10 @@ class YuzRangeReader(
     private fun elapsedMs(t0: Long): Long = System.nanoTime() / 1_000_000L - t0
 
     private fun refreshUrl(): Boolean {
+        checkCanceled()
         val next = runCatching { refresh?.invoke(pos, url) }.getOrNull()
             ?: return false
+        checkCanceled()
         if (next.url.isBlank() || next.url == url) return false
         url = next.url
         ua = next.ua
@@ -457,7 +502,10 @@ class YuzRangeReader(
         val slash = cr.lastIndexOf('/')
         if (slash < 0 || slash == cr.length - 1) return
         val t = cr.substring(slash + 1).trim().toLongOrNull() ?: return
-        if (t > 0L) total = t
+        if (t > 0L) {
+            if (total > 0L && t != total) throw RangeMismatch("range total changed $total -> $t")
+            total = t
+        }
     }
 
     /** Content-Range'dagi boshlang'ich bayt; -1 = yo'q/aniksiz. */

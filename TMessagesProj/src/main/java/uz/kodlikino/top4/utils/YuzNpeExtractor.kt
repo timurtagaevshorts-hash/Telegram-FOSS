@@ -56,21 +56,27 @@ object YuzNpeExtractor {
                     ?: "application/octet-stream"
                 builder.method(method, bytes.toRequestBody(ct.toMediaType()))
             }
-            val response = http.newCall(builder.build()).execute()
+            val cancellation = YuzDownloadCancellation.current()
+            cancellation?.check()
+            val call = http.newCall(builder.build())
             try {
-                val body = response.body?.string() ?: ""
-                if (!response.isSuccessful && (response.code == 403 || response.code == 429)) {
-                    throw IOException("HTTP ${response.code} (blocked) ${request.url().take(60)}")
+                cancellation?.attach(call)
+                call.execute().use { response ->
+                    val body = response.body?.string() ?: ""
+                    cancellation?.check()
+                    if (!response.isSuccessful && (response.code == 403 || response.code == 429)) {
+                        throw IOException("HTTP ${response.code} (blocked) ${request.url().take(60)}")
+                    }
+                    return Response(
+                        response.code,
+                        response.message,
+                        response.headers.toMultimap(),
+                        body,
+                        response.request.url.toString()
+                    )
                 }
-                return Response(
-                    response.code,
-                    response.message,
-                    response.headers.toMultimap(),
-                    body,
-                    response.request.url.toString()
-                )
             } finally {
-                response.close()
+                cancellation?.detach(call)
             }
         }
     }

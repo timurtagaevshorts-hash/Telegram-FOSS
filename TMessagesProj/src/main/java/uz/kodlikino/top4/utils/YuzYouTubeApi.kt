@@ -151,14 +151,22 @@ object YuzYouTubeApi {
 
     /** Yagona resolve zanjiri: NewPipeExtractor -> ANDROID -> IOS; natija cache. */
     fun streamsFor(videoId: String): List<YuzAudioStream> {
+        val cancellation = YuzDownloadCancellation.current()
+        cancellation?.check()
         if (videoId.isBlank()) return emptyList()
         cached(videoId).let { if (it.isNotEmpty()) return it }
         val out = ArrayList<YuzAudioStream>()
         val seen = HashSet<String>()
         for (s in YuzNpeExtractor.audioStreams(videoId, 2)) if (seen.add(s.url)) out.add(s)
-        for (c in PLAYERS) collectFromVideo(videoId, c, out, seen, 6)
-        streamCache[videoId] = System.currentTimeMillis() to out
-        return out
+        cancellation?.check()
+        for (c in PLAYERS) {
+            cancellation?.check()
+            collectFromVideo(videoId, c, out, seen, 6)
+        }
+        cancellation?.check()
+        val streams = out.map { it.copy(sourceVideoId = videoId) }
+        streamCache[videoId] = System.currentTimeMillis() to streams
+        return streams
     }
 
     /** Dvigatel prefetch'i: navbatdagi qo'shiq URL'ini oldinden ochib qo'yamiz. */
@@ -301,20 +309,30 @@ object YuzYouTubeApi {
         return JSONObject().put("context", JSONObject().put("client", client))
     }
 
-    private fun post(url: String, body: JSONObject, ua: String): JSONObject? = try {
+    private fun post(url: String, body: JSONObject, ua: String): JSONObject? {
+        val cancellation = YuzDownloadCancellation.current()
+        cancellation?.check()
         val req = Request.Builder()
             .url(url)
             .post(body.toString().toRequestBody(JSON_MT))
             .header("User-Agent", ua)
             .header("Accept-Encoding", "identity")
             .build()
-        http.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) return null
-            val text = resp.body?.string() ?: return null
-            JSONObject(text)
+        val call = http.newCall(req)
+        try {
+            cancellation?.attach(call)
+            return call.execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val text = resp.body?.string() ?: return null
+                cancellation?.check()
+                JSONObject(text)
+            }
+        } catch (_: Exception) {
+            cancellation?.check()
+            return null
+        } finally {
+            cancellation?.detach(call)
         }
-    } catch (_: Exception) {
-        null
     }
 
     /** JSON daraxtini kezib, video renderer'larni yig'adi. */
@@ -415,5 +433,6 @@ data class YuzAudioStream(
      * Shu son orqali tezlikka MOS format tanlanadi — past internetda
      * 128 kbit/s'lik oqim 256 kbit/s'likdan tezroq va uzluksiz yetib boradi.
      */
-    val bitrate: Int = 0
+    val bitrate: Int = 0,
+    val sourceVideoId: String = ""
 )

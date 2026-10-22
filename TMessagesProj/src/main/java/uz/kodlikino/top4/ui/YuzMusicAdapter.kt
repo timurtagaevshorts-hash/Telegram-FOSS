@@ -8,100 +8,132 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import org.telegram.messenger.R
 import uz.kodlikino.top4.utils.YuzMusicCache
 import uz.kodlikino.top4.utils.YuzTrack
 
-/**
- * YuzGram #62: musiqiy natijalar ro'yxati. Qatorni bosish — qo'shiqni ilova
- * ichidagi pleyerda ijro etadi (YouTube endi ochilmaydi); download tugmasi —
- * keshga saqlash (yoki yuklanganlar ro'yxatida — o'chirish).
- *
- * YuzGram #109: "ko'proq" yuklanayotganda ro'yxat oxiriga YuzShimmer
- * skelet-qator qo'shiladi; davom etayotgan yuklashda tugma X (bekor
- * qilish) ga aylanadi va qator ostida neon gradient progress chizig'i
- * yuradi.
- */
+/** Music rows keep their identity when downloads move above catalog results. */
 class YuzMusicAdapter(
     private val onPlay: (YuzTrack, Int) -> Unit,
     private val onDownload: (YuzTrack, Int) -> Unit,
-    // YuzGram #67: qatorni bosib turish — playlist/navbat menyusi.
     private val onLongPress: (YuzTrack, Int) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private companion object {
         const val TYPE_ROW = 0
         const val TYPE_SHIMMER = 1
+        const val SHIMMER_ID = Long.MIN_VALUE
+        const val PAYLOAD_DOWNLOAD = "download"
+        const val PAYLOAD_PLAYING = "playing"
     }
 
-    private val items = ArrayList<YuzTrack>()
-    private var playingPos = -1
+    private data class DownloadState(val pct: Int, val rate: String, val canceling: Boolean)
+
+    private var items: List<YuzTrack> = emptyList()
+    private val positions = HashMap<Long, Int>()
+    private var playingId: Long? = null
+    private var playing = false
     private var downloadedIds: Set<Long> = emptySet()
-    // YuzGram #98: yuklab olinayotgan qatorlar.
-    private var downloadingIds: Set<Long> = emptySet()
-    // YuzGram #104: id -> 0..100 foiz; qatorda "↓ 47%" ko'rinishida chiqadi.
-    private val progressById = HashMap<Long, Int>()
-    // #109: ro'yxat oxiridagi "ko'proq yuklanmoqda" skeleti.
+    private var downloads: Map<Long, DownloadState> = emptyMap()
     private var loadingMore = false
 
-    /** #109: infinite scroll skeletini yoqish/o'chirish (asosiy IP). */
+    init {
+        setHasStableIds(true)
+    }
+
     fun setLoadingMore(on: Boolean) {
         if (loadingMore == on) return
         loadingMore = on
         if (on) notifyItemInserted(items.size) else notifyItemRemoved(items.size)
     }
 
+    /** Snapshot global state, including cancellation and speed-only changes. */
     fun setDownloading(ids: Set<Long>) {
-        // Tugagan/uzilgan qatorlarning foizini ham tozalaymiz.
-        progressById.keys.retainAll(ids)
-        downloadingIds = ids.toSet()
-        notifyDataSetChanged()
+        val next = ids.associateWith { id ->
+            DownloadState(
+                YuzMusicCache.inflightPct(id).coerceIn(0, 100),
+                YuzMusicCache.rateLabel(id),
+                YuzMusicCache.isCanceling(id)
+            )
+        }
+        if (downloads == next) return
+        val changed = (downloads.keys + next.keys).filter { downloads[it] != next[it] }
+        downloads = next
+        notifyDownloads(changed)
     }
 
-    /** #104: faqat shu qatorni qayta bog'laymiz — butun ro'yxatni emas. */
     fun setProgress(id: Long, pct: Int) {
-        if (id !in downloadingIds) return
-        // #115: o'zgarmagan foizga qayta-bog'lash so'rovini yubormaymiz —
-        // jonli yangilanish (500ms tick) endi bir xil qiymatni ham beradi.
-        if (progressById[id] == pct) return
-        progressById[id] = pct
-        val pos = items.indexOfFirst { it.id == id }
-        if (pos >= 0) notifyItemChanged(pos)
+        val old = downloads[id] ?: return
+        val next = DownloadState(
+            pct.coerceIn(0, 100), YuzMusicCache.rateLabel(id), YuzMusicCache.isCanceling(id)
+        )
+        if (old == next) return
+        downloads = downloads + (id to next)
+        notifyDownloads(listOf(id))
     }
 
+    /** Include the footer in the diff so it survives insertions and reorders. */
     fun submit(list: List<YuzTrack>) {
-        loadingMore = false
-        items.clear()
-        items.addAll(list)
-        playingPos = -1
-        notifyDataSetChanged()
+        val next = list.distinctBy { it.id }
+        val old = items
+        if (old == next) return
+        val footer = loadingMore
+        val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize() = old.size + if (footer) 1 else 0
+            override fun getNewListSize() = next.size + if (footer) 1 else 0
+
+            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                val oldFooter = oldItemPosition == old.size
+                val newFooter = newItemPosition == next.size
+                return if (oldFooter || newFooter) oldFooter && newFooter
+                else old[oldItemPosition].id == next[newItemPosition].id
+            }
+
+            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                if (oldItemPosition == old.size) true
+                else old[oldItemPosition] == next[newItemPosition]
+        })
+        items = next
+        positions.clear()
+        items.forEachIndexed { index, track -> positions[track.id] = index }
+        diff.dispatchUpdatesTo(this)
     }
 
-    /** #104: infinite scroll — ro'yxat oxiriga yangi qatorlar qo'shadi. */
     fun append(list: List<YuzTrack>) {
-        val start = items.size
-        items.addAll(list)
-        notifyItemRangeInserted(start, list.size)
+        submit(items + list)
     }
 
-    fun setPlaying(pos: Int) {
-        val old = playingPos
-        playingPos = pos
-        if (old in items.indices) notifyItemChanged(old)
-        if (pos in items.indices) notifyItemChanged(pos)
+    fun setPlaying(pos: Int, isPlaying: Boolean = true) {
+        val id = items.getOrNull(pos)?.id
+        val active = id != null && isPlaying
+        if (playingId == id && playing == active) return
+        val old = playingId
+        playingId = id
+        playing = active
+        setOfNotNull(old, id).forEach { changed ->
+            positions[changed]?.let { notifyItemChanged(it, PAYLOAD_PLAYING) }
+        }
     }
 
-    /** Skelet hisobiga pozitsiya items chegarasidan katta bo'lishi mumkin. */
-    fun playingPosition(): Int = playingPos
+    fun playingPosition(): Int = playingId?.let { positions[it] } ?: -1
 
     fun setDownloaded(ids: Set<Long>) {
-        downloadedIds = ids
-        notifyDataSetChanged()
+        if (downloadedIds == ids) return
+        val changed = (downloadedIds - ids) + (ids - downloadedIds)
+        downloadedIds = ids.toSet()
+        notifyDownloads(changed)
+    }
+
+    private fun notifyDownloads(ids: Collection<Long>) {
+        ids.forEach { id -> positions[id]?.let { notifyItemChanged(it, PAYLOAD_DOWNLOAD) } }
     }
 
     override fun getItemCount(): Int = items.size + if (loadingMore) 1 else 0
+
+    override fun getItemId(position: Int): Long = items.getOrNull(position)?.id ?: SHIMMER_ID
 
     override fun getItemViewType(position: Int): Int =
         if (position >= items.size) TYPE_SHIMMER else TYPE_ROW
@@ -110,84 +142,118 @@ class YuzMusicAdapter(
         if (viewType == TYPE_SHIMMER) {
             return ShimmerVh(YuzShimmer(parent.context).apply { rowCount = 1 })
         }
-        val v = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_musiqa, parent, false)
-        return RowVh(v)
+        return RowVh(LayoutInflater.from(parent.context).inflate(R.layout.item_musiqa, parent, false))
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        if (holder is ShimmerVh) return // YuzShimmer o'zi animatsiyalanadi
-        val t = items.getOrNull(position) ?: return
-        val h = holder as RowVh
-        h.title.text = t.title
-        val sub = StringBuilder()
-        if (t.artist.isNotBlank()) sub.append(t.artist)
-        if (t.album.isNotBlank()) {
-            if (sub.isNotEmpty()) sub.append(" • ")
-            sub.append(t.album)
-        }
-        h.artist.text = sub
-        if (t.coverUrl.isNotBlank()) {
-            Glide.with(h.cover).load(t.coverUrl).into(h.cover)
+        if (holder !is RowVh) return
+        val track = items.getOrNull(position) ?: return
+        holder.track = track
+        holder.title.text = track.title
+        if (track.coverUrl.isNotBlank()) {
+            Glide.with(holder.cover).load(track.coverUrl).into(holder.cover)
         } else {
-            h.cover.setImageDrawable(null)
+            Glide.with(holder.cover).clear(holder.cover)
+            holder.cover.setImageDrawable(null)
         }
-        h.play.setImageResource(
-            if (position == playingPos) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
-        )
-        val has = t.id in downloadedIds
-        val busy = t.id in downloadingIds
-        // #104: yuklanayotgan qatorda davomiylik o'rniga foiz chiqadi.
-        // #115: yoniga taroq tezligi qo'shiladi — "↓ 47% 384K/s".
-        // Foiz/tezlik reyestrdan o'qiladi: boshqa ekrandan boshlangan
-        // yuklash ham shu ro'yxatda to'g'ri holatda chiziladi.
-        val pct = progressById[t.id] ?: YuzMusicCache.inflightPct(t.id)
-        val rate = YuzMusicCache.rateLabel(t.id)
+        bindPlaying(holder, track)
+        bindDownload(holder, track)
+    }
+
+    override fun onBindViewHolder(
+        holder: RecyclerView.ViewHolder, position: Int, payloads: MutableList<Any>
+    ) {
+        if (holder !is RowVh || payloads.isEmpty()) {
+            onBindViewHolder(holder, position)
+            return
+        }
+        val track = items.getOrNull(position) ?: return
+        holder.track = track
+        if (PAYLOAD_PLAYING in payloads) bindPlaying(holder, track)
+        if (PAYLOAD_DOWNLOAD in payloads) bindDownload(holder, track)
+    }
+
+    private fun bindPlaying(h: RowVh, track: YuzTrack) {
+        val active = track.id == playingId && playing
+        h.play.setImageResource(if (active) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play)
+        h.play.contentDescription = "${h.play.context.getString(
+            if (active) R.string.yuz_a11y_pause else R.string.yuz_a11y_play
+        )}: ${track.title}"
+    }
+
+    private fun bindDownload(h: RowVh, track: YuzTrack) {
+        val context = h.itemView.context
+        val state = downloads[track.id]
+        val busy = state != null
+        val canceling = state?.canceling == true
+        val has = !busy && track.id in downloadedIds
+        h.artist.text = if (canceling) context.getString(R.string.musiqa_dl_canceling)
+        else listOf(track.artist, track.album).filter { it.isNotBlank() }.joinToString(" • ")
         h.dur.text = when {
-            busy -> if (rate.isEmpty()) "↓ $pct%" else "↓ $pct% $rate"
-            t.durationSec <= 0 -> ""
-            else -> String.format("%d:%02d", t.durationSec / 60, t.durationSec % 60)
+            state != null -> if (state.rate.isEmpty() || canceling) "↓ ${state.pct}%"
+                else "↓ ${state.pct}% ${state.rate}"
+            track.durationSec <= 0 -> ""
+            else -> String.format("%d:%02d", track.durationSec / 60, track.durationSec % 60)
         }
-        // #109: busy holatda tugma — bekor qilish (X), qator ostida esa
-        // gradient progress chizig'i foiz bo'yicha cho'ziladi.
-        // #128: yuklangan qator endi ANIQL ko'rinadi — taqicha (check) aktsent
-        // rangida; yuklanayotgan — X; oddiy — pastki nuqta yo'q shakl.
-        h.dl.setImageResource(
-            when {
-                busy -> R.drawable.ic_yuz_close
-                has -> R.drawable.ic_yuz_check
-                else -> R.drawable.ic_yuz_download
-            }
-        )
-        h.dl.alpha = if (busy || has) 1.0f else 0.55f
+        h.dl.setImageResource(when {
+            busy -> R.drawable.ic_yuz_close
+            has -> R.drawable.ic_yuz_check
+            else -> R.drawable.ic_yuz_download
+        })
+        h.dl.isEnabled = !canceling
+        h.dl.alpha = if (busy || has) 1f else 0.55f
         h.dl.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(
-            h.dl.context, if (has) R.color.yuz_action else R.color.yuz_text_secondary
+            context, if (has) R.color.yuz_action else R.color.yuz_text_secondary
         ))
+        val action = context.getString(when {
+            canceling -> R.string.musiqa_dl_canceling
+            busy -> R.string.musiqa_pl_dl_cancel
+            has -> R.string.musiqa_pl_dl_done
+            else -> R.string.yuz_a11y_download
+        })
+        h.dl.contentDescription = "$action: ${track.title}"
         h.dlBox.visibility = if (busy) View.VISIBLE else View.GONE
-        if (busy) h.dlFill.scaleX = pct / 100f
-        h.dl.setOnClickListener { onDownload(t, h.adapterPosition) }
-        h.itemView.setOnClickListener { onPlay(t, h.adapterPosition) }
-        h.itemView.setOnLongClickListener {
-            onLongPress(t, h.adapterPosition)
-            true
-        }
+        h.dlFill.scaleX = (state?.pct ?: 0) / 100f
+    }
+
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        if (holder is RowVh) holder.track = null
+        super.onViewRecycled(holder)
     }
 
     class ShimmerVh(v: View) : RecyclerView.ViewHolder(v)
 
-    class RowVh(v: View) : RecyclerView.ViewHolder(v) {
+    inner class RowVh(v: View) : RecyclerView.ViewHolder(v) {
+        var track: YuzTrack? = null
         val cover: ImageView = v.findViewById(R.id.ivMusiqaCover)
         val title: TextView = v.findViewById(R.id.tvMusiqaTitle)
         val artist: TextView = v.findViewById(R.id.tvMusiqaArtist)
         val dur: TextView = v.findViewById(R.id.tvMusiqaDur)
         val dl: ImageButton = v.findViewById(R.id.btnMusiqaDl)
         val play: ImageButton = v.findViewById(R.id.btnMusiqaPlay)
-        // #109: gradient progress — chapdan o'ngga scaleX bilan o'sadi.
         val dlBox: View = v.findViewById(R.id.boxMusiqaDlProgress)
         val dlFill: View = v.findViewById(R.id.vwMusiqaDlFill)
 
+        private fun currentTrack(): YuzTrack? {
+            val pos = adapterPosition
+            if (pos == RecyclerView.NO_POSITION) return null
+            val bound = track ?: return null
+            return bound.takeIf { items.getOrNull(pos)?.id == it.id }
+        }
+
         init {
             dlFill.pivotX = 0f
+            dl.setOnClickListener { currentTrack()?.let { onDownload(it, adapterPosition) } }
+            val playClick = View.OnClickListener {
+                currentTrack()?.let { onPlay(it, adapterPosition) }
+            }
+            play.setOnClickListener(playClick)
+            itemView.setOnClickListener(playClick)
+            itemView.setOnLongClickListener {
+                val bound = currentTrack() ?: return@setOnLongClickListener false
+                onLongPress(bound, adapterPosition)
+                true
+            }
         }
     }
 }

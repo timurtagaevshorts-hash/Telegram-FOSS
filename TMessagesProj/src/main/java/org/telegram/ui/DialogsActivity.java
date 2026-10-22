@@ -7340,6 +7340,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     @Override
     public void onResume() {
         super.onResume();
+        if (isYuzGramMainRoot()) {
+            AndroidUtilities.runOnUIThread(() -> {
+                if (!isPaused() && getContext() != null) {
+                    uz.kodlikino.top4.utils.YuzStoryFeed.prepareFeed(getContext(), currentAccount);
+                }
+            }, 300);
+        }
         // YuzGram: ekranga qaytishda storylar + "YuzGram" sarlavhasi yana ko'rinishi
         // kerak — yashiringan holatda qolmasin.
         if (isYuzGramMainRoot() && scrollYOffset != 0 && progressToActionMode == 0f) {
@@ -11298,6 +11305,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         } else if (id == NotificationCenter.storiesUpdated) {
             updateStoriesVisibility(wasDrawn);
             updateVisibleRows(0);
+            if (isYuzGramMainRoot() && !isPaused() && getContext() != null) {
+                uz.kodlikino.top4.utils.YuzStoryFeed.prepareFeed(getContext(), currentAccount);
+            }
         } else if (id == NotificationCenter.storiesEnabledUpdate) {
             updateStoriesPosting();
         } else if (id == NotificationCenter.unconfirmedAuthUpdate) {

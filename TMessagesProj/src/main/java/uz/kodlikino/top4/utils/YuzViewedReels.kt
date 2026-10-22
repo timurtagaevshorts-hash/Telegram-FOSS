@@ -2,6 +2,8 @@ package uz.kodlikino.top4.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import uz.kodlikino.top4.models.Reel
+import kotlin.random.Random
 
 /**
  * Ko'rishlarni deduplikatsiya — qaysi reel'ni allaqachon ko'rganimiz
@@ -20,16 +22,16 @@ object YuzViewedReels {
     private const val KEY_KNOWN = "known_ids"
     private const val MAX_KEEP = 1500
 
-    private fun prefs(context: Context): SharedPreferences =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs(context: Context, account: Int): SharedPreferences =
+        context.applicationContext.getSharedPreferences("${PREFS}_$account", Context.MODE_PRIVATE)
 
     /**
      * Reel'ni "ko'rildi" deb belgilaydi.
      * @return `true` — BIRINCHI marta (hisobga olish kerak), `false` — avval ko'rilgan.
      */
-    fun markViewed(context: Context, reelId: String): Boolean {
+    fun markViewed(context: Context, reelId: String, account: Int): Boolean {
         if (reelId.isBlank()) return false
-        val p = prefs(context)
+        val p = prefs(context, account)
         val current = HashSet(p.getStringSet(KEY_VIEWED, emptySet()) ?: emptySet())
         if (!current.add(reelId)) return false
         if (current.size > MAX_KEEP) {
@@ -41,8 +43,8 @@ object YuzViewedReels {
     }
 
     /** Feed'da mavjud bo'lmagan (o'chirilgan) id'larni tozalaydi. */
-    fun prune(context: Context, liveIds: Collection<String>) {
-        val p = prefs(context)
+    fun prune(context: Context, liveIds: Collection<String>, account: Int) {
+        val p = prefs(context, account)
         val known = HashSet(p.getStringSet(KEY_KNOWN, emptySet()) ?: emptySet())
         val live = liveIds.toSet()
         val viewed = HashSet(p.getStringSet(KEY_VIEWED, emptySet()) ?: emptySet())
@@ -55,8 +57,37 @@ object YuzViewedReels {
             .apply()
     }
 
-    fun hasViewed(context: Context, reelId: String): Boolean {
+    fun hasViewed(context: Context, reelId: String, account: Int): Boolean {
         if (reelId.isBlank()) return false
-        return prefs(context).getStringSet(KEY_VIEWED, emptySet())?.contains(reelId) == true
+        return prefs(context, account).getStringSet(KEY_VIEWED, emptySet())?.contains(reelId) == true
+    }
+
+    fun knownIds(context: Context, account: Int): Set<String> =
+        HashSet(prefs(context, account).getStringSet(KEY_KNOWN, emptySet()) ?: emptySet())
+}
+
+class YuzReelsOrder(
+    private val knownAtOpen: Set<String>,
+    private val random: Random = Random.Default
+) {
+    private val ranks = HashMap<String, Long>()
+    private var firstNewestAt: Long? = null
+
+    fun arrange(reels: List<Reel>): List<Reel> {
+        val unique = reels.distinctBy { it.id }
+        if (knownAtOpen.isEmpty() && firstNewestAt == null) {
+            firstNewestAt = unique.filter { !it.storyArchived }.maxOfOrNull { it.createdAt }
+        }
+        val fresh = unique.filter {
+            !it.storyArchived && if (knownAtOpen.isEmpty()) {
+                firstNewestAt?.let { newest -> it.createdAt >= newest } == true
+            } else {
+                it.id !in knownAtOpen
+            }
+        }.sortedWith(compareByDescending<Reel> { it.createdAt }.thenBy { it.id })
+        val freshIds = fresh.mapTo(HashSet()) { it.id }
+        val rest = unique.filter { it.id !in freshIds }
+        rest.forEach { ranks.getOrPut(it.id) { random.nextLong() } }
+        return fresh + rest.sortedWith(compareBy<Reel> { ranks.getValue(it.id) }.thenBy { it.id })
     }
 }

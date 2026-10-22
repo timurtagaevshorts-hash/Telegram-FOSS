@@ -47,16 +47,6 @@
             android:contentDescription="@string/musiqa_collections"
             android:src="@drawable/ic_yuz_box"
             app:tint="@color/yuz_text_secondary" />
-
-        <!-- YuzGram #62: keshdagi qo'shiqlar ro'yxatiga o'tish tugmasi -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnMusiqaSaved"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:text="@string/musiqa_saved_btn"
-            android:textSize="@dimen/yuz_text_secondary" />
     </LinearLayout>
 
     <!-- Qidiruv qatori -->

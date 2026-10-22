@@ -5,7 +5,6 @@ import android.content.res.ColorStateList
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.animation.ObjectAnimator
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
@@ -49,11 +48,9 @@ class YuzPlayerActivity : BaseFragment() {
 
     private var ivCover: ImageView? = null
     private var plPulse: View? = null
-    private var dlPulse: ObjectAnimator? = null
-    // YuzGram #115: sahifa yopilgandan keyin fondagi yuklash tugashi UI'ni
-    // qayta urg'anda crash bo'lmasligi uchun holat bayroqlari.
+    private var lastDownloadState: Pair<Long?, Int>? = null
+    // Download workers outlive this screen; callbacks must not touch destroyed views.
     private var destroyed = false
-    private var dlCanceled = false
     private var plListener: Player.Listener? = null
     private var tvTitle: TextView? = null
     private var tvArtist: TextView? = null
@@ -109,6 +106,7 @@ class YuzPlayerActivity : BaseFragment() {
         ctx = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
         root = LayoutInflater.from(ctx).inflate(R.layout.fragment_yuz_player, null)
         fragmentView = root
+        lastDownloadState = null
 
         actionBar?.visibility = View.GONE
         YuzTopInset.collapseActionBar(actionBar)
@@ -260,11 +258,22 @@ class YuzPlayerActivity : BaseFragment() {
      * "Bekor" (ketayotgan, X ikon) va "Yuklangan" (taqicha, aktsent rangi).
      */
     private fun syncDlState() {
+        if (destroyed || !::root.isInitialized) return
         val t = YuzMusicEngine.currentTrack()
-        val icon = runCatching { root.findViewById<ImageView>(R.id.ivPlDlIcon) }.getOrNull()
-        val label = runCatching { root.findViewById<TextView>(R.id.tvPlDlLabel) }.getOrNull()
         val busy = t != null && YuzMusicCache.isInflight(t.id)
+        val canceling = t != null && YuzMusicCache.isCanceling(t.id)
         val has = t != null && !busy && YuzMusicCache.isDownloaded(ctx, t.id)
+        val state = Pair(t?.id, when {
+            canceling -> 3
+            busy -> 2
+            has -> 1
+            else -> 0
+        })
+        if (lastDownloadState == state) return
+        lastDownloadState = state
+        val icon = root.findViewById<ImageView>(R.id.ivPlDlIcon)
+        val label = root.findViewById<TextView>(R.id.tvPlDlLabel)
+        val button = root.findViewById<View>(R.id.btnPlDl)
         icon?.setImageResource(
             when {
                 busy -> R.drawable.ic_yuz_close
@@ -274,14 +283,17 @@ class YuzPlayerActivity : BaseFragment() {
         )
         icon?.imageTintList =
             ColorStateList.valueOf(color(if (has) R.color.yuz_action else R.color.yuz_text))
-        label?.text = ctx.getString(
-            when {
-                busy -> R.string.musiqa_pl_dl_cancel
-                has -> R.string.musiqa_pl_dl_done
-                else -> R.string.musiqa_pl_dl
-            }
-        )
+        val text = ctx.getString(when {
+            canceling -> R.string.musiqa_dl_canceling
+            busy -> R.string.musiqa_pl_dl_cancel
+            has -> R.string.musiqa_pl_dl_done
+            else -> R.string.musiqa_pl_dl
+        })
+        label?.text = text
         label?.setTextColor(color(if (has) R.color.yuz_action else R.color.yuz_text_secondary))
+        button?.isEnabled = t != null && !canceling
+        button?.alpha = 1f
+        button?.contentDescription = if (t == null) text else "$text: ${t.title}"
     }
 
     private fun syncButtons() {
@@ -326,6 +338,8 @@ class YuzPlayerActivity : BaseFragment() {
     }
 
     private fun updateProgress() {
+        // Downloads also change while buffering, seeking, or without a player duration.
+        syncDlState()
         val p = YuzMusicEngine.playerOrNull() ?: return
         if (seeking || p.duration <= 0) return
         val d = (p.duration / 1000).toInt()
@@ -494,11 +508,13 @@ class YuzPlayerActivity : BaseFragment() {
 
     private fun download() {
         val t = YuzMusicEngine.currentTrack() ?: return
-        // YuzGram #115: yuklash ketayotgan bo'lsa — tugma uni bekor qiladi
-        // (avval "allready yuklangan" toasti bilan chalkash no-op edi).
+        if (YuzMusicCache.isCanceling(t.id)) {
+            syncDlState()
+            return
+        }
         if (YuzMusicCache.isInflight(t.id)) {
-            dlCanceled = true
             YuzMusicCache.cancel(t.id)
+            syncDlState()
             Toast.makeText(ctx, R.string.musiqa_dl_canceling, Toast.LENGTH_SHORT).show()
             return
         }
@@ -507,38 +523,26 @@ class YuzPlayerActivity : BaseFragment() {
             return
         }
         Toast.makeText(ctx, R.string.musiqa_dl_started, Toast.LENGTH_SHORT).show()
-        dlCanceled = false
-        // #128: tugma darhol "Bekor" + X holatiga o'tadi.
-        syncButtons()
-        val btn = root.findViewById<View>(R.id.btnPlDl)
-        dlPulse?.cancel()
-        dlPulse = if (btn != null) ObjectAnimator.ofFloat(btn, "alpha", 0.95f, 0.2f).apply {
-            duration = 520L
-            repeatCount = ObjectAnimator.INFINITE
-            repeatMode = ObjectAnimator.REVERSE
-            start()
-        } else null
-        YuzMusicCache.download(ctx, t) { ok ->
-            if (destroyed) return@download
-            dlPulse?.cancel()
-            dlPulse = null
-            btn?.alpha = 1f
-            if (dlCanceled && !ok) {
-                dlCanceled = false
-                // #128: bekor qilishdan keyin tugma oddiy ↓ holatiga qaytadi.
-                syncDlState()
-                return@download
-            }
+        YuzMusicCache.download(ctx, t) downloadComplete@ { result ->
+            if (destroyed) return@downloadComplete
+            // A completion callback must not clear a newer download's state.
             syncDlState()
-            if (ok) {
-                // #128: yuklangandan so'ng tugma "Yuklangan" + check bo'lib
-                // neon pop bilan yangilanadi.
-                root.findViewById<View>(R.id.btnPlDl)?.let { YuzAnim.pop(it) }
+            when (result) {
+                YuzMusicCache.DownloadResult.DONE -> {
+                    if (YuzMusicEngine.currentTrack()?.id == t.id &&
+                        !YuzMusicCache.isInflight(t.id)
+                    ) {
+                        root.findViewById<View>(R.id.btnPlDl)?.let { YuzAnim.pop(it) }
+                    }
+                    Toast.makeText(ctx, R.string.musiqa_dl_done, Toast.LENGTH_SHORT).show()
+                }
+                YuzMusicCache.DownloadResult.FAILED ->
+                    Toast.makeText(ctx, R.string.musiqa_dl_fail, Toast.LENGTH_SHORT).show()
+                YuzMusicCache.DownloadResult.CANCELED -> Unit
             }
-            Toast.makeText(ctx,
-                if (ok) R.string.musiqa_dl_done else R.string.musiqa_dl_fail,
-                Toast.LENGTH_SHORT).show()
         }
+        // Registration is synchronous: the first frame already offers cancellation.
+        syncDlState()
     }
 
     private fun showEq() {
@@ -610,8 +614,9 @@ class YuzPlayerActivity : BaseFragment() {
     override fun onResume() {
         super.onResume()
         YuzMiniPlayer.setSuppressed(this, true)
-        ui.post(tick)
+        ui.removeCallbacks(tick)
         syncButtons()
+        ui.post(tick)
     }
 
     override fun onPause() {
@@ -625,8 +630,6 @@ class YuzPlayerActivity : BaseFragment() {
         // #115: fondagi yuklash/ijro callback'lari bu sahifaga urilmasin.
         destroyed = true
         ui.removeCallbacks(tick)
-        runCatching { dlPulse?.cancel() }
-        dlPulse = null
         YuzMusicEngine.removeObserver(observer)
         plListener?.let { YuzMusicEngine.playerOrNull()?.removeListener(it) }
         plListener = null

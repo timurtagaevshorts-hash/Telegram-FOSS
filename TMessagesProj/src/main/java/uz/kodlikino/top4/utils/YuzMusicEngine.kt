@@ -297,9 +297,11 @@ object YuzMusicEngine {
 
     /** Butun ro'yxatni navbat qilib [startIndex]'dan boshlab ijro etadi. */
     fun playQueue(context: Context, list: List<YuzTrack>, startIndex: Int) {
+        if (startIndex !in list.indices) return
         val p = ensurePlayer(context)
-        val bounded = list.take(150)
-        val idx = startIndex.coerceIn(0, (bounded.size - 1).coerceAtLeast(0))
+        val first = (startIndex - 75).coerceAtLeast(0)
+        val bounded = list.drop(first).take(150)
+        val idx = startIndex - first
         queueTracks = bounded
         queueGen++
         seenIds.clear()

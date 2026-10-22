@@ -1,6 +1,9 @@
 package uz.kodlikino.top4.utils
 
+import android.content.Context
+import android.os.SystemClock
 import org.telegram.messenger.DialogObject
+import org.telegram.messenger.DownloadController
 import org.telegram.messenger.FileLoader
 import org.telegram.messenger.MessageObject
 import org.telegram.messenger.MessagesController
@@ -32,6 +35,42 @@ import java.io.File
 object YuzStoryFeed {
 
     const val KEY_PREFIX = "story_"
+
+    private class PreparedOrder(val userId: Long, val order: YuzReelsOrder, var warmedAt: Long)
+    private val preparedOrders = HashMap<Int, PreparedOrder>()
+
+    @JvmStatic
+    fun prepareFeed(context: Context, account: Int) {
+        if (!DownloadController.getInstance(account).canPreloadStories()) return
+        val userId = UserConfig.getInstance(account).clientUserId
+        if (userId == 0L) return
+        val now = SystemClock.elapsedRealtime()
+        var prepared = preparedOrders[account]
+        if (prepared == null || prepared.userId != userId) {
+            prepared = PreparedOrder(userId, YuzReelsOrder(YuzViewedReels.knownIds(context, account)), 0L)
+            preparedOrders[account] = prepared
+        }
+        if (prepared.warmedAt != 0L && now - prepared.warmedAt < 1_000L) return
+        prepared.warmedAt = now
+        prepareNeighbours(account, prepared.order.arrange(buildFeed(account, "")), 0, foreground = false)
+    }
+
+    fun takeOrder(context: Context, account: Int): YuzReelsOrder {
+        val prepared = preparedOrders.remove(account)
+        return if (prepared != null && prepared.userId == UserConfig.getInstance(account).clientUserId &&
+            SystemClock.elapsedRealtime() - prepared.warmedAt <= 60_000L
+        ) prepared.order else YuzReelsOrder(YuzViewedReels.knownIds(context, account))
+    }
+
+    fun prepareNeighbours(account: Int, reels: List<Reel>, center: Int, foreground: Boolean) {
+        val allowPreload = DownloadController.getInstance(account).canPreloadStories()
+        for (offset in 0..2) {
+            val reel = reels.getOrNull(center + offset) ?: continue
+            if (!reel.storyIsVideo || resolveVideoFile(account, reel) != null) continue
+            if (offset == 0 && foreground) startVideoDownload(account, reel, true)
+            else if (allowPreload) preload(account, reel)
+        }
+    }
 
     fun storyKey(dialogId: Long, storyId: Int): String = KEY_PREFIX + dialogId + "_" + storyId
 
@@ -250,24 +289,30 @@ object YuzStoryFeed {
      * tugagan-fayl o'lchami document.size ga teng bo'ladi.
      */
     @JvmStatic
-    fun resolveVideoFile(account: Int, reel: Reel): File? {
+    fun resolveVideoFile(account: Int, reel: Reel, completed: File? = null): File? {
         val doc = storyDocument(account, reel) ?: return null
-        // StoryItem.attachPath — Telegram o'zi saqlaydigan tez yo'l.
         val item = findStoryItem(account, reel.storyDialogId, reel.storyId)
-        item?.attachPath?.let { p ->
-            try {
-                val f = File(p)
-                if (f.exists() && f.length() > 0) return f
-            } catch (_: Exception) {
-            }
+        fun ready(file: File?): Boolean = file != null && file.isFile && file.length() > 0L &&
+            (doc.size <= 0L || file.length() == doc.size)
+        if (ready(completed)) return completed
+        for (path in listOf(item?.attachPath, doc.localPath)) {
+            if (!path.isNullOrBlank()) File(path).let { if (ready(it)) return it }
         }
-        return try {
-            val f = FileLoader.getInstance(account).getPathToAttach(doc) ?: return null
-            if (f.exists() && (doc.size == 0L || f.length() == doc.size)) f else null
-        } catch (_: Exception) {
-            null
+        val loader = FileLoader.getInstance(account)
+        val type = if (doc.key != null) FileLoader.MEDIA_DIR_CACHE else FileLoader.MEDIA_DIR_VIDEO
+        // getPathToAttach consults selectedAccount, not the owning FileLoader account.
+        val path = loader.fileDatabase.getPath(doc.id, doc.dc_id, type, true)
+        if (!path.isNullOrBlank()) File(path).let { if (ready(it)) return it }
+        val name = FileLoader.getAttachFileName(doc)
+        for (directory in intArrayOf(FileLoader.MEDIA_DIR_STORIES, type, FileLoader.MEDIA_DIR_CACHE)) {
+            val dir = FileLoader.getDirectory(directory) ?: continue
+            File(dir, name).let { if (ready(it)) return it }
         }
+        return null
     }
+
+    fun videoFileName(account: Int, reel: Reel): String? =
+        storyDocument(account, reel)?.let { FileLoader.getAttachFileName(it) }
 
     /** Yuklashni boshlaydi (yoki davom ettiradi — idempotent). */
     @JvmStatic
@@ -295,6 +340,8 @@ object YuzStoryFeed {
     fun preload(account: Int, reel: Reel) {
         if (!reel.isStory || !reel.storyIsVideo) return
         if (resolveVideoFile(account, reel) != null) return
+        val name = videoFileName(account, reel) ?: return
+        if (FileLoader.getInstance(account).isLoadingFile(name)) return
         startVideoDownload(account, reel, high = false)
     }
 

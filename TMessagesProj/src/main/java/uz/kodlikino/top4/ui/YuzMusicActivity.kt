@@ -47,8 +47,8 @@ import uz.kodlikino.top4.utils.YuzTrack
  * ekran bloklanganda va ilovadan chiqqanda ham musiqa to'xtamaydi; butun
  * ro'yxat navbat bo'ladi (qo'shiq tugasa — keyingisi avtomatik), navbat
  * tugasa radio o'xshash qo'shiqlarni topib davom ettiradi; qatorni bosib
- * turib playlist/navbatga qo'shish mumkin; "Kolleksiyalar" yuklanganlar va
- * playlist'larni ochadi.
+ * turib playlist/navbatga qo'shish mumkin; "Kolleksiyalar" playlistlar va
+ * radio kalitini ochadi. Yuklashlar va saqlanganlar asosiy ro'yxatda.
  */
 class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment() {
 
@@ -59,17 +59,17 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private var rvList: RecyclerView? = null
     private var shimmer: View? = null
     private var hitsBox: View? = null
-    private val downloadingIds = HashSet<Long>()
-    // #109: bekor qilingan yuklashlar — tugash siginali kelganda
-    // "muvaffaqiyatsiz" toastini chiqmaslik uchun belgilanadi.
-    private val canceledIds = HashSet<Long>()
+    private var skeletonLoading = false
+    private var centerLoading = false
+    private var loadingPage = false
 
     private val effects by lazy { YuzMusicEffects.shared(ctx) }
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var busy = false
 
+    // Source results and rendered rows have independent lifecycles.
+    private var catalogList: List<YuzTrack> = emptyList()
     private var currentList: List<YuzTrack> = emptyList()
-    private var offlineMode = false
     private var statusLabel = ""
 
     // YuzGram #104: ro'yxat manbai + "ko'proq yuklash" holati.
@@ -85,6 +85,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private val shownIds = HashSet<Long>()
     private var moreRound = 0
     private var moreAvailable = true
+    private var catalogGeneration = 0
 
     private var playerBar: View? = null
     private var ivPlayerCover: ImageView? = null
@@ -102,9 +103,6 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private val tick = object : Runnable {
         override fun run() {
             updateProgress()
-            // #115: yuklanayotgan qatorlar (shu sahifa yoki boshqa ekran
-            // boshlagan) foizi jonli yuradi; tugaganlari ro'yxatdan
-            // chiqariladi — "Yuklanganlar" ham shu orqali yangilanadi.
             refreshDownloading()
             ui.postDelayed(this, 500)
         }
@@ -155,9 +153,10 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
 
         val rv = root.findViewById<RecyclerView>(R.id.rvMusiqa)
         rvList = rv
+        currentList = emptyList()
         rv.layoutManager = LinearLayoutManager(ctx)
         adapter = YuzMusicAdapter(
-            onPlay = { _, pos -> rowPlay(pos) },
+            onPlay = { track, _ -> rowPlay(track.id) },
             onDownload = { track, _ -> downloadTrack(track) },
             onLongPress = { track, _ -> rowMenu(track) }
         )
@@ -178,11 +177,6 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
                 runSearch()
                 true
             } else false
-        }
-        // #128: "Yuklanganlar" endi alohida chiroyli papka ekrani;
-        // kolleksiyalar (playlistlar/radio) qo'shni ikon tugmada qoldi.
-        root.findViewById<View>(R.id.btnMusiqaSaved)?.setOnClickListener {
-            presentFragment(YuzDownloadsActivity(), false)
         }
         root.findViewById<View>(R.id.btnMusiqaCollections)?.setOnClickListener { showCollections() }
 
@@ -208,6 +202,8 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         }
         YuzMusicEngine.addObserver(observer)
         syncFromPlayer()
+        // Saved tracks and global downloads are visible before any network request.
+        refreshDownloading()
 
         val q = initialQuery?.trim().orEmpty()
         if (q.isNotEmpty()) {
@@ -275,8 +271,9 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
 
     // ------------------------------------------------------------ playback
 
-    private fun rowPlay(pos: Int) {
-        if (pos !in currentList.indices) return
+    private fun rowPlay(id: Long) {
+        val pos = currentList.indexOfFirst { it.id == id }
+        if (pos < 0) return
         val track = currentList[pos]
         val p = YuzMusicEngine.ensurePlayer(ctx)
         val playing = YuzMusicEngine.currentTrack()
@@ -309,7 +306,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private fun togglePlayPause() {
         val p = YuzMusicEngine.playerOrNull()
         if (p == null || p.currentMediaItem == null) {
-            if (currentList.isNotEmpty()) rowPlay(0)
+            currentList.firstOrNull()?.let { rowPlay(it.id) }
             return
         }
         if (p.isPlaying) p.pause() else p.playWhenReady = true
@@ -338,21 +335,19 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
 
     private fun syncPlayingMark() {
         val cur = YuzMusicEngine.currentTrack() ?: run {
-            adapter.setPlaying(-1)
+            adapter.setPlaying(-1, false)
             return
         }
         val pos = currentList.indexOfFirst { it.id == cur.id }
-        adapter.setPlaying(pos)
+        adapter.setPlaying(pos, YuzMusicEngine.playerOrNull()?.isPlaying == true)
         syncDlBtn(cur.id)
     }
 
-    /**
-     * #128: plerdagi yuklab olish tugmasining uch holati — Yuklab olish /
-     * Bekor qilish (X) / Yuklangan (taqicha, aktsent rangi).
-     */
+    /** Cancellation remains pending until the cache worker has cleaned up. */
     private fun syncDlBtn(id: Long) {
         val b = btnDl ?: return
-        val busy = id in downloadingIds || YuzMusicCache.isInflight(id)
+        val busy = YuzMusicCache.isInflight(id)
+        val canceling = YuzMusicCache.isCanceling(id)
         val has = !busy && YuzMusicCache.isDownloaded(ctx, id)
         b.setImageResource(
             when {
@@ -366,6 +361,13 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
                 ctx, if (has) R.color.yuz_action else R.color.yuz_text
             )
         )
+        b.isEnabled = !canceling
+        b.contentDescription = ctx.getString(when {
+            canceling -> R.string.musiqa_dl_canceling
+            busy -> R.string.musiqa_pl_dl_cancel
+            has -> R.string.musiqa_pl_dl_done
+            else -> R.string.yuz_a11y_download
+        })
         b.alpha = if (busy || has) 1.0f else 0.6f
     }
 
@@ -406,26 +408,13 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         tvPlayerDur?.text = String.format("%d:%02d", d / 60, d % 60)
     }
 
-    /**
-     * YuzGram #115: yuklanayotgan qatorlarni reyestr bo'yicha jonli ushlab
-     * turadi: yangi foizni qatorga yetkazadi, reyestrdan chiqqan (tugagan)
-     * id'larni holatdan tushirib "Yuklanganlar"ni qayta chizadi. Boshqa
-     * ekrandan (pler) boshlangan yuklash ham shu yerda tirik ko'rinadi.
-     */
+    /** Global state is authoritative, including downloads started in the full player. */
     private fun refreshDownloading() {
-        val live = YuzMusicCache.inflightIds()
-        val stale = ArrayList<Long>()
-        for (id in downloadingIds) if (id !in live) stale.add(id)
-        if (stale.isNotEmpty()) {
-            downloadingIds.removeAll(stale.toSet())
-            // canceledIds'ga tegmaymiz — uni faqat yuklashning o'z onDone
-            // callback'i iste'mol qiladi (bekor qilish toast-suppression'i).
-            adapter.setDownloading(downloadingIds)
-            adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
-            if (offlineMode) applyList(YuzMusicCache.downloadedTracks(ctx))
-            syncPlayingMark()
-        }
-        for (id in downloadingIds) adapter.setProgress(id, YuzMusicCache.inflightPct(id))
+        if (destroyed || !::adapter.isInitialized) return
+        adapter.setDownloading(YuzMusicCache.inflightIds())
+        adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
+        renderList()
+        syncPlayingMark()
     }
 
     // -------------------------------------------------------------- search
@@ -435,8 +424,16 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         if (q.isEmpty() || busy) return
         hideKeyboard()
         busy = true
-        offlineMode = false
-        statusView.text = ctx.getString(R.string.musiqa_searching)
+        lastQuery = q
+        listSource = 1
+        presetSeeds = null
+        if (presetIndex != -1) {
+            presetIndex = -1
+            renderPresets()
+        }
+        applyList(emptyList())
+        val generation = catalogGeneration
+        setStatus(R.string.musiqa_searching)
         setLoading(skeleton = true, center = false)
         scope.launch {
             val list = try {
@@ -444,23 +441,15 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             } catch (_: Exception) {
                 null
             }
+            if (destroyed) return@launch
             busy = false
             setLoading(skeleton = false, center = false)
+            if (generation != catalogGeneration) return@launch
+            applyList(list.orEmpty())
             when {
                 list == null -> setStatus(R.string.musiqa_error)
                 list.isEmpty() -> setStatus(R.string.musiqa_empty)
-                else -> {
-                    setStatus(R.string.musiqa_results)
-                    lastQuery = q
-                    listSource = 1
-                    // #116: maxsus qidiruv — chip tanlanmasini olib tashlaymiz.
-                    if (presetIndex != -1) {
-                        presetIndex = -1
-                        presetSeeds = null
-                        renderPresets()
-                    }
-                    applyList(list)
-                }
+                else -> setStatus(R.string.musiqa_results)
             }
         }
     }
@@ -468,8 +457,12 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private fun loadChart() {
         if (busy) return
         busy = true
-        offlineMode = false
+        lastQuery = null
+        listSource = 2
         presetSeeds = null
+        applyList(emptyList())
+        val generation = catalogGeneration
+        setStatus(R.string.musiqa_hits_loading)
         setLoading(skeleton = false, center = true)
         scope.launch {
             val list = try {
@@ -477,16 +470,12 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             } catch (_: Exception) {
                 null
             }
+            if (destroyed) return@launch
             busy = false
             setLoading(skeleton = false, center = false)
-            if (list != null && list.isNotEmpty()) {
-                setStatus(R.string.musiqa_trending)
-                lastQuery = null
-                listSource = 2
-                applyList(list)
-            } else {
-                setStatus(R.string.musiqa_error)
-            }
+            if (generation != catalogGeneration) return@launch
+            applyList(list.orEmpty())
+            setStatus(if (list.isNullOrEmpty()) R.string.musiqa_error else R.string.musiqa_trending)
         }
     }
 
@@ -516,9 +505,13 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     private fun loadPreset(seeds: Array<String>, labelRes: Int) {
         if (busy) return
         busy = true
-        offlineMode = false
+        lastQuery = null
+        listSource = 2
         presetSeeds = seeds
         etQuery.setText("")
+        applyList(emptyList())
+        val generation = catalogGeneration
+        setStatus(R.string.musiqa_hits_loading)
         setLoading(skeleton = false, center = true)
         scope.launch {
             val list = try {
@@ -526,17 +519,12 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             } catch (_: Exception) {
                 null
             }
+            if (destroyed) return@launch
             busy = false
             setLoading(skeleton = false, center = false)
-            if (list != null && list.isNotEmpty()) {
-                statusLabel = ctx.getString(labelRes)
-                statusView.text = statusLabel
-                lastQuery = null
-                listSource = 2
-                applyList(list)
-            } else {
-                setStatus(R.string.musiqa_error)
-            }
+            if (generation != catalogGeneration) return@launch
+            applyList(list.orEmpty())
+            setStatus(if (list.isNullOrEmpty()) R.string.musiqa_error else labelRes)
         }
     }
 
@@ -551,20 +539,39 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
      * (ommabop xitlar kelganda).
      */
     private fun setLoading(skeleton: Boolean, center: Boolean) {
-        shimmer?.visibility = if (skeleton) View.VISIBLE else View.GONE
-        hitsBox?.visibility = if (center) View.VISIBLE else View.GONE
-        rvList?.visibility = if (center && currentList.isEmpty()) View.INVISIBLE else View.VISIBLE
+        skeletonLoading = skeleton
+        centerLoading = center
+        updateLoadingVisibility()
     }
 
+    private fun updateLoadingVisibility() {
+        val empty = currentList.isEmpty()
+        // Overlay skeletons must never cover saved tracks or active downloads.
+        shimmer?.visibility = if (skeletonLoading && empty) View.VISIBLE else View.GONE
+        hitsBox?.visibility = if (centerLoading && empty) View.VISIBLE else View.GONE
+        rvList?.visibility = if (centerLoading && empty) View.INVISIBLE else View.VISIBLE
+        adapter.setLoadingMore(loadingPage || (!empty && (skeletonLoading || centerLoading)))
+    }
+
+    /** Replace source results only for a new query, preset, or playlist. */
     private fun applyList(list: List<YuzTrack>) {
-        // #67: fon ijrosi qat'iy to'xtamaydi — faqat belgilash yangilanadi.
-        currentList = list
-        adapter.submit(list)
+        catalogGeneration++
+        catalogList = list.distinctBy { it.id }
         shownIds.clear()
-        shownIds.addAll(list.map { it.id })
+        shownIds.addAll(catalogList.map { it.id })
         moreRound = 0
         moreAvailable = true
-        syncPlayingMark()
+        refreshDownloading()
+    }
+
+    /** Cache refreshes do not reset pagination or rebuild the playback queue. */
+    private fun renderList() {
+        val next = YuzMusicCache.unifiedTracks(ctx, catalogList)
+        if (next != currentList) {
+            currentList = next
+            adapter.submit(next)
+        }
+        updateLoadingVisibility()
     }
 
     /**
@@ -573,15 +580,16 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
      * ko'rilgan qatorlar takrorlanmaydi.
      */
     private fun loadMore() {
-        if (busy || !moreAvailable || offlineMode || listSource == 0 || currentList.isEmpty()) return
+        if (busy || !moreAvailable || listSource == 0 || catalogList.isEmpty()) return
         busy = true
         moreRound++
-        // #109: quyida hali kelmagan qatorlar o'rnida shimmer skelet yonadi.
-        adapter.setLoadingMore(true)
+        loadingPage = true
+        updateLoadingVisibility()
         val round = moreRound
         val q = lastQuery
         val seeds = presetSeeds
         val exclude = HashSet(shownIds)
+        val generation = catalogGeneration
         scope.launch {
             val more = try {
                 withContextIo {
@@ -594,33 +602,27 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             } catch (_: Exception) {
                 null
             }
-            busy = false
             if (destroyed) return@launch
-            adapter.setLoadingMore(false)
+            busy = false
+            loadingPage = false
+            updateLoadingVisibility()
+            if (generation != catalogGeneration) return@launch
             if (more.isNullOrEmpty()) {
                 if (more != null) moreAvailable = false
             } else {
                 shownIds.addAll(more.map { it.id })
-                currentList = currentList + more
-                adapter.append(more)
-                syncPlayingMark()
+                catalogList = (catalogList + more).distinctBy { it.id }
+                refreshDownloading()
             }
         }
     }
 
     // ------------------------------------------------------- collections UI
 
-    /** "Kolleksiyalar": yuklanganlar + playlistlar + radio kaliti. */
+    /** Collections contain only playlists and the radio toggle. */
     private fun showCollections() {
         val playlists = YuzMusicEngine.playlists(ctx)
-        val downloaded = YuzMusicCache.downloadedTracks(ctx)
-        // YuzGram #115: yuklanayotgan qatorlar bu ro'yxatning tepasida
-        // jonli holat (foiz+tezlik) bilan chiziladi — reyestrdagi id'larni
-        // UI ham "davom etmoqda" deb bilishi kerak.
-        downloadingIds.addAll(YuzMusicCache.inflightIds())
-        adapter.setDownloading(downloadingIds)
         val labels = ArrayList<String>()
-        labels.add(ctx.getString(R.string.musiqa_saved_btn) + " (${downloaded.size})")
         for (pl in playlists) labels.add("${pl.name} (${pl.tracks.size})")
         labels.add(ctx.getString(R.string.musiqa_radio_toggle,
             if (YuzMusicEngine.radio) "OFF" else "ON"))
@@ -628,19 +630,16 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             .setTitle(ctx.getString(R.string.musiqa_collections))
             .setItems(labels.toTypedArray()) { _, which ->
                 when {
-                    which == 0 -> {
-                        // #128: yuklanganlar — endi chiroyli mustaqil papka ekrani.
-                        presentFragment(YuzDownloadsActivity(), false)
-                    }
-                    which <= playlists.size -> {
-                        val pl = playlists[which - 1]
-                        offlineMode = false
+                    which in playlists.indices -> {
+                        val pl = playlists[which]
                         listSource = 0
+                        lastQuery = null
+                        presetSeeds = null
                         statusLabel = pl.name
                         statusView.text = "${pl.name} (${pl.tracks.size})"
                         applyList(pl.tracks)
                     }
-                    else -> {
+                    which == playlists.size -> {
                         YuzMusicEngine.radio = !YuzMusicEngine.radio
                         Toast.makeText(ctx,
                             if (YuzMusicEngine.radio) R.string.musiqa_radio_on
@@ -655,11 +654,17 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
 
     /** Qatorni bosib turish menyusi. */
     private fun rowMenu(track: YuzTrack) {
-        val downloaded = YuzMusicCache.isDownloaded(ctx, track.id)
+        val inflight = YuzMusicCache.isInflight(track.id)
+        val downloaded = !inflight && YuzMusicCache.isDownloaded(ctx, track.id)
         val labels = arrayOf(
             ctx.getString(R.string.musiqa_menu_add_queue),
             ctx.getString(R.string.musiqa_menu_add_playlist),
-            ctx.getString(if (downloaded) R.string.musiqa_dl_removed else R.string.musiqa_menu_dl)
+            ctx.getString(when {
+                YuzMusicCache.isCanceling(track.id) -> R.string.musiqa_dl_canceling
+                inflight -> R.string.musiqa_pl_dl_cancel
+                downloaded -> R.string.Delete
+                else -> R.string.musiqa_menu_dl
+            })
         )
         val dlg = AlertDialog.Builder(ctx, getResourceProvider())
             .setTitle(track.title)
@@ -671,7 +676,16 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
                         Toast.makeText(ctx, R.string.musiqa_queue_added, Toast.LENGTH_SHORT).show()
                     }
                     1 -> playlistPicker(track)
-                    2 -> downloadTrack(track)
+                    2 -> if (downloaded) {
+                        // Removal is explicit and must never cancel an unrelated new worker.
+                        if (!YuzMusicCache.isInflight(track.id) &&
+                            YuzMusicCache.isDownloaded(ctx, track.id)
+                        ) {
+                            YuzMusicCache.remove(ctx, track.id)
+                            refreshDownloading()
+                            Toast.makeText(ctx, R.string.musiqa_dl_removed, Toast.LENGTH_SHORT).show()
+                        }
+                    } else downloadTrack(track)
                 }
             }
             .setNegativeButton(ctx.getString(android.R.string.cancel), null)
@@ -735,21 +749,14 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     // -------------------------------------------------------------- download
 
     private fun downloadTrack(track: YuzTrack) {
-        // YuzGram #115: davom etayotgan yuklash — har doim AVVAL bekor
-        // qilish tekshiriladi (oflayn rejimda turganda ham): boshqa ekrandan
-        // boshlangan yuklash "Yuklanganlar"dagi qatorda X bo'lib chiqadi.
-        if (track.id in downloadingIds || YuzMusicCache.isInflight(track.id)) {
-            if (track.id in downloadingIds && track.id !in canceledIds) {
-                canceledIds.add(track.id)
-            }
-            YuzMusicCache.cancel(track.id)
-            Toast.makeText(ctx, R.string.musiqa_dl_canceling, Toast.LENGTH_SHORT).show()
+        if (YuzMusicCache.isCanceling(track.id)) {
+            refreshDownloading()
             return
         }
-        if (offlineMode) {
-            YuzMusicCache.remove(ctx, track.id)
-            adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
-            Toast.makeText(ctx, R.string.musiqa_dl_removed, Toast.LENGTH_SHORT).show()
+        if (YuzMusicCache.isInflight(track.id)) {
+            YuzMusicCache.cancel(track.id)
+            refreshDownloading()
+            Toast.makeText(ctx, R.string.musiqa_dl_canceling, Toast.LENGTH_SHORT).show()
             return
         }
         if (YuzMusicCache.isDownloaded(ctx, track.id)) {
@@ -757,30 +764,24 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             return
         }
         Toast.makeText(ctx, R.string.musiqa_dl_started, Toast.LENGTH_SHORT).show()
-        downloadingIds.add(track.id)
-        adapter.setDownloading(downloadingIds)
-        // YuzGram #104: foizli progress — qatordagi davomiylik o'rnida jonli
-        // yangilanadi; tugaganda holat tozalanadi.
-        YuzMusicCache.download(ctx, track, { pct ->
-            if (!destroyed) adapter.setProgress(track.id, pct)
-        }) { ok ->
-            downloadingIds.remove(track.id)
-            val wasCancel = canceledIds.remove(track.id) && !ok
+        YuzMusicCache.download(ctx, track) { result ->
             if (destroyed) return@download
-            adapter.setDownloading(downloadingIds)
-            if (wasCancel) {
-                syncDlBtn(track.id)
-                return@download
+            refreshDownloading()
+            when (result) {
+                YuzMusicCache.DownloadResult.DONE -> {
+                    if (YuzMusicEngine.currentTrack()?.id == track.id &&
+                        !YuzMusicCache.isInflight(track.id)
+                    ) YuzAnim.pop(btnDl)
+                    Toast.makeText(ctx, R.string.musiqa_dl_done, Toast.LENGTH_SHORT).show()
+                }
+                YuzMusicCache.DownloadResult.FAILED ->
+                    Toast.makeText(ctx, R.string.musiqa_dl_fail, Toast.LENGTH_SHORT).show()
+                YuzMusicCache.DownloadResult.CANCELED -> Unit
             }
-            adapter.setDownloaded(YuzMusicCache.downloadedIds(ctx))
-            syncPlayingMark()
-            // #128: tugagan yuklash tugmani "Yuklangan"ga aylantirib, pop qiladi.
-            syncDlBtn(track.id)
-            if (ok) YuzAnim.pop(btnDl)
-            Toast.makeText(ctx,
-                if (ok) R.string.musiqa_dl_done else R.string.musiqa_dl_fail,
-                Toast.LENGTH_SHORT).show()
         }
+        // The backend registers before returning, so the new row is immediately first.
+        refreshDownloading()
+        rvList?.scrollToPosition(0)
     }
 
     // -------------------------------------------------------------------- eq
@@ -850,8 +851,10 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         super.onResume()
         // #69: pastda o'z player bari bor — ustidagi mini bar ortiqcha.
         YuzMiniPlayer.setSuppressed(this, true)
-        ui.post(tick)
+        ui.removeCallbacks(tick)
+        refreshDownloading()
         syncFromPlayer()
+        ui.post(tick)
     }
 
     override fun onFragmentDestroy() {
