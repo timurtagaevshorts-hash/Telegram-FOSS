@@ -79,4 +79,46 @@ public final class YuzStories {
         viewer.open(fragment.getContext(), null, peerIds, 0, null, null, null, false);
         return true;
     }
+
+    /**
+     * Bitta peer'ning hikoyalarini ochadi (Reels tepasidagi doiralar tasmasi).
+     * Peer asosiy ro'yxatda bo'lmasa ham, uning hikoyasi bo'lsa ochiladi.
+     */
+    public static boolean viewPeer(BaseFragment fragment, long dialogId) {
+        if (fragment == null || fragment.getParentActivity() == null || dialogId == 0) {
+            return false;
+        }
+        int account = UserConfig.selectedAccount;
+        StoriesController controller = MessagesController.getInstance(account).getStoriesController();
+        controller.checkExpiredStories();
+        if (!controller.hasStories(dialogId)) {
+            return false;
+        }
+        long selfId = UserConfig.getInstance(account).clientUserId;
+        ArrayList<Long> peerIds = new ArrayList<>();
+        if (controller.hasSelfStories()) {
+            peerIds.add(selfId);
+        }
+        ArrayList<TL_stories.PeerStories> list = controller.getDialogListStories();
+        if (list != null) {
+            for (TL_stories.PeerStories ps : list) {
+                try {
+                    long id = DialogObject.getPeerDialogId(ps.peer);
+                    if (id != 0 && id != selfId && id != dialogId
+                            && controller.hasStories(id) && !peerIds.contains(id)) {
+                        peerIds.add(id);
+                    }
+                } catch (Exception ignore) {
+                }
+            }
+        }
+        int position = peerIds.indexOf(dialogId);
+        if (position < 0) {
+            peerIds.add(0, dialogId);
+            position = 0;
+        }
+        StoryViewer viewer = fragment.getOrCreateStoryViewer();
+        viewer.open(fragment.getContext(), null, peerIds, position, null, null, null, false);
+        return true;
+    }
 }

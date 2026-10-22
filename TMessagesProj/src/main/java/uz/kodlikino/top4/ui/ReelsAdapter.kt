@@ -25,9 +25,11 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.FileDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.RecyclerView
@@ -42,6 +44,7 @@ import org.telegram.messenger.ImageLoader
 import org.telegram.messenger.ImageLocation
 import org.telegram.messenger.NotificationCenter
 import org.telegram.messenger.SharedConfig
+import org.telegram.messenger.YuzStoryStreamDataSource
 import org.telegram.ui.Components.BackupImageView
 import uz.kodlikino.top4.utils.NetworkReachability
 import uz.kodlikino.top4.utils.YuzStoryFeed
@@ -495,7 +498,32 @@ class ReelsAdapter(
         val h = holder ?: return
         if (!canPlay(h)) return
         val reel = items.getOrNull(activePos) ?: return
-        if (reel.isStory) activateStory(h, reel) else showActivateError(h)
+        if (reel.isStory) activateStory(h, reel) else activateRemote(h, reel)
+    }
+
+    /**
+     * Firebase reel'i — HTTP orqali progressiv oqim. Avval to'liq yuklab olish
+     * shart emas: ExoPlayer birinchi bufer bilan ijrodi boshlaydi, qolganini
+     * oqim davomida tortadi (past internetda ham darhol ochiladi).
+     */
+    private fun activateRemote(h: PageHolder, reel: Reel) {
+        if (!canPlay(h)) return
+        if (reel.videoUrl.isBlank()) {
+            showActivateError(h)
+            return
+        }
+        try {
+            val source = ProgressiveMediaSource.Factory(httpDataSourceFactory())
+                .createMediaSource(
+                    MediaItem.Builder()
+                        .setUri(Uri.parse(reel.videoUrl))
+                        .setMediaId(reel.id)
+                        .build()
+                )
+            startSource(h, ensurePlayer(), source, reel.id)
+        } catch (_: Exception) {
+            showActivateError(h)
+        }
     }
 
     /** Sahifa qayta ko'rinmaganda chaqiriladi (masalan, CreateReel'dan qaytish). */
@@ -531,6 +559,38 @@ class ReelsAdapter(
         if (ready != null) {
             startMedia(h, ensurePlayer(), Uri.fromFile(ready), reel.id)
             return
+        }
+        // Oqim: fayl to'liq yuklanishini kutmasdan ijro etamiz — past
+        // internetda ham hikoya darhol boshlanadi. FileLoader'o'zi
+        // attachment papkasiga yozadi, DataSource esa kelgan bo'laklarni
+        // pleyerga uzatadi (`YuzStoryStreamDataSource`).
+        val storyItem = try {
+            YuzStoryFeed.findStoryItem(account, reel.storyDialogId, reel.storyId)
+        } catch (_: Exception) {
+            null
+        }
+        if (storyItem != null) {
+            try {
+                val source = ProgressiveMediaSource.Factory {
+                    YuzStoryStreamDataSource(account, storyItem)
+                }.createMediaSource(
+                    MediaItem.Builder()
+                        .setUri(
+                            YuzStoryStreamDataSource.buildUri(
+                                reel.storyDialogId,
+                                reel.storyId
+                            )
+                        )
+                        .setMediaId(reel.id)
+                        .build()
+                )
+                h.storyThumb.visibility = View.VISIBLE
+                h.pageProgress.visibility = View.VISIBLE
+                startSource(h, ensurePlayer(), source, reel.id)
+                return
+            } catch (_: Exception) {
+                // Oqim manbasi qurilmasa — pastdagi "yuklab, keyin ijro" yo'li.
+            }
         }
         silence()
         h.storyThumb.visibility = View.VISIBLE
@@ -573,6 +633,49 @@ class ReelsAdapter(
         }
         storyPoll = poll
         mainHandler.postDelayed(poll, 350L)
+    }
+
+    /**
+     * Tayyor [MediaSource]'ni pleyerga beradi (oqim yoki HTTP manba).
+     * [startMedia]'dan farqi — `setMediaItem` emas, `setMediaSource` ishlatiladi,
+     * chunki `yuzstory://` va HTTP uchun pleyerning standart file-only fabrikasi
+     * yaramaydi.
+     */
+    private fun startSource(h: PageHolder, p: ExoPlayer, source: MediaSource, reelId: String) {
+        if (!canPlay(h)) return
+        cancelStoryPoll()
+        cancelPendingRetry()
+        pendingStoryFileName = null
+        h.playerView.player = p
+        if (p.currentMediaItem?.mediaId != reelId || p.playbackState == Player.STATE_IDLE) {
+            silence()
+            renderedReelId = null
+            p.setMediaSource(source)
+            p.prepare()
+        }
+        h.pageProgress.visibility = if (p.playbackState == Player.STATE_READY) View.GONE else View.VISIBLE
+        if (renderedReelId == reelId) {
+            h.storyThumb.visibility = View.GONE
+            h.ivThumbnail.visibility = View.GONE
+        }
+        p.volume = if (muted || userPaused) 0f else 1f
+        p.playWhenReady = !userPaused
+        mainHandler.removeCallbacks(progressTicker)
+        mainHandler.post(progressTicker)
+    }
+
+    private var httpFactory: DefaultHttpDataSource.Factory? = null
+
+    /** Firebase Storage/HTTP uchun ulanish sozlamalari (sekin tarmoqqa chidamli). */
+    private fun httpDataSourceFactory(): DefaultHttpDataSource.Factory {
+        httpFactory?.let { return it }
+        val factory = DefaultHttpDataSource.Factory()
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(15_000)
+            .setAllowCrossProtocolRedirects(true)
+            .setUserAgent("YuzGram")
+        httpFactory = factory
+        return factory
     }
 
     private fun startMedia(h: PageHolder, p: ExoPlayer, uri: Uri, reelId: String) {

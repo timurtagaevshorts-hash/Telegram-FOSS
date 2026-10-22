@@ -83,4 +83,5 @@
     <string name="story_view">Hikoyalar</string>
     <string name="story_none">Hozircha hikoyalar yo\'q</string>
     <string name="story_back">Yopish</string>
+    <string name="reels_story_you">Sizning hikoyangiz</string>
 </resources>

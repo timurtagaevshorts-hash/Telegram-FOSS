@@ -27,12 +27,15 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.telegram.messenger.AndroidUtilities
+import org.telegram.messenger.DialogObject
+import org.telegram.messenger.MessagesController
 import org.telegram.messenger.NotificationCenter
 import org.telegram.messenger.R
 import org.telegram.messenger.UserConfig
 import org.telegram.tgnet.TLRPC
 import org.telegram.ui.ActionBar.BaseFragment
 import org.telegram.ui.LaunchActivity
+import org.telegram.ui.Stories.StoriesController
 import uz.kodlikino.top4.models.Reel
 import uz.kodlikino.top4.models.ReelComment
 import uz.kodlikino.top4.utils.ReelStorageHelper
@@ -92,6 +95,7 @@ class ReelsActivity @JvmOverloads constructor(
     private var progressBar: ProgressBar? = null
     private var emptyView: TextView? = null
     private var adapter: ReelsAdapter? = null
+    private var storyStripAdapter: YuzStoryStripAdapter? = null
 
     // Izohlar paneli (ekran ichida — alohida dialog EMAS, qarang fragment_reels.xml)
     private var commentsScrim: View? = null
@@ -216,14 +220,9 @@ class ReelsActivity @JvmOverloads constructor(
 
         root.findViewById<View>(R.id.btnPostReel)?.setOnClickListener { openCreate() }
 
-        // #70: storiya kirish nuqtalari — chatdan Reels tepasiga ko'chirildi.
-        root.findViewById<View>(R.id.btnStoryPost)?.setOnClickListener {
-            val fab = storyFab ?: return@setOnClickListener
-            YuzStories.openRecorder(this@ReelsActivity, fab)
-        }
-        root.findViewById<View>(R.id.btnStoryView)?.setOnClickListener {
-            if (!YuzStories.viewAll(this@ReelsActivity)) toast(R.string.story_none)
-        }
+        // Telegram uslubidagi hikoya doiralari (o'zimiz + yaqinda hikoya
+        // joylagan profillar). Profil ichidan ochilganda (filterUid) ko'rsatilmaydi.
+        setupStoryStrip(themed)
         fsClose?.setOnClickListener { exitReelFullscreen() }
 
         // Ovoz tugmasi — feed davomida bitta player ishlatilgani uchun holat
@@ -254,6 +253,137 @@ class ReelsActivity @JvmOverloads constructor(
         registerNetworkWatch()
         registerStoryWatch()
         return root
+    }
+
+    private fun setupStoryStrip(themed: Context) {
+        val strip = fragmentView?.findViewById<RecyclerView>(R.id.rvStoryStrip) ?: return
+        if (filterUid.isNotBlank()) {
+            strip.visibility = View.GONE
+            return
+        }
+        val stripAdapter = YuzStoryStripAdapter(
+            context = themed,
+            account = currentAccount,
+            onSelfAvatar = { hasStories ->
+                val selfId = UserConfig.getInstance(currentAccount).clientUserId
+                if (!hasStories || !YuzStories.viewPeer(this, selfId)) openStoryRecorder()
+            },
+            onAddStory = { openStoryRecorder() },
+            onPeer = { dialogId ->
+                if (!YuzStories.viewPeer(this, dialogId)) toast(R.string.story_none)
+            }
+        )
+        storyStripAdapter = stripAdapter
+        strip.layoutManager = LinearLayoutManager(themed, RecyclerView.HORIZONTAL, false)
+        strip.adapter = stripAdapter
+        strip.itemAnimator = null
+        refreshStoryStrip()
+    }
+
+    private fun openStoryRecorder() {
+        val fab = storyFab ?: return
+        YuzStories.openRecorder(this, fab)
+    }
+
+    /**
+     * Doiralar tasmasini Telegram statidan quradi: o'zimiz (birinchi),
+     * asosiy hikoya ro'yxati, so'ng dialog ro'yxatidagi qolgan barcha
+     * peer'lar — shu bilan kontakt bo'lmagan, lekin hikoyasi bor profillar
+     * ham ko'rinadi. Yashirilgan (hidden) hikoyalar chiqarilmaydi.
+     */
+    private fun refreshStoryStrip() {
+        if (filterUid.isNotBlank()) return
+        val stripAdapter = storyStripAdapter ?: return
+        val account = currentAccount
+        try {
+            val sc: StoriesController = MessagesController.getInstance(account).getStoriesController()
+            try {
+                sc.checkExpiredStories()
+            } catch (_: Exception) {
+            }
+            val selfId = UserConfig.getInstance(account).clientUserId
+            val selfHasStories = try {
+                sc.hasSelfStories()
+            } catch (_: Exception) {
+                false
+            }
+            val items = ArrayList<YuzStoryCircle>()
+            items.add(
+                YuzStoryCircle(
+                    dialogId = selfId,
+                    name = "",
+                    unseen = false,
+                    isSelf = true,
+                    hasStories = selfHasStories
+                )
+            )
+            val seen = HashSet<Long>()
+            if (selfId != 0L) seen.add(selfId)
+            val hidden = HashSet<Long>()
+            try {
+                sc.getHiddenList()?.forEach { ps ->
+                    try {
+                        hidden.add(DialogObject.getPeerDialogId(ps.peer))
+                    } catch (_: Exception) {
+                    }
+                }
+            } catch (_: Exception) {
+            }
+            try {
+                sc.getDialogListStories()?.forEach { ps ->
+                    val id = try {
+                        DialogObject.getPeerDialogId(ps.peer)
+                    } catch (_: Exception) {
+                        0L
+                    }
+                    if (id == 0L || id == selfId || id in hidden || !seen.add(id)) {
+                        return@forEach
+                    }
+                    addStoryCircle(items, sc, account, id)
+                }
+            } catch (_: Exception) {
+            }
+            try {
+                for (dialog in MessagesController.getInstance(account).getAllDialogs()) {
+                    val id = dialog.id
+                    if (id == 0L || id == selfId || id in seen || id in hidden) {
+                        continue
+                    }
+                    val has = try {
+                        sc.hasStories(id)
+                    } catch (_: Exception) {
+                        false
+                    }
+                    if (!has) {
+                        continue
+                    }
+                    seen.add(id)
+                    addStoryCircle(items, sc, account, id)
+                }
+            } catch (_: Exception) {
+            }
+            stripAdapter.submit(items)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun addStoryCircle(
+        out: ArrayList<YuzStoryCircle>,
+        sc: StoriesController,
+        account: Int,
+        dialogId: Long
+    ) {
+        val unseen = try {
+            sc.getUnreadStoriesCount(dialogId) > 0
+        } catch (_: Exception) {
+            false
+        }
+        val name = try {
+            YuzStoryFeed.peerTitle(account, dialogId)
+        } catch (_: Exception) {
+            ""
+        }
+        out.add(YuzStoryCircle(dialogId, name, unseen, isSelf = false, hasStories = true))
     }
 
     /**
@@ -301,7 +431,10 @@ class ReelsActivity @JvmOverloads constructor(
         storyRefresh?.let { view.removeCallbacks(it) }
         val r = Runnable {
             storyRefresh = null
-            if (fragmentView != null) loadReels()
+            if (fragmentView != null) {
+                refreshStoryStrip()
+                loadReels()
+            }
         }
         storyRefresh = r
         view.postDelayed(r, 500L)
@@ -420,11 +553,13 @@ class ReelsActivity @JvmOverloads constructor(
     }
 
     private fun openCreate() {
-        // #106: "Reel joylash" endi Firebase reel yuklash EMAS — Telegram'ning
-        // o'z StoryRecorder'i (hikoya). Tasma hikoyalardan qurilgani uchun
-        // joylangan hikoya darhol feed'ga tushadi.
-        val fab = storyFab ?: return
-        YuzStories.openRecorder(this, fab)
+        // "Reel joylash" — Firebase'ga video yuklash ekrani (kuniga 5 ta,
+        // premium uchun cheksiz). Hikoya joylash esa tepadagi doiralardan.
+        try {
+            presentFragment(CreateReelActivity(), false)
+        } catch (_: Exception) {
+            toast(R.string.reels_create_title)
+        }
     }
 
     /**
@@ -475,10 +610,18 @@ class ReelsActivity @JvmOverloads constructor(
      * user_id olamiz.
      */
     private fun openNativeProfile(uid: String) {
-        val userId = uid.removePrefix("tg_").toLongOrNull() ?: return
+        val peerId = uid.removePrefix("tg_").toLongOrNull() ?: return
         val args = android.os.Bundle()
-        args.putLong("user_id", userId)
-        args.putBoolean("my_profile", userId == UserConfig.getInstance(currentAccount).clientUserId)
+        if (peerId > 0) {
+            args.putLong("user_id", peerId)
+            args.putBoolean(
+                "my_profile",
+                peerId == UserConfig.getInstance(currentAccount).clientUserId
+            )
+        } else {
+            // Kanal/guruh hikoyasi — ProfileActivity chat rejimida ochiladi.
+            args.putLong("chat_id", -peerId)
+        }
         presentFragment(org.telegram.ui.ProfileActivity(args, null), false)
     }
 
@@ -497,29 +640,73 @@ class ReelsActivity @JvmOverloads constructor(
         openNativeProfile(uid)
     }
 
+    /**
+     * Tasma = Telegram hikoyalari + Firebase reel'lari:
+     *  1) keshdagi Firebase feed (bo'lsa) + hikoyalar — birinchi kadrda,
+     *     tarmoq javobini kutmasdan ko'rinadi;
+     *  2) tarmoqdan yangilangan Firebase ro'yxati + hikoyalar.
+     * Yangi (48 soat ichida joylangan) Firebase reel'lari boshida turadi,
+     * keyin hikoyalar (YuzReelsOrder tartibida), keyin eski Firebase reel'lari.
+     * Profil ichidan ochilganda (filterUid) faqat shu muallif kontenti.
+     */
     private fun loadReels() {
-        // #106: Firebase `reels` feed o'chirildi — tasma endi Telegram
-        // hikoyalaridan quriladi (ma'lumot lokal/sinxron — tarmoq kutilmaydi).
         val s = scope ?: return
         val keepPosition = selectedPosition
         val keepId = currentReels.getOrNull(keepPosition)?.id
         if (currentReels.isEmpty()) progressBar?.visibility = View.VISIBLE
         s.launch {
-            val reels = try {
-                val feed = YuzStoryFeed.buildFeed(currentAccount, filterUid)
-                feedOrder?.arrange(feed) ?: feed
+            val stories = try {
+                YuzStoryFeed.buildFeed(currentAccount, filterUid)
             } catch (_: Exception) {
-                progressBar?.visibility = View.GONE
-                emptyView?.visibility = View.VISIBLE
-                return@launch
+                emptyList()
+            }
+            val cached = try {
+                if (filterUid.isBlank()) ReelsRepository.peekReels()
+                else ReelsRepository.peekReelsByUploader(filterUid)
+            } catch (_: Exception) {
+                null
             }
             if (fragmentView == null) return@launch
-            if (filterUid.isBlank()) YuzViewedReels.prune(themedContext ?: return@launch, reels.map { it.id }, currentAccount)
+            // 1) Kesh bilan darhol render (hikoyalar lokal — tarmoq kutilmaydi).
+            if (cached != null && currentReels.isEmpty()) {
+                val quick = composeFeed(stories, cached)
+                if (quick.isNotEmpty()) {
+                    try {
+                        renderReels(quick, keepPosition)
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+            // 2) Tarmoqdan Firebase reelslarini yangilaymiz; xato bo'lsa kesh
+            // yoki faqat hikoyalar bilan davom etamiz.
+            val firebase = try {
+                if (filterUid.isBlank()) {
+                    ReelsRepository.getReelsOrNull() ?: cached ?: emptyList()
+                } else {
+                    ReelsRepository.getReelsByUploader(filterUid)
+                }
+            } catch (_: Exception) {
+                cached ?: emptyList()
+            }
+            if (fragmentView == null) return@launch
+            val reels = composeFeed(stories, firebase)
+            if (filterUid.isBlank()) {
+                YuzViewedReels.prune(
+                    themedContext ?: return@launch,
+                    reels.map { it.id },
+                    currentAccount
+                )
+            }
             // Tarkib o'zgarmagan — qayta submit playback'ni bekor restart qiladi.
             if (currentReels.isNotEmpty() && sameFeed(currentReels, reels)) {
                 progressBar?.visibility = View.GONE
-                emptyView?.visibility = View.GONE
-                reelsList?.visibility = View.VISIBLE
+                if (reels.isEmpty()) {
+                    emptyView?.visibility = View.VISIBLE
+                    reelsList?.visibility = View.GONE
+                } else {
+                    emptyView?.visibility = View.GONE
+                    reelsList?.visibility = View.VISIBLE
+                }
                 return@launch
             }
             // #110: renderReels pleyer yaratish/hikoya bog'lash sinxron yolini
@@ -534,6 +721,32 @@ class ReelsActivity @JvmOverloads constructor(
                 reelsList?.visibility = View.GONE
             }
         }
+    }
+
+    /** Hikoyalar tartibi saqlanadi; yangi Firebase reel'lari esa eng boshida. */
+    private fun composeFeed(stories: List<Reel>, firebase: List<Reel>): List<Reel> {
+        val arranged = try {
+            feedOrder?.arrange(stories) ?: stories
+        } catch (_: Exception) {
+            stories
+        }
+        if (filterUid.isNotBlank()) {
+            val scoped = ArrayList<Reel>(stories.size + firebase.size)
+            scoped.addAll(stories)
+            scoped.addAll(firebase)
+            return scoped
+        }
+        val freshCutoff = System.currentTimeMillis() - FRESH_REEL_MS
+        val fresh = ArrayList<Reel>()
+        val older = ArrayList<Reel>()
+        for (reel in firebase) {
+            if (reel.createdAt >= freshCutoff) fresh.add(reel) else older.add(reel)
+        }
+        val out = ArrayList<Reel>(fresh.size + arranged.size + older.size)
+        out.addAll(fresh)
+        out.addAll(arranged)
+        out.addAll(older)
+        return out
     }
 
     /** Tasmani ko'rsatadi: [keepPosition] saqlangan holda snap + player + preload. */
@@ -581,46 +794,92 @@ class ReelsActivity @JvmOverloads constructor(
         return true
     }
 
-    /** Faol hikoya uchun like holati — Telegram reaksiyasidan (`sent_reaction`). */
+    /**
+     * Faol reel uchun like holati: hikoya — Telegram reaksiyasi, Firebase —
+     * `reels/{id}/likes/{uid}` hujjati.
+     */
     private fun refreshLikeState(reelId: String?) {
         val rid = reelId ?: return
-        val key = YuzStoryFeed.parseKey(rid) ?: return
-        try {
-            val item = YuzStoryFeed.findStoryItem(currentAccount, key.first, key.second) ?: return
-            val liked = item.sent_reaction != null && item.sent_reaction !is TLRPC.TL_reactionEmpty
-            adapter?.applyLikeState(rid, liked, item.views?.reactions_count ?: 0)
-        } catch (_: Exception) {
+        val key = YuzStoryFeed.parseKey(rid)
+        if (key != null) {
+            try {
+                val item = YuzStoryFeed.findStoryItem(currentAccount, key.first, key.second) ?: return
+                val liked = item.sent_reaction != null && item.sent_reaction !is TLRPC.TL_reactionEmpty
+                adapter?.applyLikeState(rid, liked, item.views?.reactions_count ?: 0)
+            } catch (_: Exception) {
+            }
+            return
+        }
+        if (currentUid().isBlank()) return
+        val s = scope ?: return
+        val account = currentAccount
+        s.launch {
+            try {
+                awaitAuth()
+                val signedUid = YuzGramAdsAuth.ensureSignedIn(account)
+                val liked = ReelsRepository.isLiked(rid, signedUid)
+                if (fragmentView == null) return@launch
+                adapter?.applyLikeState(rid, liked)
+            } catch (_: Exception) {
+            }
         }
     }
 
     /**
-     * #106: like/unlike — Telegram hikoya reaksiyasi (`❤`). Bildirishnomani
-     * Telegram'ning o'zi yetkazadi (postiga reaction keladi); Firestore `likes`
-     * hujjati va undagi sana ko'paytmasi endi kerak emas.
+     * Like/unlike: hikoya — Telegram reaksiyasi (`❤`), Firebase reel —
+     * Firestore `likes` hujjati va `likeCount` increment.
      */
     private fun toggleLike(reelId: String, likedNow: Boolean) {
         val key = YuzStoryFeed.parseKey(reelId)
-        if (key == null) {
-            // Eski Firebase reel'lar feed'da qolmadi — kalit story bo'lmasa chiqamiz.
+        if (key != null) {
+            val ok = try {
+                YuzStoryFeed.likeStory(currentAccount, key.first, key.second, likedNow)
+            } catch (_: Exception) {
+                false
+            }
+            if (!ok) {
+                adapter?.applyLikeState(reelId, !likedNow)
+                toast(R.string.reels_like_failed)
+            }
             return
         }
-        val ok = try {
-            YuzStoryFeed.likeStory(currentAccount, key.first, key.second, likedNow)
-        } catch (_: Exception) {
-            false
-        }
-        if (!ok) {
+        val uid = currentUid()
+        if (uid.isBlank()) {
             adapter?.applyLikeState(reelId, !likedNow)
-            toast(R.string.reels_like_failed)
+            toast(R.string.reels_sign_in_required)
+            return
+        }
+        val s = scope ?: return
+        val account = currentAccount
+        s.launch {
+            try {
+                awaitAuth()
+                val signedUid = YuzGramAdsAuth.ensureSignedIn(account)
+                ReelsRepository.setLiked(reelId, signedUid, likedNow, authorName(account))
+            } catch (_: Exception) {
+                if (fragmentView == null) return@launch
+                adapter?.applyLikeState(reelId, !likedNow)
+                toast(R.string.reels_like_failed)
+            }
         }
     }
 
-    /** #106: "ko'rish" — Telegram max_read_id (Firestore increment o'rniga). */
+    /** "Ko'rish": hikoya — Telegram max_read_id, Firebase — `views` increment. */
     private fun registerView(reelId: String) {
-        val key = YuzStoryFeed.parseKey(reelId) ?: return
-        try {
-            YuzStoryFeed.markViewed(currentAccount, key.first, key.second)
-        } catch (_: Exception) {
+        val key = YuzStoryFeed.parseKey(reelId)
+        if (key != null) {
+            try {
+                YuzStoryFeed.markViewed(currentAccount, key.first, key.second)
+            } catch (_: Exception) {
+            }
+            return
+        }
+        val s = scope ?: return
+        s.launch {
+            try {
+                ReelsRepository.registerView(reelId)
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -973,6 +1232,7 @@ class ReelsActivity @JvmOverloads constructor(
         playbackVisible = true
         actionBar?.visibility = View.GONE
         if (fragmentView != null) {
+            refreshStoryStrip()
             loadReels()
             if (reelsList?.scrollState == RecyclerView.SCROLL_STATE_IDLE) adapter?.resumePlayback()
             preloadNeighbours(selectedPosition)
@@ -1061,5 +1321,10 @@ class ReelsActivity @JvmOverloads constructor(
     private fun getString(resId: Int, vararg args: Any): String {
         val ctx = themedContext ?: context ?: return ""
         return ctx.getString(resId, *args)
+    }
+
+    private companion object {
+        /** Yangi Firebase reel'lari tasmaning boshida turadigan oyna. */
+        private const val FRESH_REEL_MS = 48L * 60L * 60L * 1000L
     }
 }

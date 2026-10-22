@@ -1413,6 +1413,45 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
 
     private BaseFragment profileActivity;
 
+    // ----- YuzGram: profil ekranlarida "Archived Stories" yonida "Reels" tab -----
+    // Tab tanlanganda media sahifalari ustiga opaque YuzProfileReelsView
+    // qatlami qo'yiladi: foydalanuvchining Firebase reel'lari grid'i.
+    // O'z profilida ko'rish + o'chirish, begona profilida faqat ko'rish.
+    private uz.kodlikino.top4.ui.YuzProfileReelsView yuzReelsOverlay;
+
+    private boolean isYuzProfileHost() {
+        return profileActivity instanceof ProfileActivity
+                && DialogObject.isUserDialog(dialog_id) && !DialogObject.isEncryptedDialog(dialog_id);
+    }
+
+    private boolean isYuzSelfProfile() {
+        return profileActivity instanceof ProfileActivity && ((ProfileActivity) profileActivity).myProfile;
+    }
+
+    protected String yuzReelsTabLabel() {
+        return isYuzProfileHost() ? getString(R.string.reels_title) : getString(R.string.ProfileArchivedStories);
+    }
+
+    private void updateYuzReelsOverlay(int tab) {
+        if (!isYuzProfileHost()) {
+            return;
+        }
+        if (tab == TAB_ARCHIVED_STORIES) {
+            if (yuzReelsOverlay == null) {
+                yuzReelsOverlay = new uz.kodlikino.top4.ui.YuzProfileReelsView(
+                        getContext(), profileActivity.getCurrentAccount(), profileActivity,
+                        "tg_" + dialog_id, isYuzSelfProfile());
+                addView(yuzReelsOverlay, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.LEFT | Gravity.TOP, 0, mediaPageTopMargin(), 0, 0));
+            } else {
+                yuzReelsOverlay.setVisibility(VISIBLE);
+                yuzReelsOverlay.bringToFront();
+            }
+            yuzReelsOverlay.refresh();
+        } else if (yuzReelsOverlay != null) {
+            yuzReelsOverlay.setVisibility(GONE);
+        }
+    }
+
     private int startedTrackingPointerId;
     private boolean startedTracking;
     private boolean maybeStartTracking;
@@ -3773,6 +3812,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                 onSelectedTabChanged();
                 animateSearchToOptions(!isSearchItemVisible(id), true);
                 updateOptionsSearch(true);
+                updateYuzReelsOverlay(id);
             }
 
             @Override
@@ -5892,7 +5932,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
             if ((DialogObject.isUserDialog(dialog_id) || DialogObject.isChatDialog(dialog_id)) && !DialogObject.isEncryptedDialog(dialog_id) && (userInfo != null && userInfo.stories_pinned_available || info != null && info.stories_pinned_available || isStoriesView()) && includeStories()) {
                 if (isArchivedOnlyStoriesView()) {
                     if (!scrollSlidingTextTabStrip.hasTab(TAB_ARCHIVED_STORIES)) {
-                        scrollSlidingTextTabStrip.addTextTab(TAB_ARCHIVED_STORIES, getString(R.string.ProfileArchivedStories), idToView);
+                        scrollSlidingTextTabStrip.addTextTab(TAB_ARCHIVED_STORIES, yuzReelsTabLabel(), idToView);
                     }
                     scrollSlidingTextTabStrip.animationDuration = 420;
                 } else {
@@ -5901,10 +5941,17 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                     }
                     if (isStoriesView()) {
                         if (!scrollSlidingTextTabStrip.hasTab(TAB_ARCHIVED_STORIES)) {
-                            scrollSlidingTextTabStrip.addTextTab(TAB_ARCHIVED_STORIES, getString(R.string.ProfileArchivedStories), idToView);
+                            scrollSlidingTextTabStrip.addTextTab(TAB_ARCHIVED_STORIES, yuzReelsTabLabel(), idToView);
                         }
                         scrollSlidingTextTabStrip.animationDuration = 420;
                     }
+                }
+            }
+            // YuzGram: har qanday foydalanuvchi profilida (o'zi va begona)
+            // "Reels" tab'ini shartlarsiz ta'minlaymiz. hasTab duplikatni saqlaydi.
+            if (isYuzProfileHost() && !isStoriesView() && !isArchivedOnlyStoriesView() && !isSearchingStories()) {
+                if (!scrollSlidingTextTabStrip.hasTab(TAB_ARCHIVED_STORIES)) {
+                    scrollSlidingTextTabStrip.addTextTab(TAB_ARCHIVED_STORIES, yuzReelsTabLabel(), idToView);
                 }
             }
             if (!isStoriesView()) {

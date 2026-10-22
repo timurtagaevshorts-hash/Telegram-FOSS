@@ -9,6 +9,7 @@ import org.telegram.messenger.MessageObject
 import org.telegram.messenger.MessagesController
 import org.telegram.messenger.UserConfig
 import org.telegram.messenger.UserObject
+import org.telegram.tgnet.TLObject
 import org.telegram.tgnet.TLRPC
 import org.telegram.tgnet.tl.TL_stories
 import org.telegram.ui.Components.Reactions.ReactionsLayoutInBubble
@@ -134,6 +135,52 @@ object YuzStoryFeed {
             }
         }
 
+        // "Iloji boricha barcha hikoyalar": Telegram asosiy ro'yxati kontakt
+        // bo'lmagan foydalanuvchilarni filtrlab tashlaydi. Dialog ro'yxatidagi
+        // qolgan peer'larda faol hikoya bo'lsa, ularni ham qo'shamiz —
+        // foydalanuvchi yashirganlar (hidden) bundan mustasno.
+        val processed = HashSet<Long>()
+        for (ps in peers) {
+            try {
+                processed.add(DialogObject.getPeerDialogId(ps.peer))
+            } catch (_: Exception) {
+            }
+        }
+        val hidden = HashSet<Long>()
+        try {
+            sc.getHiddenList()?.forEach { hs ->
+                try {
+                    hidden.add(DialogObject.getPeerDialogId(hs.peer))
+                } catch (_: Exception) {
+                }
+            }
+        } catch (_: Exception) {
+        }
+        try {
+            val dialogs = MessagesController.getInstance(account).getAllDialogs()
+            for (dialog in dialogs) {
+                val dialogId = dialog.id
+                if (dialogId == 0L || dialogId == selfId) continue
+                if (dialogId in processed || dialogId in hidden) continue
+                if (filterId != null && filterId != dialogId) continue
+                val ps = try {
+                    sc.checkExpiredStories(dialogId)
+                    sc.getStories(dialogId)
+                } catch (_: Exception) {
+                    null
+                } ?: continue
+                if (ps.stories.isEmpty()) continue
+                try {
+                    for (item in ps.stories) {
+                        val reel = toReel(account, dialogId, item, archived = false) ?: continue
+                        if (seen.add(reel.id)) out.add(reel)
+                    }
+                } catch (_: Exception) {
+                }
+            }
+        } catch (_: Exception) {
+        }
+
         // O'zimizning arxiv + profilga saqlangan (pinned) hikoyalar — faqat
         // umumiy tasmada yoki o'z profilimizdan filtrlanganda.
         if (filterId == null || filterId == selfId) {
@@ -203,6 +250,21 @@ object YuzStoryFeed {
             }
         } catch (_: Exception) {
             ""
+        }
+    }
+
+    /** Hikoya egasining ko'rsatiladigan nomi (doiralar tasmasi uchun). */
+    @JvmStatic
+    fun peerTitle(account: Int, dialogId: Long): String = peerName(account, dialogId)
+
+    /** dialogId -> TLRPC.User/Chat (avatar uchun); topilmasa null. */
+    @JvmStatic
+    fun peerObject(account: Int, dialogId: Long): TLObject? {
+        return try {
+            val mc = MessagesController.getInstance(account)
+            if (dialogId > 0) mc.getUser(dialogId) else mc.getChat(-dialogId)
+        } catch (_: Exception) {
+            null
         }
     }
 

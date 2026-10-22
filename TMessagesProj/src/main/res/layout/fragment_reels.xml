@@ -76,55 +76,21 @@
                 app:iconTint="@color/yuz_action" />
         </LinearLayout>
 
-        <!-- #70: storiya qatori — chatdan Reels tepasiga ko'chirildi. -->
-        <LinearLayout
-            android:id="@+id/storyRow"
+        <!-- Telegram uslubidagi hikoya doiralari: o'zimiz (yangi hikoya "+"
+             belgisi bilan) + yaqinda hikoya joylagan profillar/kanallar.
+             Avvalgi ikkita matnli tugma o'rnini bosdi (#136). -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvStoryStrip"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_reel_top_scrim"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="@dimen/yuz_space_4"
+            android:clipToPadding="false"
+            android:overScrollMode="never"
+            android:paddingStart="@dimen/yuz_space_3"
+            android:paddingTop="@dimen/yuz_space_1"
             android:paddingEnd="@dimen/yuz_space_3"
-            android:paddingBottom="@dimen/yuz_space_3">
-
-            <TextView
-                android:id="@+id/btnStoryPost"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="@dimen/yuz_space_2"
-                android:background="@drawable/bg_classified_category_badge"
-                android:drawablePadding="6dp"
-                android:drawableStart="@drawable/msg_stories_add"
-                android:drawableTint="@color/yuz_text"
-                android:foreground="?attr/selectableItemBackground"
-                android:gravity="center_vertical"
-                android:paddingStart="@dimen/yuz_space_3"
-                android:paddingTop="@dimen/yuz_space_2"
-                android:paddingEnd="@dimen/yuz_space_3"
-                android:paddingBottom="@dimen/yuz_space_2"
-                android:text="@string/story_post"
-                android:textColor="@color/yuz_text"
-                android:textSize="@dimen/yuz_text_secondary" />
-
-            <TextView
-                android:id="@+id/btnStoryView"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_classified_category_badge"
-                android:drawablePadding="6dp"
-                android:drawableStart="@drawable/ic_yuz_film"
-                android:drawableTint="@color/yuz_text"
-                android:foreground="?attr/selectableItemBackground"
-                android:gravity="center_vertical"
-                android:paddingStart="@dimen/yuz_space_3"
-                android:paddingTop="@dimen/yuz_space_2"
-                android:paddingEnd="@dimen/yuz_space_3"
-                android:paddingBottom="@dimen/yuz_space_2"
-                android:text="@string/story_view"
-                android:textColor="@color/yuz_text"
-                android:textSize="@dimen/yuz_text_secondary" />
-        </LinearLayout>
+            android:paddingBottom="@dimen/yuz_space_2"
+            android:scrollbars="none" />
     </LinearLayout>
 
     <!-- StoryRecorder uchun yashirin langar: 56dp FAB (ko'rinmaydi, lekin
