@@ -66,12 +66,25 @@ object YuzCrashJar {
             }
             val scroll = ScrollView(activity)
             scroll.addView(tv)
+            // #156: release build'da ham crash matni ko'rinadi (bizning yagona
+            // adb'siz diagnostika kanalimiz), lekin ichki "pult" tili o'rniga
+            // foydalanuvchiga tushunarli til + bir bosishli nusxa olish.
             android.app.AlertDialog.Builder(activity)
-                .setTitle("Oxirgi crash — matnni belgilab, pult'ga yuboring")
+                .setTitle("Ilova nosozligi qayd etildi")
                 .setView(scroll)
+                .setNeutralButton("Nusxa olish") { _, _ -> copyToClipboard(activity, text) }
                 .setPositiveButton(android.R.string.ok, null)
                 .show()
         } catch (_: Throwable) {
+        }
+    }
+
+    private fun copyToClipboard(context: Context, text: String) {
+        runCatching {
+            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                as android.content.ClipboardManager
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("yuzgram-crash", text))
+            android.widget.Toast.makeText(context, "Nusxa olindi", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 }

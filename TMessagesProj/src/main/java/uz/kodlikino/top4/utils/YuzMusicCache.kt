@@ -72,6 +72,36 @@ object YuzMusicCache {
     }
 
     /** Saqlangan fayl (barcha mumkin bo'lgan kengaytmalarni tekshiradi). */
+    // #157: noma'lum kengaytmali fayllar uchun papka skanini 5 soniya eslab
+    // qolamiz. playQueue 150 trek uchun localFile chaqiradi va har biri to'liq
+    // listFiles() + 2-3 stat qilardi — ijro boshlanishidan oldin ASOSIY oqimda
+    // 100-300 ms to'xtalish (refreshDownloading'da ham takroran).
+    @Volatile
+    private var scanMap: Map<Long, File>? = null
+
+    @Volatile
+    private var scanAt = 0L
+    private const val SCAN_TTL = 5_000L
+
+    private fun scanOf(d: File): Map<Long, File> {
+        val cachedScan = scanMap
+        if (cachedScan != null &&
+            android.os.SystemClock.elapsedRealtime() - scanAt < SCAN_TTL
+        ) {
+            return cachedScan
+        }
+        val built = HashMap<Long, File>()
+        for (f in d.listFiles().orEmpty()) {
+            if (!f.isFile || f.length() <= 0L || f.name.endsWith(".tmp")) continue
+            if (f.name.substringAfterLast('.', "").lowercase() !in KNOWN_EXT) continue
+            val fid = f.name.substringBeforeLast('.', "").toLongOrNull() ?: continue
+            if (!built.containsKey(fid)) built[fid] = f
+        }
+        scanMap = built
+        scanAt = android.os.SystemClock.elapsedRealtime()
+        return built
+    }
+
     fun localFile(context: Context, id: Long): File? {
         val d = dir(context)
         for (e in EXT) {
@@ -82,11 +112,7 @@ object YuzMusicCache {
         }
         // #133: noma'lum/eski kengaytma (webma, opus...) — nom "$id."
         // bilan boshlansa va audio kengaytmasi bo'lsa, faylni tan olamiz.
-        return d.listFiles()?.firstOrNull { f ->
-            f.isFile && f.length() > 0L && !f.name.endsWith(".tmp") &&
-                f.name.startsWith("$id.") &&
-                f.name.substringAfterLast('.', "").lowercase() in KNOWN_EXT
-        }
+        return scanOf(d)[id]
     }
 
     fun isDownloaded(context: Context, id: Long): Boolean = localFile(context, id) != null
@@ -745,11 +771,13 @@ object YuzMusicCache {
         // Both paths share a directory; only an atomic rename exposes saved audio.
         if (dst.exists()) runCatching { dst.delete() }
         if (!tmp.renameTo(dst)) return false
+        scanMap = null
         Log.i(TAG, "download OK ${dst.length()}B -> ${dst.name}")
         return true
     }
 
     fun remove(context: Context, id: Long) {
+        scanMap = null
         removeFiles(dir(context), id)
         // #155: resume-qoldiqlari ($id-<itag>.tmp) ham o'chsin — keyingi
         // yuklash toza boshlanadi.
@@ -850,6 +878,7 @@ object YuzMusicCache {
 
     /** [MAX_BYTES]'dan chiqib ketsa — eng eski ishlatilganlarni o'chiramiz. */
     private fun evict(context: Context, keepId: Long) {
+        scanMap = null
         val d = dir(context)
         val arr = index(context)
         val entries = ArrayList<JSONObject>()

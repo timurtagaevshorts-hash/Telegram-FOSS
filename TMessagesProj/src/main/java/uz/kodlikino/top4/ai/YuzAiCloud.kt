@@ -38,7 +38,11 @@ object YuzAiCloud {
                     .put("peers", JSONArray(peers.take(120)))
                     // Tezlik: /voice ichida TTS kutmaymiz — javob ovozi keyin /speak'dan olinadi.
                     .put("speak", false)
-                val resp = post("$BASE/voice", body.toString(), 8000, 30000) ?: return@withContext null
+                // #157: oldingi 3 savol/javob — davom ettiruvchi buyruqlar uchun.
+                uz.kodlikino.top4.utils.YuzgramAiBrain.historyJson()?.let { body.put("h", it) }
+                // #157: 30s o'qish vaqti orbni osib qo'yardi — 15s'da zaxira
+                // (tizim mikrofoni) ishga tushadi.
+                val resp = post("$BASE/voice", body.toString(), 8000, 15000) ?: return@withContext null
                 val j = JSONObject(resp)
                 if (j.has("error") && !j.has("i")) return@withContext null
                 val audio = j.optString("ab64").takeIf { it.isNotBlank() }?.let {
@@ -52,7 +56,12 @@ object YuzAiCloud {
                     goto = j.optString("g"),
                     answer = j.optString("a"),
                     audio = audio
-                )
+                ).also { r ->
+                    // #157: ovozli suhbat ham xotiraga yoziladi (matnli yo'l bilan birga).
+                    if (r.transcript.isNotBlank() && r.answer.isNotBlank()) {
+                        uz.kodlikino.top4.utils.YuzgramAiBrain.remember(r.transcript, r.answer)
+                    }
+                }
             } catch (_: Exception) {
                 null
             }
@@ -89,7 +98,21 @@ object YuzAiCloud {
         // disconnect() YO'Q — pool socket'ni keyingi /voice o'rib oladi.
     }
 
+    /** 429 (limit) xabari — UI foydalanuvchiga SABABNI aytishi uchun. */
+    @Volatile
+    var lastRateMessage: String? = null
+        private set
+
+    private fun rateText(c: HttpURLConnection): String? = try {
+        c.errorStream?.bufferedReader()?.use { it.readText() }
+            ?.let { JSONObject(it).optString("a").trim() }
+            ?.takeIf { it.length > 3 }
+    } catch (_: Exception) {
+        null
+    }
+
     private fun post(url: String, jsonBody: String, connectMs: Int, readMs: Int): String? {
+        lastRateMessage = null
         var connection: HttpURLConnection? = null
         var healthy = false
         return try {
@@ -102,7 +125,13 @@ object YuzAiCloud {
                 setRequestProperty("User-Agent", "YuzGram-AI/2.0")
             }
             connection.outputStream.use { it.write(jsonBody.toByteArray(Charsets.UTF_8)) }
-            if (connection.responseCode !in 200..299) return null
+            val code = connection.responseCode
+            if (code !in 200..299) {
+                // #157: worker 429 da tayyor o'zbekcha xabar qaytaradi — uni
+                // chiqarib yubormaymiz, aks holda "aloqa uzildi" deyiladi.
+                if (code == 429) lastRateMessage = rateText(connection)
+                return null
+            }
             val text = connection.inputStream.bufferedReader().use { it.readText() }
             healthy = true
             text

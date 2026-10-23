@@ -27,17 +27,57 @@ object YuzgramAiBrain {
     /** Tarmoqsiz, bir zumda javob beriladigan savollar (soat, sana, salomlashuv). */
     fun quickAnswer(question: String): String? = localAnswer(question.trim())
 
+    // ------------------------------------------------------------- #157 xotira
+    /**
+     * YuzGram #157: suhbat xotirasi. Ilgari har bir so'rov BIR TARMOQLI edi —
+     * "unga yana yoz", "batafsilroq ayt" kabi davom ettiruvchi gaplar umuman
+     * ishlamasdi. Endi oxirgi [MEMORY_TURNS] savol/javob jufti worker'ga "h"
+     * ro'yxatida yuboriladi; matnli va ovozli yo'l bitta xotirani bo'lishadi.
+     */
+    private const val MEMORY_TURNS = 3
+    private const val MEMORY_CHARS = 200
+    private val memory = ArrayDeque<Pair<String, String>>()
+
+    fun remember(question: String, answer: String) {
+        val q = question.trim().take(MEMORY_CHARS)
+        val a = answer.trim().take(MEMORY_CHARS)
+        if (q.isEmpty() || a.isEmpty()) return
+        synchronized(memory) {
+            memory.addLast(q to a)
+            while (memory.size > MEMORY_TURNS) memory.removeFirst()
+        }
+    }
+
+    fun clearMemory() {
+        synchronized(memory) { memory.clear() }
+    }
+
+    /** Worker'ga ketadigan oldingi suhbat; bo'sh bo'lsa null (ortiqcha bayt yo'q). */
+    fun historyJson(): JSONArray? {
+        val out = JSONArray()
+        synchronized(memory) {
+            for (pair in memory) {
+                out.put(JSONObject().put("r", "user").put("t", pair.first))
+                out.put(JSONObject().put("r", "model").put("t", pair.second))
+            }
+        }
+        return if (out.length() == 0) null else out
+    }
+
     suspend fun answer(question: String): String = withContext(Dispatchers.IO) {
         val q = question.trim()
         if (q.isBlank()) return@withContext "Ha, eshitaman. Savolingizni ayting."
-        localAnswer(q)?.let { return@withContext it }
+        localAnswer(q)?.let { remember(q, it); return@withContext it }
         if (isWeather(q)) {
-            weatherAnswer()?.let { return@withContext it }
+            weatherAnswer()?.let { remember(q, it); return@withContext it }
         }
         if (AI_PROXY_URL.isNotBlank()) {
-            llmAnswer(q)?.let { return@withContext it }
+            llmAnswer(q)?.let { remember(q, it); return@withContext it }
         }
-        wikipediaAnswer(q) ?: fallback(q)
+        // #157: worker limit (429) bergan bo'lsa SABABNI aytamiz — Wikipedia'ga
+        // tushib "manba topa olmadim" deyish foydalanuvchini chalkashtiradi.
+        rateLimitedMessage?.let { return@withContext it }
+        (wikipediaAnswer(q) ?: fallback(q)).also { remember(q, it) }
     }
 
     /**
@@ -46,8 +86,9 @@ object YuzgramAiBrain {
      */
     private fun llmAnswer(question: String): String? {
         return try {
-            val body = JSONObject().put("q", question).toString()
-            val response = httpPostJson(AI_PROXY_URL, body) ?: return null
+            val body = JSONObject().put("q", question)
+            historyJson()?.let { body.put("h", it) }
+            val response = httpPostJson(AI_PROXY_URL, body.toString()) ?: return null
             val text = JSONObject(response).optString("a").trim()
             if (text.length < 2) null else text
         } catch (_: Exception) {
@@ -68,7 +109,10 @@ object YuzgramAiBrain {
                 setRequestProperty("User-Agent", "YuzgramAI/1.0")
             }
             connection.outputStream.use { it.write(jsonBody.toByteArray(Charsets.UTF_8)) }
-            if (connection.responseCode !in 200..299) return null
+            if (connection.responseCode !in 200..299) {
+                rateLimitedMessage = rateText(connection)
+                return null
+            }
             val text = connection.inputStream.bufferedReader().use { it.readText() }
             healthy = true
             text
@@ -81,6 +125,20 @@ object YuzgramAiBrain {
                 try { connection?.disconnect() } catch (_: Exception) { }
             }
         }
+    }
+
+    /** Oxirgi 429 (limit) xabari — worker o'zbekcha tayyor matn qaytaradi. */
+    @Volatile
+    var rateLimitedMessage: String? = null
+        private set
+
+    private fun rateText(connection: HttpURLConnection): String? = try {
+        if (connection.responseCode != 429) null
+        else connection.errorStream?.bufferedReader()?.use { it.readText() }
+            ?.let { JSONObject(it).optString("a").trim() }
+            ?.takeIf { it.length > 3 }
+    } catch (_: Exception) {
+        null
     }
 
     private fun localAnswer(raw: String): String? {

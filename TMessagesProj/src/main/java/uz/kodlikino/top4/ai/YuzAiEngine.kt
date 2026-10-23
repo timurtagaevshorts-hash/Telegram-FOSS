@@ -281,7 +281,7 @@ object YuzAiEngine {
         }
 
         // 4) Bilinadigan nom: "sardor qalesan bugun kelasanmi" -> Sardor'ga yuborish.
-        val smart = findPeer(tokens, normed, account)
+        val smart = findPeer(tokens, normed, account, allowFuzzy = false)
         if (smart != null) {
             val body = cleanBody(tokens, smart.nameIndices)
             return if (body.isBlank()) Intent.NeedBody(smart.peer) else Intent.SendText(smart.peer, body)
@@ -372,7 +372,12 @@ object YuzAiEngine {
      * Nomni BARCHA tokenlar bo'yicha izlaydi (ism, familiya, username),
      * eng uzun/aniq moslik g'olib bo'ladi.
      */
-    private fun findPeer(tokens: List<String>, normed: List<String>, account: Int): PeerMatch? {
+    private fun findPeer(
+        tokens: List<String>,
+        normed: List<String>,
+        account: Int,
+        allowFuzzy: Boolean = true
+    ): PeerMatch? {
         val list = peers(account)
         if (list.isEmpty()) return null
         var bestPeer: Peer? = null
@@ -384,6 +389,10 @@ object YuzAiEngine {
             if (isStopToken(token)) continue
             for (peer in list) {
                 val score = scoreToken(token, peer)
+                // #157: buyruq so'zi bo'lmagan "aqlli yuborish"da bitta harf
+                // farqli (Levenshtein-1) moslik 300..999 ball beradi — tasodifiy
+                // so'z kontaktni topib, XABARNI RUXSATSIZ yuborib yuborardi.
+                if (!allowFuzzy && score in 300..999) continue
                 if (score > bestScore) {
                     bestScore = score
                     bestPeer = peer

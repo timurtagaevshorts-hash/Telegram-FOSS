@@ -324,7 +324,9 @@ class YuzAiOverlayService : Service() {
             if (destroyed) return@launch
             if (res == null) {
                 setOrb(YuzAiOrbView.Mode.IDLE)
-                speak(getString(R.string.ai_cloud_fallback))
+                // #157: limit (429) sababini aytamiz — "aloqa uzildi" emas.
+                val rate = YuzAiCloud.lastRateMessage
+                speak(if (!rate.isNullOrBlank()) rate else getString(R.string.ai_cloud_fallback))
                 return@launch
             }
             if (res.transcript.isBlank()) {

@@ -359,6 +359,14 @@ class YuzAiActivity : BaseFragment() {
                 return@launch
             }
             if (res == null) {
+                // #157: worker limit (429) bergan bo'lsa — sababni o'zi aytadi,
+                // offline STT'ga o'tishning foydasi yo'q (u ham /chat'ga boradi).
+                YuzAiCloud.lastRateMessage?.takeIf { it.isNotBlank() }?.let { rate ->
+                    statusView.text = rate
+                    assistant(rate)
+                    setOrb(YuzAiOrbView.Mode.IDLE)
+                    return@launch
+                }
                 // Muloqot uzildi — tizim mikrofoni (offline STT) zaxirasiga o'tamiz.
                 val m = ctx.getString(R.string.ai_cloud_fallback)
                 statusView.text = m

@@ -100,9 +100,29 @@ object YuzNpeExtractor {
      * videoId uchun sof audio oqimlar (bitrate bo'yicha eng yuqori avval).
      * Xato bo'lsa bo'sh ro'yxat — chaqiruvchi o'z zanjiriga o'tadi.
      */
+    // #157: NewPipeExtractor v0.24.5 pinlangan va YouTube o'zgarishida butunlay
+    // o'lishi mumkin. O'lik bo'lsa har bir resolve/refresh watch-page + Rhino
+    // "n" decipher uchun 1-3 SONIYA yo'qotardi (InnerTube zanjiridan oldin).
+    // Ketma-ket 2 muvaffaqiyatsiz urinish -> 10 daqiqaga o'chiramiz; bitta
+    // muvaffaqiyat hisoblagichni nollaydi. Tartib O'ZGARMAYDI: NPE ishlab
+    // turganda u birinchi bo'lib qoladi (to'liq treklar shu decipher'ga bog'liq).
+    @Volatile
+    private var npeFailStreak = 0
+
+    @Volatile
+    private var npeDisabledUntil = 0L
+
+    private fun noteNpeFailure() {
+        if (++npeFailStreak >= 2) {
+            npeDisabledUntil = android.os.SystemClock.elapsedRealtime() + 10 * 60_000L
+            Log.i(TAG, "npe circuit OPEN 10m (streak=$npeFailStreak)")
+        }
+    }
+
     fun audioStreams(videoId: String, max: Int = 4): List<YuzAudioStream> {
         if (!ready) ensureInit()
         if (!ready) return emptyList()
+        if (android.os.SystemClock.elapsedRealtime() < npeDisabledUntil) return emptyList()
         return try {
             val info = StreamInfo.getInfo("https://www.youtube.com/watch?v=$videoId")
             val out = ArrayList<YuzAudioStream>()
@@ -120,9 +140,14 @@ object YuzNpeExtractor {
                     )
                 )
             }
+            if (out.isEmpty()) noteNpeFailure() else {
+                npeFailStreak = 0
+                npeDisabledUntil = 0L
+            }
             Log.i(TAG, "npe $videoId -> ${out.size} audio (${out.firstOrNull()?.ext})")
             out
         } catch (e: Throwable) {
+            noteNpeFailure()
             Log.i(TAG, "npe fail $videoId ${e.javaClass.simpleName}: ${e.message?.take(120)}")
             emptyList()
         }

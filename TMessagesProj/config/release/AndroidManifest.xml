@@ -13,6 +13,12 @@
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
 
+    <!-- #156 Play siyosati: Play orqali tarqatiladigan ilova APK o'rnatishni
+         so'ramasligi kerak (REQUEST_INSTALL_PACKAGES rad etilish sababi).
+         Telegram-FOSS upstream'dan kelgan ikkita e'lon release varianta'dan
+         olib tashlanadi; debug build'da (Telegram orqali tarqatish) qoladi. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove"/>
+
     <application
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"

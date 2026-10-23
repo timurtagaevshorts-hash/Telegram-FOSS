@@ -64,8 +64,14 @@ object YuzYouTubeApi {
 
     /** videoId bo'yicha ijroga MOS eng sifatli sof audio oqimini topadi. */
     fun resolveStream(videoId: String): YuzAudioStream? {
-        val l = streamsFor(videoId)
-        if (l.isEmpty()) return null
+        val all = streamsFor(videoId)
+        if (all.isEmpty()) return null
+        // #157: media3 buffer'lanmagan har qanday seek'da DataSource'ni QAYTA
+        // ochadi va resolveStream yana ishlaydi. O'sha paytda taroq tezligi
+        // pasaygan bo'lsa fitThroughput boshqa KONTEYNERga o'tib ketardi
+        // (m4a -> webm/opus), ProgressiveMediaPeriod esa prepare paytida
+        // tanlangan Mp4Extractor'da qolgan — oqim buzilar, ovoz g'oyib bo'lardi.
+        val l = sameItag(videoId, all)
         val i = attempt[videoId] ?: 0
         // Rotatsiya rejimida (oldingisi 403 berdi) tartib bo'yicha keyingisi.
         // #120: bir martalik 403 video uchun rotatsiyani MAG'ULI QILIB
@@ -74,9 +80,22 @@ object YuzYouTubeApi {
         // qaytamiz; yangi 403 noteBadStream() counter'ni yana ko'taradi.
         if (i > 0) {
             attempt[videoId] = i - 1
-            return l[i % l.size]
+            return l[i % l.size].also { pinItag(videoId, it) }
         }
-        return fitThroughput(l)
+        return fitThroughput(l).also { pinItag(videoId, it) }
+    }
+
+    /** Tanlangan itag'ni shu video uchun qo'zg'atmaymiz (rotatsiya shu itag ichida). */
+    private val pinnedItag = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    private fun pinItag(videoId: String, s: YuzAudioStream) {
+        itagOf(s.url)?.let { pinnedItag[videoId] = it }
+    }
+
+    private fun sameItag(videoId: String, list: List<YuzAudioStream>): List<YuzAudioStream> {
+        val want = pinnedItag[videoId] ?: return list
+        val same = list.filter { itagOf(it.url) == want }
+        return if (same.isEmpty()) list else same
     }
 
     /**
@@ -248,6 +267,7 @@ object YuzYouTubeApi {
     fun resetRotation() {
         attempt.clear()
         used.clear()
+        pinnedItag.clear()
     }
 
     private fun collectFromVideo(
@@ -264,13 +284,22 @@ object YuzYouTubeApi {
             android.util.Log.i("YuzMusic", "player $videoId ${c.name} -> $st")
             return
         }
+        val cleans = ArrayList<YuzAudioStream>()
         for (s in audioFormats(p, c.ua)) {
-            if (out.size >= max) return
+            if (out.size >= max) break
             if (seen.add(s.url)) out.add(s)
             val clean = stripN(s.url)
-            if (clean != s.url && out.size < max && seen.add(clean)) {
-                out.add(YuzAudioStream(clean, s.ext, s.approxBytes, c.ua, s.bitrate))
+            if (clean != s.url && !seen.contains(clean)) {
+                cleans.add(YuzAudioStream(clean, s.ext, s.approxBytes, c.ua, s.bitrate))
             }
+        }
+        // #157: "n" throttling'siz egizaklarni ORTGA suramiz. Ilgari ular har
+        // formatning yoniga juft bo'lib kirardi: rotatsiyaning 1-qadami
+        // throttled URL'ga tushar, max=6 sig'imi esa faqat 3 ta haqiqiy
+        // formatni sig'dirardi.
+        for (cs in cleans) {
+            if (out.size >= max) break
+            if (seen.add(cs.url)) out.add(cs)
         }
     }
 

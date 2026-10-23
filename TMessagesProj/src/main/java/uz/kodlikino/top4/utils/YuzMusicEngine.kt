@@ -275,6 +275,10 @@ object YuzMusicEngine {
             // uchun 2s yetadi (eski 0.9s juda erta edi: o'yin boshlanib,
             // birinchi oyna tugamay tinch holatga qaytardi).
             .setBufferDurationsMs(20000, 60000, 2000, 4000)
+            // #157 orqaga seek: back buffer 0 edi — har bir orqaga siljish
+            // oqimni qayta ochardi (0.3-1.5s jimlik + format almashish xavfi).
+            // 60s ~1MB (128kbps) — seek buffer ichida bo'lsa darhol bajariladi.
+            .setBackBuffer(60_000, true)
             .build()
         val p = ExoPlayer.Builder(appCtx)
             .setMediaSourceFactory(ProgressiveMediaSource.Factory(http))
@@ -306,6 +310,17 @@ object YuzMusicEngine {
                 itemRetries = 0
                 Log.i(TAG, "transition idx=${p.currentMediaItemIndex} vid=${tagOf(item)?.videoId}")
                 notifyItemChanged(item)
+                // #157: give-up yo'li (seekToNextMediaItem + prepare) BUFFERING
+                // ichida yangi transition holatini O'ZGARTIRMAYDI, shuning uchun
+                // watchdog qayta qurollanmasdi — ikkinchi tiqilgan qo'shiq
+                // pleyerni abadiy BUFFERING'da qoldirardi ("pleyer o'ldi").
+                if (p.playbackState == Player.STATE_BUFFERING) {
+                    val rearm = android.os.SystemClock.elapsedRealtime()
+                    bufferingStarted = rearm
+                    stallMark = rearm
+                    lastBuffered = p.bufferedPosition
+                    ui.postDelayed(bufferingWatchdog, 2000L)
+                }
                 prefetchNext(p, p.currentMediaItemIndex)
                 markPlayed(item)
                 prebufferNext(p, p.currentMediaItemIndex)
