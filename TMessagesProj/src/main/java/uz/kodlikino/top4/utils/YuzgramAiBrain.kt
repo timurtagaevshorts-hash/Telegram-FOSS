@@ -4,8 +4,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -97,34 +95,14 @@ object YuzgramAiBrain {
     }
 
     private fun httpPostJson(url: String, jsonBody: String): String? {
-        var connection: HttpURLConnection? = null
-        var healthy = false
-        return try {
-            connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 6000
-                readTimeout = 12000
-                requestMethod = "POST"
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                setRequestProperty("User-Agent", "YuzgramAI/1.0")
-            }
-            connection.outputStream.use { it.write(jsonBody.toByteArray(Charsets.UTF_8)) }
-            if (connection.responseCode !in 200..299) {
-                rateLimitedMessage = rateText(connection)
-                return null
-            }
-            val text = connection.inputStream.bufferedReader().use { it.readText() }
-            healthy = true
-            text
-        } catch (_: Exception) {
-            null
-        } finally {
-            // holdiskiy so'rovlar (worker keep-alive, wikipedia zanjiri) socket'ni
-            // qayta topsin — muvaffaqiyatli javobda disconnect yo'q.
-            if (!healthy) {
-                try { connection?.disconnect() } catch (_: Exception) { }
-            }
+        // #160: OkHttp + IPv4-first DNS. HttpURLConnection bitta manzilni
+        // sinardi va qora tuynuk IPv6'da so'rov butunlay so'nardi.
+        val r = YuzNet.postJson(url, jsonBody, 6000, 12000, "YuzgramAI/1.0") ?: return null
+        if (r.code !in 200..299) {
+            rateLimitedMessage = rateText(r)
+            return null
         }
+        return r.body
     }
 
     /** Oxirgi 429 (limit) xabari — worker o'zbekcha tayyor matn qaytaradi. */
@@ -132,11 +110,9 @@ object YuzgramAiBrain {
     var rateLimitedMessage: String? = null
         private set
 
-    private fun rateText(connection: HttpURLConnection): String? = try {
-        if (connection.responseCode != 429) null
-        else connection.errorStream?.bufferedReader()?.use { it.readText() }
-            ?.let { JSONObject(it).optString("a").trim() }
-            ?.takeIf { it.length > 3 }
+    private fun rateText(r: YuzNet.Reply): String? = try {
+        if (r.code != 429) null
+        else JSONObject(r.body).optString("a").trim().takeIf { it.length > 3 }
     } catch (_: Exception) {
         null
     }
@@ -271,26 +247,7 @@ object YuzgramAiBrain {
         "Bu haqida aniq manba topa olmadim. Savolni boshqacha ayting, yoki xabar yuborish kabi buyruq bering."
 
     private fun httpGet(url: String): String? {
-        var connection: HttpURLConnection? = null
-        var healthy = false
-        return try {
-            connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 5000
-                readTimeout = 5000
-                requestMethod = "GET"
-                setRequestProperty("User-Agent", "YuzgramAI/1.0")
-                instanceFollowRedirects = true
-            }
-            if (connection.responseCode !in 200..299) return null
-            val text = connection.inputStream.bufferedReader().use { it.readText() }
-            healthy = true
-            text
-        } catch (_: Exception) {
-            null
-        } finally {
-            if (!healthy) {
-                try { connection?.disconnect() } catch (_: Exception) { }
-            }
-        }
+        val r = YuzNet.get(url, 5000, 5000, "YuzgramAI/1.0") ?: return null
+        return if (r.code in 200..299) r.body else null
     }
 }

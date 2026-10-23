@@ -38,6 +38,7 @@ object YuzArtwork {
     private const val KEEP_FILES = 80
 
     private val http = OkHttpClient.Builder()
+        .dns(uz.kodlikino.top4.utils.YuzNet.DNS_V4_FIRST)
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()

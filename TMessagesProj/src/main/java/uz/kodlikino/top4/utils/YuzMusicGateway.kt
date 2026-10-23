@@ -21,6 +21,7 @@ object YuzMusicGateway {
     private const val BASE = "https://yuzgram-ai-proxy.timurtagaevshorts.workers.dev"
 
     private val http = OkHttpClient.Builder()
+        .dns(uz.kodlikino.top4.utils.YuzNet.DNS_V4_FIRST)
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()

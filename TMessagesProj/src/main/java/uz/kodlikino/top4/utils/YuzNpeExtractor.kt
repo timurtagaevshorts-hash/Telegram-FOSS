@@ -32,6 +32,7 @@ object YuzNpeExtractor {
             "Chrome/140.0.0.0 Safari/537.36"
 
     private val http = OkHttpClient.Builder()
+        .dns(uz.kodlikino.top4.utils.YuzNet.DNS_V4_FIRST)
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()

@@ -263,6 +263,7 @@ object YuzMusicEngine {
             )
         }
         val okHttp = OkHttpClient.Builder()
+            .dns(uz.kodlikino.top4.utils.YuzNet.DNS_V4_FIRST)
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)

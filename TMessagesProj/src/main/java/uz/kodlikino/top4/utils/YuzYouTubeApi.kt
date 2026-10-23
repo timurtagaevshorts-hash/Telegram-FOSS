@@ -38,6 +38,7 @@ object YuzYouTubeApi {
 
     private val JSON_MT = "application/json; charset=utf-8".toMediaType()
     private val http = OkHttpClient.Builder()
+        .dns(uz.kodlikino.top4.utils.YuzNet.DNS_V4_FIRST)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .build()

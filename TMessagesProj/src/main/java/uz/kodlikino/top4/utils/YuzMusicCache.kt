@@ -46,6 +46,7 @@ object YuzMusicCache {
     private const val MAX_BYTES = 220L * 1024 * 1024
 
     private val http = OkHttpClient.Builder()
+        .dns(uz.kodlikino.top4.utils.YuzNet.DNS_V4_FIRST)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(45, TimeUnit.SECONDS)
         .build()

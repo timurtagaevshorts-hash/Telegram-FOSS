@@ -85,6 +85,7 @@ object InstagramMediaResolver {
 
     private val client by lazy {
         OkHttpClient.Builder()
+            .dns(uz.kodlikino.top4.utils.YuzNet.DNS_V4_FIRST)
             .connectTimeout(25, TimeUnit.SECONDS)
             .readTimeout(45, TimeUnit.SECONDS)
             .followRedirects(true)

@@ -5,8 +5,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * /voice natijasi: bitta Gemini chaquvda transkripsiya + niyat + javob (+ inson ovozi WAV).
@@ -42,7 +40,7 @@ object YuzAiCloud {
                 uz.kodlikino.top4.utils.YuzgramAiBrain.historyJson()?.let { body.put("h", it) }
                 // #157: 30s o'qish vaqti orbni osib qo'yardi — 15s'da zaxira
                 // (tizim mikrofoni) ishga tushadi.
-                val resp = post("$BASE/voice", body.toString(), 8000, 15000) ?: return@withContext null
+                val resp = post("$BASE/voice", body.toString(), 8000, 20000) ?: return@withContext null
                 val j = JSONObject(resp)
                 if (j.has("error") && !j.has("i")) return@withContext null
                 val audio = j.optString("ab64").takeIf { it.isNotBlank() }?.let {
@@ -84,18 +82,9 @@ object YuzAiCloud {
      * OPTIONS — worker darhol javob beradi (Gemini chaqilmaydi, rate-limit sanalmaydi).
      */
     suspend fun warmup() = withContext(Dispatchers.IO) {
-        try {
-            val c = (URL("$BASE/chat").openConnection() as HttpURLConnection).apply {
-                connectTimeout = 4000
-                readTimeout = 4000
-                requestMethod = "OPTIONS"
-            }
-            // Body TO'LIQ o'qilsa Android socket'ni pool'da saqlaydi (keep-alive).
-            c.inputStream.use { it.readBytes() }
-            Unit
-        } catch (_: Exception) {
-        }
-        // disconnect() YO'Q — pool socket'ni keyingi /voice o'rib oladi.
+        // #160: umumiy OkHttp pooli — DNS (IPv4 oldin) + TLS bir marta isiydi,
+        // keyingi /voice va /speak so'rovlari handshake to'lamaydi.
+        uz.kodlikino.top4.utils.YuzNet.warm("$BASE/chat", 4000)
     }
 
     /** 429 (limit) xabari — UI foydalanuvchiga SABABNI aytishi uchun. */
@@ -103,47 +92,24 @@ object YuzAiCloud {
     var lastRateMessage: String? = null
         private set
 
-    private fun rateText(c: HttpURLConnection): String? = try {
-        c.errorStream?.bufferedReader()?.use { it.readText() }
-            ?.let { JSONObject(it).optString("a").trim() }
-            ?.takeIf { it.length > 3 }
+    private fun rateText(r: uz.kodlikino.top4.utils.YuzNet.Reply): String? = try {
+        if (r.code != 429) null
+        else JSONObject(r.body).optString("a").trim().takeIf { it.length > 3 }
     } catch (_: Exception) {
         null
     }
 
     private fun post(url: String, jsonBody: String, connectMs: Int, readMs: Int): String? {
         lastRateMessage = null
-        var connection: HttpURLConnection? = null
-        var healthy = false
-        return try {
-            connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = connectMs
-                readTimeout = readMs
-                requestMethod = "POST"
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                setRequestProperty("User-Agent", "YuzGram-AI/2.0")
-            }
-            connection.outputStream.use { it.write(jsonBody.toByteArray(Charsets.UTF_8)) }
-            val code = connection.responseCode
-            if (code !in 200..299) {
-                // #157: worker 429 da tayyor o'zbekcha xabar qaytaradi — uni
-                // chiqarib yubormaymiz, aks holda "aloqa uzildi" deyiladi.
-                if (code == 429) lastRateMessage = rateText(connection)
-                return null
-            }
-            val text = connection.inputStream.bufferedReader().use { it.readText() }
-            healthy = true
-            text
-        } catch (_: Exception) {
-            null
-        } finally {
-            // Muvaffaqiyatli so'rovda disconnect QILMAYMIZ — Android HTTPS
-            // keep-alive pooli keyingi socket'ni qayta ishlatadi (~300-500 ms
-            // TLS handshake tejaldi: /voice -> /speak ketma-ketligida).
-            if (!healthy) {
-                try { connection?.disconnect() } catch (_: Exception) { }
-            }
+        val r = uz.kodlikino.top4.utils.YuzNet.postJson(
+            url, jsonBody, connectMs, readMs, "YuzGram-AI/2.0"
+        ) ?: return null
+        if (r.code !in 200..299) {
+            // #157: worker 429 da tayyor o'zbekcha xabar qaytaradi — uni
+            // chiqarib yubormaymiz, aks holda "aloqa uzildi" deyiladi.
+            if (r.code == 429) lastRateMessage = rateText(r)
+            return null
         }
+        return r.body
     }
 }
