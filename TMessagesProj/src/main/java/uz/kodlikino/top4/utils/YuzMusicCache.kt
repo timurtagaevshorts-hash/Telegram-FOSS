@@ -110,6 +110,13 @@ object YuzMusicCache {
         var result: DownloadResult? = null
         @Volatile var pct = 0
         @Volatile var rate = 0
+        // #155: foydalanuvchi o'zi bosgan yuklash. Fon (prebuffer/silent)
+        // operatsiyasiga UI'dan attach bo'lsa ham shu flag ko'tariladi:
+        // (1) qattiq backgroundGate (bekor qiluvchi) o'rniga yumshoq eshik
+        //     ishlatiladi — ijro buffering'i foydalanuvchi yuklashini
+        //     CANCELED qila olmaydi;
+        // (2) FAILED bo'lsa progress saqlangan holda auto-retry yuradi.
+        @Volatile var userJoined = false
         private var lastGot = 0L
         private var lastAt = 0L
 
@@ -160,8 +167,12 @@ object YuzMusicCache {
 
     fun download(context: Context, track: YuzTrack, onProgress: ((Int) -> Unit)? = null, onDone: (DownloadResult) -> Unit) {
         val fresh = Inflight(track)
+        fresh.userJoined = true
         val existing = inflight.putIfAbsent(track.id, fresh)
         val operation = existing ?: fresh
+        // #155: fon prebuffer'iga attach bo'lgan taqdirda ham yuklash
+        // "foydalanuvchiniki"ga aylanadi — bekor qilinmaydi, retry oladi.
+        operation.userJoined = true
         synchronized(operation) {
             val result = operation.result
             if (result != null) {
@@ -192,15 +203,38 @@ object YuzMusicCache {
             // rejimda esa Yumshoq eshik hech qachon bekor qilmaydi, faqat
             // pleyer buffering'da yoki zaxirasi kam bo'lganda qisqa dam
             // beradi — sekin internetda ikkalasi ham ishlaydi.
-            val wait = backgroundGate?.invoke() ?: YuzMusicEngine.softDownloadGate()
+            // #155: foydalanuvchi yuklashi (userJoined) hech qachon qattiq
+            // eshikka tushmaydi — buffering uni BEKOR QILA olmaydi.
+            val wait = if (operation.userJoined) {
+                YuzMusicEngine.softDownloadGate()
+            } else {
+                backgroundGate?.invoke() ?: YuzMusicEngine.softDownloadGate()
+            }
             if (wait < 0L) cancellation.cancel()
             wait
         }
-        val ok = runCatching {
-            cancellation.scoped {
-                downloadBlocking(context, operation.track, gate, operation::update, cancellation)
+        // #155: foydalanuvchi yuklashi FAILED bo'lsa — progress saqlanadi
+        // (tmp qoladi, keyingi urinish davom etadi) va 12 sekunddan keyin
+        // yana sinab ko'riladi: zaif/o'zgaruvchan tarmoqda bitta raund
+        // kamlik qiladi, "to'xtab qoldi" ko'rinar edi. Jami 3 raund.
+        var ok = false
+        var round = 0
+        while (true) {
+            ok = runCatching {
+                cancellation.scoped {
+                    downloadBlocking(context, operation.track, gate, operation::update, cancellation)
+                }
+            }.getOrDefault(false)
+            round++
+            if (ok || cancellation.canceled || !operation.userJoined || round >= 3) break
+            Log.i(TAG, "download round $round FAILED vid=${operation.track.videoId} — 12s'dan keyin qayta")
+            try {
+                Thread.sleep(12_000L)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                break
             }
-        }.getOrDefault(false)
+        }
         val result = when {
             ok -> DownloadResult.DONE
             cancellation.canceled -> DownloadResult.CANCELED
@@ -273,10 +307,11 @@ object YuzMusicCache {
         return false
     }
 
-    /** #104: tugallanmagan .tmp qoldiqlari (eski nom va yangi "id-<nano>.tmp"). */
+    /** #104/#155: tugallanmagan .tmp qoldiqlari — 72 soatdan eski bo'lsa
+     * (resume imkonini saqlab, uzoq muddatli axlatni yig'ib boramiz). */
     private fun cleanupStaleTmp(context: Context) {
         runCatching {
-            val cutoff = System.currentTimeMillis() - 86_400_000L
+            val cutoff = System.currentTimeMillis() - 3 * 86_400_000L
             dir(context).listFiles()?.forEach { f ->
                 if (f.name.endsWith(".tmp") && f.lastModified() < cutoff) f.delete()
             }
@@ -306,10 +341,15 @@ object YuzMusicCache {
         cancellation: YuzDownloadCancellation
     ): Int {
         val id = track.id
-        // #104: har urinishga O'Z tmp nomi — ikki ip bir faylga yozib,
-        // uni buzishi endi imkonsiz.
-        val tmp = File(dir(context), "$id-${System.nanoTime()}.tmp")
-        runCatching { if (tmp.exists()) tmp.delete() }
+        // #155: tmp nomi endi FORMATGA BOG'LIQ VA BARQAROR: "$id-<itag>.tmp".
+        // (1) Ikki ip bir faylga yoza olmaydi — inflight single-flight buni
+        //     oldin ham ta'minlar edi;
+        // (2) Uzilgan/qolgan yuklash KEYINGI urinishda (hatto ilova qayta
+        //     ochilganda) shu fayldan DAVOM ETADI — avval har chaqiruvda yangi
+        //     nanoTime nom yaratilar va tortilgan baytlar yo'qolar edi.
+        //     Turli nomzod (itag) = turli fayl: formatlar aralashmaydi.
+        val fp = YuzYouTubeApi.itagOf(stream.url) ?: stream.ext.ifBlank { "raw" }
+        val tmp = File(dir(context), "$id-$fp.tmp")
         // refresh FAQAT shu videoId uchun: muqobil videoning baytlari
         // yarim faylga aralashib ketmasligi kerak.
         val refresh: ((Long, String) -> YuzAudioStream?)? =
@@ -317,11 +357,14 @@ object YuzMusicCache {
         // #109: hajmi aniq katta faylni avval ikki parallel ulanishda
         // tortib ko'ramiz.
         // #133: split uzilsa ham pastki yarmdan yozilgan UZLUKSIZ prefiks
-        // saqlanadi — ketma-ket yo'l o'sha joydan davom etadi. Avval bu
-        // yerda tmp o'chirilardi va sekin tarmoqda 90% tortilgan fayl
-        // noldan qayta boshlanardi ("to'liq yuklanmayapti" sababi).
+        // saqlanadi — ketma-ket yo'l o'sha joydan davom etadi.
+        // #155: mavjud tmp bo'lsa split O'TKAZIB yuboriladi (fayl allaqachon
+        // uzluksiz prefiks — ketma-ket davom ettirish xavfsiz va arzon).
         var resumeAt = 0L
-        if (stream.approxBytes > PAR_MIN) {
+        runCatching {
+            if (tmp.isFile && tmp.length() > 0L) resumeAt = tmp.length()
+        }
+        if (resumeAt <= 0L && stream.approxBytes > PAR_MIN) {
             val split = fetchRangesSplit(context, tmp, track, stream, refresh, gate, progress, cancellation)
             if (split.code != FAIL) return split.code
             resumeAt = split.lowerEnd
@@ -433,7 +476,8 @@ object YuzMusicCache {
                 reader.close()
             }
             if (reader.canceled || cancellation.canceled) {
-                runCatching { tmp.delete() }
+                // #155: progress O'CHIRILMAYDI — keyingi yuklash shu yerdan
+                // davom etadi (barqaror tmp nomi itag bo'yicha topadi).
                 return CANCELED
             }
             // #152: sawEof endi FAQAT haqiqiy oxirda true (416 yoki server
@@ -443,8 +487,9 @@ object YuzMusicCache {
             val complete = got > 0L && (sawEof || (total > 0L && got >= total))
             if (complete && publish(context, tmp, track, stream.ext, cancellation)) return OK
         }
-        Log.i(TAG, "download seq FAIL got=$got expect=${if (total > 0) total else -1}")
-        runCatching { tmp.delete() }
+        // #155: FAIL'da fayl o'chirilmaydi — auto-retry/keyingi bosish shu
+        // prefiksdan davom etadi. Eski qoldiqlarni cleanupStaleTmp yig'adi.
+        Log.i(TAG, "download seq FAIL got=$got expect=${if (total > 0) total else -1} (tmp saqlandi)")
         return FAIL
     }
 
@@ -536,13 +581,27 @@ object YuzMusicCache {
                 "ok=$complete lowerEnd=$lowerEnd"
         )
         if (canceled) {
-            runCatching { tmp.delete() }
-            return SplitOutcome(CANCELED, 0L, total)
+            // #155: bekor qilinganda ham uzluksiz pastki prefiks saqlanadi —
+            // foydalanuvchi qayta bosganda shu joydan davom etadi.
+            val le = lowerWritten.get().coerceIn(0L, mid)
+            if (le > 0L) {
+                runCatching { java.io.RandomAccessFile(tmp, "rw").use { it.setLength(le) } }
+            } else {
+                runCatching { tmp.delete() }
+            }
+            return SplitOutcome(CANCELED, le, total)
         }
         if (complete && publish(context, tmp, track, stream.ext, cancellation)) {
             return SplitOutcome(OK, total, total)
         }
-        // #133: tmp O'CHIRILMAYDI — chaqiruvchi [lowerEnd]'dan davom etadi.
+        // #133/#155: tmp O'CHIRILMAYDI — uzluksiz prefiksgacha KESILADI.
+        // Kesishmasa fayl uzunligida yuqori yarmning baytlari qolardi va
+        // uzunlikka asoslangan resume o'rtadagi teshiklarni o'tkazib yuborardi.
+        if (lowerEnd > 0L) {
+            runCatching { java.io.RandomAccessFile(tmp, "rw").use { it.setLength(lowerEnd) } }
+        } else {
+            runCatching { tmp.delete() }
+        }
         return SplitOutcome(FAIL, lowerEnd, total)
     }
 
@@ -692,6 +751,13 @@ object YuzMusicCache {
 
     fun remove(context: Context, id: Long) {
         removeFiles(dir(context), id)
+        // #155: resume-qoldiqlari ($id-<itag>.tmp) ham o'chsin — keyingi
+        // yuklash toza boshlanadi.
+        runCatching {
+            dir(context).listFiles()?.forEach { f ->
+                if (f.name.startsWith("$id-") && f.name.endsWith(".tmp")) f.delete()
+            }
+        }
         removeIndex(context, id)
         // UI keshi "yuklangan" holatini shu sanoq orqali yangilaydi.
         doneSeq.incrementAndGet()

@@ -171,6 +171,11 @@ object YuzMusicEngine {
     @Volatile private var gateBuffering = false
     @Volatile private var gatePlaying = false
     @Volatile private var gateAhead = 0L
+    // #155: eshik holatining YANGILIK vaqti. Ticker faqat ijro paytida
+    // yuradi — pauza/ekran o'chishida to'xtaydi va gateBuffering eskirgan
+    // holda qolar edi. Stale "buffering" foydalanuvchi yuklashini ABADIY
+    // muzlatib qo'yardi ("ozroq yuklab to'xtab qolyabdi" sabablaridan).
+    @Volatile private var gateAt = 0L
     // #152: "qo'shiq HAQIQATAN tugadimi" nazorati — so'nggi tick'dagi
     // indeks/pozitsiya/davomiylik. Oqim muddatidan oldin uzilsa (truncated
     // EOF) media3 buni oddiy AUTO o'tish deb hisoblaydi; shunda orqaga
@@ -196,6 +201,7 @@ object YuzMusicEngine {
             gateBuffering = p.playbackState == Player.STATE_BUFFERING
             gatePlaying = p.playWhenReady
             gateAhead = (p.bufferedPosition - p.currentPosition).coerceAtLeast(0L)
+            gateAt = android.os.SystemClock.elapsedRealtime()
             tickIndex = p.currentMediaItemIndex
             tickPos = p.currentPosition
             tickDur = p.duration
@@ -525,8 +531,11 @@ object YuzMusicEngine {
      *   0: davom et;   >0: shuncha ms dam ol.
      */
     private fun backgroundGate(): Long {
-        if (gateBuffering) return -1L
-        if (!gatePlaying) return 0L
+        // #155: ticker to'xtagan bo'lsa (pauza, ekran o'chishi) holat
+        // eskirgan — 4 sekunddan eski signal inobatga olinmaydi.
+        val fresh = android.os.SystemClock.elapsedRealtime() - gateAt < 4_000L
+        if (fresh && gateBuffering) return -1L
+        if (!fresh || !gatePlaying) return 0L
         // Ijro zaxirasi 15s'dan kam bo'lsa — tarmoqni pleyerga qoldiramiz.
         return if (gateAhead < 15_000L) 1200L else 0L
     }
@@ -539,8 +548,11 @@ object YuzMusicEngine {
      * ikkalasi ham bir-birini o'ldirmaydi.
      */
     fun softDownloadGate(): Long {
-        if (gateBuffering) return 1500L
-        if (!gatePlaying) return 0L
+        // #155: stale holat yuklashni abadiy muzlatib qo'ymasligi uchun —
+        // 4 sekunddan eski signal "ijro yo'q" deb hisoblanadi.
+        val fresh = android.os.SystemClock.elapsedRealtime() - gateAt < 4_000L
+        if (fresh && gateBuffering) return 1500L
+        if (!fresh || !gatePlaying) return 0L
         return if (gateAhead < 10_000L) 800L else 0L
     }
 
