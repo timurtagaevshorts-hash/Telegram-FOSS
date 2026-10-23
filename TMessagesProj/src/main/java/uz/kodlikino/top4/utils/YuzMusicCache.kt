@@ -349,10 +349,14 @@ object YuzMusicCache {
         { at: Long, cur: String ->
             val itag = YuzYouTubeApi.itagOf(cur)
             if (itag == null) null else {
+                // #161: approxBytes tengligi olib tashlandi — InnerTube
+                // clen= tez-tez yolg'on gapiradi (#152) va yangi resolve'da
+                // boshqa son kelganda butun refresh rad etilib, o'qish
+                // o'lik URL'da qotib qolardi. Itag + ext mosligi fayl
+                // bir xilligini kafolatlaydi; haqiqiy hajmni reader
+                // server Content-Range'dan o'zi o'rganadi.
                 YuzYouTubeApi.refreshStream(videoId, at, cur)?.takeIf {
-                    YuzYouTubeApi.itagOf(it.url) == itag && it.ext == stream.ext &&
-                        (stream.approxBytes <= 0L || it.approxBytes <= 0L ||
-                            stream.approxBytes == it.approxBytes)
+                    YuzYouTubeApi.itagOf(it.url) == itag && it.ext == stream.ext
                 }
             }
         }

@@ -33,6 +33,16 @@ object YuzYouTubeApi {
 
     const val UA = "com.google.android.youtube/20.10.40 (Linux; U; Android 15) gzip"
     private const val UA_IOS = "com.google.ios.youtube/20.08.3 (iPhone16,2; U; CPU iOS 18_1 like Mac OS X)"
+    // #161: PO-token'ga ega bo'lmagan oqim URL'lari googlevideo tomonidan
+    // (video, IP) juftligi uchun ~1MB (PC'da ~384KB)dan keyin 403 qilinadi —
+    // "faqat 1 daqiqa ijro etiladi" alomatining ildizi. yt-dlp Po-Token
+    // Guide'ga ko'ra ANDROID_VR va TVHTML5 klientlari PO talab qilmaydi;
+    // faqat IP-reputatsiyasi past bo'lgan (datacenter) manzillardan
+    // LOGIN_REQUIRED beradi. Telefonda ishlashi kutiladi — sinab ko'riladi.
+    private const val UA_VR =
+        "com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12; " +
+            "eureka-user Build/SQ3A.220705.004.A1) gzip"
+    private const val UA_TV = "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version"
     private const val SEARCH_URL = "https://www.youtube.com/youtubei/v1/search"
     private const val PLAYER_URL = "https://www.youtube.com/youtubei/v1/player"
 
@@ -45,9 +55,15 @@ object YuzYouTubeApi {
 
     private data class Client(val name: String, val version: String, val ua: String, val extras: Map<String, Any>)
 
+    // #161: zanjir ANDROID (sifat/baseline) -> ANDROID_VR -> IOS -> TVHTML5.
+    // Barchasi bitta resolve'da yig'iladi, nomzodlar klientlar BO'YICHA
+    // aralash joylashadi — rotatsiya har bir o'lik nomzoddan keyin
+    // keyingi klientning shu-itag URL'iga tushadi.
     private val PLAYERS = listOf(
         Client("ANDROID", "20.10.40", UA, mapOf("androidSdkVersion" to 35)),
+        Client("ANDROID_VR", "1.60.19", UA_VR, emptyMap()),
         Client("IOS", "20.08.3", UA_IOS, mapOf("deviceModel" to "iPhone16,2")),
+        Client("TVHTML5", "7.20250312.16.00", UA_TV, emptyMap()),
     )
 
     /** Birinchi sinovdan o'tgan so'rovlar 3 ta rendererni qaytardi. */
@@ -73,17 +89,57 @@ object YuzYouTubeApi {
         // (m4a -> webm/opus), ProgressiveMediaPeriod esa prepare paytida
         // tanlangan Mp4Extractor'da qolgan — oqim buzilar, ovoz g'oyib bo'lardi.
         val l = sameItag(videoId, all)
-        val i = attempt[videoId] ?: 0
-        // Rotatsiya rejimida (oldingisi 403 berdi) tartib bo'yicha keyingisi.
-        // #120: bir martalik 403 video uchun rotatsiyani MAG'ULI QILIB
-        // qo'ymasligi uchun har bir muvaffaqiyatli resolve counter'ni
-        // pasaytiradi — uzluks ijro etilganda #86 throughput-tanlovga
-        // qaytamiz; yangi 403 noteBadStream() counter'ni yana ko'taradi.
+        // #161: rotatsiya endi QAYTMAYDI. Eski `attempt[videoId] = i - 1`
+        // (muqilliqda counter'ni pasaytirish) nomzodlar ro'yxatida faqat
+        // 0-chi va 1-chi orasida tebranishga olib kelardi: ANDROID URL'lari
+        // PO-cap tufayli o'lgach, pleyer ANDROID_VR/IOS/TV nomzodlariga
+        // umuman chiqa olmasdi — "1 daqiqa ijro" shundan. Endi counter
+        // faqat noteBadStream() bilan o'sadi; tozalanishi: navbat oxiri
+        // (resetRotation), kesh TTL tugashi yoki trek muvaffaqiyatli
+        // tugashi (noteStreamOk -> sticky saqlanadi).
+        val i = maxOf(attempt[videoId] ?: 0, stickyIndex)
         if (i > 0) {
-            attempt[videoId] = i - 1
-            return l[i % l.size].also { pinItag(videoId, it) }
+            return l[i % l.size].also {
+                pinItag(videoId, it)
+                rememberClient(videoId, it)
+            }
         }
-        return fitThroughput(l).also { pinItag(videoId, it) }
+        return fitThroughput(l).also {
+            pinItag(videoId, it)
+            rememberClient(videoId, it)
+        }
+    }
+
+    /**
+     * #161: oxirgi ishlagan nomzod indeksi — keyingi treklar birinchi
+     * urinishdan o'sha klientdan boshlaydi (har trekda 403-raqsga
+     * tushmaslik uchun). Trek oxirigacha ijro etilganda chaqiriladi.
+     */
+    @Volatile
+    private var stickyIndex = 0
+
+    fun noteStreamOk(videoId: String) {
+        val i = attempt[videoId] ?: 0
+        if (i > 0) stickyIndex = i
+    }
+
+    /**
+     * #161: diagnostika — shu videoning oxirgi tanlangan nomzodi qaysi
+     * mijozdan keldi (UA bo'yicha). Telefondagi haqiqiy test natijasi
+     * pult chatiga shu teg bilan tushadi: ANDROID/VR/IOS/TV'dan qaysi
+     * biri PO-cap'dan o'tayotgani shu yerda aniq ko'rinadi.
+     */
+    private val lastClient = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    fun clientNow(videoId: String): String = lastClient[videoId] ?: "?"
+
+    private fun rememberClient(videoId: String, s: YuzAudioStream) {
+        lastClient[videoId] = when (s.ua) {
+            UA_VR -> "VR"
+            UA_TV -> "TV"
+            UA_IOS -> "IOS"
+            else -> "AND"
+        }
     }
 
     /** Tanlangan itag'ni shu video uchun qo'zg'atmaymiz (rotatsiya shu itag ichida). */
@@ -169,12 +225,15 @@ object YuzYouTubeApi {
         val e = streamCache[videoId] ?: return emptyList()
         if (System.currentTimeMillis() - e.first < CACHE_TTL) return e.second
         // URL'lar muddati tugadi — "ishlatilgan" belgilari ham keraksiz.
+        // #161: attempt ham tozalanadi (URL'lar yangilandi — eski o'liklar
+        // ro'yxatga endi aloqador emas).
         streamCache.remove(videoId)
         used.remove(videoId)
+        attempt.remove(videoId)
         return emptyList()
     }
 
-    /** Yagona resolve zanjiri: NewPipeExtractor -> ANDROID -> IOS; natija cache. */
+    /** Yagona resolve zanjiri: NewPipeExtractor -> InnerTube (4 klient); natija cache. */
     fun streamsFor(videoId: String): List<YuzAudioStream> {
         val cancellation = YuzDownloadCancellation.current()
         cancellation?.check()
@@ -189,9 +248,16 @@ object YuzYouTubeApi {
             val seen = HashSet<String>()
             for (s in YuzNpeExtractor.audioStreams(videoId, 2)) if (seen.add(s.url)) out.add(s)
             cancellation?.check()
+            // #161: har klientdan eng yaxshi 2 ta format — KLIENTLAR BO'YICHA
+            // ARALASH. Eski `collectFromVideo(..., 6)` bitta global chegarani
+            // birinchi klientning 6 ta formati to'ldirib qo'yardi: ANDROID_VR/
+            // IOS/TVHTML5 umuman ro'yxatga kirmasdi va rotatsiya ularga
+            // hech qachon chiqa olmasdi.
             for (c in PLAYERS) {
                 cancellation?.check()
-                collectFromVideo(videoId, c, out, seen, 6)
+                val perClient = ArrayList<YuzAudioStream>()
+                collectFromVideo(videoId, c, perClient, seen, 2)
+                out.addAll(perClient)
             }
             cancellation?.check()
             val streams = out.map { it.copy(sourceVideoId = videoId) }
@@ -269,6 +335,8 @@ object YuzYouTubeApi {
         attempt.clear()
         used.clear()
         pinnedItag.clear()
+        lastClient.clear()
+        stickyIndex = 0
     }
 
     private fun collectFromVideo(

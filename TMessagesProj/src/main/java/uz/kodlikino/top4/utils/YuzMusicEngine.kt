@@ -184,6 +184,11 @@ object YuzMusicEngine {
     private var tickPos = 0L
     private var tickDur = 0L
     private var tickItem: MediaItem? = null
+    // #161: oxirgi pleyer xatosi (kod + nom) — give-up hisobotida pultga
+    // boradi: telefon testining eng muhim savoli "qaysi xatoda to'xtadi".
+    @Volatile private var lastError: String? = null
+    // #161: "95s o'tdi" muvaffaqiyat voqeasi bir trek uchun bir marta.
+    private var okReportedVid: String? = null
     // #122: YuzMusicService'ni har "playing" signalida EMAS, faqat trek
     // haqiqatan o'ynala boshlaganda (STATE_READY) va bir marta ko'taramiz.
     // startForegroundService chaqirilib, media3 5s ichida startForeground()
@@ -206,6 +211,20 @@ object YuzMusicEngine {
             tickPos = p.currentPosition
             tickDur = p.duration
             tickItem = p.currentMediaItem
+            // #161: 95 sekund o'tdi = joriy mijoz PO-cap'dan o'tdi
+            // (telefonda cap ~60s). Bu MUVAFFAQIYAT dalili — qaysi mijoz
+            // ishlayotgani pult chatida aniq ko'rinadi, keyingi treklar
+            // shu mijozdan boshlanadi (sticky).
+            if (tickPos > 95_000L) {
+                tagOf(tickItem)?.videoId
+                    ?.takeIf { it.isNotBlank() && it != okReportedVid }
+                    ?.let { vid ->
+                        okReportedVid = vid
+                        YuzMusicDiagnostics.reportEvent(
+                            "ok95s pos=${tickPos / 1000}s client=${YuzYouTubeApi.clientNow(vid)}"
+                        )
+                    }
+            }
             if (gatePlaying) ui.postDelayed(this, 2000L) else gateTickerOn = false
         }
     }
@@ -306,6 +325,16 @@ object YuzMusicEngine {
                     tickItem !== item &&
                     retryEarlyEnd(p, tickItem, tickIndex)
                 ) return
+                // #161: tabiiy (AUTO) tugash — joriy nomzod PO-cap'dan
+                // O'TDI. Keyingi treklar aynan shu mijozdan boshlaydi
+                // (sticky) va telefon testining asosiy savoliga javob
+                // pult chatiga boradi.
+                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                    tickItem?.let { prev ->
+                        tagOf(prev)?.videoId?.takeIf { it.isNotBlank() }
+                            ?.let { YuzYouTubeApi.noteStreamOk(it) }
+                    }
+                }
                 ui.removeCallbacks(bufferingWatchdog)
                 postStatus(null)
                 itemRetries = 0
@@ -362,6 +391,9 @@ object YuzMusicEngine {
                         if (retryEarlyEnd(p, p.currentMediaItem, p.currentMediaItemIndex)) {
                             return
                         }
+                        // #161: haqiqiy oxir — joriy mijoz ishlayapti (sticky).
+                        tagOf(p.currentMediaItem)?.videoId?.takeIf { it.isNotBlank() }
+                            ?.let { YuzYouTubeApi.noteStreamOk(it) }
                         musicServiceStarted = false // #122: keyingi READY'da qayta ko'tariladi
                         // YuzGram #98: navbat tugashi — tugash emas. Radio
                         // yoqilgan bo'lsa o'xshash/ommabop qo'shiqlar
@@ -381,6 +413,8 @@ object YuzMusicEngine {
 
             override fun onPlayerError(error: PlaybackException) {
                 ui.removeCallbacks(bufferingWatchdog)
+                // #161: keyingi give-up hisoboti uchun saqlab qolamiz.
+                lastError = "err=${error.errorCode} ${error.errorCodeName.take(48)}"
                 Log.i(TAG, "playerError code=${error.errorCode} vid=${tagOf(p.currentMediaItem)?.videoId}")
                 handleItemFailure(p.currentMediaItem)
             }
@@ -697,6 +731,18 @@ object YuzMusicEngine {
         itemRetries = 0
         consecutiveSkips++
         Log.i(TAG, "give-up vid=${t.videoId} skips=$consecutiveSkips -> bg download + skip")
+        // #161: telefon testining asosiy dalili — give-up bo'lganda qaysi
+        // mijoz, qaysi pozitsiyada va qaysi xatoda to'xtagani pult chatiga
+        // boradi (pult daemon'i requests.txt'ga yozadi, PC'dan o'qiyman).
+        if (t.videoId.isNotBlank()) {
+            YuzMusicDiagnostics.reportGiveUp(
+                title = t.title,
+                videoId = t.videoId,
+                detail = "client=${YuzYouTubeApi.clientNow(t.videoId)} " +
+                    "pos=${p.currentPosition}/${p.duration} " +
+                    "skips=$consecutiveSkips ${lastError ?: "no-err"}"
+            )
+        }
         p.playWhenReady = false
         silentDownload(t)
         // #86 bo'ron bekori: ketma-ket 4 qo'shiq boshlanmasa tarmoq

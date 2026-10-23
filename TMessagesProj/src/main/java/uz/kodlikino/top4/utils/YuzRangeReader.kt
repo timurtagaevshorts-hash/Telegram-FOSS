@@ -93,6 +93,10 @@ class YuzRangeReader(
         private const val MAX_TRIES = 9
         // Yangi URL ko'pincha ishlaydi — 2 tadan ko'p resolve trekni
         // sekinlashtiradi, lekin bittasi yetmaydi.
+        // #161: endi bu KETMA-KET cheklov: muvaffaqiyatli ochilgan oyna
+        // counter'ni nollaydi. Eskidan bu READER UMRI bo'yicha 2 edi —
+        // uzun trekda 3-url'dan keyin (har biri PO-cap bilan o'lsa)
+        // refresh umuman bo'lmay qolardi va ijro yarimda to'xtar edi.
         private const val MAX_REFRESHES = 2
         // Hammasi rad etilsa: cooldown bilan qayta urinishlar soni.
         private const val MAX_STALL_RETRIES = 2
@@ -141,8 +145,14 @@ class YuzRangeReader(
         return minOf(ceiling shr s, PROVEN[s]).coerceAtLeast(STEP_MIN)
     }
 
-    /** Joriy oyna hajmi uchun ruxsat etilgan vaqt (tezlikdan kelib chiqadi). */
-    private fun budgetMs(): Long = YuzNetPulse.windowDeadlineMs(window)
+    /**
+     * Joriy oyna uchun ruxsat etilgan vaqt (tezlikdan kelib chiqadi).
+     * #161: har sarflangan refresh qo'shimcha 6s beradi — refresh o'zi
+     * tarmoqdan yangi URL resolve qiladi (sekin taroqda 2-5s); eskidan
+     * bu vaqt umumiy byudjetdan yeyilardi va oyna ochilmay qolib,
+     * "range open failed" bilan ijro to'xtar edi.
+     */
+    private fun budgetMs(): Long = YuzNetPulse.windowDeadlineMs(window) + 6_000L * refreshes
 
     private fun checkCanceled() {
         if (aborted) throw IOException("range aborted @$pos")
@@ -363,6 +373,10 @@ class YuzRangeReader(
                     if (move.query) queryFailed = false else headerFailed = false
                     sizeFails = 0
                     growAfterClean()
+                    // #161: oyna muvaffaqiyatli ochildi — refresh byudjeti
+                    // tiklanadi. Uzun trekda har bir o'lik URL avlodidan
+                    // keyin yangi URL olish imkoni cheksiz qoladi.
+                    refreshes = 0
                     Log.i(TAG, "range open $pos..$windowEnd code=$code q=${move.query} total=$total")
                     return
                 }
