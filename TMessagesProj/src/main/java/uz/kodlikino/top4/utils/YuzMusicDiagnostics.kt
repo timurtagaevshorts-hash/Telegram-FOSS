@@ -57,6 +57,11 @@ object YuzMusicDiagnostics {
     }
 
     private fun post(text: String) {
+        // #161: faqat DEBUG build hisobot yuboradi — release (Play) build'da
+        // begona foydalanuvchining ma'lumoti (trek nomi, xato) hech kimga
+        // ketmaydi. Bu eshik yo'q bo'lsa, diagnostika release'da "yashirin
+        // eksfiltratsiya"ga aylanardi — Play uchun qat'iy taqiqlangan.
+        if (!org.telegram.messenger.BuildConfig.DEBUG) return
         AndroidUtilities.runOnUIThread {
             runCatching {
                 val account = UserConfig.selectedAccount
