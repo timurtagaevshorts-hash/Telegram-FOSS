@@ -15,6 +15,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
 
+    <!-- #156 Play siyosati: afat flavor release varianti SHU manifest'ni ishlatadi
+         (flavor bloki yuqoridagi umumiy release sourceSet'ni almashtiradi), shuning
+         uchun REQUEST_INSTALL_PACKAGES removal ham shu yerda bo'lishi shart. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove"/>
+
     <application
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
