@@ -9,6 +9,7 @@ import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
 import com.android.billingclient.api.BillingResult
 import com.android.billingclient.api.ProductDetails
+import com.android.billingclient.api.PendingPurchasesParams
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
@@ -18,9 +19,9 @@ import com.android.billingclient.api.QueryPurchasesParams
  * Google Play Billing — KinoTOP4'dagi `PlayBillingManager`ning to'liq
  * ko'chirmasi (INAPP mahsulotlar: premium_kino / full_premium).
  *
- * Farqlar (compileSdk 33 chegarasi):
- *  - billing kutubxonasi 5.2.1 (donor 8.0.0 — SDK 34 talab qiladi); 5.2.1'da
- *    `queryProductDetailsAsync` javobi `ProductDetailsResult` orqali keladi;
+ * Farqlar:
+ *  - billing 8.0.0 (Play 2026 minimumi); `queryProductDetailsAsync` javobi
+ *    `QueryProductDetailsResult` orqali keladi;
  *  - `enableAutoServiceReconnection()` ataylab ishlatilmadi — qo'lda
  *    eksponensial qayta ulanish ([scheduleReconnect]) donor'da ham bor,
  *    version riskiga tushmaslik uchun faqat shu yo'l qoldirildi.
@@ -59,7 +60,9 @@ class YuzPlayBilling(
         }
         billingClient = BillingClient.newBuilder(activity)
             .setListener(this)
-            .enablePendingPurchases() // billing 5.2.1: paramsli variant 6.0.1+ da
+            .enablePendingPurchases(
+                PendingPurchasesParams.newBuilder().enableOneTimeProducts().build()
+            )
             .build()
         connect()
     }
@@ -157,12 +160,11 @@ class YuzPlayBilling(
         val params = QueryProductDetailsParams.newBuilder()
             .setProductList(productList)
             .build()
-        // billing 5.2.1: qayta wang (callback) to'g'ridan-to'g'ri
-        // List<ProductDetails> beradi — ProductDetailsResponse obyekti 6.x+ da.
-        client.queryProductDetailsAsync(params) { result, detailsList ->
+        // billing 8.0.0: callback QueryProductDetailsResult beradi.
+        client.queryProductDetailsAsync(params) { result, detailsResult ->
             if (result.responseCode != BillingClient.BillingResponseCode.OK) return@queryProductDetailsAsync
             productDetailsMap.clear()
-            detailsList.forEach { details ->
+            detailsResult.productDetailsList.forEach { details ->
                 productDetailsMap[details.productId] = details
                 val price = details.oneTimePurchaseOfferDetails?.formattedPrice ?: return@forEach
                 listener.onProductDetails(details.productId, price)
