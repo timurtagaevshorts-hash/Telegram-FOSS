@@ -62,13 +62,26 @@ object YuzYouTubeApi {
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    private data class Client(val name: String, val version: String, val ua: String, val extras: Map<String, Any>)
+    /**
+     * #164b: [id] — InnerTube'ning "X-YouTube-Client-Name" raqami. yt-dlp
+     * shu sarlavhalarni yuboradi; ularsiz VISIONOS so'rovi bot-tekshiruviga
+     * tushadi ("Sign in to confirm you're not a bot") — telefon va PC'da
+     * o'lchandi. Raqamlar: WEB=1, ANDROID=3, IOS=5, TVHTML5=7, ANDROID_VR=28,
+     * VISIONOS=101.
+     */
+    private data class Client(
+        val name: String,
+        val version: String,
+        val ua: String,
+        val id: Int,
+        val extras: Map<String, Any>
+    )
 
     // #164: zanjir VISIONOS (PO-cap'siz) -> NPE/ANDROID/VR/IOS/TV (zaxira).
     // VISIONOS muvaffaqiyatli bo'lsa qolgan (1MB'da 403 bo'ladigan)
     // klientlar umuman so'ralmaydi — resolve ham tezroq.
     private val VISIONOS_CLIENT = Client(
-        "VISIONOS", "1.02", UA_VIS,
+        "VISIONOS", "1.02", UA_VIS, 101,
         mapOf(
             "deviceMake" to "Apple",
             "deviceModel" to "RealityDevice17,1",
@@ -77,14 +90,15 @@ object YuzYouTubeApi {
         )
     )
 
-    private val ANDROID_CLIENT = Client("ANDROID", "20.10.40", UA, mapOf("androidSdkVersion" to 35))
+    private val ANDROID_CLIENT =
+        Client("ANDROID", "20.10.40", UA, 3, mapOf("androidSdkVersion" to 35))
 
     private val PLAYERS = listOf(
         VISIONOS_CLIENT,
         ANDROID_CLIENT,
-        Client("ANDROID_VR", "1.60.19", UA_VR, emptyMap()),
-        Client("IOS", "20.08.3", UA_IOS, mapOf("deviceModel" to "iPhone16,2")),
-        Client("TVHTML5", "7.20250312.16.00", UA_TV, emptyMap()),
+        Client("ANDROID_VR", "1.60.19", UA_VR, 28, emptyMap()),
+        Client("IOS", "20.08.3", UA_IOS, 5, mapOf("deviceModel" to "iPhone16,2")),
+        Client("TVHTML5", "7.20250312.16.00", UA_TV, 7, emptyMap()),
     )
 
     /** Birinchi sinovdan o'tgan so'rovlar 3 ta rendererni qaytardi. */
@@ -96,7 +110,7 @@ object YuzYouTubeApi {
         // sinovdan o'tgan; eski ANDROID qidiruvi o'zgarmaydi.
         val c = ANDROID_CLIENT
         val body = baseBody(c).put("query", query)
-        val resp = post(SEARCH_URL, body, c.ua) ?: return emptyList()
+        val resp = post(SEARCH_URL, body, c) ?: return emptyList()
         val out = ArrayList<YuzTrack>()
         collect(resp, out, HashSet(), limit)
         return out
@@ -382,10 +396,29 @@ object YuzYouTubeApi {
         max: Int
     ) {
         if (out.size >= max) return
-        val p = post(PLAYER_URL, baseBody(c).put("videoId", videoId), c.ua) ?: return
-        val st = p.optJSONObject("playabilityStatus")?.optString("status")
+        // #164b: VISIONOS faqat to'g'ri so'rov shakli bilan bot-tekshiruvidan
+        // o'tadi — visitorData sarlavhasi + yt-dlp konteksti (pastda).
+        // visitorData qidiruv javobidan olinadi; hali bo'lmasa bootstrap.
+        val visitor = visitorData ?: ensureVisitor()
+        val body = baseBody(c)
+            .put("videoId", videoId)
+            .put(
+                "playbackContext",
+                JSONObject().put(
+                    "contentPlaybackContext",
+                    JSONObject().put("html5Preference", "HTML5_PREF_WANTS")
+                )
+            )
+            .put("contentCheckOk", true)
+            .put("racyCheckOk", true)
+        val p = post(PLAYER_URL, body, c, visitor) ?: return
+        val ps = p.optJSONObject("playabilityStatus")
+        val st = ps?.optString("status")
         if (st != "OK") {
-            android.util.Log.i("YuzMusic", "player $videoId ${c.name} -> $st")
+            android.util.Log.i(
+                "YuzMusic",
+                "player $videoId ${c.name} -> $st (${ps?.optString("reason")}) vis=${visitor != null}"
+            )
             return
         }
         val cleans = ArrayList<YuzAudioStream>()
@@ -447,29 +480,63 @@ object YuzYouTubeApi {
         val client = JSONObject()
             .put("clientName", c.name)
             .put("clientVersion", c.version)
+            .put("userAgent", c.ua)
             .put("hl", "en")
             .put("gl", "UZ")
+            .put("timeZone", "UTC")
+            .put("utcOffsetMinutes", 0)
         for ((k, v) in c.extras) client.put(k, v)
         return JSONObject().put("context", JSONObject().put("client", client))
     }
 
-    private fun post(url: String, body: JSONObject, ua: String): JSONObject? {
+    /**
+     * #164b: visitorData — YouTube'ning "mehmon" identifikatori. yt-dlp uni
+     * har qanday javobning responseContext.visitorData'sidan olib, keyingi
+     * so'rovlarga X-Goog-Visitor-Id sarlavhasi sifatida qo'shadi. Usiz
+     * VISIONOS player bot-tekshiruviga tushadi: 2026-10-24 o'lchovi —
+     * sarlavhasiz LOGIN_REQUIRED, sarlavha bilan status=OK va 1MB'dan
+     * keyingi Range'lar ham 206 (cap yo'q).
+     */
+    @Volatile
+    private var visitorData: String? = null
+
+    private fun ensureVisitor(): String? {
+        visitorData?.let { return it }
+        val c = ANDROID_CLIENT
+        post(SEARCH_URL, baseBody(c).put("query", "music"), c)
+        return visitorData
+    }
+
+    private fun post(
+        url: String,
+        body: JSONObject,
+        c: Client,
+        visitor: String? = visitorData
+    ): JSONObject? {
         val cancellation = YuzDownloadCancellation.current()
         cancellation?.check()
-        val req = Request.Builder()
+        val builder = Request.Builder()
             .url(url)
             .post(body.toString().toRequestBody(JSON_MT))
-            .header("User-Agent", ua)
+            .header("User-Agent", c.ua)
             .header("Accept-Encoding", "identity")
-            .build()
-        val call = http.newCall(req)
+            .header("X-YouTube-Client-Name", c.id.toString())
+            .header("X-YouTube-Client-Version", c.version)
+            .header("Origin", "https://www.youtube.com")
+        if (!visitor.isNullOrBlank()) builder.header("X-Goog-Visitor-Id", visitor)
+        val call = http.newCall(builder.build())
         try {
             cancellation?.attach(call)
             return call.execute().use { resp ->
                 if (!resp.isSuccessful) return null
                 val text = resp.body?.string() ?: return null
                 cancellation?.check()
-                JSONObject(text)
+                val json = JSONObject(text)
+                json.optJSONObject("responseContext")
+                    ?.optString("visitorData")
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { visitorData = it }
+                json
             }
         } catch (_: Exception) {
             cancellation?.check()
