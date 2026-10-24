@@ -33,6 +33,15 @@ object YuzYouTubeApi {
 
     const val UA = "com.google.android.youtube/20.10.40 (Linux; U; Android 15) gzip"
     private const val UA_IOS = "com.google.ios.youtube/20.08.3 (iPhone16,2; U; CPU iOS 18_1 like Mac OS X)"
+    // #164: ILDIZ SABAB topildi. googlevideo PO-token'siz ANDROID/IOS URL'lariga
+    // (video, IP) juftligi uchun aynan 1 048 576 bayt "cold start" budjeti
+    // beradi (StreamProtectionStatus=2), keyin HAR QANDAY yangi URL ham 403.
+    // 1MB ≈ 128kbps'da 65 soniya — "1 daqiqadan keyin to'xtaydi" shu.
+    // VISIONOS klienti bu cheklovga tushmaydi: bir xil IP'da 4.8MB faylni
+    // to'liq, parallel Range'lar bilan ham berdi (2026-10-24 o'lchov).
+    // yt-dlp ham standart zanjirda shu klientni ishlatadi (JSLess default).
+    private const val UA_VIS = "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) " +
+        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
     // #161: PO-token'ga ega bo'lmagan oqim URL'lari googlevideo tomonidan
     // (video, IP) juftligi uchun ~1MB (PC'da ~384KB)dan keyin 403 qilinadi —
     // "faqat 1 daqiqa ijro etiladi" alomatining ildizi. yt-dlp Po-Token
@@ -55,12 +64,24 @@ object YuzYouTubeApi {
 
     private data class Client(val name: String, val version: String, val ua: String, val extras: Map<String, Any>)
 
-    // #161: zanjir ANDROID (sifat/baseline) -> ANDROID_VR -> IOS -> TVHTML5.
-    // Barchasi bitta resolve'da yig'iladi, nomzodlar klientlar BO'YICHA
-    // aralash joylashadi — rotatsiya har bir o'lik nomzoddan keyin
-    // keyingi klientning shu-itag URL'iga tushadi.
+    // #164: zanjir VISIONOS (PO-cap'siz) -> NPE/ANDROID/VR/IOS/TV (zaxira).
+    // VISIONOS muvaffaqiyatli bo'lsa qolgan (1MB'da 403 bo'ladigan)
+    // klientlar umuman so'ralmaydi — resolve ham tezroq.
+    private val VISIONOS_CLIENT = Client(
+        "VISIONOS", "1.02", UA_VIS,
+        mapOf(
+            "deviceMake" to "Apple",
+            "deviceModel" to "RealityDevice17,1",
+            "osName" to "visionOS",
+            "osVersion" to "26.5.23O471"
+        )
+    )
+
+    private val ANDROID_CLIENT = Client("ANDROID", "20.10.40", UA, mapOf("androidSdkVersion" to 35))
+
     private val PLAYERS = listOf(
-        Client("ANDROID", "20.10.40", UA, mapOf("androidSdkVersion" to 35)),
+        VISIONOS_CLIENT,
+        ANDROID_CLIENT,
         Client("ANDROID_VR", "1.60.19", UA_VR, emptyMap()),
         Client("IOS", "20.08.3", UA_IOS, mapOf("deviceModel" to "iPhone16,2")),
         Client("TVHTML5", "7.20250312.16.00", UA_TV, emptyMap()),
@@ -71,7 +92,9 @@ object YuzYouTubeApi {
 
     /** Qidiruv natijalari (to'liq qo'shiq videoId'lari). */
     fun search(query: String, limit: Int = 25): List<YuzTrack> {
-        val c = PLAYERS[0]
+        // #164: qidiruvda VISIONOS ishlatilmaydi — u faqat player uchun
+        // sinovdan o'tgan; eski ANDROID qidiruvi o'zgarmaydi.
+        val c = ANDROID_CLIENT
         val body = baseBody(c).put("query", query)
         val resp = post(SEARCH_URL, body, c.ua) ?: return emptyList()
         val out = ArrayList<YuzTrack>()
@@ -135,6 +158,7 @@ object YuzYouTubeApi {
 
     private fun rememberClient(videoId: String, s: YuzAudioStream) {
         lastClient[videoId] = when (s.ua) {
+            UA_VIS -> "VIS"
             UA_VR -> "VR"
             UA_TV -> "TV"
             UA_IOS -> "IOS"
@@ -246,18 +270,29 @@ object YuzYouTubeApi {
             cached(videoId).let { if (it.isNotEmpty()) return it }
             val out = ArrayList<YuzAudioStream>()
             val seen = HashSet<String>()
-            for (s in YuzNpeExtractor.audioStreams(videoId, 2)) if (seen.add(s.url)) out.add(s)
+            // #164: avval VISIONOS — uning URL'lari googlevideo'ning
+            // (video, IP) uchun 1MB "cold start" chekloviga tushmaydi:
+            // qo'shiq oxirigacha ijro etiladi, yuklash 100% tugaydi.
+            collectFromVideo(videoId, VISIONOS_CLIENT, out, seen, 2)
             cancellation?.check()
-            // #161: har klientdan eng yaxshi 2 ta format — KLIENTLAR BO'YICHA
-            // ARALASH. Eski `collectFromVideo(..., 6)` bitta global chegarani
-            // birinchi klientning 6 ta formati to'ldirib qo'yardi: ANDROID_VR/
-            // IOS/TVHTML5 umuman ro'yxatga kirmasdi va rotatsiya ularga
-            // hech qachon chiqa olmasdi.
-            for (c in PLAYERS) {
+            if (out.isEmpty()) {
+                // Zaxira: "made for kids" videolari yoki VISIONOS bloklanganda
+                // eski zanjir (NPE -> ANDROID/VR/IOS/TV). Bu URL'lar 1MB'dan
+                // keyin 403 bo'ladi, lekin ijro baribir boshlanadi.
+                for (s in YuzNpeExtractor.audioStreams(videoId, 2)) if (seen.add(s.url)) out.add(s)
                 cancellation?.check()
-                val perClient = ArrayList<YuzAudioStream>()
-                collectFromVideo(videoId, c, perClient, seen, 2)
-                out.addAll(perClient)
+                // #161: har klientdan eng yaxshi 2 ta format — KLIENTLAR
+                // BO'YICHA ARALASH. Eski `collectFromVideo(..., 6)` bitta
+                // global chegarani birinchi klientning 6 ta formati to'ldirib
+                // qo'yardi: ANDROID_VR/IOS/TVHTML5 umuman ro'yxatga kirmasdi
+                // va rotatsiya ularga hech qachon chiqa olmasdi.
+                for (c in PLAYERS) {
+                    if (c.name == VISIONOS_CLIENT.name) continue
+                    cancellation?.check()
+                    val perClient = ArrayList<YuzAudioStream>()
+                    collectFromVideo(videoId, c, perClient, seen, 2)
+                    out.addAll(perClient)
+                }
             }
             cancellation?.check()
             val streams = out.map { it.copy(sourceVideoId = videoId) }
