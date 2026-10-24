@@ -14,6 +14,9 @@
     <string name="ai_chip_musiqa">Musiqa top</string>
     <string name="func_musiqa_title">Musiqa topish</string>
     <string name="func_musiqa_desc">Qo\'shiq nomini yozing — to\'liq tinglang</string>
+    <string name="func_musiqa_playing_desc">Ijro etilmoqda · %1$s</string>
+    <string name="func_musiqa_buffering_desc">Yuklanmoqda · %1$s</string>
+    <string name="func_musiqa_paused_desc">Pauza · %1$s</string>
     <!-- YuzGram #62: ilova ichidagi pleyer + ekvalayzer + kesh -->
     <string name="musiqa_saved_btn">Yuklanganlar</string>
     <string name="musiqa_saved_empty">Hech narsa yuklanmagan. Pleyerdagi yuklab olish tugmasi bilan qo\'shiqni keshga saqlang.</string>

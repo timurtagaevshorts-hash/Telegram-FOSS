@@ -26,6 +26,7 @@
     <!-- Funksiyalar hub kartasi -->
     <string name="func_ai_title">AI Yordamchi</string>
     <string name="func_ai_desc">Ovoz orqali xabar yuborish, soat, ob-havo va buyruqlar</string>
+    <string name="func_ai_cta">Ovoz bilan boshlash</string>
     <!-- Bo'lim nomlari (ovoz javoblarida) -->
     <string name="func_ai_elon_name">Elonlar</string>
     <string name="func_ai_kino_name">Kinolar</string>

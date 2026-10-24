@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/modern_surface">
+    android:background="@color/yuz_bg">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -11,145 +10,301 @@
         android:orientation="vertical"
         android:paddingBottom="100dp">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:id="@+id/funkHeader"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:orientation="vertical"
             android:paddingStart="@dimen/yuz_gutter"
             android:paddingTop="@dimen/yuz_space_4"
             android:paddingEnd="@dimen/yuz_gutter"
-            android:text="@string/funksiyalar_title"
-            android:textColor="@color/yuz_text"
-            android:textSize="@dimen/yuz_text_display"
-            android:textStyle="bold" />
+            android:paddingBottom="@dimen/yuz_space_2">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:paddingStart="@dimen/yuz_gutter"
-            android:paddingTop="2dp"
-            android:paddingEnd="@dimen/yuz_gutter"
-            android:paddingBottom="@dimen/yuz_space_4"
-            android:text="@string/funksiyalar_subtitle"
-            android:textColor="@color/yuz_text_secondary"
-            android:textSize="@dimen/yuz_text_secondary" />
+            <TextView
+                style="@style/YuzScreenTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/funksiyalar_title"
+                android:textSize="@dimen/yuz_text_display" />
 
+            <TextView
+                style="@style/YuzScreenSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/funksiyalar_subtitle" />
+        </LinearLayout>
+
+        <!-- AI — hub'ning yagona hero kartasi; qolganlari tarmoqqa bo'linadi. -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardAi"
-            style="@style/FuncsionCard">
+            style="@style/FuncsionHero">
 
-            <LinearLayout style="@style/FuncsionCardRow">
-
-                <ImageView
-                    style="@style/FuncsionCardIconImg"
-                    android:background="@drawable/bg_func_violet"
-                    android:src="@drawable/ic_yuz_mic" />
-
-                <LinearLayout style="@style/FuncsionCardText">
-                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_ai_title" />
-                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_ai_desc" />
-                </LinearLayout>
-
-                <ImageView style="@style/FuncsionCardChevron" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardElonlar"
-            style="@style/FuncsionCard">
-
-            <LinearLayout style="@style/FuncsionCardRow">
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
 
                 <ImageView
-                    style="@style/FuncsionCardIconImg"
-                    android:background="@drawable/bg_func_blue"
-                    android:src="@drawable/ic_yuz_tag" />
+                    android:layout_width="132dp"
+                    android:layout_height="132dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginEnd="4dp"
+                    android:alpha="0.06"
+                    android:contentDescription="@null"
+                    android:rotation="-12"
+                    android:src="@drawable/ic_yuz_mic"
+                    android:tint="@color/yuz_decor" />
 
-                <LinearLayout style="@style/FuncsionCardText">
-                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_elonlar_title" />
-                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_elonlar_desc" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/yuz_space_5">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
+                            android:background="@drawable/bg_func_violet"
+                            android:contentDescription="@null"
+                            android:padding="14dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/ic_yuz_mic"
+                            android:tint="#FFFFFF" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/yuz_space_4"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                style="@style/FuncsionHeroTitle"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/func_ai_title" />
+
+                            <TextView
+                                style="@style/FuncsionHeroDesc"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/func_ai_desc" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <TextView
+                        style="@style/FuncsionHeroCta"
+                        android:text="@string/func_ai_cta" />
                 </LinearLayout>
-
-                <ImageView style="@style/FuncsionCardChevron" />
-            </LinearLayout>
+            </FrameLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardIsh"
-            style="@style/FuncsionCard">
+        <TextView
+            android:id="@+id/marketSection"
+            style="@style/FuncsionSection"
+            android:text="@string/funksiyalar_section_market" />
 
-            <LinearLayout style="@style/FuncsionCardRow">
+        <LinearLayout
+            android:id="@+id/rowMarket"
+            style="@style/FuncsionRow">
 
-                <ImageView
-                    style="@style/FuncsionCardIconImg"
-                    android:background="@drawable/bg_func_indigo"
-                    android:src="@drawable/ic_yuz_briefcase" />
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardElonlar"
+                style="@style/FuncsionTile">
 
-                <LinearLayout style="@style/FuncsionCardText">
-                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_ish_title" />
-                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_ish_desc" />
+                <LinearLayout style="@style/FuncsionTileBody">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            style="@style/FuncsionTileIcon"
+                            android:background="@drawable/bg_func_blue"
+                            android:src="@drawable/ic_yuz_tag" />
+
+                        <Space
+                            android:layout_width="0dp"
+                            android:layout_height="1dp"
+                            android:layout_weight="1" />
+
+                        <ImageView style="@style/FuncsionChevron" />
+                    </LinearLayout>
+
+                    <TextView
+                        style="@style/FuncsionTileTitle"
+                        android:text="@string/func_elonlar_title" />
+
+                    <TextView
+                        style="@style/FuncsionTileDesc"
+                        android:text="@string/func_elonlar_desc" />
                 </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-                <ImageView style="@style/FuncsionCardChevron" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            <Space
+                android:layout_width="@dimen/yuz_space_3"
+                android:layout_height="1dp" />
 
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardMusiqa"
-            style="@style/FuncsionCard">
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardIsh"
+                style="@style/FuncsionTile">
 
-            <LinearLayout style="@style/FuncsionCardRow">
+                <LinearLayout style="@style/FuncsionTileBody">
 
-                <ImageView
-                    style="@style/FuncsionCardIconImg"
-                    android:background="@drawable/bg_func_teal"
-                    android:src="@drawable/ic_yuz_music" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-                <LinearLayout style="@style/FuncsionCardText">
-                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_musiqa_title" />
-                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_musiqa_desc" />
+                        <ImageView
+                            style="@style/FuncsionTileIcon"
+                            android:background="@drawable/bg_func_indigo"
+                            android:src="@drawable/ic_yuz_briefcase" />
+
+                        <Space
+                            android:layout_width="0dp"
+                            android:layout_height="1dp"
+                            android:layout_weight="1" />
+
+                        <ImageView style="@style/FuncsionChevron" />
+                    </LinearLayout>
+
+                    <TextView
+                        style="@style/FuncsionTileTitle"
+                        android:text="@string/func_ish_title" />
+
+                    <TextView
+                        style="@style/FuncsionTileDesc"
+                        android:text="@string/func_ish_desc" />
                 </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
 
-                <ImageView style="@style/FuncsionCardChevron" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+        <TextView
+            android:id="@+id/contentSection"
+            style="@style/FuncsionSection"
+            android:text="@string/funksiyalar_section_content" />
 
+        <LinearLayout
+            android:id="@+id/rowContent"
+            style="@style/FuncsionRow">
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardMusiqa"
+                style="@style/FuncsionTile">
+
+                <LinearLayout style="@style/FuncsionTileBody">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            style="@style/FuncsionTileIcon"
+                            android:background="@drawable/bg_func_teal"
+                            android:src="@drawable/ic_yuz_music" />
+
+                        <Space
+                            android:layout_width="0dp"
+                            android:layout_height="1dp"
+                            android:layout_weight="1" />
+
+                        <ImageView
+                            android:id="@+id/musicTileEq"
+                            style="@style/FuncsionEq" />
+
+                        <ImageView style="@style/FuncsionChevron" />
+                    </LinearLayout>
+
+                    <TextView
+                        style="@style/FuncsionTileTitle"
+                        android:text="@string/func_musiqa_title" />
+
+                    <TextView
+                        android:id="@+id/musicTileDesc"
+                        style="@style/FuncsionTileDesc"
+                        android:text="@string/func_musiqa_desc" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <Space
+                android:layout_width="@dimen/yuz_space_3"
+                android:layout_height="1dp" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardKinolar"
+                style="@style/FuncsionTile">
+
+                <LinearLayout style="@style/FuncsionTileBody">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            style="@style/FuncsionTileIcon"
+                            android:background="@drawable/bg_func_amber"
+                            android:src="@drawable/ic_yuz_film" />
+
+                        <Space
+                            android:layout_width="0dp"
+                            android:layout_height="1dp"
+                            android:layout_weight="1" />
+
+                        <ImageView style="@style/FuncsionChevron" />
+                    </LinearLayout>
+
+                    <TextView
+                        style="@style/FuncsionTileTitle"
+                        android:text="@string/func_kinolar_title" />
+
+                    <TextView
+                        style="@style/FuncsionTileDesc"
+                        android:text="@string/func_kinolar_desc" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+
+        <!-- Toq qolgan asbob — to'liq kenglikdagi karta. -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardInstagram"
-            style="@style/FuncsionCard">
+            style="@style/FuncsionWide">
 
-            <LinearLayout style="@style/FuncsionCardRow">
+            <LinearLayout style="@style/FuncsionWideRow">
 
                 <ImageView
-                    style="@style/FuncsionCardIconImg"
+                    style="@style/FuncsionTileIcon"
                     android:background="@drawable/bg_func_pink"
                     android:src="@drawable/ic_yuz_download" />
 
-                <LinearLayout style="@style/FuncsionCardText">
-                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_instagram_title" />
-                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_instagram_desc" />
+                <LinearLayout style="@style/FuncsionWideText">
+
+                    <TextView
+                        style="@style/FuncsionTileTitle"
+                        android:layout_marginTop="0dp"
+                        android:text="@string/func_instagram_title" />
+
+                    <TextView
+                        style="@style/FuncsionTileDesc"
+                        android:minLines="1"
+                        android:text="@string/func_instagram_desc" />
                 </LinearLayout>
 
-                <ImageView style="@style/FuncsionCardChevron" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardKinolar"
-            style="@style/FuncsionCard">
-
-            <LinearLayout style="@style/FuncsionCardRow">
-
-                <ImageView
-                    style="@style/FuncsionCardIconImg"
-                    android:background="@drawable/bg_func_amber"
-                    android:src="@drawable/ic_yuz_film" />
-
-                <LinearLayout style="@style/FuncsionCardText">
-                    <TextView style="@style/FuncsionCardTitle" android:text="@string/func_kinolar_title" />
-                    <TextView style="@style/FuncsionCardDesc" android:text="@string/func_kinolar_desc" />
-                </LinearLayout>
-
-                <ImageView style="@style/FuncsionCardChevron" />
+                <ImageView style="@style/FuncsionChevron" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
     </LinearLayout>

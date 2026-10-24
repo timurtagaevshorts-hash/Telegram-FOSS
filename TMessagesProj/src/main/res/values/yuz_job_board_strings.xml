@@ -35,7 +35,9 @@
 
     <!-- Funksiyalar hub -->
     <string name="funksiyalar_title">Funksiyalar</string>
-    <string name="funksiyalar_subtitle">Barcha imkoniyatlar bir joyda</string>
+    <string name="funksiyalar_subtitle">Bozor, kontent va asboblar — bir joyda</string>
+    <string name="funksiyalar_section_market">Bozor</string>
+    <string name="funksiyalar_section_content">Kontent</string>
     <string name="func_elonlar_title">Elonlar</string>
     <string name="func_elonlar_desc">Sotish va xarid uchun e\'lonlar</string>
     <string name="func_ish_title">Ish kartasi</string>

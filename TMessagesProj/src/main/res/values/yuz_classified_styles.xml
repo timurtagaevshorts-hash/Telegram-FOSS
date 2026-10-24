@@ -18,83 +18,184 @@
     </style>
 
     <!--
-      Funksiyalar hub kartochkalari. Qasddan `Funcsion*` (bitta qo'shimcha i) —
-      eskilar bilan nom to'qnashmasligi uchun. Faqat yuqoridagi Material tema ostida
-      ishlatiladi ( Elonlar/Reels bilan bir xil ContextThemeWrapper).
+      Funksiyalar hub v2 — bitta hero + bo'lim qatorlari. Barcha raqamlar
+      yuz_design_tokens.xml'dan; layout faqat tuzilma yozadi.
     -->
-    <style name="FuncsionCard" parent="Widget.MaterialComponents.CardView">
+    <style name="FuncsionHero" parent="Widget.MaterialComponents.CardView">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_marginStart">16dp</item>
-        <item name="android:layout_marginEnd">16dp</item>
-        <item name="android:layout_marginTop">10dp</item>
+        <item name="android:layout_marginStart">@dimen/yuz_gutter</item>
+        <item name="android:layout_marginEnd">@dimen/yuz_gutter</item>
+        <item name="android:layout_marginTop">@dimen/yuz_space_4</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
         <item name="android:foreground">?attr/selectableItemBackground</item>
-        <item name="cardBackgroundColor">@color/classified_card_default_bg</item>
-        <item name="cardCornerRadius">20dp</item>
-        <!-- Qorong'i sirt ustida soyali "ko'tarish" loyqa chiqadi; ajratishni
-           1 dp lik neon chet bajaradi. -->
+        <item name="cardBackgroundColor">@color/yuz_surface_raised</item>
+        <item name="cardCornerRadius">24dp</item>
         <item name="cardElevation">0dp</item>
-        <item name="strokeColor">@color/classified_card_default_stroke</item>
-        <item name="strokeWidth">1dp</item>
+        <item name="strokeColor">@color/yuz_stroke_decor</item>
+        <item name="strokeWidth">@dimen/yuz_stroke</item>
     </style>
 
-    <style name="FuncsionCardRow">
+    <style name="FuncsionHeroTitle">
+        <item name="android:textColor">@color/yuz_text_bright</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="FuncsionHeroDesc">
+        <item name="android:layout_marginTop">3dp</item>
+        <item name="android:textColor">@color/yuz_text_secondary</item>
+        <item name="android:textSize">@dimen/yuz_text_secondary</item>
+        <item name="android:lineSpacingExtra">2sp</item>
+    </style>
+
+    <style name="FuncsionHeroCta">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">@dimen/yuz_space_4</item>
+        <item name="android:background">@drawable/bg_funktions_cta</item>
+        <item name="android:drawableStart">@drawable/ic_yuz_mic</item>
+        <item name="android:drawablePadding">@dimen/yuz_space_2</item>
+        <item name="android:drawableTint">@color/yuz_on_action</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingLeft">@dimen/yuz_space_4</item>
+        <item name="android:paddingTop">10dp</item>
+        <item name="android:paddingRight">@dimen/yuz_space_4</item>
+        <item name="android:paddingBottom">10dp</item>
+        <item name="android:textColor">@color/yuz_on_action</item>
+        <item name="android:textSize">@dimen/yuz_text_secondary</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="FuncsionSection">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">@dimen/yuz_gutter</item>
+        <item name="android:layout_marginEnd">@dimen/yuz_gutter</item>
+        <item name="android:layout_marginTop">@dimen/yuz_space_6</item>
+        <item name="android:textColor">@color/yuz_text_bright</item>
+        <item name="android:textSize">@dimen/yuz_text_section</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.005</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="FuncsionRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">@dimen/yuz_gutter</item>
+        <item name="android:layout_marginEnd">@dimen/yuz_gutter</item>
+        <item name="android:layout_marginTop">@dimen/yuz_space_3</item>
         <item name="android:orientation">horizontal</item>
-        <item name="android:gravity">center_vertical</item>
-        <item name="android:padding">16dp</item>
+        <item name="android:baselineAligned">false</item>
     </style>
 
-    <style name="FuncsionCardIcon">
-        <item name="android:layout_width">48dp</item>
-        <item name="android:layout_height">48dp</item>
-        <item name="android:gravity">center</item>
-        <item name="android:background">@drawable/bg_classified_premium_fab</item>
-        <item name="android:textSize">22sp</item>
+    <style name="FuncsionTile" parent="Widget.MaterialComponents.CardView">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:minHeight">150dp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:foreground">?attr/selectableItemBackground</item>
+        <item name="cardBackgroundColor">@color/yuz_surface</item>
+        <item name="cardCornerRadius">@dimen/yuz_radius_card</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">@color/yuz_stroke</item>
+        <item name="strokeWidth">@dimen/yuz_stroke</item>
     </style>
 
-    <!-- Funksiyalar kartasi ikonka plitasi: gradient doira + oq vektor ikon. -->
-    <style name="FuncsionCardIconImg">
-        <item name="android:layout_width">48dp</item>
-        <item name="android:layout_height">48dp</item>
-        <item name="android:padding">12dp</item>
+    <style name="FuncsionTileBody">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:padding">@dimen/yuz_space_4</item>
+    </style>
+
+    <!-- Funksiyalar kartasi ikonka plitasi: gradient kvadrat + oq vektor ikon. -->
+    <style name="FuncsionTileIcon">
+        <item name="android:layout_width">@dimen/yuz_icon_tile</item>
+        <item name="android:layout_height">@dimen/yuz_icon_tile</item>
+        <item name="android:padding">11dp</item>
         <item name="android:scaleType">fitCenter</item>
         <item name="android:tint">#FFFFFF</item>
         <item name="android:contentDescription">@null</item>
     </style>
 
-    <style name="FuncsionCardText">
+    <style name="FuncsionTileTitle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">@dimen/yuz_space_3</item>
+        <item name="android:textColor">@color/yuz_text_bright</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="FuncsionTileDesc">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">3dp</item>
+        <item name="android:textColor">@color/yuz_text_secondary</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:lineSpacingExtra">2sp</item>
+        <item name="android:minLines">2</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:ellipsize">end</item>
+    </style>
+
+    <style name="FuncsionChevron">
+        <item name="android:layout_width">18dp</item>
+        <item name="android:layout_height">18dp</item>
+        <item name="android:src">@drawable/ic_yuz_chevron_right</item>
+        <item name="android:tint">@color/yuz_text_muted</item>
+        <item name="android:contentDescription">@null</item>
+    </style>
+
+    <style name="FuncsionEq">
+        <item name="android:layout_width">18dp</item>
+        <item name="android:layout_height">18dp</item>
+        <item name="android:layout_marginEnd">@dimen/yuz_space_2</item>
+        <item name="android:contentDescription">@null</item>
+        <item name="android:src">@drawable/ic_yuz_eq</item>
+        <item name="android:tint">@color/yuz_action</item>
+        <item name="android:visibility">gone</item>
+    </style>
+
+    <style name="FuncsionWide" parent="Widget.MaterialComponents.CardView">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">@dimen/yuz_gutter</item>
+        <item name="android:layout_marginEnd">@dimen/yuz_gutter</item>
+        <item name="android:layout_marginTop">@dimen/yuz_space_3</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:foreground">?attr/selectableItemBackground</item>
+        <item name="cardBackgroundColor">@color/yuz_surface</item>
+        <item name="cardCornerRadius">@dimen/yuz_radius_card</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">@color/yuz_stroke</item>
+        <item name="strokeWidth">@dimen/yuz_stroke</item>
+    </style>
+
+    <style name="FuncsionWideRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:padding">@dimen/yuz_space_4</item>
+    </style>
+
+    <style name="FuncsionWideText">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:layout_weight">1</item>
         <item name="android:layout_marginStart">14dp</item>
         <item name="android:orientation">vertical</item>
-    </style>
-
-    <style name="FuncsionCardTitle">
-        <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">wrap_content</item>
-        <item name="android:textColor">@color/text_primary</item>
-        <item name="android:textSize">16sp</item>
-        <item name="android:textStyle">bold</item>
-    </style>
-
-    <style name="FuncsionCardDesc">
-        <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_marginTop">2dp</item>
-        <item name="android:textColor">@color/text_secondary</item>
-        <item name="android:textSize">12sp</item>
-    </style>
-
-    <style name="FuncsionCardChevron">
-        <item name="android:layout_width">20dp</item>
-        <item name="android:layout_height">20dp</item>
-        <item name="android:src">@drawable/ic_yuz_chevron_right</item>
-        <item name="android:contentDescription">@null</item>
-        <item name="tint">@color/text_secondary</item>
     </style>
 </resources>
