@@ -428,7 +428,9 @@ object YuzMusicCache {
         startAt: Long
     ): Int {
         var got = startAt.coerceAtLeast(0L)
-        var total = stream.approxBytes
+        // #163: clen= boshlang'ich qiymat EMAS — faqat server tasdiqlagan
+        // hajm to'liqlik mezoni bo'ladi (InnerTube clen= yolg'on aytadi).
+        var total = -1L
         var lastEmit = 0L
         var attempt = 0
         val maxAttempts = 6
@@ -446,10 +448,10 @@ object YuzMusicCache {
             attempt++
             var knownTotal = total
             var sawEof = false
-            // #152: limit=-1 — clen= taxminiga EMAS, serverning haqiqiy
-            // EOF'iga (416/Content-Range total) qadar o'qiydi. Avval limit
-            // yolg'on clen'dan hisoblanardi: kichik clen'da fayl yarim
-            // holda "tugallangan" deb qabul qilinardi.
+            // #152/#163: limit=-1 — serverning haqiqiy EOF'iga
+            // (416/Content-Range total) qadar o'qiydi. Reader clen= ni EOF
+            // deb ham, uzunlik deb ham QABUL QILMAYDI; shu sabab bu yerda
+            // ham to'liqlik faqat tasdiqlangan jami bilan aniqlanadi.
             val reader = YuzRangeReader(
                 http, stream.url, stream.ua, got, -1L,
                 stream.approxBytes, refresh, true, gate, cancellation
@@ -511,11 +513,11 @@ object YuzMusicCache {
                 // davom etadi (barqaror tmp nomi itag bo'yicha topadi).
                 return CANCELED
             }
-            // #152: sawEof endi FAQAT haqiqiy oxirda true (416 yoki server
-            // totali) — yolg'on clen katta bo'lganda "got >= total" hech
-            // qachon bajarilmasdi va yuklash 6 urinishdan keyin o'chib
-            // ketardi ("yarimida to'xtab qolmoqda" sababi).
-            val complete = got > 0L && (sawEof || (total > 0L && got >= total))
+            // #163: to'liq = server TASDIQLAGAN jami ma'lum va unga
+            // yetildi. Faqat "EOF ko'rindi" yetarli emas: clen= kichik
+            // bo'lsa eski kod yarim faylni saqlab qo'yardi. Tasdiq
+            // bo'lmasa — keyingi urinish (tmp saqlanadi, resume bo'ladi).
+            val complete = got > 0L && total > 0L && got >= total
             if (complete && publish(context, tmp, track, stream.ext, cancellation)) return OK
         }
         // #155: FAIL'da fayl o'chirilmaydi — auto-retry/keyingi bosish shu
@@ -598,13 +600,13 @@ object YuzMusicCache {
         }
         if (interrupted) throw IOException("split download interrupted")
         val canceled = ra.canceled || rb.canceled || cancellation.canceled
-        // #152: yakun mezonlari — ikkala yarm o'z HAAQIQIY EOF'iga yetdi
-        // (readHalf reader.isEof() qaytaradi) VA yig'indi server tasdiqlagan
-        // hajmga yetdi. Avval faqat `got >= total` (clen) tekshirilardi:
-        // clen yolg'on bo'lganda to'liq tortilgan fayl ham FAIL bo'lardi.
+        // #152/#163: yakun mezonlari — ikkala yarm muvaffaqiyatli o'qildi VA
+        // server tasdiqlagan hajm ma'lum, yig'indi unga yetdi. Avval
+        // `realTotal <= 0` ham "to'liq" hisoblanardi — server hajmi
+        // aniqlanmagan fayl yarim holda saqlanib qolardi.
         val realTotal = maxOf(ra.serverTotal, rb.serverTotal)
         val complete = lowerOk && !upperFailed.get() && got.get() > 0L &&
-            (realTotal <= 0L || got.get() >= realTotal)
+            realTotal > 0L && got.get() >= realTotal
         val lowerEnd = lowerWritten.get().coerceIn(0L, mid)
         Log.i(
             TAG,

@@ -662,7 +662,21 @@ object YuzMusicEngine {
             "early end pos=$tickPos/$tickDur vid=${tagOf(item)?.videoId} " +
                 "-> retry#$itemRetries (oqim almashtirish)"
         )
-        tagOf(item)?.videoId?.let { YuzYouTubeApi.noteBadStream(it) }
+        val t = tagOf(item)
+        // #163: eski versiyada yarim saqlangan fayl ham xuddi shunday "erta
+        // tugaydi". Faqat nomzodni almashtirsak pleyer O'SHA kesilgan faylni
+        // qayta ochib, yana shu joyda tugatadi. Shuning uchun keshdan olib
+        // tashlab, o'rniga haqiqiy oqim manbasini quramiz — foydalanuvchi
+        // qayta yuklab olishi shart bo'lmaydi.
+        if (t != null && item.localConfiguration?.uri?.scheme == "file") {
+            Log.i(TAG, "early end on local file -> drop cache + re-stream id=${t.id}")
+            YuzMusicCache.remove(appCtx, t.id)
+            runCatching {
+                p.removeMediaItem(index)
+                p.addMediaItem(index, buildItem(t))
+            }
+        }
+        t?.videoId?.let { YuzYouTubeApi.noteBadStream(it) }
         tickItem = null
         tickDur = 0L
         runCatching {

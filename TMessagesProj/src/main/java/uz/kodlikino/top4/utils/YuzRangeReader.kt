@@ -55,7 +55,10 @@ import java.io.InputStream
  *
  * @param start o'qish boshlanadigan absolyut bayt
  * @param limit nechta bayt kerak (-1 = fayl oxirigacha)
- * @param expectedTotal URL'dagi clen= (0 = noma'lum; 206 javob aniqlaydi)
+ * @param expectedTotal URL'dagi clen= — FAQAT maslahat (log). Hech qachon
+ *        EOF/uzunlik manbai emas: InnerTube bu sonni tez-tez yolg'on
+ *        aytadi (#152). Haqiqiy jami faqat server javobidan olinadi —
+ *        206/416 Content-Range yoki 200 Content-Length.
  * @param refresh (bayt joyi, eski URL) -> shu itag'da davom ettiruvchi
  *        yangi URL; null = yo'q
  * @param windows false = bitta so'rov, oynalar yo'q (Range'ni
@@ -99,6 +102,8 @@ class YuzRangeReader(
         // refresh umuman bo'lmay qolardi va ijro yarimda to'xtar edi.
         private const val MAX_REFRESHES = 2
         // Hammasi rad etilsa: cooldown bilan qayta urinishlar soni.
+        // #163: 403-kvota bloki JVM probe'da ~30s ichida bo'shashdi —
+        // 1.2s/2.4s juda qisqa edi va ijro qo'shiqni tashlab ketardi.
         private const val MAX_STALL_RETRIES = 2
 
         /**
@@ -113,7 +118,11 @@ class YuzRangeReader(
     private class RangeMismatch(message: String) : Exception(message)
 
     private var pos = start
+    // #163: clen= faqat maslahat. Jami hajm va EOF server tasdiqlagach
+    // (Content-Range/Content-Length) amal qiladi — aks holda kichik
+    // clen= yarim faylni "tugallangan" qilib qo'yardi.
     private var total = if (expectedTotal > 0L) expectedTotal else -1L
+    private var totalConfirmed = false
     private var windowEnd = -1L
     private var windowStep = learnedStep.coerceIn(0, STEPS - 1)
     // #86: hajm har oyna ochishda tezlikdan qayta hisoblanadi.
@@ -182,10 +191,14 @@ class YuzRangeReader(
         checkCanceled()
     }
 
-    /** start'dan qolgan jami bayt; -1 = hali aniq emas. */
+    /**
+     * start'dan qolgan jami bayt; -1 = hali aniq emas.
+     * #163: tasdiqlanmagan clen= qaytarilmaydi — media3 uni uzunlik deb
+     * olib, qo'shiqni o'sha baytda "tugatardi" (yarim ijro sababi).
+     */
     val length: Long
         get() {
-            if (total < 0L) return -1L
+            if (!totalConfirmed) return if (limit >= 0L) limit else -1L
             val t = (total - start).coerceAtLeast(0L)
             return if (limit >= 0L) minOf(t, limit) else t
         }
@@ -232,7 +245,7 @@ class YuzRangeReader(
             // Jism tugadi, lekin oyna to'lmagan — uzilgan ulanish.
             if (isEof()) return -1
             if (singleShot) {
-                if (total >= 0L && pos < total) throw IOException("short body @$pos")
+                if (totalConfirmed && pos < total) throw IOException("short body @$pos")
                 return -1
             }
             Log.i(TAG, "window short at pos=$pos end=$windowEnd — reopen")
@@ -244,15 +257,21 @@ class YuzRangeReader(
     fun isEof(): Boolean {
         if (finished) return true
         if (limit >= 0L && pos >= start + limit) return true
-        return total >= 0L && pos >= total
+        // #163: faqat TASDIQLANGAN oxir. clen= kichik bo'lsa, undan
+        // oldin "tugadi" demaslik yarim fayl/qo'shiqning oldini oladi.
+        return totalConfirmed && pos >= total
     }
 
     /** Qancha bayt o'qilgan (download progress uchun). */
     fun position(): Long = pos
 
-    /** #152: server tasdiqlagan jami hajm; -1 = hali aniq emas. */
+    /**
+     * #152/#163: server TASDIQLAGAN jami hajm; -1 = hali aniq emas.
+     * Yuklashning to'liqlik mezoni shu songa tayanadi — clen= maslahati
+     * hech qachon bu yerdan chiqmaydi.
+     */
     val serverTotal: Long
-        get() = total
+        get() = if (totalConfirmed) total else -1L
 
     fun abort() {
         aborted = true
@@ -288,17 +307,20 @@ class YuzRangeReader(
         var last: Exception? = null
         var attempt = 0
         var stalls = 0
+        // #163: dam olish vaqti oyna budjetidan hisoblanmaydi — aks holda
+        // 403-blok paytida budjet 1-2 soniyada tugab, cooldown boshlanmasdi.
+        var waitedMs = 0L
         val t0 = System.nanoTime() / 1_000_000L
         val tried = HashSet<String>()
-        while (attempt < MAX_TRIES && elapsedMs(t0) < budgetMs()) {
+        while (attempt < MAX_TRIES && elapsedMs(t0) - waitedMs < budgetMs()) {
             holdForGate()
             var move: Move? = nextMove(tried)
             if (move == null) {
-                // Barcha til/URL variantlari rad etildi. Google throttle'i
-                // ko'pincha bir necha soniyada bo'shashadi — qisqa damlar
-                // bilan qayta uritamiz, lekin deadline'dan oshmaydi.
+                // Barcha til/URL variantlari rad etildi. Google kvota bloki
+                // odatda ~30s ichida bo'shashadi — shu vaqtgacha dam olib
+                // qayta uritamiz (JVM probe: 403 -> 30s -> 206).
                 if (stalls >= MAX_STALL_RETRIES ||
-                    elapsedMs(t0) + stallMs(stalls + 1) > budgetMs()
+                    elapsedMs(t0) - waitedMs + stallMs(stalls + 1) > budgetMs()
                 ) break
                 stalls++
                 tried.clear()
@@ -306,6 +328,7 @@ class YuzRangeReader(
                 headerFailed = false
                 last = IOException("stalled")
                 Log.i(TAG, "range stall @$pos win=${window / 1024}KB — ${stallMs(stalls)}ms dam")
+                waitedMs += stallMs(stalls)
                 pause(stallMs(stalls))
                 move = nextMove(tried) ?: break
             }
@@ -330,7 +353,11 @@ class YuzRangeReader(
                     // #152: 416 = server "bu offset'da bayt yo'q" dedi —
                     // total aniq bo'lmasa ham, start'dan oldinga o'tib
                     // bo'lgan bo'lsak, bu haqiqiy EOF.
-                    if ((total >= 0L && pos >= total) || (total < 0L && pos > start)) {
+                    // #163: clen= tasdiqlanmagan bo'lsa, unga qarab
+                    // "tugadi" demaymiz — faqat server totali hal qiladi.
+                    if ((totalConfirmed && pos >= total) ||
+                        (!totalConfirmed && pos > start)
+                    ) {
                         finished = true
                         Log.i(TAG, "range 416 at pos=$pos total=$total — eof")
                         return
@@ -351,7 +378,11 @@ class YuzRangeReader(
                         code == 206 -> crStart == pos
                         pos == 0L -> true
                         !windows -> false
-                        else -> cl == want
+                        // #163: query javobi fayl oxirida qisqaroq bo'ladi
+                        // (200 + Content-Length = qolgan baytlar). Buni rad
+                        // etish oxirgi oynani abadiy qayta so'rashga olib
+                        // kelardi.
+                        else -> cl == want || (move.query && cl in 0L until want)
                     }
                     if (!honored) {
                         runCatching { resp.close() }
@@ -362,7 +393,23 @@ class YuzRangeReader(
                     response = resp
                     stream = body
                     if (code == 206) parseTotal(resp.header("Content-Range"))
-                    else if (cl > 0L && total < 0L && !move.query) total = pos + cl
+                    else if (cl > 0L && !move.query && pos == 0L) {
+                        // 200 pos=0'da = butun fayl boshidan: Content-Length
+                        // haqiqiy jami. (?rn= query javobi ham 200 bo'ladi,
+                        // lekin u faqat oyna hajmi — shuning uchun !query.)
+                        if (total != cl) Log.i(TAG, "range total from 200 $total -> $cl")
+                        total = cl
+                        totalConfirmed = true
+                    }
+                    if (code == 200 && move.query && cl >= 0L && cl < want) {
+                        // Query 200 Content-Range bermaydi; lekin so'ralganidan
+                        // qisqa jism FAQAT fayl oxirida bo'ladi. 403-blok
+                        // paytida header tili o'lik bo'lsa, jami hajmning
+                        // yagona ishonchli manbai shu — #163.
+                        Log.i(TAG, "range query short $cl/$want @$pos -> total=${pos + cl}")
+                        total = pos + cl
+                        totalConfirmed = true
+                    }
                     // Oynasiz rejimda jism = qolgan butun fayl, chekni hajm
                     // bo'yicha qo'yamiz (1MB'lik oyna bilan kesib qo'lmasin).
                     windowEnd = when {
@@ -480,7 +527,10 @@ class YuzRangeReader(
     private fun backoff(attempt: Int): Long =
         (300L * (1L shl (attempt - 1).coerceAtMost(3))).coerceAtMost(2000L)
 
-    private fun stallMs(retry: Int): Long = 1200L * retry
+    private fun stallMs(retry: Int): Long = when (retry) {
+        1 -> 3_000L
+        else -> 8_000L
+    }
 
     private fun elapsedMs(t0: Long): Long = System.nanoTime() / 1_000_000L - t0
 
@@ -507,14 +557,16 @@ class YuzRangeReader(
 
     private fun bounded(e: Long): Long {
         var v = e
-        if (total > 0L) v = minOf(v, total)
+        // #163: faqat tasdiqlangan jami oynani kesadi. clen= kichik bo'lsa,
+        // u bilan kesish o'qishni yarimda to'xtatardi.
+        if (totalConfirmed && total > 0L) v = minOf(v, total)
         if (limit >= 0L) v = minOf(v, start + limit)
         return v
     }
 
     private fun windowEndFor(): Long {
         var end = pos + window - 1
-        if (total > 0L) end = minOf(end, total - 1)
+        if (totalConfirmed && total > 0L) end = minOf(end, total - 1)
         if (limit >= 0L) end = minOf(end, start + limit - 1)
         return end
     }
@@ -534,6 +586,7 @@ class YuzRangeReader(
             Log.i(TAG, "range total corrected $total -> $t @$pos")
         }
         total = t
+        totalConfirmed = true
     }
 
     /** Content-Range'dagi boshlang'ich bayt; -1 = yo'q/aniksiz. */
