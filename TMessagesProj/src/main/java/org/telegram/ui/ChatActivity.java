@@ -36551,7 +36551,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 }
                 if (!handled) {
                     try {
-                        AndroidUtilities.openForView(message, getParentActivity(), themeDelegate);
+                        AndroidUtilities.openForView(message, getParentActivity(), themeDelegate, true);
                     } catch (Exception e) {
                         FileLog.e(e);
                         alertUserOpenError(message);

@@ -1,16 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- YuzGram #85: chat bo'limi sarlavhasi va qidiruv satri matnlari -->
-    <!-- #100: APK himoyasi -->
-    <string name="yuz_apk_guard_on">APK himoyasi yoqildi — chatdan kelgan .apk fayllar ochilmaydi</string>
-    <string name="yuz_apk_guard_off">APK himoyasi o‘chirildi</string>
+    <!-- #100 / #178: APK himoyasi -->
     <string name="yuz_apk_guard_title">APK himoyasi</string>
-    <string name="yuz_apk_guard_desc">Yoqilganda chatda kelgan APK fayllarni ochish va o\'rnatish taqiqlanadi. APK fayl ochish shaxsiy ma\'lumotlaringiz tarqalish xavfini oshiradi — ilovalarni faqat Play Market\'dan yuklang.</string>
-    <string name="yuz_apk_guard_disable">Himoyani o‘chirish</string>
+    <string name="yuz_apk_guard_desc">Yoqilganda chatdagi APK fayllar qizil rangda belgilanadi va ochishdan oldin ogohlantirish chiqadi. Tasdiqlasangizgina fayl ochiladi — shubhali ilovalarni o‘rnatmang.</string>
+    <string name="yuz_apk_guard_on">APK himoyasi yoqildi</string>
+    <string name="yuz_apk_guard_off">APK himoyasi o‘chirildi</string>
     <string name="yuz_apk_guard_save">Saqlash</string>
-    <string name="yuz_apk_guard_warn_title">APK fayl bloklandi</string>
-    <string name="yuz_apk_guard_warn_text">APK fayl ochishingiz shaxsiy ma’lumotlaringiz tarqalish xavfini o‘shiradi. Play Market‘dan boshqa joydan APK fayl yuklab olmang.</string>
     <string name="yuz_apk_guard_toggle">APK himoyasini yoqish yoki o‘chirish</string>
+    <string name="yuz_apk_pill">APK himoya</string>
+    <string name="yuz_apk_badge">Ogoh bo‘ling</string>
+    <string name="yuz_apk_badge_title">APK fayl xavfi</string>
+    <string name="yuz_apk_badge_text">APK ilovani notanish manbadan yuklab olish shaxsiy ma’lumotlaringizga tahdid soladi. Iltimos, o‘z xavfsizligingizga befarq bo‘lmang.</string>
+    <string name="yuz_apk_warn_title">Diqqat: APK fayl</string>
+    <string name="yuz_apk_warn_text">Siz notanish manbadan APK fayl o‘rnatmoqdasiz. Ehtiyot bo‘ling: barcha fayllarga ruxsat yoki administrator huquqini bermang — bu sizning shaxsiy ma’lumotlaringiz uchun xavfli.\n\n«APK faylni o‘rnatmaslik» bosilsa, bu xabar chatingizdan o‘chiriladi.</string>
+    <string name="yuz_apk_warn_text_plain">Siz notanish manbadan APK fayl o‘rnatmoqdasiz. Ehtiyot bo‘ling: barcha fayllarga ruxsat yoki administrator huquqini bermang — bu sizning shaxsiy ma’lumotlaringiz uchun xavfli.</string>
+    <string name="yuz_apk_warn_confirm">Tushundim</string>
+    <string name="yuz_apk_warn_decline">APK faylni o‘rnatmaslik</string>
+
+    <!-- #179: fon ulanishi uchun tizim kanali nomi -->
+    <string name="yuz_service_channel_name">Fon xizmati</string>
 
     <string name="yuz_chat_tagline" translatable="false">Yangi imkoniyatlar, bir ilovada!</string>
     <string name="yuz_chat_offline" translatable="false">Tarmoqqa ulanish…</string>

@@ -1459,6 +1459,15 @@ public class ActionBarMenuItem extends FrameLayout {
                         if (!AndroidUtilities.showKeyboard(this)) {
                             clearFocus();
                             requestFocus();
+                            // YuzGram: ba'zi qurilmalarda (TECNO/HiOS) maydon
+                            // allaqachon fokusda bo'lsa showSoftInput false
+                            // qaytaradi va klaviatura ochilmay qoladi. Fokus
+                            // yangilangach bir kadr kechiktirib qayta so'raymiz.
+                            postDelayed(() -> {
+                                if (isFocused() && isShown()) {
+                                    AndroidUtilities.showKeyboard(this);
+                                }
+                            }, 100);
                         }
                     }
                     return result;

@@ -3836,12 +3836,14 @@ public class AndroidUtilities {
     }
 
     public static boolean openForView(File f, String fileName, String mimeType, final Activity activity, Theme.ResourcesProvider resourcesProvider) {
+        return openForView(f, fileName, mimeType, activity, resourcesProvider, null);
+    }
+
+    private static boolean openForView(File f, String fileName, String mimeType, final Activity activity, Theme.ResourcesProvider resourcesProvider, MessageObject message) {
         if (f != null && f.exists()) {
             String realMimeType = null;
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             MimeTypeMap myMime = MimeTypeMap.getSingleton();
-            int idx = fileName.lastIndexOf('.');
+            int idx = fileName == null ? -1 : fileName.lastIndexOf('.');
             if (idx != -1) {
                 String ext = fileName.substring(idx + 1);
                 realMimeType = myMime.getMimeTypeFromExtension(ext.toLowerCase());
@@ -3852,39 +3854,62 @@ public class AndroidUtilities {
                     }
                 }
             }
-            if (YuzApkGuard.isEnabled() && (f.getName().toLowerCase().endsWith(".apk") || "application/vnd.android.package-archive".equals(realMimeType))) {
-                AlertsCreator.createApkProtectionDialog(activity, resourcesProvider).show();
+            final String resolvedMimeType = realMimeType;
+            if (YuzApkGuard.isEnabled() && (YuzApkGuard.isApkFile(f.getName(), resolvedMimeType) || YuzApkGuard.isApkFile(fileName, mimeType))) {
+                AlertsCreator.createApkProtectionDialog(activity, resourcesProvider,
+                        () -> openForViewNow(f, resolvedMimeType, activity, resourcesProvider),
+                        message != null ? () -> deleteApkMessage(message) : null).show();
                 return true;
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && realMimeType != null && realMimeType.equals("application/vnd.android.package-archive") && !ApplicationLoader.applicationContext.getPackageManager().canRequestPackageInstalls()) {
-                AlertsCreator.createApkRestrictedDialog(activity, resourcesProvider).show();
-                return true;
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                intent.setDataAndType(FileProvider.getUriForFile(activity, ApplicationLoader.getApplicationId() + ".provider", f), realMimeType != null ? realMimeType : "text/plain");
-            } else {
-                intent.setDataAndType(Uri.fromFile(f), realMimeType != null ? realMimeType : "text/plain");
-            }
-            if (realMimeType != null) {
-                try {
-                    activity.startActivityForResult(intent, 500);
-                } catch (Exception e) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        intent.setDataAndType(FileProvider.getUriForFile(activity, ApplicationLoader.getApplicationId() + ".provider", f), "text/plain");
-                    } else {
-                        intent.setDataAndType(Uri.fromFile(f), "text/plain");
-                    }
-                    activity.startActivityForResult(intent, 500);
-                }
-            } else {
-                activity.startActivityForResult(intent, 500);
-            }
+            openForViewNow(f, resolvedMimeType, activity, resourcesProvider);
             return true;
         }
         return false;
     }
 
+    private static void openForViewNow(File f, String realMimeType, Activity activity, Theme.ResourcesProvider resourcesProvider) {
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && realMimeType != null && realMimeType.equals("application/vnd.android.package-archive") && !ApplicationLoader.applicationContext.getPackageManager().canRequestPackageInstalls()) {
+            AlertsCreator.createApkRestrictedDialog(activity, resourcesProvider).show();
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            intent.setDataAndType(FileProvider.getUriForFile(activity, ApplicationLoader.getApplicationId() + ".provider", f), realMimeType != null ? realMimeType : "text/plain");
+        } else {
+            intent.setDataAndType(Uri.fromFile(f), realMimeType != null ? realMimeType : "text/plain");
+        }
+        if (realMimeType != null) {
+            try {
+                activity.startActivityForResult(intent, 500);
+            } catch (Exception e) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    intent.setDataAndType(FileProvider.getUriForFile(activity, ApplicationLoader.getApplicationId() + ".provider", f), "text/plain");
+                } else {
+                    intent.setDataAndType(Uri.fromFile(f), "text/plain");
+                }
+                activity.startActivityForResult(intent, 500);
+            }
+        } else {
+            activity.startActivityForResult(intent, 500);
+        }
+    }
+
+    private static void deleteApkMessage(MessageObject message) {
+        if (message == null || message.messageOwner == null) {
+            return;
+        }
+        ArrayList<Integer> ids = new ArrayList<>();
+        ids.add(message.getId());
+        int topicId = (int) MessageObject.getTopicId(message.currentAccount, message.messageOwner, false);
+        MessagesController.getInstance(message.currentAccount).deleteMessages(ids, null, null, message.getDialogId(), topicId, false, 0);
+    }
+
     public static boolean openForView(MessageObject message, Activity activity, Theme.ResourcesProvider resourcesProvider) {
+        return openForView(message, activity, resourcesProvider, false);
+    }
+
+    public static boolean openForView(MessageObject message, Activity activity, Theme.ResourcesProvider resourcesProvider, boolean allowDeleteOnDecline) {
         File f = null;
         if (message.messageOwner.attachPath != null && message.messageOwner.attachPath.length() != 0) {
             f = new File(message.messageOwner.attachPath);
@@ -3893,7 +3918,7 @@ public class AndroidUtilities {
             f = FileLoader.getInstance(message.currentAccount).getPathToMessage(message.messageOwner);
         }
         String mimeType = message.type == MessageObject.TYPE_FILE || message.type == MessageObject.TYPE_TEXT ? message.getMimeType() : null;
-        return openForView(f, message.getFileName(), mimeType, activity, resourcesProvider);
+        return openForView(f, message.getFileName(), mimeType, activity, resourcesProvider, allowDeleteOnDecline ? message : null);
     }
 
     public static boolean openForView(TLRPC.Document document, boolean forceCache, Activity activity) {

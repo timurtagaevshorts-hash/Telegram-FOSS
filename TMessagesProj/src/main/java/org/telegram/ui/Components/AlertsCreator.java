@@ -248,24 +248,36 @@ public class AlertsCreator {
     }
 
     /**
-     * YuzGram #100: APK fayl ochishga urinish — ogohlantirish. Himoya tugmasi
-     * orqali o'chirilmasa, har urinishda shu xabar chiqadi.
+     * YuzGram #178: APK bubble'idagi "Ogoh bo'ling" tugmasi uchun qisqa izoh.
      */
-    public static Dialog createApkProtectionDialog(Context ctx, Theme.ResourcesProvider resourcesProvider) {
-        LinearLayout layout = new LinearLayout(ctx);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(AndroidUtilities.dp(18), AndroidUtilities.dp(6), AndroidUtilities.dp(18), AndroidUtilities.dp(4));
-        TextView text = new TextView(ctx);
-        text.setText(LocaleController.getString("YuzApkGuardWarnText", R.string.yuz_apk_guard_warn_text));
-        text.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 15);
-        text.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
-        layout.addView(text, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+    public static Dialog createApkGuardInfoDialog(Context ctx, Theme.ResourcesProvider resourcesProvider) {
         return new AlertDialog.Builder(ctx, resourcesProvider)
-                .setTitle(LocaleController.getString("YuzApkGuardWarnTitle", R.string.yuz_apk_guard_warn_title))
-                .setView(layout)
-                .setPositiveButton(LocaleController.getString("OK", R.string.OK), null)
-                .setNegativeButton(LocaleController.getString("YuzApkGuardDisable", R.string.yuz_apk_guard_disable), (d, w) -> {
-                    YuzApkGuard.setEnabled(false);
+                .setTitle(LocaleController.getString(R.string.yuz_apk_badge_title))
+                .setMessage(LocaleController.getString(R.string.yuz_apk_badge_text))
+                .setTopAnimation(R.raw.permission_request_apk, PERMISSIONS_REQUEST_TOP_ICON_SIZE, false, Theme.getColor(Theme.key_dialogTopBackground, resourcesProvider))
+                .setPositiveButton(LocaleController.getString(R.string.yuz_apk_warn_confirm), null)
+                .create();
+    }
+
+    /**
+     * YuzGram #100 / #178: APK ochishdan oldin tasdiq. "Tushundim" — fayl
+     * ochiladi, "APK faylni o'rnatmaslik" — onDecline (xabarni o'chirish).
+     */
+    public static Dialog createApkProtectionDialog(Context ctx, Theme.ResourcesProvider resourcesProvider, Runnable onConfirm, Runnable onDecline) {
+        return new AlertDialog.Builder(ctx, resourcesProvider)
+                .setTitle(LocaleController.getString(R.string.yuz_apk_warn_title))
+                .setMessage(LocaleController.getString(onDecline != null ? R.string.yuz_apk_warn_text : R.string.yuz_apk_warn_text_plain))
+                .setTopAnimation(R.raw.permission_request_apk, PERMISSIONS_REQUEST_TOP_ICON_SIZE, false, Theme.getColor(Theme.key_dialogTopBackground, resourcesProvider))
+                .forceVerticalButtons()
+                .setPositiveButton(LocaleController.getString(R.string.yuz_apk_warn_confirm), (dialog, which) -> {
+                    if (onConfirm != null) {
+                        onConfirm.run();
+                    }
+                })
+                .setNegativeButton(LocaleController.getString(R.string.yuz_apk_warn_decline), (dialog, which) -> {
+                    if (onDecline != null) {
+                        onDecline.run();
+                    }
                 })
                 .create();
     }

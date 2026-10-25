@@ -7,34 +7,46 @@ import android.graphics.Path;
 import android.view.View;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.R;
 import org.telegram.messenger.YuzApkGuard;
 
 /**
- * YuzGram #100: "APK himoyasi" tugmasi — chat tepasida, brend palavrasi
- * yonida. Qalqon yoniq ko'k = himoya YOQILGAN; kulreng = O'CHIQ.
- * Bosish holatni [DialogsActivity]da dialog orqali boshqaradi.
+ * YuzGram #100 / #178: "APK himoya" pill tugmasi — chat tepasida, brend
+ * palavrasi yonida. Qalqon + yozuv: ko‘k = himoya YOQILGAN, kulrang = O‘CHIQ.
+ * Bosish holatni [org.telegram.ui.DialogsActivity]da dialog orqali boshqaradi.
  */
 public class YuzGramApkToggle extends View {
 
     private static final int ON = 0xFF38B6FF;
-    private static final int OFF = 0xFF6B7A8C;
+    private static final int OFF = 0xFF7A8794;
+    private static final int ON_TEXT = 0xFFE8F6FF;
+    private static final int OFF_TEXT = 0xFFA7B4C2;
 
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint check = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path shield = new Path();
-    private boolean enabled = YuzApkGuard.isEnabled();
+    private final String label;
 
-    private final int size = AndroidUtilities.dp(30);
+    private final int height = AndroidUtilities.dp(30);
+    private final float iconSize = AndroidUtilities.dp(14);
+    private final float padding = AndroidUtilities.dp(9);
+    private final float gap = AndroidUtilities.dp(5);
+
+    private boolean enabled = YuzApkGuard.isEnabled();
+    private int width;
 
     public YuzGramApkToggle(Context context) {
         super(context);
+        label = context.getString(R.string.yuz_apk_pill);
         stroke.setStyle(Paint.Style.STROKE);
-        stroke.setStrokeWidth(AndroidUtilities.dp(1f));
         check.setStyle(Paint.Style.STROKE);
         check.setStrokeCap(Paint.Cap.ROUND);
-        check.setStrokeWidth(AndroidUtilities.dp(2f));
+        textPaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+        textPaint.setTextSize(AndroidUtilities.dp(12));
         buildShield();
+        width = Math.round(padding * 2 + iconSize + gap + textPaint.measureText(label));
     }
 
     /** Material "security" yo'li (24x24 katak) 0..1 kvadratiga normalelangan. */
@@ -62,34 +74,45 @@ public class YuzGramApkToggle extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        setMeasuredDimension(size, size);
+        setMeasuredDimension(width, height);
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
-        int c = enabled ? ON : OFF;
-        float pad = AndroidUtilities.dp(3);
-        float w = size - pad * 2;
-        // yumshoq doira fon
-        fill.setColor((c & 0x00FFFFFF) | (enabled ? 0x33000000 : 0x1A000000));
-        canvas.drawCircle(size / 2f, size / 2f, size / 2f - AndroidUtilities.dp(0.5f), fill);
-        float sx = pad, sy = pad + w * 0.02f, scale = w;
+        int color = enabled ? ON : OFF;
+        float radius = height / 2f;
+
+        fill.setColor(enabled ? 0x2E38B6FF : 0x1A7A8794);
+        canvas.drawRoundRect(0, 0, width, height, radius, radius, fill);
+
+        stroke.setColor(enabled ? 0x9938B6FF : 0x667A8794);
+        stroke.setStrokeWidth(AndroidUtilities.dp(1));
+        float inset = AndroidUtilities.dp(0.5f);
+        canvas.drawRoundRect(inset, inset, width - inset, height - inset, radius - inset, radius - inset, stroke);
+
+        float iconTop = (height - iconSize) / 2f;
+        float scale = iconSize * 0.92f;
         canvas.save();
-        canvas.translate(sx, sy);
+        canvas.translate(padding + iconSize * 0.04f, iconTop + iconSize * 0.02f);
         canvas.scale(scale, scale);
-        fill.setColor(enabled ? 0xFF0A1120 : 0);
         if (enabled) {
+            fill.setColor(ON);
             canvas.drawPath(shield, fill);
         }
-        stroke.setColor(c);
+        stroke.setColor(color);
         stroke.setStrokeWidth(AndroidUtilities.dp(1.4f) / scale);
         canvas.drawPath(shield, stroke);
         if (enabled) {
-            check.setColor(0xFFFFFFFF);
+            check.setColor(0xFF06131F);
             check.setStrokeWidth(AndroidUtilities.dp(2.6f) / scale);
             canvas.drawLine(0.3f, 0.52f, 0.45f, 0.67f, check);
             canvas.drawLine(0.45f, 0.67f, 0.72f, 0.36f, check);
         }
         canvas.restore();
+
+        textPaint.setColor(enabled ? ON_TEXT : OFF_TEXT);
+        Paint.FontMetrics fm = textPaint.getFontMetrics();
+        float textY = height / 2f - (fm.ascent + fm.descent) / 2f;
+        canvas.drawText(label, padding + iconSize + gap, textY, textPaint);
     }
 }

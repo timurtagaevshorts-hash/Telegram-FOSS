@@ -69,6 +69,7 @@ public class YuzGramBrandMark extends View {
         badgeSize = AndroidUtilities.dp(30f);
         Typeface bold = Typeface.create(Typeface.DEFAULT, Typeface.BOLD);
         wordPaint.setTextSize(AndroidUtilities.dp(20f));
+        wordPaint.setColor(WORD_PRIMARY);
         wordPaint.setTypeface(bold);
         tagPaint.setTextSize(AndroidUtilities.dp(10.5f));
         tagPaint.setColor(TAGLINE);
@@ -165,6 +166,9 @@ public class YuzGramBrandMark extends View {
             canvas.drawText(offlineText, tx, wordBaseline, wordPaint);
             wordPaint.setColor(WORD_PRIMARY);
         } else {
+            // Paint standart rangi qora — birinchi kadrdanoq "Yuz" oq bo'lishi
+            // uchun rangni har chizishdan oldin majburan o'rnatamiz.
+            wordPaint.setColor(WORD_PRIMARY);
             canvas.drawText(WORD_1, tx, wordBaseline, wordPaint);
             float w1 = wordPaint.measureText(WORD_1);
             wordPaint.setColor(WORD_ACCENT);

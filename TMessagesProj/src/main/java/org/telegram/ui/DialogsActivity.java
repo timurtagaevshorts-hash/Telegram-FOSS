@@ -2860,10 +2860,21 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     /** YuzGram #93: sarlavha bloki endi faqat qidiruv pill'i — reyka o'ng ustun. */
     private int yuzSearchBarTopMargin() {
-        int top = actionBar != null && actionBar.getMeasuredHeight() > 0 ? actionBar.getMeasuredHeight() : dp(56);
+        int barBottom;
+        if (actionBar != null) {
+            // getMeasuredHeight() birinchi layout'da 0 bo'lishi mumkin — u holda
+            // status bar + action bar balandligi bilan pastki chegara hisoblanadi,
+            // aks holda pill sarlavha ustiga chiqib ketadi.
+            int measured = actionBar.getMeasuredHeight();
+            int minimum = (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0)
+                    + ActionBar.getCurrentActionBarHeight();
+            barBottom = Math.max(measured, minimum);
+        } else {
+            barBottom = AndroidUtilities.statusBarHeight + dp(56);
+        }
         // YuzGram #70: storiya qatori chatdan olib tashlandi — tepada faqat
         // action bar o'rni qoladi.
-        return top + dp(10);
+        return barBottom + dp(10);
     }
 
     /** YuzGram #93b: gumbaz pastki-o'ng burchakda, nav bar ustida turadi. */
@@ -2953,7 +2964,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (!actionBar.isSearchFieldVisible()) {
             actionBar.openSearchField("", true);
         } else if (searchItem != null && searchItem.getSearchField() != null) {
-            AndroidUtilities.showKeyboard(searchItem.getSearchField());
+            // YuzGram: maydon ochiq bo'lsa ham fokus boshqa view'da qolgan
+            // bo'lishi mumkin — avval fokusni maydonga qaytaramiz, keyin
+            // klaviaturani so'raymiz (aks holda IME ochilmaydi).
+            EditTextBoldCursor field = searchItem.getSearchField();
+            if (!field.hasFocus()) {
+                field.requestFocus();
+            }
+            AndroidUtilities.showKeyboard(field);
         }
     }
 

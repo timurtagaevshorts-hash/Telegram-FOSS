@@ -121,6 +121,7 @@ import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.WebFile;
+import org.telegram.messenger.YuzApkGuard;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.messenger.video.VideoPlayerRewinder;
 import org.telegram.tgnet.ConnectionsManager;
@@ -130,6 +131,7 @@ import org.telegram.tgnet.tl.TL_stories;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.AvatarSpan;
 import org.telegram.ui.ChatActivity;
+import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.AnimatedEmojiSpan;
 import org.telegram.ui.Components.AnimatedFileDrawable;
@@ -1051,6 +1053,17 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     private long loadingProgressLayoutHash;
     private int infoX;
     private int infoWidth;
+
+    private final RectF yuzApkBadgeRect = new RectF();
+    private final Paint yuzApkTintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint yuzApkBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint yuzApkBadgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final TextPaint yuzApkBadgeTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    private boolean yuzApkBadgePressed;
+    private int yuzApkBadgeWidth = -1;
+    private String yuzApkBadgeLabel;
+    private MessageObject yuzApkCheckedMessage;
+    private boolean yuzApkCheckedApk;
 
     private String currentUrl;
     private WebFile currentWebFile;
@@ -3411,6 +3424,104 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         return roundSeekbarTouched != 0;
     }
 
+    private void initYuzApkPaints() {
+        if (yuzApkBadgeTextPaint.getTextSize() == 0) {
+            yuzApkBadgeTextPaint.setTextSize(AndroidUtilities.dp(10.5f));
+            yuzApkBadgeTextPaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+            yuzApkBorderPaint.setStyle(Paint.Style.STROKE);
+            yuzApkBorderPaint.setStrokeWidth(AndroidUtilities.dp(1.2f));
+        }
+    }
+
+    private int getYuzApkBadgeWidth() {
+        if (yuzApkBadgeWidth < 0) {
+            initYuzApkPaints();
+            yuzApkBadgeWidth = (int) Math.ceil(yuzApkBadgeTextPaint.measureText(getYuzApkBadgeLabel())) + AndroidUtilities.dp(16);
+        }
+        return yuzApkBadgeWidth;
+    }
+
+    private String getYuzApkBadgeLabel() {
+        if (yuzApkBadgeLabel == null) {
+            yuzApkBadgeLabel = getContext().getString(R.string.yuz_apk_badge);
+        }
+        return yuzApkBadgeLabel;
+    }
+
+    private boolean yuzApkGuardActive() {
+        if (documentAttachType != DOCUMENT_ATTACH_TYPE_DOCUMENT
+                || currentMessageObject == null
+                || !YuzApkGuard.isEnabled()) {
+            return false;
+        }
+        // Xabar obyekti har qayta bog'lashda o'zgaradi — APK tekshiruvini
+        // har kadrda emas, faqat bir marta bajaramiz (scroll silliqligi).
+        if (currentMessageObject != yuzApkCheckedMessage) {
+            yuzApkCheckedMessage = currentMessageObject;
+            yuzApkCheckedApk = YuzApkGuard.isApkMessage(currentMessageObject);
+        }
+        return yuzApkCheckedApk;
+    }
+
+    private void drawYuzApkGuard(Canvas canvas) {
+        if (!yuzApkGuardActive() || currentBackgroundDrawable == null) {
+            yuzApkBadgeRect.setEmpty();
+            return;
+        }
+        if (currentBackgroundDrawable.getBounds().isEmpty()) {
+            yuzApkBadgeRect.setEmpty();
+            return;
+        }
+        initYuzApkPaints();
+        Path bubblePath = currentBackgroundDrawable.makePath();
+        yuzApkTintPaint.setColor(Theme.isCurrentThemeDark() ? 0x5EE5484D : 0x33E5484D);
+        canvas.drawPath(bubblePath, yuzApkTintPaint);
+        yuzApkBorderPaint.setColor(Theme.isCurrentThemeDark() ? 0xB3E5484D : 0x99E5484D);
+        canvas.drawPath(bubblePath, yuzApkBorderPaint);
+    }
+
+    private void drawYuzApkBadge(Canvas canvas) {
+        if (!yuzApkGuardActive() || currentBackgroundDrawable == null) {
+            yuzApkBadgeRect.setEmpty();
+            return;
+        }
+        Rect bubble = currentBackgroundDrawable.getBounds();
+        if (bubble.isEmpty()) {
+            yuzApkBadgeRect.setEmpty();
+            return;
+        }
+        initYuzApkPaints();
+        int chipWidth = getYuzApkBadgeWidth();
+        float chipHeight = AndroidUtilities.dp(19);
+        float left = bubble.left + AndroidUtilities.dp(10);
+        float right = left + chipWidth;
+        if (right > bubble.right - AndroidUtilities.dp(10)) {
+            yuzApkBadgeRect.setEmpty();
+            return;
+        }
+        float chipTop;
+        if (!TextUtils.isEmpty(currentMessageObject.caption) && captionLayout != null) {
+            chipTop = captionY - AndroidUtilities.dp(23);
+        } else {
+            float reactionsLift = !reactionsLayoutInBubble.isEmpty && !reactionsLayoutInBubble.isSmall ? reactionsLayoutInBubble.totalHeight : 0;
+            chipTop = bubble.bottom - AndroidUtilities.dp(25) - reactionsLift;
+        }
+        yuzApkBadgeRect.set(left, chipTop, right, chipTop + chipHeight);
+        yuzApkBadgePaint.setColor(yuzApkBadgePressed ? 0xFFC93A3F : 0xFFE5484D);
+        canvas.drawRoundRect(yuzApkBadgeRect, chipHeight / 2f, chipHeight / 2f, yuzApkBadgePaint);
+        yuzApkBadgeTextPaint.setColor(0xFFFFFFFF);
+        Paint.FontMetrics fm = yuzApkBadgeTextPaint.getFontMetrics();
+        float textY = chipTop + chipHeight / 2f - (fm.ascent + fm.descent) / 2f;
+        canvas.drawText(getYuzApkBadgeLabel(), left + AndroidUtilities.dp(10), textY, yuzApkBadgeTextPaint);
+    }
+
+    private void showYuzApkBadgeDialog() {
+        Context context = getContext();
+        if (context instanceof Activity) {
+            AlertsCreator.createApkGuardInfoDialog(context, resourcesProvider).show();
+        }
+    }
+
     private boolean checkPhotoImageMotionEvent(MotionEvent event) {
         if (!drawPhotoImage && documentAttachType != DOCUMENT_ATTACH_TYPE_DOCUMENT || currentMessageObject.isSending() && buttonState != 1) {
             return false;
@@ -3421,6 +3532,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
         boolean result = false;
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            if (!yuzApkBadgeRect.isEmpty() && yuzApkBadgeRect.contains(x, y)) {
+                yuzApkBadgePressed = true;
+                invalidate();
+                return true;
+            }
             boolean area2 = false;
             int side = AndroidUtilities.dp(48);
 
@@ -3483,6 +3599,13 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             }
         } else {
             if (event.getAction() == MotionEvent.ACTION_UP) {
+                if (yuzApkBadgePressed) {
+                    yuzApkBadgePressed = false;
+                    playSoundEffect(SoundEffectConstants.CLICK);
+                    showYuzApkBadgeDialog();
+                    invalidate();
+                    return true;
+                }
                 if (videoButtonPressed == 1) {
                     videoButtonPressed = 0;
                     playSoundEffect(SoundEffectConstants.CLICK);
@@ -3513,6 +3636,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     }
                     invalidate();
                 }
+            } else if (event.getAction() == MotionEvent.ACTION_CANCEL) {
+                yuzApkBadgePressed = false;
             }
         }
         return result;
@@ -8095,6 +8220,12 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                             maxTextWidth = Math.max(maxTextWidth, infoWidth + AndroidUtilities.dp(86 + (drawPhotoImage ? 52 : 22)));
                         }
                     }
+                    if (!drawPhotoImage && TextUtils.isEmpty(messageObject.caption) && YuzApkGuard.isEnabled() && YuzApkGuard.isApkMessage(messageObject)) {
+                        measureTime(messageObject);
+                        int apkMinWidth = getYuzApkBadgeWidth() + timeWidth + AndroidUtilities.dp(30);
+                        int apkMaxWidth = getParentWidth() - AndroidUtilities.dp(drawAvatar ? 102 : 50);
+                        maxTextWidth = Math.max(maxTextWidth, Math.min(apkMinWidth, apkMaxWidth));
+                    }
                     if (captionLayout != null) {
                         maxTextWidth = Math.max(captionLayout.textWidth + getExtraTextX() * 2 + dp(31), maxTextWidth);
                     }
@@ -8130,6 +8261,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                                     photoHeight += AndroidUtilities.dp(4);
                                 }
                             }
+                        }
+                        if (YuzApkGuard.isEnabled() && YuzApkGuard.isApkMessage(messageObject)) {
+                            photoHeight += AndroidUtilities.dp(26);
                         }
                     }
                     if (!reactionsLayoutInBubble.isSmall && !reactionsLayoutInBubble.isEmpty) {
@@ -12524,6 +12658,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 }
             } catch (Exception e) {
                 FileLog.e(e);
+            }
+            if (!drawPhotoImage) {
+                drawYuzApkBadge(canvas);
             }
         }
         if (currentMessageObject.type == MessageObject.TYPE_GEO && !(MessageObject.getMedia(currentMessageObject.messageOwner) instanceof TLRPC.TL_messageMediaGeoLive) && currentMapProvider == 2 && photoImage.hasNotThumb()) {
@@ -17029,6 +17166,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
 
         drawBackgroundInternal(canvas, false);
+        drawYuzApkGuard(canvas);
         if (isHighlightedAnimated) {
             long newTime = System.currentTimeMillis();
             long dt = Math.abs(newTime - lastHighlightProgressTime);

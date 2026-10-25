@@ -23,7 +23,7 @@
     <string name="premium_active_full">Sizda To\'liq Premium faol!</string>
     <string name="premium_active_kino_sub">Premium kinolar ochiq. To\'liq imkoniyatlar uchun yuqori tarifga o\'ting.</string>
     <string name="premium_active_full_sub">Barcha premium imkoniyatlar ochiq.</string>
-    <string name="premium_checking_purchases">Xaridlar tekshirilmoqda...</string>
+    <string name="premium_checking_purchases">Xaridlar tekshirilmoqda…</string>
     <string name="premium_restore_not_found">Play hisobida bu ilova uchun xarid topilmadi</string>
     <string name="premium_full_already_active">Sizda allaqachon To\'liq Premium faol — bu tarif kerak emas</string>
 
