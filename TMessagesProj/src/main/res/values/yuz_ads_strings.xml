@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Banner (foydalanuvchi ko'radigan qism) -->
+    <string name="yuz_ad_label">REKLAMA</string>
+    <string name="yuz_ad_cta">Batafsil</string>
+    <string name="yuz_ad_open_failed">Havolani ochib bo\'lmadi</string>
+
+    <!-- Rang uslublari -->
+    <string name="yuz_ad_theme_brand">Ko\'k</string>
+    <string name="yuz_ad_theme_violet">Binafsha</string>
+    <string name="yuz_ad_theme_emerald">Zumrad</string>
+    <string name="yuz_ad_theme_sunset">Shafaq</string>
+    <string name="yuz_ad_theme_crimson">Qip-qizil</string>
+    <string name="yuz_ad_theme_graphite">Grafit</string>
+
+    <!-- Admin: tablar -->
+    <string name="yuz_admin_tab_limits">Limitlar</string>
+    <string name="yuz_admin_tab_ads">Reklama</string>
+
+    <!-- Admin: reels limitlari -->
+    <string name="yuz_admin_limits_title">Reels joylash limitlari</string>
+    <string name="yuz_admin_limits_desc">Premium obunasi yo\'q va premium foydalanuvchilar kuniga nechta rels joylashi mumkinligini hamda video hajmini belgilang. O\'zgarish keyingi yuklashdan amal qiladi.</string>
+    <string name="yuz_admin_limit_regular">Premium obunasiz — kunlik rels</string>
+    <string name="yuz_admin_limit_premium">Premium obuna — kunlik rels</string>
+    <string name="yuz_admin_limit_regular_mb">Premium obunasiz — hajm (MB)</string>
+    <string name="yuz_admin_limit_premium_mb">Premium obuna — hajm (MB)</string>
+    <string name="yuz_admin_limits_unlimited_hint">0 = cheksiz (kunlik rels). Hajm 1–1024 MB.</string>
+    <string name="yuz_admin_limits_save">Limitlarni saqlash</string>
+    <string name="yuz_admin_limits_saved">Limitlar saqlandi</string>
+    <string name="yuz_admin_limits_save_failed">Limitlar saqlanmadi: %1$s</string>
+    <string name="yuz_admin_limits_invalid">Sonlarni to\'g\'ri kiriting (0 yoki undan katta, hajm 1–1024 MB)</string>
+    <string name="yuz_admin_limits_updated">Yangilangan: %1$s</string>
+    <string name="yuz_admin_limits_load_failed">Limitlar yuklanmadi. Standart qiymatlar ko\'rsatildi</string>
+
+    <!-- Admin: reklama ro'yxati -->
+    <string name="yuz_admin_ads_empty">Hozircha reklama yo\'q. Pastdagi + tugmasi bilan qo\'shing.</string>
+    <string name="yuz_admin_ad_add">Reklama qo\'shish</string>
+    <string name="yuz_admin_ad_untitled">Reklama</string>
+    <string name="yuz_admin_ad_delete_confirm">\"%1$s\" reklamasi o\'chirilsinmi?</string>
+    <string name="yuz_admin_ad_place_chats">Chatlar tepasida</string>
+    <string name="yuz_admin_ad_place_functions">Funksiyalar tepasida</string>
+    <string name="yuz_admin_ad_place_none">Joylashuv tanlanmagan</string>
+    <string name="yuz_admin_ad_active">Faol</string>
+    <string name="yuz_admin_ad_inactive">O\'chirilgan</string>
+    <string name="yuz_admin_ad_load_failed">Reklamalar yuklanmadi. Internetni tekshiring</string>
+
+    <!-- Admin: reklama dialogi -->
+    <string name="yuz_admin_ad_dlg_add">Reklama qo\'shish</string>
+    <string name="yuz_admin_ad_dlg_edit">Reklamani tahrirlash</string>
+    <string name="yuz_admin_ad_preview">Ko\'rinishi</string>
+    <string name="yuz_admin_ad_f_title">Sarlavha</string>
+    <string name="yuz_admin_ad_f_text">Qisqa matn</string>
+    <string name="yuz_admin_ad_f_image">Yoki rasm havolasi (ixtiyoriy)</string>
+    <string name="yuz_admin_ad_image_section">Reklama surati</string>
+    <string name="yuz_admin_ad_image_pick">Surat yuklash</string>
+    <string name="yuz_admin_ad_image_change">Boshqa surat</string>
+    <string name="yuz_admin_ad_image_none">Surat tanlanmagan — gradient fon ishlatiladi</string>
+    <string name="yuz_admin_ad_image_selected">Yangi surat tanlandi — saqlashda yuklanadi</string>
+    <string name="yuz_admin_ad_image_remote">Joriy surat ishlatiladi</string>
+    <string name="yuz_admin_ad_image_uploading">Surat yuklanmoqda: %1$d%%</string>
+    <string name="yuz_admin_ad_image_upload_failed">Surat yuklanmadi: %1$s</string>
+    <string name="yuz_admin_ad_image_clear">O\'chirish</string>
+    <string name="yuz_admin_ad_image_pick_title">Rasm tanlash</string>
+    <string name="yuz_admin_ad_image_pick_failed">Rasm tanlash oynasi ochilmadi</string>
+    <string name="yuz_admin_ad_f_link">Havola — https://…</string>
+    <string name="yuz_admin_ad_f_placements">Qayerda ko\'rsatilsin</string>
+    <string name="yuz_admin_ad_f_theme">Rang uslubi</string>
+    <string name="yuz_admin_ad_f_active">Faol holatda</string>
+    <string name="yuz_admin_ad_required">Sarlavha va havola kiritilishi shart</string>
+    <string name="yuz_admin_ad_link_invalid">Havola http:// yoki https:// bilan boshlanishi kerak</string>
+    <string name="yuz_admin_ad_image_invalid">Rasm URL http:// yoki https:// bilan boshlanishi kerak</string>
+    <string name="yuz_admin_ad_saved">Reklama saqlandi</string>
+    <string name="yuz_admin_ad_save_failed">Reklama saqlanmadi: %1$s</string>
+</resources>

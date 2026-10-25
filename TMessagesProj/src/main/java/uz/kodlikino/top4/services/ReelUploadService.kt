@@ -167,6 +167,7 @@ class ReelUploadService : android.app.Service() {
             }
 
             var reservedUid: String? = null
+            var slotReserved = false
             var compressedFile: File? = null
             val boosted = YuzPremiumManager.from(this@ReelUploadService).hasReelsBoost(account)
 
@@ -185,6 +186,7 @@ class ReelUploadService : android.app.Service() {
                     return@launch
                 }
                 reservedUid = uid
+                slotReserved = reservation.getOrDefault(false)
 
                 // Siqish
                 updateNotification(0, "Video siqilmoqda...")
@@ -253,7 +255,7 @@ class ReelUploadService : android.app.Service() {
                 FileLog.e(e)
                 reservedUid?.let {
                     try {
-                        YuzReelQuota.releaseUploadSlot(it, boosted)
+                        YuzReelQuota.releaseUploadSlot(it, slotReserved)
                     } catch (_: Exception) {
                     }
                 }

@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  YuzGram admin paneli (#77) — login/parol (claimAdminSession) dan so'ng uch tab:
+  YuzGram admin paneli (#77) — login/parol (claimAdminSession) dan so'ng besh tab:
   Dashboard (haqiqiy statistika: comment_profiles.lastActiveAt + reels + movies),
-  Kinolar (CRUD), Reels (ko'rish/hujjat holati + o'chirish).
+  Kinolar (CRUD), Reels (ko'rish/hujjat holati + o'chirish), Limitlar (reels
+  kunlik/hajm chegaralari), Reklama (chatlar va Funksiyalar bannerlari CRUD).
   Kinolar ekrani kirish tugmasi bu yerga ko'chirildi: endi ochilish joyi —
   Sozlamalar ro'yxatidagi "Admin panel" qatori (ProfileActivity).
 -->
@@ -178,6 +179,7 @@
                         android:id="@+id/btnTabReels"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/yuz_space_2"
                         android:background="@drawable/bg_yuz_chip"
                         android:clickable="true"
                         android:focusable="true"
@@ -186,6 +188,37 @@
                         android:paddingEnd="@dimen/yuz_space_4"
                         android:paddingBottom="@dimen/yuz_space_2"
                         android:text="@string/yuz_admin_tab_reels"
+                        android:textColor="@color/yuz_text_secondary"
+                        android:textSize="@dimen/yuz_text_secondary" />
+
+                    <TextView
+                        android:id="@+id/btnTabLimits"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/yuz_space_2"
+                        android:background="@drawable/bg_yuz_chip"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:paddingStart="@dimen/yuz_space_4"
+                        android:paddingTop="@dimen/yuz_space_2"
+                        android:paddingEnd="@dimen/yuz_space_4"
+                        android:paddingBottom="@dimen/yuz_space_2"
+                        android:text="@string/yuz_admin_tab_limits"
+                        android:textColor="@color/yuz_text_secondary"
+                        android:textSize="@dimen/yuz_text_secondary" />
+
+                    <TextView
+                        android:id="@+id/btnTabAds"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_yuz_chip"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:paddingStart="@dimen/yuz_space_4"
+                        android:paddingTop="@dimen/yuz_space_2"
+                        android:paddingEnd="@dimen/yuz_space_4"
+                        android:paddingBottom="@dimen/yuz_space_2"
+                        android:text="@string/yuz_admin_tab_ads"
                         android:textColor="@color/yuz_text_secondary"
                         android:textSize="@dimen/yuz_text_secondary" />
                 </LinearLayout>
@@ -386,6 +419,200 @@
                         android:layout_gravity="center"
                         android:indeterminateTint="@color/yuz_action"
                         android:visibility="gone" />
+                </FrameLayout>
+
+                <!-- ─── Limitlar ─── -->
+                <androidx.core.widget.NestedScrollView
+                    android:id="@+id/limitsPanel"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingStart="@dimen/yuz_space_4"
+                    android:paddingTop="@dimen/yuz_space_3"
+                    android:paddingEnd="@dimen/yuz_space_4"
+                    android:paddingBottom="@dimen/yuz_space_6"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/yuz_admin_limits_title"
+                            android:textColor="@color/yuz_text"
+                            android:textSize="@dimen/yuz_text_body"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/yuz_space_1"
+                            android:text="@string/yuz_admin_limits_desc"
+                            android:textColor="@color/yuz_text_secondary"
+                            android:textSize="@dimen/yuz_text_caption" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/yuz_space_4"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:hint="@string/yuz_admin_limit_regular">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/etAdminLimitRegularDaily"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="number"
+                                    android:maxLines="1" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="@dimen/yuz_space_3"
+                                android:layout_weight="1"
+                                android:hint="@string/yuz_admin_limit_premium">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/etAdminLimitPremiumDaily"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="number"
+                                    android:maxLines="1" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/yuz_space_3"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:hint="@string/yuz_admin_limit_regular_mb">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/etAdminLimitRegularMb"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="number"
+                                    android:maxLines="1" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="@dimen/yuz_space_3"
+                                android:layout_weight="1"
+                                android:hint="@string/yuz_admin_limit_premium_mb">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/etAdminLimitPremiumMb"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="number"
+                                    android:maxLines="1" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                        </LinearLayout>
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/yuz_space_2"
+                            android:text="@string/yuz_admin_limits_unlimited_hint"
+                            android:textColor="@color/yuz_text_muted"
+                            android:textSize="@dimen/yuz_text_caption" />
+
+                        <ProgressBar
+                            android:id="@+id/progressLimits"
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:layout_gravity="center"
+                            android:layout_marginTop="@dimen/yuz_space_4"
+                            android:indeterminateTint="@color/yuz_action"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvLimitsUpdated"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/yuz_space_3"
+                            android:textColor="@color/yuz_text_muted"
+                            android:textSize="@dimen/yuz_text_caption" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnSaveLimits"
+                            style="@style/YuzButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="@dimen/yuz_button"
+                            android:layout_marginTop="@dimen/yuz_space_3"
+                            android:text="@string/yuz_admin_limits_save" />
+                    </LinearLayout>
+                </androidx.core.widget.NestedScrollView>
+
+                <!-- ─── Reklama ─── -->
+                <FrameLayout
+                    android:id="@+id/adsPanel"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvAdminAds"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:clipToPadding="false"
+                        android:paddingStart="@dimen/yuz_space_4"
+                        android:paddingTop="@dimen/yuz_space_2"
+                        android:paddingEnd="@dimen/yuz_space_4"
+                        android:paddingBottom="96dp" />
+
+                    <TextView
+                        android:id="@+id/tvAdminAdsEmpty"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:gravity="center"
+                        android:paddingStart="@dimen/yuz_space_6"
+                        android:paddingEnd="@dimen/yuz_space_6"
+                        android:text="@string/yuz_admin_ads_empty"
+                        android:textColor="@color/yuz_text_secondary"
+                        android:textSize="@dimen/yuz_text_body"
+                        android:visibility="gone" />
+
+                    <ProgressBar
+                        android:id="@+id/progressAdminAds"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:indeterminateTint="@color/yuz_action"
+                        android:visibility="gone" />
+
+                    <com.google.android.material.floatingactionbutton.FloatingActionButton
+                        android:id="@+id/btnAddAd"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom|end"
+                        android:layout_margin="@dimen/yuz_gutter"
+                        android:contentDescription="@string/yuz_admin_ad_add"
+                        app:backgroundTint="@color/yuz_action"
+                        app:srcCompat="@drawable/ic_add"
+                        app:tint="@color/yuz_on_action" />
                 </FrameLayout>
             </FrameLayout>
         </LinearLayout>

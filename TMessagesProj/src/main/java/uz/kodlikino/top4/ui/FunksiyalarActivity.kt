@@ -2,6 +2,8 @@ package uz.kodlikino.top4.ui
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.view.ContextThemeWrapper
@@ -9,14 +11,17 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.widget.NestedScrollView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.BaseFragment
+import uz.kodlikino.top4.utils.YuzAdFeed
 import uz.kodlikino.top4.utils.YuzMusicEngine
 
 /**
@@ -28,6 +33,8 @@ import uz.kodlikino.top4.utils.YuzMusicEngine
 class FunksiyalarActivity : BaseFragment() {
 
     private var musicObserver: YuzMusicEngine.Observer? = null
+    private var adSlot: FrameLayout? = null
+    private var adSignature: String? = null
 
     override fun createView(context: Context): View {
         val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
@@ -67,7 +74,57 @@ class FunksiyalarActivity : BaseFragment() {
         }
 
         playIntro(root)
+        adSlot = root.findViewById(R.id.adFunctionsSlot)
+        refreshAd()
         return root
+    }
+
+    /** Funksiyalar tepasidagi reklama — faol banner bo'lmasa slot butunlay yashirin. */
+    private fun refreshAd() {
+        if (adSlot == null) return
+        YuzAdFeed.loadFunctionsBanner { banner ->
+            val target = adSlot ?: return@loadFunctionsBanner
+            if (fragmentView == null) {
+                target.visibility = View.GONE
+                return@loadFunctionsBanner
+            }
+            if (banner == null) {
+                target.removeAllViews()
+                target.visibility = View.GONE
+                adSignature = null
+                return@loadFunctionsBanner
+            }
+            val signature = listOf(
+                banner.id, banner.title, banner.subtitle,
+                banner.imageUrl, banner.linkUrl, banner.theme
+            ).joinToString("|")
+            if (signature == adSignature && target.childCount > 0) return@loadFunctionsBanner
+            target.removeAllViews()
+            val ad = YuzAdBannerView(target.context) { url -> openAdLink(url) }
+            ad.bind(banner)
+            target.addView(
+                ad,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+            target.visibility = View.VISIBLE
+            adSignature = signature
+        }
+    }
+
+    private fun openAdLink(url: String) {
+        val ctx = context ?: return
+        if (url.isBlank()) return
+        try {
+            ctx.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (_: Exception) {
+            Toast.makeText(ctx, R.string.yuz_ad_open_failed, Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onResume() {
@@ -85,6 +142,7 @@ class FunksiyalarActivity : BaseFragment() {
             }.also { YuzMusicEngine.addObserver(it) }
         }
         updateMusicState()
+        refreshAd()
     }
 
     override fun onPause() {

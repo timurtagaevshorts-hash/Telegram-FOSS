@@ -35,6 +35,16 @@
                 android:text="@string/funksiyalar_subtitle" />
         </LinearLayout>
 
+        <!-- Admin panel boshqaradigan reklama (faol banner bo'lsa ko'rinadi). -->
+        <FrameLayout
+            android:id="@+id/adFunctionsSlot"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/yuz_gutter"
+            android:layout_marginTop="@dimen/yuz_space_2"
+            android:layout_marginEnd="@dimen/yuz_gutter"
+            android:visibility="gone" />
+
         <!-- AI — hub'ning yagona hero kartasi; qolganlari tarmoqqa bo'linadi. -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardAi"

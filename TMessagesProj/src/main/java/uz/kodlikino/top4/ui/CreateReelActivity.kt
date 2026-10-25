@@ -123,16 +123,16 @@ class CreateReelActivity : BaseFragment() {
         return root
     }
 
-    /** To'liq Premium — cheksiz kunlik limit + 100 MB hajm. */
+    /** To'liq Premium — admin panelda belgilangan premium limitlar. */
     private fun premiumBoost(): Boolean {
         val ctx = themedContext ?: context ?: return false
         return YuzPremiumManager.from(ctx).hasReelsBoost(currentAccount)
     }
 
     /**
-     * "Bugungi limit: 4/5 ta · 50 MB gacha" — Firestore kvot hujjatini o'qib
-     * ko'rsatadi. Hujjat yo'q/xato bo'lsa 0 ishlatilgan hisoblanadi (limitni
-     * sun'iy qisqartirmaydi).
+     * "Bugungi limit: 4/5 ta · 50 MB gacha" — admin panel sozlagan limitlar
+     * (`settings/app`) va Firestore kvota hujjati asosida. Hujjat yo'q/xato
+     * bo'lsa 0 ishlatilgan hisoblanadi (limitni sun'iy qisqartirmaydi).
      */
     private fun refreshQuotaLabel() {
         val s = scope ?: return
@@ -230,7 +230,8 @@ class CreateReelActivity : BaseFragment() {
                 rejectVideo(getString(R.string.reels_video_too_large))
                 return@launch
             }
-            // Kunlik kvot: bepul 50 MB, premium 100 MB.
+            // Kunlik/hajm limitlari — admin panel sozlamasidan (settings/app).
+            YuzReelQuota.loadLimits()
             val maxBytes = YuzReelQuota.maxFileBytes(premiumBoost())
             if (size > maxBytes) {
                 rejectVideo(YuzReelQuota.sizeLimitMessage(premiumBoost(), size))
