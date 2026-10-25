@@ -52,10 +52,12 @@ public class YuzGramBottomBar extends View {
     // Neon palitra (YuzGram brendi; rail bilan bir xil ko'klar)
     // YuzGram #96/#102/#108: sirt shaffof shisha — ostidan o'tayotgan chat
     // qatorlari aniq ko'rinadi (#102 talab: "orqasi korinsin"; #108: "bar
-    // shaffof bolsin"). Alpha 0x73→0x4D: endi qatorlar bar ortida belgilan-
-    // may, shuning uchun sirt yanada yengil bo'lishi mumkin. Kontrast
-    // border + pill + soya hisobiga saqlanadi.
-    private static final int SURFACE = 0x4D0C1626;      // chuqur to'q-ko'k yarim shaffof sirt
+    // shaffof bolsin").
+    // #185: chat ro'yxati endi bar ORTIDAN davom etadi (padding 0), shuning
+    // uchun sirt 0x4D→0x8C quyuqlashdi: qatorlar shishadan ko'rinib turadi,
+    // lekin bar yorliqlari matn ustida ham o'qiladi. Kontrast border + pill
+    // + soya hisobiga saqlanadi.
+    private static final int SURFACE = 0x8C0C1626;      // chuqur to'q-ko'k yarim shaffof sirt
     private static final int BORDER = 0x662AABEE;       // brend-ko'k neon border (#2AABEE)
     private static final int GLOW_BLUE = 0x992AABEE;    // tashqi nur (#2AABEE)
     private static final int PILL_START = 0xFF38B6FF;   // och-ko'k (rail ACTIVE_START)
@@ -521,6 +523,13 @@ public class YuzGramBottomBar extends View {
     public boolean onTouchEvent(MotionEvent event) {
         int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
+            // #185: ro'yxat bar ortidan o'tadi — dock panelidan tashqaridagi
+            // (shaffof chekka/bo'shliq) teginish ro'yxatga o'tsin, aks holda
+            // bar 68dp tasmada skroll va qator bosishini yutib yuboradi.
+            if (!isInsidePanel(event.getX(), event.getY())) {
+                pressSlot = -1;
+                return false;
+            }
             super.onTouchEvent(event);
             int slot = slotAt(event.getX());
             if (slot >= 0) {
@@ -576,5 +585,11 @@ public class YuzGramBottomBar extends View {
         }
         int slot = (int) ((x - panelLeft) / ((panelRight - panelLeft) / COUNT));
         return Math.max(0, Math.min(COUNT - 1, slot));
+    }
+
+    /** #185: faqat ko'rinadigan dock paneli teginishni ushlaydi. */
+    private boolean isInsidePanel(float x, float y) {
+        return panelRight > panelLeft && x >= panelLeft && x <= panelRight
+                && y >= panelTop && y <= panelBottom;
     }
 }

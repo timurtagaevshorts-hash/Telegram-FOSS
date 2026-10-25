@@ -2227,13 +2227,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     t += authHintCell.getMeasuredHeight();
                     additionalPadding += authHintCell.getMeasuredHeight();
                 }
-                // YuzGram #167: suzuvchi nav bar ostidan chatlar ko'rinib tursin
-                // (clipToPadding=false — qatorlar bar ortidan ham chiziladi), lekin
-                // oxirgi qator bar ostida "kesilib" qolmasin — ro'yxat tagiga bar
-                // balandligicha skroll zaxirasi qo'shamiz (#112 buni 0 qilgan edi).
-                // Forward tanlash oynasida bar yo'q — u yerda zaxira kerakmas.
-                final int yuzBottomPad = initialDialogsType == DIALOGS_TYPE_DEFAULT
-                        ? uz.kodlikino.top4.ui.YuzGramBottomBar.height() : 0;
+                // YuzGram #185: chat ro'yxati to'liq ekran — pastki padding yo'q,
+                // shuning uchun qatorlar suzuvchi shisha nav bar ORTIDAN ham
+                // davom etadi (skrinshotdagi 68dp o'lik lenta yo'qoladi).
+                // Oxirgi chat bar ostida qolib ketmasligi uchun ro'yxat oxiri
+                // (pastga skroll) bar'ni yashiradi — pastdagi onScrolled qoidasi.
+                final int yuzBottomPad = 0;
                 // YuzGram #93b: gumbaz reyka ENDI suzuvchi — chatlar ro'yxati
                 // butun kenglikda (maketdagi kabi), shisha gumbaz ostidan o'tadi.
                 if (yuzChatRail != null && yuzChatRail.getVisibility() == VISIBLE) {
@@ -2291,6 +2290,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             lastTop = t;
             scrollAdditionalOffset = 0;
             parentPage.pageAdditionalOffset = 0;
+            // YuzGram #185: ekranga qaytganda ro'yxat oxirida turgan bo'lsa
+            // bar qayta chatlarni to'smasin (skroll bo'lmasa onScrolled
+            // qoidasi ishlamaydi).
+            if (isYuzGramMainRoot() && canScrollVertically(-1) && !canScrollVertically(1)
+                    && getParentActivity() instanceof LaunchActivity) {
+                ((LaunchActivity) getParentActivity()).setYuzGramBarScrollHidden(DialogsActivity.this, true);
+            }
         }
 
         @Override
@@ -4772,6 +4778,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         }
                     }
                     checkListLoad(viewPage);
+                    // YuzGram #185: ro'yxat tagiga yetilganda bar chatlarni
+                    // to'smasin — ro'yxat to'liq ekran bo'lgani uchun oxirgi
+                    // chat bar ortida qolishi mumkin. Tepaga skroll qilinganda
+                    // bar avtomatik qaytadi (YuzGramBarAutoHide).
+                    if (recyclerView == viewPages[0].listView && isYuzGramMainRoot()
+                            && !recyclerView.canScrollVertically(1) && recyclerView.canScrollVertically(-1)
+                            && getParentActivity() instanceof LaunchActivity) {
+                        ((LaunchActivity) getParentActivity()).setYuzGramBarScrollHidden(DialogsActivity.this, true);
+                    }
                     // YuzGram: asosiy chat ekranida storylar + "YuzGram" sarlavhasi
                     // skroll yo'nalishi bo'yicha yuqoriga surilib g'oyib bo'ladi;
                     // ro'yxat o'z tepasida tepaga surilsa qaytadi.
