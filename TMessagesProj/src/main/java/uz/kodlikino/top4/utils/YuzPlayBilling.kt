@@ -8,30 +8,38 @@ import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
 import com.android.billingclient.api.BillingResult
-import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.PendingPurchasesParams
+import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
+import org.telegram.messenger.FileLog
 
 /**
  * Google Play Billing — KinoTOP4'dagi `PlayBillingManager`ning to'liq
  * ko'chirmasi (INAPP mahsulotlar: premium_kino / full_premium).
  *
- * Farqlar:
- *  - billing 8.0.0 (Play 2026 minimumi); `queryProductDetailsAsync` javobi
- *    `QueryProductDetailsResult` orqali keladi;
- *  - `enableAutoServiceReconnection()` ataylab ishlatilmadi — qo'lda
- *    eksponensial qayta ulanish ([scheduleReconnect]) donor'da ham bor,
- *    version riskiga tushmaslik uchun faqat shu yo'l qoldirildi.
+ * Grant qoidasi qat'iy: faqat Google `PURCHASED` deb qaytargan va imzosi
+ * [YuzBillingSecurity] bilan tasdiqlangan xarid premium beradi. PENDING
+ * to'lov hech qachon grant qilmaydi; acknowledge esa fonda qayta uriniladi.
  *
- * DIQQAT: to'lov faqat Google Play'ga yuklangan (signed, internal test)
- * build'larda to'liq ishlaydi. Sideload CI debug build'ida Play xizmati
- * imzolashni rad etadi — tugma "Mahsulot topilmadi" xabisini ko'rsatadi.
+ * Har ulanishda `queryPurchasesAsync` butun inventarni qayta o'qiydi:
+ *  - bir nechta xarid bo'lsa eng yuqori tarif tanlanadi (full > kino) —
+ *    upgrade qilgan foydalanuvchi pastroq tarifga tushib qolmaydi;
+ *  - inventar aniq bo'sh bo'lsa [Listener.onSyncFinished] `null` qaytaradi —
+ *    refund/void aniqlanganda mahalliy premium o'chiriladi.
+ *
+ * `expectedUid` (`tg_<telegramId>`) xaridga obfuscatedAccountId sifatida
+ * bog'lanadi — bir Play hisobidagi xarid boshqa Telegram akkauntga o'tmaydi.
+ *
+ * DIQQAT: to'lov faqat Google Play'ga yuklangan (signed, internal/open test)
+ * build'larda ishlaydi. Sideload CI debug build'ida Play xizmati imzolashni
+ * rad etadi — tugma "Mahsulot topilmadi" xabarini ko'rsatadi.
  */
 class YuzPlayBilling(
     private val activity: Activity,
+    private val account: Int,
     private val listener: Listener
 ) : PurchasesUpdatedListener {
 
@@ -41,7 +49,10 @@ class YuzPlayBilling(
         fun onProductUnavailable(productId: String)
         fun onPurchaseCompleted(planId: String, purchase: Purchase)
         fun onPurchaseFailed(message: String)
-        fun onExistingPurchaseRestored(planId: String)
+        fun onExistingPurchaseRestored(planId: String, purchase: Purchase)
+
+        /** Aniq natija: null = Play hisobida faol xarid yo'q (refund/void). */
+        fun onSyncFinished(activePlanId: String?)
     }
 
     private var billingClient: BillingClient? = null
@@ -49,6 +60,10 @@ class YuzPlayBilling(
     private val reconnectHandler = Handler(Looper.getMainLooper())
     private var reconnectAttempts = 0
     private var destroyed = false
+    private var restoreRequested = false
+
+    private val expectedUid: String
+        get() = YuzGramAdsAuth.expectedUid(account)
 
     fun start() {
         destroyed = false
@@ -122,29 +137,51 @@ class YuzPlayBilling(
         val productParams = BillingFlowParams.ProductDetailsParams.newBuilder()
             .setProductDetails(details)
             .build()
-        val flowParams = BillingFlowParams.newBuilder()
+        val builder = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(listOf(productParams))
-            .build()
-        val result = client.launchBillingFlow(activity, flowParams)
+        val uid = expectedUid
+        if (uid.isNotBlank()) {
+            builder.setObfuscatedAccountId(uid)
+        }
+        val result = client.launchBillingFlow(activity, builder.build())
         if (result.responseCode != BillingClient.BillingResponseCode.OK) {
-            listener.onPurchaseFailed(result.debugMessage ?: "To'lov oynasi ochilmadi")
+            listener.onPurchaseFailed(
+                result.debugMessage.takeIf { it.isNotBlank() } ?: "To'lov oynasi ochilmadi"
+            )
         }
     }
 
     fun restorePurchases() {
-        queryExistingPurchases(restoredOnly = true)
+        restoreRequested = true
+        queryExistingPurchases()
+    }
+
+    /** Ekranga qaytganda inventarni jimgina yangilash. */
+    fun refreshPurchases() {
+        restoreRequested = false
+        queryExistingPurchases()
     }
 
     override fun onPurchasesUpdated(result: BillingResult, purchases: MutableList<Purchase>?) {
         when (result.responseCode) {
             BillingClient.BillingResponseCode.OK -> {
-                purchases?.forEach { handlePurchase(it, restoredOnly = false) }
+                // Bu ro'yxat to'liq inventar emas — qayta so'raymiz, shunda
+                // upgrade qilgan foydalanuvchi pastroq tarifga tushmaydi.
+                // So'rov yiqilsa, callback ro'yxati zaxira bo'lib qoladi.
+                queryExistingPurchases(purchases)
             }
             BillingClient.BillingResponseCode.USER_CANCELED -> {
                 listener.onPurchaseFailed("To'lov bekor qilindi")
             }
+            BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> {
+                listener.onPurchaseFailed("Xarid allaqachon mavjud — tiklanmoqda")
+                restoreRequested = true
+                queryExistingPurchases()
+            }
             else -> {
-                listener.onPurchaseFailed(result.debugMessage ?: "To'lov xatosi")
+                listener.onPurchaseFailed(
+                    result.debugMessage.takeIf { it.isNotBlank() } ?: "To'lov xatosi"
+                )
             }
         }
     }
@@ -175,68 +212,111 @@ class YuzPlayBilling(
         }
     }
 
-    private fun queryExistingPurchases(restoredOnly: Boolean = false) {
+    private fun queryExistingPurchases(fallback: List<Purchase>? = null) {
         val client = billingClient ?: return
         val params = QueryPurchasesParams.newBuilder()
             .setProductType(BillingClient.ProductType.INAPP)
             .build()
         client.queryPurchasesAsync(params) { result, purchases ->
-            if (result.responseCode != BillingClient.BillingResponseCode.OK) return@queryPurchasesAsync
-            purchases.forEach { purchase ->
-                handlePurchase(purchase, restoredOnly = restoredOnly)
+            if (result.responseCode != BillingClient.BillingResponseCode.OK) {
+                // Play xaridni tasdiqladi, lekin to'liq inventar so'rovi yiqildi —
+                // pul to'lagan foydalanuvchi premium'siz qolmasin.
+                if (!fallback.isNullOrEmpty()) {
+                    val restoredOnly = restoreRequested
+                    restoreRequested = false
+                    processQuery(fallback, restoredOnly, allowEmptyClear = false)
+                    return@queryPurchasesAsync
+                }
+                if (restoreRequested) {
+                    restoreRequested = false
+                    listener.onPurchaseFailed("Xaridlar tekshirilmadi. Internetni sinab ko'ring.")
+                }
+                return@queryPurchasesAsync
+            }
+            val restoredOnly = restoreRequested
+            restoreRequested = false
+            processQuery(purchases, restoredOnly, allowEmptyClear = true)
+        }
+    }
+
+    private fun processQuery(
+        purchases: List<Purchase>,
+        restoredOnly: Boolean,
+        allowEmptyClear: Boolean
+    ) {
+        val valid = ArrayList<YuzPurchaseCheck.Valid>()
+        var pending = false
+        var rejected = false
+        purchases.forEach { purchase ->
+            when (val check = YuzPurchaseValidator.check(purchase, expectedUid)) {
+                is YuzPurchaseCheck.Valid -> valid.add(check)
+                YuzPurchaseCheck.Pending -> pending = true
+                is YuzPurchaseCheck.Rejected -> {
+                    rejected = true
+                    FileLog.d("YuzPlayBilling: xarid rad etildi — ${check.reason}")
+                }
+                YuzPurchaseCheck.NotPurchased -> Unit
+            }
+        }
+
+        if (valid.isEmpty()) {
+            if (pending) {
+                listener.onPurchaseFailed("To'lov tasdiqlanishi kutilmoqda...")
+            }
+            if (rejected) {
+                // Imzo/akkaunt tekshiruvi yiqildi — inventar "bo'sh" degan
+                // xulosa chiqarmaymiz, aks holda haqiqiy xarid o'chib ketadi.
+                if (restoredOnly) listener.onPurchaseFailed("Xarid tekshiruvdan o'tmadi")
+                return
+            }
+            // Faqat aniq bo'sh inventar — refund/void yoki boshqa akkaunt.
+            if (allowEmptyClear) listener.onSyncFinished(null)
+            return
+        }
+        processValid(valid, restoredOnly)
+    }
+
+    private fun processValid(valid: List<YuzPurchaseCheck.Valid>, restoredOnly: Boolean) {
+        // To'lov Google tomonidan tasdiqlangan (PURCHASED + imzo tekshirildi) —
+        // grant darhol beriladi. Acknowledge buxgalteriya qadami: u yiqilsa ham
+        // xaridor premium'ni yo'qotmaydi, keyingi urinishlar davom etadi.
+        finishSync(valid, restoredOnly)
+        valid.filter { !it.purchase.isAcknowledged }.forEach { item ->
+            acknowledge(item.purchase, attempt = 0) { ok ->
+                if (!ok) FileLog.d("YuzPlayBilling: acknowledge bajarilmadi")
             }
         }
     }
 
-    private fun handlePurchase(purchase: Purchase, restoredOnly: Boolean) {
-        if (purchase.purchaseState == Purchase.PurchaseState.PENDING) {
-            // To'lov hali yakunlanmagan (masalan, naqd/keyinroq). qayta so'raladi.
-            if (!restoredOnly) listener.onPurchaseFailed("To'lov tasdiqlanishi kutilmoqda")
+    private fun acknowledge(purchase: Purchase, attempt: Int, onDone: (Boolean) -> Unit) {
+        val client = billingClient
+        if (client == null) {
+            onDone(false)
             return
         }
-        if (purchase.purchaseState != Purchase.PurchaseState.PURCHASED) return
-        val productId = purchase.products.firstOrNull() ?: return
-        val planId = YuzPremiumPlans.planIdFromPlayProductId(productId) ?: return
-
-        if (!purchase.isAcknowledged) {
-            acknowledgeWithRetry(purchase, planId, restoredOnly, attempt = 0)
-        } else {
-            notifyPurchase(planId, purchase, restoredOnly)
-        }
-    }
-
-    /**
-     * Xaridni tasdiqlash (acknowledge) — 3 kun ichida tasdiqlanmasa Google
-     * pulni qaytaradi. Shuning uchun xatolikda bir necha marta qayta urinamiz.
-     */
-    private fun acknowledgeWithRetry(
-        purchase: Purchase,
-        planId: String,
-        restoredOnly: Boolean,
-        attempt: Int
-    ) {
-        val client = billingClient ?: return
         val params = AcknowledgePurchaseParams.newBuilder()
             .setPurchaseToken(purchase.purchaseToken)
             .build()
         client.acknowledgePurchase(params) { ackResult ->
             when {
-                ackResult.responseCode == BillingClient.BillingResponseCode.OK ->
-                    notifyPurchase(planId, purchase, restoredOnly)
+                ackResult.responseCode == BillingClient.BillingResponseCode.OK -> onDone(true)
                 attempt < MAX_ACK_ATTEMPTS -> reconnectHandler.postDelayed({
-                    if (!destroyed) acknowledgeWithRetry(purchase, planId, restoredOnly, attempt + 1)
+                    if (!destroyed) acknowledge(purchase, attempt + 1, onDone) else onDone(false)
                 }, 2000L * (attempt + 1))
-                else -> listener.onPurchaseFailed("Xarid tasdiqlanmadi")
+                else -> onDone(false)
             }
         }
     }
 
-    private fun notifyPurchase(planId: String, purchase: Purchase, restoredOnly: Boolean) {
+    private fun finishSync(valid: List<YuzPurchaseCheck.Valid>, restoredOnly: Boolean) {
+        val bestPlan = YuzPurchaseValidator.bestPlan(valid.map { it.planId }) ?: return
+        val best = valid.first { it.planId == bestPlan }
         if (restoredOnly) {
-            listener.onExistingPurchaseRestored(planId)
+            listener.onExistingPurchaseRestored(bestPlan, best.purchase)
         } else {
-            listener.onPurchaseCompleted(planId, purchase)
+            listener.onPurchaseCompleted(bestPlan, best.purchase)
         }
+        listener.onSyncFinished(bestPlan)
     }
 
     companion object {

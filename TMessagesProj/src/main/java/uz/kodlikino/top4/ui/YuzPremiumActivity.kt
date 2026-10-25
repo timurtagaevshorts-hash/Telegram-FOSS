@@ -48,7 +48,7 @@ class YuzPremiumActivity : BaseFragment() {
 
     private var billing: YuzPlayBilling? = null
     private var billingReady = false
-    private var handledFinalStatus = false
+    private var restoreRequested = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -76,7 +76,14 @@ class YuzPremiumActivity : BaseFragment() {
         root.findViewById<View>(R.id.btnPremiumBack)?.setOnClickListener { removeSelfFromStack() }
         root.findViewById<View>(R.id.btnApprovedClose)?.setOnClickListener { removeSelfFromStack() }
         root.findViewById<View>(R.id.btnRestorePurchases)?.setOnClickListener {
-            billing?.restorePurchases()
+            restoreRequested = true
+            val existing = billing
+            if (existing != null) {
+                existing.restorePurchases()
+            } else {
+                // start() o'zi inventarni so'raydi.
+                ensureBilling()
+            }
             toast(getString(R.string.premium_checking_purchases))
         }
 
@@ -93,10 +100,9 @@ class YuzPremiumActivity : BaseFragment() {
     override fun onResume() {
         super.onResume()
         actionBar?.visibility = View.GONE
-        val themed = themedContext ?: return
-        if (!YuzPremiumManager.from(themed).isPremium(currentAccount)) {
-            ensureBilling()
-        }
+        if (themedContext == null) return
+        // Har qaytishda inventar qayta o'qiladi — refund/void darhol aks etadi.
+        ensureBilling()
     }
 
     /** Ikkala tarif kartasi imtiyozlarini vektor belgili qatorlar qilib chiqaradi. */
@@ -163,9 +169,13 @@ class YuzPremiumActivity : BaseFragment() {
     }
 
     private fun ensureBilling() {
-        if (billing != null) return
+        val existing = billing
+        if (existing != null) {
+            existing.refreshPurchases()
+            return
+        }
         val activity = parentActivity ?: return
-        billing = YuzPlayBilling(activity, billingListener).also { it.start() }
+        billing = YuzPlayBilling(activity, currentAccount, billingListener).also { it.start() }
     }
 
     private val billingListener = object : YuzPlayBilling.Listener {
@@ -192,13 +202,17 @@ class YuzPremiumActivity : BaseFragment() {
         }
 
         override fun onPurchaseCompleted(planId: String, purchase: Purchase) {
-            if (handledFinalStatus) return
-            handledFinalStatus = true
-            // #120: callback destroy'dan keyin ham kelishi mumag — themedContext
-            // bo'lmasa ham grant'ni TO'XATMASLIK kerak (pullanuvchi pul to'lagan).
-            // Manager applicationContext bilan ishlaydi, shuning uchun xavfsiz.
+            // Grant faqat Google PURCHASED + imzo tekshiruvidan keyin keladi
+            // (qarang YuzPurchaseValidator). #120: callback destroy'dan keyin ham
+            // kelishi mumkin — themedContext bo'lmasa ham grant to'xtatilmaydi.
             val ctx = themedContext ?: org.telegram.messenger.ApplicationLoader.applicationContext
-            YuzPremiumManager.from(ctx).setPlanType(currentAccount, planId)
+            YuzPremiumManager.from(ctx).applyPurchase(
+                currentAccount,
+                planId,
+                purchase.products.firstOrNull().orEmpty(),
+                purchase.purchaseToken,
+                purchase.purchaseTime
+            )
             mainHandler.post {
                 if (fragmentView == null) return@post
                 showApproved(planId)
@@ -208,25 +222,48 @@ class YuzPremiumActivity : BaseFragment() {
         override fun onPurchaseFailed(message: String) {
             mainHandler.post {
                 if (fragmentView == null) return@post
+                // Restore so'rovi aniq natija bermadi — keyingi jimgina
+                // yangilanishda "xarid topilmadi" degan yolg'on xabar chiqmasin.
+                restoreRequested = false
                 refreshPriceLabels()
                 toast(message)
             }
         }
 
-        override fun onExistingPurchaseRestored(planId: String) {
+        override fun onExistingPurchaseRestored(planId: String, purchase: Purchase) {
             // #120: restore ham destroy-keyin kelishi mumkin — app context fallback.
             val themed = themedContext ?: org.telegram.messenger.ApplicationLoader.applicationContext
-            val manager = YuzPremiumManager.from(themed)
-            // Premium Kino ustuniga To'liq Premium yetar — pastga tushirmaymiz.
-            if (manager.isFullPremium(currentAccount) &&
-                planId == YuzPremiumPlans.PREMIUM_KINO.id
-            ) {
-                return
-            }
-            manager.setPlanType(currentAccount, planId)
+            YuzPremiumManager.from(themed).applyPurchase(
+                currentAccount,
+                planId,
+                purchase.products.firstOrNull().orEmpty(),
+                purchase.purchaseToken,
+                purchase.purchaseTime
+            )
             mainHandler.post {
                 if (fragmentView == null) return@post
                 showApproved(planId)
+            }
+        }
+
+        override fun onSyncFinished(activePlanId: String?) {
+            mainHandler.post {
+                if (fragmentView == null) return@post
+                val ctx = themedContext
+                    ?: org.telegram.messenger.ApplicationLoader.applicationContext
+                if (activePlanId == null) {
+                    // Play aniq "xarid yo'q" dedi — refund/void yoki boshqa akkaunt.
+                    val manager = YuzPremiumManager.from(ctx)
+                    if (manager.isPremium(currentAccount)) {
+                        manager.clearPlan(currentAccount)
+                    }
+                    showPlanChooser()
+                    if (restoreRequested) {
+                        toast(getString(R.string.premium_restore_not_found))
+                    }
+                }
+                restoreRequested = false
+                refreshPriceLabels()
             }
         }
     }
@@ -253,6 +290,14 @@ class YuzPremiumActivity : BaseFragment() {
             toast(getString(R.string.premium_need_sign_in))
             return
         }
+        val manager = themedContext?.let { YuzPremiumManager.from(it) }
+        if (plan.id == YuzPremiumPlans.PREMIUM_KINO.id &&
+            manager?.isFullPremium(currentAccount) == true
+        ) {
+            // To'liq Premium egalari uchun pastroq tarif sotilmaydi.
+            toast(getString(R.string.premium_full_already_active))
+            return
+        }
         val b = billing
         if (b == null || !billingReady) {
             toast(getString(R.string.premium_billing_off))
@@ -262,9 +307,16 @@ class YuzPremiumActivity : BaseFragment() {
         btnPayKino?.isEnabled = false
         btnPayFull?.isEnabled = false
         b.launchPurchase(plan.playProductId)
+        // Play oynasi yopilib qaytgan bo'lsa, tugmalar qotib qolmasin.
         mainHandler.postDelayed({
-            if (fragmentView != null && !handledFinalStatus) refreshPriceLabels()
+            if (fragmentView != null) refreshPriceLabels()
         }, 1500L)
+    }
+
+    /** Tarif tanlash ekraniga qaytish (xarid topilmadi / refund). */
+    private fun showPlanChooser() {
+        overlay?.visibility = View.GONE
+        scroll?.visibility = View.VISIBLE
     }
 
     private fun showApproved(planId: String) {

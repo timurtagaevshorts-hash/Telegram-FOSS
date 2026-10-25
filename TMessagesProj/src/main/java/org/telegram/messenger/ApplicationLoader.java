@@ -227,6 +227,12 @@ public class ApplicationLoader extends Application {
             ContactsController.getInstance(a).checkAppAccount();
             DownloadController.getInstance(a);
         }
+
+        // Premium faqat Play'dagi haqiqiy xaridga tayanishi uchun inventar
+        // fon rejimida qayta o'qiladi (refund/void -> o'chadi, yangi qurilma ->
+        // tiklanadi). TDLib ulanishi ochilishini kutish uchun kechiktiriladi.
+        AndroidUtilities.runOnUIThread(() ->
+                uz.kodlikino.top4.utils.YuzPremiumSync.INSTANCE.syncInBackground(UserConfig.selectedAccount), 6000);
     }
 
     public ApplicationLoader() {

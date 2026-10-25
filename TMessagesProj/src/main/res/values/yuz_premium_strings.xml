@@ -17,13 +17,15 @@
     <string name="premium_need_sign_in">Avval Telegram orqali kiring</string>
     <string name="premium_approved_kino">Premium Kino faollashtirildi!</string>
     <string name="premium_approved_full">To\'liq Premium faollashtirildi!</string>
-    <string name="premium_approved_kino_sub">Endi premium kinolarni ko\'rishingiz mumkin.\nReels limiti oddiy foydalanuvchi kabi (3 ta/hafta).</string>
-    <string name="premium_approved_full_sub">Barcha imtiyozlar ochiq:\n• Premium kinolar\n• Haftasiga 30 tagacha reel\n• 100 MB gacha video</string>
+    <string name="premium_approved_kino_sub">Endi premium kinolarni ko\'rishingiz mumkin.\nReels limiti oddiy foydalanuvchi kabi qoladi.</string>
+    <string name="premium_approved_full_sub">Barcha imtiyozlar ochiq:\n• Premium kinolar\n• Ko\'proq reel joylash imkoniyati\n• Kattaroq video hajmi</string>
     <string name="premium_active_kino">Sizda Premium Kino faol!</string>
     <string name="premium_active_full">Sizda To\'liq Premium faol!</string>
     <string name="premium_active_kino_sub">Premium kinolar ochiq. To\'liq imkoniyatlar uchun yuqori tarifga o\'ting.</string>
     <string name="premium_active_full_sub">Barcha premium imkoniyatlar ochiq.</string>
     <string name="premium_checking_purchases">Xaridlar tekshirilmoqda...</string>
+    <string name="premium_restore_not_found">Play hisobida bu ilova uchun xarid topilmadi</string>
+    <string name="premium_full_already_active">Sizda allaqachon To\'liq Premium faol — bu tarif kerak emas</string>
 
     <!-- Sozlamalar ro'yxatidagi premium qatori (Telegram Premium o'rniga) -->
     <string name="YuzGramPremium">YuzGram Premium</string>

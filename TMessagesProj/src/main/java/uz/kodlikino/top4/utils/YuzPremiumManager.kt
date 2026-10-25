@@ -11,7 +11,12 @@ import android.util.Log
  * ([YuzGramAdsAuth.expectedUid]). Donor bilan bir xil sabab: Firestore
  * qoidalarida `users` hujjatlari berkitilgan va `comment_profiles` premium
  * maydonlarini client'ga o'zgartirish taqiqlangan — Play Billing'da xarid
- * Google tomonidan imzolanib tasdiqlangach holat shu qurilmada yoza­miladi.
+ * Google tomonidan imzolanib tasdiqlangach holat shu qurilmada yoziladi.
+ *
+ * Faqat [applyPurchase] (tekshirilgan Play `Purchase` bilan) premium beradi;
+ * [clearPlan] refund/void yoki boshqa Play akkaunt aniqlanganda chaqiriladi.
+ * Xarid tokeni/sanasi ham saqlanadi — kelajakda server tekshiruvi va
+ * qo'llab-quvvatlash uchun iz qoladi.
  *
  * [mirrorBestEffort] donor'dagi `refreshUserPremium` urinishining o'rniga
  * qo'yilgan: qoida rad etsa jimgina o'tamiz (iltimos xatolik UI'ga chiqmaydi).
@@ -27,13 +32,57 @@ class YuzPremiumManager private constructor(private val context: Context) {
         return YuzPremiumPlans.normalizePlanType(prefs.getString(planKey(uid), ""))
     }
 
-    fun setPlanType(account: Int, planType: String) {
+    /** Faqat tasdiqlangan xarid natijasidan chaqiriladi. */
+    fun applyPurchase(
+        account: Int,
+        planType: String,
+        productId: String,
+        purchaseToken: String,
+        purchaseTimeMs: Long
+    ) {
+        val uid = YuzGramAdsAuth.expectedUid(account)
+        if (uid.isBlank()) return
+        val plan = YuzPremiumPlans.normalizePlanType(planType)
+        if (plan.isBlank()) return
+        prefs.edit()
+            .putString(planKey(uid), plan)
+            .putString(productKey(uid), productId)
+            .putString(tokenKey(uid), purchaseToken)
+            .putLong(purchaseTimeKey(uid), purchaseTimeMs)
+            .putLong(verifiedKey(uid), System.currentTimeMillis())
+            .apply()
+        mirrorBestEffort(uid, plan)
+    }
+
+    /** Refund/void yoki Play hisobida faol xarid yo'qligi aniqlandi. */
+    fun clearPlan(account: Int) {
         val uid = YuzGramAdsAuth.expectedUid(account)
         if (uid.isBlank()) return
         prefs.edit()
-            .putString(planKey(uid), YuzPremiumPlans.normalizePlanType(planType))
+            .remove(planKey(uid))
+            .remove(productKey(uid))
+            .remove(tokenKey(uid))
+            .remove(purchaseTimeKey(uid))
             .apply()
-        mirrorBestEffort(uid, YuzPremiumPlans.normalizePlanType(planType))
+        mirrorBestEffort(uid, "")
+    }
+
+    fun lastVerifiedAt(account: Int): Long {
+        val uid = YuzGramAdsAuth.expectedUid(account)
+        if (uid.isBlank()) return 0L
+        return prefs.getLong(verifiedKey(uid), 0L)
+    }
+
+    fun markVerified(account: Int) {
+        val uid = YuzGramAdsAuth.expectedUid(account)
+        if (uid.isBlank()) return
+        prefs.edit().putLong(verifiedKey(uid), System.currentTimeMillis()).apply()
+    }
+
+    fun purchaseToken(account: Int): String {
+        val uid = YuzGramAdsAuth.expectedUid(account)
+        if (uid.isBlank()) return ""
+        return prefs.getString(tokenKey(uid), "").orEmpty()
     }
 
     /** Har qanday faol tarif (Premium Kino yoki To'liq Premium). */
@@ -86,6 +135,10 @@ class YuzPremiumManager private constructor(private val context: Context) {
         private const val PREFS = "premium_prefs"
 
         private fun planKey(uid: String): String = "premium_plan_$uid"
+        private fun productKey(uid: String): String = "premium_product_$uid"
+        private fun tokenKey(uid: String): String = "premium_token_$uid"
+        private fun purchaseTimeKey(uid: String): String = "premium_purchase_time_$uid"
+        private fun verifiedKey(uid: String): String = "premium_verified_at_$uid"
 
         @Volatile
         private var instance: YuzPremiumManager? = null
