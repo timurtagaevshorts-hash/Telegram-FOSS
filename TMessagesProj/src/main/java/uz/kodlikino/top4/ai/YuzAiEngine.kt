@@ -30,6 +30,10 @@ object YuzAiEngine {
 
     enum class Section { REELS, ELONLAR, KINOLAR, PROFIL, CHATS, MUSIQA }
 
+    enum class ChoiceKind { SEND, OPEN, CALL }
+
+    data class ChoiceOption(val peer: Peer, val text: String)
+
     sealed class Intent {
         data class SendText(val peer: Peer, val text: String) : Intent()
         data class NeedBody(val peer: Peer) : Intent()
@@ -39,6 +43,16 @@ object YuzAiEngine {
         data class Goto(val section: Section) : Intent()
         data class PlayMusic(val query: String) : Intent()
         data class Ask(val question: String) : Intent()
+        /**
+         * Bir xil ismga bir nechta chat mos keldi — foydalanuvchi tanlaydi.
+         * Ilgari eng birinchi topilgan chatga jimgina yuborilardi.
+         */
+        data class NeedChoice(
+            val label: String,
+            val options: List<ChoiceOption>,
+            val kind: ChoiceKind,
+            val video: Boolean = false
+        ) : Intent()
     }
 
     private val SEND_WORDS_RAW = listOf("yubor", "yubordim", "jo'nat", "jonat", "yoz", "olibsana", "xabar", "xabarlang")
@@ -94,6 +108,23 @@ object YuzAiEngine {
     private val PLAY_WORDS: List<String> = PLAY_WORDS_RAW.map { norm(it) }
     private val MUSIC_STOP: Set<String> = MUSIC_STOP_RAW.map { norm(it) }.toSet()
 
+    // "salom", "rahmat" kabi sof suhbat so'zlari kontakt nomiga o'xshab
+    // qolmasin — aks holda aqlli yuborish ularni "Salomat" kabi chatga
+    // xabar deb yuborib yuborardi.
+    private val CONVERSATIONAL_RAW = listOf(
+        "salom", "assalom", "assalomu", "alaykum", "hayr", "xayr", "rahmat", "raxmat",
+        "tashakkur", "qalesan", "qalaysan", "qalaysiz", "qandaysan", "qandaysiz",
+        "yaxshimisan", "yaxshimisiz", "yaxshiman", "tuzukmisan", "tuzuqmisan",
+        "yaxshi", "zor", "zo'r", "ok", "ha", "yoq", "yo'q", "nima", "gap", "yangilik",
+        "korishguncha", "sog", "boling", "bo'ling"
+    )
+    private val CONVERSATIONAL: Set<String> = CONVERSATIONAL_RAW.map { norm(it) }.toSet()
+
+    private const val MAX_CHOICES = 6
+    // 1000+ (aniq nom) va 300..999 (bir harf farq) orasidagi bo'shliqdan
+    // kichik: faqat bir toifadagi yaqin nomlar variant bo'ladi.
+    private const val AMBIGUITY_GAP = 200
+
     @Volatile private var cachedPeers: List<Peer>? = null
     @Volatile private var cachedAt = 0L
     @Volatile private var cachedAccount = -1
@@ -134,7 +165,7 @@ object YuzAiEngine {
                 if (uid == 0L || uid in userIds) continue
                 val user = controller.getUser(uid) ?: continue
                 if (UserObject.isDeleted(user)) continue
-                val name = UserObject.getUserName(user) ?: continue
+                val name = UserObject.getUserName(user)
                 if (name.isBlank()) continue
                 userIds.add(uid)
                 result.add(Peer(uid, name, user.username?.takeIf { it.isNotBlank() }, uid))
@@ -150,10 +181,16 @@ object YuzAiEngine {
      * #105: bulut (Gemini) qaytargan nomni hovuzdan sillashtiradi — kirill,
      * tipografiya ("azom" -> "Azam") va familiya qismlariga chidamli.
      */
-    fun findByName(want: String, account: Int): Peer? {
+    fun findByName(want: String, account: Int): Peer? = findByNames(want, account).firstOrNull()
+
+    /**
+     * Bir xil nomga mos keladigan barcha yaqin chatlar. "Sardor" ismli ikki
+     * kishi bo'lsa ikkalasi ham qaytadi — foydalanuvchi tanlaydi.
+     */
+    fun findByNames(want: String, account: Int): List<Peer> {
         val parts = want.trim().split(Regex("\\s+")).map { norm(it) }.filter { it.length >= 3 }
-        if (parts.isEmpty()) return null
-        var best: Peer? = null
+        if (parts.isEmpty()) return emptyList()
+        val scored = LinkedHashMap<Peer, Int>()
         var bestScore = 0
         for (peer in peers(account)) {
             var score = 0
@@ -161,12 +198,41 @@ object YuzAiEngine {
                 val s = scoreToken(part, peer)
                 if (s > 0) score += s
             }
-            if (score > bestScore) {
-                bestScore = score
-                best = peer
+            if (score > 0) {
+                scored[peer] = score
+                if (score > bestScore) bestScore = score
             }
         }
-        return best
+        if (bestScore <= 0) return emptyList()
+        val cutoff = bestScore - AMBIGUITY_GAP
+        return scored.entries
+            .filter { it.value >= cutoff }
+            .sortedWith(
+                compareByDescending<Map.Entry<Peer, Int>> { it.value }
+                    .thenByDescending { recency(account, it.key) }
+            )
+            .take(MAX_CHOICES)
+            .map { it.key }
+    }
+
+    /** Oxirgi suhbat vaqti — bir xil ballli variantlarda eng yaqin chat birinchi turadi. */
+    private fun recency(account: Int, peer: Peer): Int = try {
+        MessagesController.getInstance(account).dialogs_dict?.get(peer.dialogId)?.last_message_date ?: 0
+    } catch (_: Exception) {
+        0
+    }
+
+    /** "Salom", "rahmat", "qalaysan" — buyruq emas, oddiy suhbat. */
+    fun isSmallTalk(raw: String): Boolean {
+        val normed = raw.lowercase(Locale.getDefault())
+            .replace(",", " ")
+            .replace("’", "'")
+            .trim()
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() }
+            .map { norm(it) }
+            .filter { it.isNotBlank() }
+        return normed.isNotEmpty() && normed.all { it in CONVERSATIONAL }
     }
 
     /** Kichik harf + apostrofsiz + kirill->lotin: "Sardor", "Сардор", "sardor'" bir xil bo'ladi. */
@@ -237,18 +303,41 @@ object YuzAiEngine {
         val hasCall = CALL_WORDS.any { w -> normed.any { it.contains(w) } }
 
         // 0) Qo'ng'iroq: "Islomga telefon qil" -> Call (video so'zi bo'lsa video).
-        if (hasCall) {
-            val match = findPeer(tokens, normed, account)
-            if (match != null) return Intent.Call(match.peer, normed.any { it.contains("video") })
+        // Yuborish so'zi ham bo'lsa ("telefon raqamini yoz") — bu xabar, call emas.
+        if (hasCall && !hasSend) {
+            val video = normed.any { it.contains("video") }
+            val matches = findPeerMatches(normed, account)
+            when {
+                matches.size > 1 -> return Intent.NeedChoice(
+                    matchLabel(matches, tokens, normed),
+                    matches.map { ChoiceOption(it.peer, "") },
+                    ChoiceKind.CALL, video
+                )
+                matches.size == 1 -> return Intent.Call(matches[0].peer, video)
+            }
             val guessed = guessNameToken(normed)
             if (guessed != null) return Intent.NotFound(guessed)
         }
 
         // 1) Aniq yuborish buyrug'i yoki chat ochish — nomni qidir.
         if (hasSend || openChat) {
-            val match = findPeer(tokens, normed, account)
+            val openOnly = openChat && !hasSend
+            val matches = findPeerMatches(normed, account)
+            if (matches.size > 1) {
+                return Intent.NeedChoice(
+                    matchLabel(matches, tokens, normed),
+                    matches.map {
+                        ChoiceOption(
+                            it.peer,
+                            if (openOnly) "" else cleanBody(tokens, it.nameIndices)
+                        )
+                    },
+                    if (openOnly) ChoiceKind.OPEN else ChoiceKind.SEND
+                )
+            }
+            val match = matches.firstOrNull()
             if (match != null) {
-                if (openChat && !hasSend) return Intent.OpenChat(match.peer)
+                if (openOnly) return Intent.OpenChat(match.peer)
                 val body = cleanBody(tokens, match.nameIndices)
                 return if (body.isBlank()) Intent.NeedBody(match.peer) else Intent.SendText(match.peer, body)
             }
@@ -276,12 +365,23 @@ object YuzAiEngine {
 
         // 3) Navigatsiya kalit so'zlari (reels/taksi/...) — nom bilan aralashmasa.
         val nav = findNav(normed)
-        if (nav != null && !isQuestion(normed) && findPeer(tokens, normed, account) == null) {
+        if (nav != null && !isQuestion(normed) && findPeer(normed, account) == null) {
             return Intent.Goto(nav)
         }
 
         // 4) Bilinadigan nom: "sardor qalesan bugun kelasanmi" -> Sardor'ga yuborish.
-        val smart = findPeer(tokens, normed, account, allowFuzzy = false)
+        // Sof suhbat so'zlari ("salom", "rahmat") kontakt nomiga o'xshab
+        // qolsa ham avtomatik xabar yubormaymiz — savol sifatida miyaga beramiz.
+        if (isSmallTalk(raw)) return Intent.Ask(raw.trim())
+        val smartMatches = findPeerMatches(normed, account, allowFuzzy = false)
+        if (smartMatches.size > 1) {
+            return Intent.NeedChoice(
+                matchLabel(smartMatches, tokens, normed),
+                smartMatches.map { ChoiceOption(it.peer, cleanBody(tokens, it.nameIndices)) },
+                ChoiceKind.SEND
+            )
+        }
+        val smart = smartMatches.firstOrNull()
         if (smart != null) {
             val body = cleanBody(tokens, smart.nameIndices)
             return if (body.isBlank()) Intent.NeedBody(smart.peer) else Intent.SendText(smart.peer, body)
@@ -366,71 +466,129 @@ object YuzAiEngine {
         }
     }
 
-    private class PeerMatch(val peer: Peer, val nameIndices: List<Int>)
+    private class PeerMatch(val peer: Peer, val nameIndices: List<Int>, val score: Int)
 
-    /**
-     * Nomni BARCHA tokenlar bo'yicha izlaydi (ism, familiya, username),
-     * eng uzun/aniq moslik g'olib bo'ladi.
-     */
     private fun findPeer(
-        tokens: List<String>,
         normed: List<String>,
         account: Int,
         allowFuzzy: Boolean = true
-    ): PeerMatch? {
+    ): PeerMatch? = findPeerMatches(normed, account, allowFuzzy).firstOrNull()
+
+    /**
+     * Nomni BARCHA tokenlar bo'yicha izlaydi (ism, familiya, username) va
+     * yaqin ball olgan BARCHA chatlarni qaytaradi. Ilgari faqat bitta "eng
+     * yaxshi" chat olinardi — ikki xil Sardor bo'lsa qaysi biriga yuborilishi
+     * tushunarsiz edi.
+     */
+    private fun findPeerMatches(
+        normed: List<String>,
+        account: Int,
+        allowFuzzy: Boolean = true
+    ): List<PeerMatch> {
         val list = peers(account)
-        if (list.isEmpty()) return null
-        var bestPeer: Peer? = null
-        var bestIndex = -1
-        var bestScore = 0
+        if (list.isEmpty()) return emptyList()
+        // Aniq nom mosliklari (>=1000) yig'iladi: "sardor karimov" ikki
+        // tokenni ham qamrab, faqat "sardor" mos kelgan chatlardan ajralib
+        // turadi. Kuchsiz (prefiks/fuzzy) mosliklar yig'ilmaydi — aks holda
+        // xabar matnidagi tasodifiy so'zlar kontaktni yuqoriga chiqarardi.
+        val strong = HashMap<Peer, Int>()
+        val weak = HashMap<Peer, Int>()
         for (i in normed.indices) {
             val token = normed[i]
             if (token.length < 3) continue
             if (isStopToken(token)) continue
             for (peer in list) {
                 val score = scoreToken(token, peer)
+                if (score <= 0) continue
                 // #157: buyruq so'zi bo'lmagan "aqlli yuborish"da bitta harf
                 // farqli (Levenshtein-1) moslik 300..999 ball beradi — tasodifiy
                 // so'z kontaktni topib, XABARNI RUXSATSIZ yuborib yuborardi.
                 if (!allowFuzzy && score in 300..999) continue
-                if (score > bestScore) {
-                    bestScore = score
-                    bestPeer = peer
-                    bestIndex = i
+                if (score >= 1000) {
+                    strong[peer] = (strong[peer] ?: 0) + score
+                } else if (score > (weak[peer] ?: 0)) {
+                    weak[peer] = score
                 }
             }
         }
-        val peer = bestPeer ?: return null
-        // Nomning barcha qisplari ("Aziz Karimov") xabar matnidan tushirib qolsin.
+        val scores = LinkedHashMap<Peer, Int>()
+        for (peer in strong.keys) {
+            // Kuchsiz moslik aniq moslik ustiga qo'shilmaydi — ikki bir xil
+            // nomli chat orasidagi tenglikni tasodifiy fuzzy ball buzmasin.
+            scores[peer] = strong[peer] ?: 0
+        }
+        for ((peer, w) in weak) {
+            if (peer !in scores) scores[peer] = w
+        }
+        if (scores.isEmpty()) return emptyList()
+        val bestScore = scores.values.maxOrNull() ?: 0
+        if (bestScore <= 0) return emptyList()
+        val cutoff = bestScore - AMBIGUITY_GAP
+        val out = ArrayList<PeerMatch>()
+        for ((peer, score) in scores) {
+            if (score < cutoff) continue
+            out.add(PeerMatch(peer, matchIndices(peer, normed), score))
+        }
+        out.sortWith(
+            compareByDescending<PeerMatch> { it.score }
+                .thenByDescending { recency(account, it.peer) }
+        )
+        return out.take(MAX_CHOICES)
+    }
+
+    /** Nomning barcha qisplari ("Aziz Karimov") xabar matnidan tushirib qolsin. */
+    private fun matchIndices(peer: Peer, normed: List<String>): List<Int> {
         val nameTs = nameTokens(peer.name)
         val uname = norm(peer.username ?: "")
         val indices = ArrayList<Int>()
         for (i in normed.indices) {
             val token = normed[i]
             if (token.length < 3) continue
+            val variants = tokenVariants(token)
             var hit = false
             for (nt in nameTs) {
-                if (pairScore(token, nt) > 0) { hit = true; break }
+                if (variants.any { pairScore(it, nt) > 0 }) { hit = true; break }
             }
-            if (!hit && uname.length >= 4 && pairScore(token, uname) > 0) hit = true
+            if (!hit && uname.length >= 4 && variants.any { pairScore(it, uname) > 0 }) hit = true
             if (hit) indices.add(i)
         }
-        if (bestIndex >= 0 && bestIndex !in indices) indices.add(bestIndex)
-        return PeerMatch(peer, indices)
+        return indices
+    }
+
+    /** Variant sarlavhasi uchun foydalanuvchi aytgan nom: "sardorga" -> "Sardor". */
+    private fun matchLabel(matches: List<PeerMatch>, tokens: List<String>, normed: List<String>): String {
+        for (i in normed.indices) {
+            val token = normed[i]
+            if (token.length < 3 || isStopToken(token)) continue
+            if (matches.none { scoreToken(token, it.peer) > 0 }) continue
+            val raw = tokens.getOrElse(i) { token }
+                .trim('.', ',', '!', '?', '"', '“', '”', '«', '»', ':')
+            val clean = stripUzSuffix(raw).ifBlank { token }
+            return clean.replaceFirstChar { it.uppercase(Locale.getDefault()) }
+        }
+        return matches.firstOrNull()?.peer?.name ?: ""
     }
 
     private fun scoreToken(token: String, peer: Peer): Int {
         var best = 0
-        for (nt in nameTokens(peer.name)) {
-            val s = pairScore(token, nt)
-            if (s > best) best = s
-        }
         val uname = norm(peer.username ?: "")
-        if (uname.length >= 4) {
-            val s = pairScore(token, uname)
-            if (s > best) best = s
+        for (variant in tokenVariants(token)) {
+            for (nt in nameTokens(peer.name)) {
+                val s = pairScore(variant, nt)
+                if (s > best) best = s
+            }
+            if (uname.length >= 4) {
+                val s = pairScore(variant, uname)
+                if (s > best) best = s
+            }
         }
         return best
+    }
+
+    /** "sardorga"/"karimovga" kabi kelishik shakllari ham aniq nom hisoblanadi. */
+    private fun tokenVariants(token: String): List<String> {
+        val stripped = stripUzSuffix(token)
+        return if (stripped != token) listOf(token, stripped) else listOf(token)
     }
 
     private fun pairScore(token: String, nameToken: String): Int = when {
@@ -512,10 +670,16 @@ object YuzAiEngine {
         body = body.replace(Regex("^(ayt|ayting|aytib|gapir|gapirib)\\s+"), "")
         body = body.replace(Regex("^(xabar|msg|habar)\\s+"), "")
         body = body.replace(Regex("^(ga|kga|nga|gha|qa)\\s+"), "")
+        // "Sardor ismli odamga ..." / "Sardor chatiga ..." — nomga ishora
+        // qiluvchi qobiq xabar matniga qo'shilib qolmasin.
+        body = body.replace(Regex("^(ismli\\w*|ismidagi|nomli\\w*|degan)\\s+"), "")
+        body = body.replace(Regex("^(odamga|odamni|chatga|chatiga|chati\\w*|guruhga|kanalga)\\s+"), "")
+        // "Sardorga yubor yaxshimisan" -> "Yaxshimisan".
+        body = body.replace(Regex("^(yubor|yuboring|yuborib|jo'nat|jo'nating|jonat|jonating|yoz|yozing)\\s+"), "")
         // Ortidagi wrapper'lar: "... deb yubor", "... deb ayt", "... desang"
         body = body.replace(Regex("\\s+(deb|des|dedi|demoqchiman|demoqchimancha)\\s+(yubor|yoz|ayt|des|qilib\\s+ber|aytib\\s+ber)\\s*$"), "")
         body = body.replace(Regex("\\s+(deb|des|dedi)\\s*$"), "")
-        body = body.replace(Regex("\\s+(yubor|jo'nat|jonat|yozib\\s+yubor|aytib\\s+ber|qilib\\s+ber)\\s*$"), "")
+        body = body.replace(Regex("\\s+(yubor|yuboring|yuborsin|yuborish|jo'nat|jo'nating|jonat|jonating|yozib\\s+yubor|aytib\\s+ber|qilib\\s+ber)\\s*$"), "")
         body = body.replace(Regex("\\s+(ayt|ayting|gapir|gapirib(\\s+ber)?)\\s*$"), "")
         // "Sardor qalesan deb aytsa" -> "Qalesan" (gap oxiridagi buyruq qobig'i)
         body = body.replace(Regex("\\s+(deb|des)\\s+(aytsa|aytsang|aytib|desa|desang|de|ayt)\\s*$"), "")

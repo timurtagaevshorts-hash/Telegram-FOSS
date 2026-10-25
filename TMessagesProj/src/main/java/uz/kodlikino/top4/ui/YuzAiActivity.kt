@@ -76,6 +76,7 @@ class YuzAiActivity : BaseFragment() {
     private var entryPending = true
     private var quickButton: ImageButton? = null
     private var quickPending = false
+    private var choiceHolder: android.widget.HorizontalScrollView? = null
 
     override fun createView(context: Context): View {
         ctx = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
@@ -302,13 +303,15 @@ class YuzAiActivity : BaseFragment() {
     private fun startCloudFlow() {
         val v = voice ?: return
         if (cloudBusy) return
+        clearChoices()
         cloudBusy = true
         val seq = ++interactionSeq
         statusView.text = ctx.getString(R.string.ai_listening)
         setOrb(YuzAiOrbView.Mode.LISTENING)
         v.playReadySignal()
         val acc = currentAccount
-        scope.launch { runCatching { YuzAiEngine.peers(acc) } }
+        // Hovuz qurish disk/contacts bilan ishlaydi — UI thread'ni band qilmaymiz.
+        scope.launch(Dispatchers.IO) { runCatching { YuzAiEngine.peers(acc) } }
         scope.launch {
             delay(190L)
             if (!screenActive || parentActivity == null) {
@@ -406,25 +409,61 @@ class YuzAiActivity : BaseFragment() {
             executeIntent(intent)
             return
         }
+        // "Salom/rahmat" kabi sof suhbat: worker uni "send" deb talqin qilsa
+        // ham kontaktga xabar yuborilmaydi — darhol lokal javob.
+        if (YuzAiEngine.isSmallTalk(text)) {
+            askQuestion(text, res.answer)
+            return
+        }
         // Lokal qoida topolmadi — worker niyati hali ham foydali bo'lishi mumkin.
-        val peer = if (res.peerName.isNotBlank()) findPeerByName(res.peerName) else null
+        // Nomi bo'yicha BARCHA yaqin chatlar olinadi: bir nechta "Sardor"
+        // bo'lsa yolg'on "yubordim" o'rniga variantlar ko'rsatiladi.
+        val named = try {
+            if (res.peerName.isNotBlank()) YuzAiEngine.findByNames(res.peerName, currentAccount)
+            else emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+        val video = res.message.trim().equals("video", ignoreCase = true) ||
+            text.contains("video", ignoreCase = true)
         when (res.intent) {
             "send" -> when {
-                peer == null -> askQuestion(text, res.answer)
-                res.message.isBlank() -> askBody(peer)
-                else -> sendTo(peer, res.message)
+                named.isEmpty() -> notFound(res.peerName)
+                named.size > 1 -> askWhich(
+                    YuzAiEngine.Intent.NeedChoice(
+                        res.peerName.trim(),
+                        named.map { YuzAiEngine.ChoiceOption(it, res.message.trim()) },
+                        YuzAiEngine.ChoiceKind.SEND
+                    )
+                )
+                res.message.isBlank() -> askBody(named[0])
+                else -> sendTo(named[0], res.message)
             }
             "call" -> when {
-                peer == null -> askQuestion(text, res.answer)
-                peer.userId == 0L ->
-                    fastSay(ctx.getString(R.string.ai_call_no_user, peer.name), false)
-                else -> executeCall(
-                    peer,
-                    res.message.trim().equals("video", ignoreCase = true) ||
-                        text.contains("video", ignoreCase = true)
+                named.isEmpty() -> notFound(res.peerName)
+                named.size > 1 -> askWhich(
+                    YuzAiEngine.Intent.NeedChoice(
+                        res.peerName.trim(),
+                        named.map { YuzAiEngine.ChoiceOption(it, "") },
+                        YuzAiEngine.ChoiceKind.CALL,
+                        video
+                    )
                 )
+                named[0].userId == 0L ->
+                    fastSay(ctx.getString(R.string.ai_call_no_user, named[0].name), false)
+                else -> executeCall(named[0], video)
             }
-            "open" -> if (peer != null) openChatWithLine(peer) else askQuestion(text, res.answer)
+            "open" -> when {
+                named.isEmpty() -> notFound(res.peerName)
+                named.size > 1 -> askWhich(
+                    YuzAiEngine.Intent.NeedChoice(
+                        res.peerName.trim(),
+                        named.map { YuzAiEngine.ChoiceOption(it, "") },
+                        YuzAiEngine.ChoiceKind.OPEN
+                    )
+                )
+                else -> openChatWithLine(named[0])
+            }
             "goto" -> {
                 val sec = mapGoto(res.goto)
                 when {
@@ -454,6 +493,7 @@ class YuzAiActivity : BaseFragment() {
                 }
             is YuzAiEngine.Intent.Goto -> gotoWithLine(intent.section)
             is YuzAiEngine.Intent.PlayMusic -> playMusic(intent.query)
+            is YuzAiEngine.Intent.NeedChoice -> askWhich(intent)
             is YuzAiEngine.Intent.Ask -> askQuestion(intent.question, null)
         }
     }
@@ -463,6 +503,7 @@ class YuzAiActivity : BaseFragment() {
      */
     private fun handleUtterance(raw: String) {
         if (raw.isBlank()) return
+        clearChoices()
         user(raw)
         val pending = pendingPeer
         if (pending != null) {
@@ -470,7 +511,12 @@ class YuzAiActivity : BaseFragment() {
             sendTo(pending, raw)
             return
         }
-        executeIntent(YuzAiEngine.parse(raw, currentAccount))
+        val intent = try {
+            YuzAiEngine.parse(raw, currentAccount)
+        } catch (_: Exception) {
+            YuzAiEngine.Intent.Ask(raw)
+        }
+        executeIntent(intent)
     }
 
     private fun askQuestion(question: String, cloudAnswer: String?) {
@@ -647,8 +693,87 @@ class YuzAiActivity : BaseFragment() {
         else -> null
     }
 
-    private fun findPeerByName(want: String): YuzAiEngine.Peer? =
-        YuzAiEngine.findByName(want, currentAccount)
+    private fun notFound(name: String) {
+        val n = name.trim()
+        if (n.isBlank()) fastSay(ctx.getString(R.string.ai_need_peer))
+        else fastSay(ctx.getString(R.string.ai_not_found, n))
+    }
+
+    /**
+     * Bir xil ismli bir nechta chat topilganda — savol + bosiladigan variant
+     * chiplari. Chiplar yangi buyruq boshlanishida olib tashlanadi, shunda
+     * eskirgan variant bosilib, noto'g'ri odamga xabar ketmaydi.
+     */
+    private fun askWhich(intent: YuzAiEngine.Intent.NeedChoice) {
+        val m = ctx.getString(R.string.ai_choose_peer, intent.label)
+        statusView.text = m
+        assistant(m)
+        setOrb(YuzAiOrbView.Mode.IDLE)
+        autoListenArmed = false
+        voice?.speak(m)
+
+        clearChoices()
+        val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
+        for (option in intent.options) {
+            val duplicate = intent.options.count { it.peer.name == option.peer.name } > 1
+            val label = if (duplicate && !option.peer.username.isNullOrBlank()) {
+                "${option.peer.name} (@${option.peer.username})"
+            } else {
+                option.peer.name
+            }
+            val chip = YuzChips.pillText(ctx, label, false).apply {
+                isClickable = true
+                minimumHeight = AndroidUtilities.dp(48f)
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setOnClickListener {
+                    clearChoices()
+                    executeChoice(intent, option)
+                }
+            }
+            row.addView(chip)
+        }
+        val holder = android.widget.HorizontalScrollView(ctx).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(row)
+        }
+        val lp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = AndroidUtilities.dp(6f)
+            bottomMargin = AndroidUtilities.dp(4f)
+        }
+        logContainer.addView(holder, lp)
+        choiceHolder = holder
+        scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    private fun executeChoice(
+        intent: YuzAiEngine.Intent.NeedChoice,
+        option: YuzAiEngine.ChoiceOption
+    ) {
+        when (intent.kind) {
+            YuzAiEngine.ChoiceKind.SEND ->
+                if (option.text.isBlank()) askBody(option.peer)
+                else sendTo(option.peer, option.text)
+            YuzAiEngine.ChoiceKind.OPEN -> openChatWithLine(option.peer)
+            YuzAiEngine.ChoiceKind.CALL ->
+                if (option.peer.userId == 0L) {
+                    fastSay(ctx.getString(R.string.ai_call_no_user, option.peer.name), false)
+                } else {
+                    executeCall(option.peer, intent.video)
+                }
+        }
+    }
+
+    private fun clearChoices() {
+        val holder = choiceHolder ?: return
+        choiceHolder = null
+        try {
+            logContainer.removeView(holder)
+        } catch (_: Exception) {
+        }
+    }
 
     private fun openChat(peer: YuzAiEngine.Peer) {
         if (parentActivity == null) return
@@ -753,6 +878,7 @@ class YuzAiActivity : BaseFragment() {
 
     private fun stopAll() {
         autoListenArmed = false
+        clearChoices()
         interactionSeq++
         try {
             recorder.cancel()

@@ -355,7 +355,18 @@ class YuzAiOverlayService : Service() {
             execute(intent, account)
             return
         }
-        val peer = if (res.peerName.isNotBlank()) YuzAiEngine.findByName(res.peerName, account) else null
+        val named = if (res.peerName.isNotBlank()) {
+            try {
+                YuzAiEngine.findByNames(res.peerName, account)
+            } catch (_: Exception) {
+                emptyList()
+            }
+        } else emptyList()
+        if (named.size > 1 && res.intent in MULTI_PEER_INTENTS) {
+            speakWhich(res.peerName, named)
+            return
+        }
+        val peer = named.firstOrNull()
         when (res.intent) {
             "send" -> when {
                 peer == null -> answer(text, res.answer)
@@ -385,8 +396,20 @@ class YuzAiOverlayService : Service() {
             is YuzAiEngine.Intent.Call -> openApp()
             is YuzAiEngine.Intent.Goto -> openApp()
             is YuzAiEngine.Intent.PlayMusic -> playMusic(intent.query)
+            is YuzAiEngine.Intent.NeedChoice -> speakWhich(intent.label, intent.options.map { it.peer })
             is YuzAiEngine.Intent.Ask -> answer(intent.question, null)
         }
+    }
+
+    /** Overlayda tanlash chiplari yo'q — noto'g'ri chatga yubormasdan variantlarni aytamiz. */
+    private fun speakWhich(label: String, peers: List<YuzAiEngine.Peer>) {
+        pendingPeer = null
+        val names = peers.take(3).joinToString(", ") { p ->
+            val uname = p.username
+            if (uname.isNullOrBlank()) p.name else "${p.name} (@$uname)"
+        }
+        speak(getString(R.string.ai_choose_peer, label) + " " + names)
+        setOrb(YuzAiOrbView.Mode.IDLE)
     }
 
     private fun sendTo(peer: YuzAiEngine.Peer, text: String, account: Int) {
@@ -553,6 +576,7 @@ class YuzAiOverlayService : Service() {
     companion object {
         private const val CHANNEL_ID = "yuz_ai_quick"
         private const val NOTIF_ID = 23071
+        private val MULTI_PEER_INTENTS = setOf("send", "call", "open")
 
         @Volatile
         var running: Boolean = false

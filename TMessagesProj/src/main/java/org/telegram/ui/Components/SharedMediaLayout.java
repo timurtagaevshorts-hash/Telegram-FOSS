@@ -5011,6 +5011,10 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                         searchItemState = 0;
                         scrollSlidingTextTabStrip.selectTabWithId(mediaPages[0].selectedType, 1.0f);
                         onSelectedTabChanged();
+                        // #168: swipe bilan "Reels" tabiga o'tilganda ham Firebase
+                        // grid overlay'i yoqilsin — aks holda ostidagi native
+                        // arxiv storiyalar sahifasi ko'rinib qoladi.
+                        updateYuzReelsOverlay(mediaPages[0].selectedType);
                         startStopVisibleGifs();
                     }
                     tabsAnimationInProgress = false;

@@ -11,6 +11,7 @@
     <string name="ai_network_voice">Ovoz uchun internet kerak.</string>
     <string name="ai_need_body">%1$s ga qaysi xabarni yuboray?</string>
     <string name="ai_not_found">%1$s ismli chat topilmadi.</string>
+    <string name="ai_choose_peer">«%1$s» bo\'yicha bir nechta chat bor — qaysi biriga?</string>
     <string name="ai_sent">Xabar yubordim: %1$s — «%2$s»</string>
     <string name="ai_sent_short">Xabar yubordim.</string>
     <string name="ai_send_failed">Xabar yuborilmadi.</string>

@@ -696,9 +696,15 @@ class ReelsActivity @JvmOverloads constructor(
         val keepId = currentReels.getOrNull(keepPosition)?.id
         if (currentReels.isEmpty()) progressBar?.visibility = View.VISIBLE
         s.launch {
-            val stories = try {
-                YuzStoryFeed.buildFeed(currentAccount, filterUid)
-            } catch (_: Exception) {
+            // #168: profil ichidagi Reels bo'limi faqat shu muallifning Firebase
+            // reel'larini ko'rsatadi — hikoyalar bu yerda umuman qo'shilmaydi.
+            val stories = if (filterUid.isBlank()) {
+                try {
+                    YuzStoryFeed.buildFeed(currentAccount, "")
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            } else {
                 emptyList()
             }
             val cached = try {
@@ -776,10 +782,9 @@ class ReelsActivity @JvmOverloads constructor(
             stories
         }
         if (filterUid.isNotBlank()) {
-            val scoped = ArrayList<Reel>(stories.size + firebase.size)
-            scoped.addAll(stories)
-            scoped.addAll(firebase)
-            return scoped
+            // #168: scoped feed'da hikoya yozuvlari hech qanday yo'l bilan
+            // (kesh yoki Firebase) tasmaga tushmasin.
+            return firebase.filter { !it.isStory && it.videoUrl.isNotBlank() }
         }
         val freshCutoff = System.currentTimeMillis() - FRESH_REEL_MS
         val fresh = ArrayList<Reel>()

@@ -93,6 +93,7 @@ object ReelsRepository {
                 try {
                     val reel = doc.toObject(Reel::class.java) ?: return@mapNotNull null
                     reel.copy(id = reel.id.ifBlank { doc.id })
+                        .takeIf { !it.isStory && it.videoUrl.isNotBlank() }
                 } catch (e: Exception) {
                     Log.e(TAG, "parse ${doc.id}: ${e.message}", e)
                     null
