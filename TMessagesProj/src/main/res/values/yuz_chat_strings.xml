@@ -17,6 +17,7 @@
     <string name="yuz_apk_warn_text_plain">Siz notanish manbadan APK fayl o‘rnatmoqdasiz. Ehtiyot bo‘ling: barcha fayllarga ruxsat yoki administrator huquqini bermang — bu sizning shaxsiy ma’lumotlaringiz uchun xavfli.</string>
     <string name="yuz_apk_warn_confirm">Tushundim</string>
     <string name="yuz_apk_warn_decline">APK faylni o‘rnatmaslik</string>
+    <string name="yuz_apk_install_unavailable">Bu versiyada APK fayllarni bevosita o‘rnatish o‘chirilgan (Play Store talabi). Faylni saqlab, telefonning fayl menejeridan o‘rnatishingiz mumkin.</string>
 
     <!-- #179: fon ulanishi uchun tizim kanali nomi -->
     <string name="yuz_service_channel_name">Fon xizmati</string>

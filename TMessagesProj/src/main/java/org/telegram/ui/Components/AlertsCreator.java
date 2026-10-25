@@ -248,6 +248,18 @@ public class AlertsCreator {
     }
 
     /**
+     * YuzGram: REQUEST_INSTALL_PACKAGES manifestda e'lon qilinmagan build'lar uchun
+     * (Play talabi) — tizim sozlamalarida bu ilova ko'rinmaydi, shuning uchun tushuntirish.
+     */
+    public static Dialog createApkInstallUnavailableDialog(Context ctx, Theme.ResourcesProvider resourcesProvider) {
+        return new AlertDialog.Builder(ctx, resourcesProvider)
+                .setMessage(LocaleController.getString(R.string.yuz_apk_install_unavailable))
+                .setTopAnimation(R.raw.permission_request_apk, PERMISSIONS_REQUEST_TOP_ICON_SIZE, false, Theme.getColor(Theme.key_dialogTopBackground, resourcesProvider))
+                .setPositiveButton(LocaleController.getString("OK", R.string.OK), null)
+                .create();
+    }
+
+    /**
      * YuzGram #178: APK bubble'idagi "Ogoh bo'ling" tugmasi uchun qisqa izoh.
      */
     public static Dialog createApkGuardInfoDialog(Context ctx, Theme.ResourcesProvider resourcesProvider) {

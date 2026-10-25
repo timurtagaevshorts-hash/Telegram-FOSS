@@ -3867,12 +3867,36 @@ public class AndroidUtilities {
         return false;
     }
 
+    private static final int APK_INSTALL_ALLOWED = 0;
+    private static final int APK_INSTALL_NOT_ALLOWED = 1;
+    private static final int APK_INSTALL_NOT_DECLARED = 2;
+
+    private static int getApkInstallState() {
+        try {
+            PackageManager packageManager = ApplicationLoader.applicationContext.getPackageManager();
+            if (packageManager.checkPermission(Manifest.permission.REQUEST_INSTALL_PACKAGES, ApplicationLoader.getApplicationId()) != PackageManager.PERMISSION_GRANTED) {
+                return APK_INSTALL_NOT_DECLARED;
+            }
+            return packageManager.canRequestPackageInstalls() ? APK_INSTALL_ALLOWED : APK_INSTALL_NOT_ALLOWED;
+        } catch (Throwable error) {
+            FileLog.e(error);
+            return APK_INSTALL_NOT_DECLARED;
+        }
+    }
+
     private static void openForViewNow(File f, String realMimeType, Activity activity, Theme.ResourcesProvider resourcesProvider) {
         Intent intent = new Intent(Intent.ACTION_VIEW);
         intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && realMimeType != null && realMimeType.equals("application/vnd.android.package-archive") && !ApplicationLoader.applicationContext.getPackageManager().canRequestPackageInstalls()) {
-            AlertsCreator.createApkRestrictedDialog(activity, resourcesProvider).show();
-            return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && realMimeType != null && realMimeType.equals("application/vnd.android.package-archive")) {
+            int apkInstallState = getApkInstallState();
+            if (apkInstallState == APK_INSTALL_NOT_DECLARED) {
+                AlertsCreator.createApkInstallUnavailableDialog(activity, resourcesProvider).show();
+                return;
+            }
+            if (apkInstallState == APK_INSTALL_NOT_ALLOWED) {
+                AlertsCreator.createApkRestrictedDialog(activity, resourcesProvider).show();
+                return;
+            }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             intent.setDataAndType(FileProvider.getUriForFile(activity, ApplicationLoader.getApplicationId() + ".provider", f), realMimeType != null ? realMimeType : "text/plain");
