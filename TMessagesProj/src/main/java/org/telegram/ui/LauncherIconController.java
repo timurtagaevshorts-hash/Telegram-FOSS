@@ -9,12 +9,12 @@ import org.telegram.messenger.R;
 
 public class LauncherIconController {
     public static void tryFixLauncherIconIfNeeded() {
-        for (LauncherIcon icon : LauncherIcon.values()) {
-            if (isEnabled(icon)) {
-                return;
-            }
+        // YuzGram: ikonka almashtirish sozlamasi olib tashlangan — har doim brend
+        // (DEFAULT) ikonkasi. Avval Telegram ikonkalaridan biri tanlangan bo'lsa,
+        // o'sha tanlov saqlanib qolmasin.
+        if (isEnabled(LauncherIcon.DEFAULT)) {
+            return;
         }
-
         setIcon(LauncherIcon.DEFAULT);
     }
 
