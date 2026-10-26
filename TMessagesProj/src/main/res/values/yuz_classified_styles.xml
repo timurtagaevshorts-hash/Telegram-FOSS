@@ -201,6 +201,22 @@
         <item name="android:paddingBottom">14dp</item>
     </style>
 
+    <!-- "Tez orada" nishoni — rasm ustidagi kichik neon pill. -->
+    <style name="FuncsionSoonBadge">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/bg_func_soon</item>
+        <item name="android:paddingLeft">10dp</item>
+        <item name="android:paddingTop">5dp</item>
+        <item name="android:paddingRight">10dp</item>
+        <item name="android:paddingBottom">5dp</item>
+        <item name="android:textColor">@color/yuz_text_bright</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
     <!-- "Music player" — to'liq kenglikdagi jonli holat kartasi. -->
     <style name="FuncsionMusic" parent="FuncsionWide">
         <item name="cardBackgroundColor">@color/yuz_surface_raised</item>

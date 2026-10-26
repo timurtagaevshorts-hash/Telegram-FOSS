@@ -44,4 +44,12 @@
     <string name="func_ish_desc">Ish topish va ishchi qidirish</string>
     <string name="func_instagram_title">Instagram video</string>
     <string name="func_instagram_desc">Instagram relsni yuklab olish</string>
+
+    <!-- Taksi kartasi — hozircha "tez orada" holatida -->
+    <string name="func_taksi_title">Taksi chaqirish</string>
+    <string name="func_taksi_desc">Tez orada ishga tushadi — sizlar uchun eng yaxshisini tayyorlayapmiz</string>
+    <string name="func_taksi_soon">TEZ ORADA</string>
+    <string name="func_taksi_dialog_title">Taksi chaqirish</string>
+    <string name="func_taksi_dialog_message">Bu xizmat tez orada ishga tushadi. Sizlar uchun eng yaxshisini tayyorlayapmiz.</string>
+    <string name="func_taksi_dialog_ok">Yaxshi</string>
 </resources>

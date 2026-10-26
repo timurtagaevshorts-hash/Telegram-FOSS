@@ -443,5 +443,62 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
+
+        <!-- Taksi chaqirish — hozircha "tez orada": bosilganda tushuntirish oynasi. -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardTaksi"
+            style="@style/FuncsionWide"
+            android:layout_marginTop="@dimen/yuz_space_3">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="150dp">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@null"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/func_taxi_photo" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="72dp"
+                        android:layout_gravity="bottom"
+                        android:background="@drawable/bg_func_image_fade" />
+
+                    <ImageView
+                        style="@style/FuncsionImageBadge"
+                        android:layout_gravity="bottom|start"
+                        android:layout_marginStart="@dimen/yuz_space_4"
+                        android:layout_marginBottom="@dimen/yuz_space_3"
+                        android:background="@drawable/bg_func_teal"
+                        android:src="@drawable/ic_yuz_car" />
+
+                    <TextView
+                        style="@style/FuncsionSoonBadge"
+                        android:layout_gravity="top|end"
+                        android:layout_marginTop="@dimen/yuz_space_3"
+                        android:layout_marginEnd="@dimen/yuz_space_3"
+                        android:text="@string/func_taksi_soon" />
+                </FrameLayout>
+
+                <LinearLayout style="@style/FuncsionTileText">
+
+                    <TextView
+                        style="@style/FuncsionTileTitle"
+                        android:text="@string/func_taksi_title" />
+
+                    <TextView
+                        style="@style/FuncsionTileDesc"
+                        android:text="@string/func_taksi_desc" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

@@ -20,6 +20,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
+import org.telegram.ui.ActionBar.AlertDialog
 import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.utils.YuzAdFeed
 import uz.kodlikino.top4.utils.YuzMusicEngine
@@ -78,6 +79,9 @@ class FunksiyalarActivity : BaseFragment() {
         root.findViewById<View>(R.id.cardKinolar)?.setOnClickListener {
             presentFragment(KinolarActivity(), false)
         }
+        root.findViewById<View>(R.id.cardTaksi)?.setOnClickListener {
+            showTaksiComingSoon()
+        }
 
         playIntro(root)
         adSlot = root.findViewById(R.id.adFunctionsSlot)
@@ -131,6 +135,16 @@ class FunksiyalarActivity : BaseFragment() {
         } catch (_: Exception) {
             Toast.makeText(ctx, R.string.yuz_ad_open_failed, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /** Taksi kartasi: xizmat hali ishga tushmagan — "tez orada" oynasi. */
+    private fun showTaksiComingSoon() {
+        val ctx = context ?: return
+        AlertDialog.Builder(ctx)
+            .setTitle(ctx.getString(R.string.func_taksi_dialog_title))
+            .setMessage(ctx.getString(R.string.func_taksi_dialog_message))
+            .setPositiveButton(ctx.getString(R.string.func_taksi_dialog_ok), null)
+            .show()
     }
 
     override fun onResume() {
