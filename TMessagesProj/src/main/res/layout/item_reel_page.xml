@@ -414,4 +414,46 @@
                 android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
+
+    <!--
+      Story scrubbing HUD: sahifani bosib turib gorizontal surilganda vaqt
+      ko'rsatkichi chiqadi. ReelsAdapter boshqaradi — oddiy holatda yashirin.
+      Oxirgi element: spinner va boshqa markaziy qatlamlardan USTIDA turadi.
+    -->
+    <LinearLayout
+        android:id="@+id/reelScrubHud"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_yuz_scrub_hud"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/yuz_space_4"
+        android:paddingTop="@dimen/yuz_space_3"
+        android:paddingEnd="@dimen/yuz_space_4"
+        android:paddingBottom="@dimen/yuz_space_3"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvScrubTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/reels_scrub_seek"
+            android:includeFontPadding="false"
+            android:letterSpacing="0.02"
+            android:textColor="@color/yuz_text_bright"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <ProgressBar
+            android:id="@+id/scrubBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="196dp"
+            android:layout_height="4dp"
+            android:layout_marginTop="@dimen/yuz_space_2"
+            android:max="1000"
+            android:progress="0"
+            android:progressBackgroundTint="@color/yuz_stroke_strong"
+            android:progressTint="@color/yuz_action" />
+    </LinearLayout>
 </FrameLayout>

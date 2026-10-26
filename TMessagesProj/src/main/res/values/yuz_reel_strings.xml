@@ -50,6 +50,9 @@
     <string name="reels_sound_on">Ovozni o\'chirish</string>
     <string name="reels_sound_off">Ovozni yoqish</string>
 
+    <!-- Story scrubbing: bosib turib gorizontal surish orqali vaqtga o'tish. -->
+    <string name="reels_scrub_seek">Vaqtni tanlash</string>
+
     <!-- Izohlar paneli -->
     <string name="reels_comments">Izohlar</string>
     <string name="reels_comments_title">Izohlar (%1$d)</string>

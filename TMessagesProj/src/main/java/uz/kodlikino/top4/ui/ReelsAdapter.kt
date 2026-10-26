@@ -7,11 +7,14 @@ import androidx.core.content.ContextCompat
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.GestureDetector
+import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
@@ -29,6 +32,7 @@ import androidx.media3.datasource.FileDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
@@ -53,20 +57,22 @@ import uz.kodlikino.top4.utils.YuzStoryFeed
 import uz.kodlikino.top4.utils.YuzVideoCache
 import uz.kodlikino.top4.utils.YuzViewedReels
 import java.io.File
+import kotlin.math.abs
 
 /**
  * Reels feed adapter'i — vertikal [RecyclerView] sahifalari uchun adapter
  * (har bir sahifa butun ekranga [androidx.recyclerview.widget.PagerSnapHelper]
  * bilan yopishadi).
  *
- * Ijro modeli (bir nechta Player o'rniga BITTA player — eng tejamkor va barqaror):
- *  - Butun feed uchun yagona [ExoPlayer]; faqat ko'rinib turgan sahifaning
- *    `PlayerView.player` maydoniga biriktiriladi, qolganlari `null` qo'yiladi.
- *  - Sahifa almashganda oldingi video to'xtaydi, yangi manba `setMediaItem` +
- *    `prepare()` + avtomatik o'ynatishga o'tadi (Reels standart xulqiyati).
+ * Ijro modeli (ikki pleyerli "iliq hovuz"):
+ *  - Faol [ExoPlayer] ko'rinib turgan sahifaning `PlayerView.player`iga
+ *    biriktiriladi; ikkinchisi fon rejimida KEYINGI reel'ni oldindan
+ *    tayyorlaydi (`warmNext`). Sahifa almashganda pleyerlar joy almashadi —
+ *    `prepare()` ham, tarmoq kutishi ham bo'lmaydi.
  *  - `repeatMode = REPEAT_MODE_ONE` — video tugagach boshidan aylanadi.
- *  - Ekranni bosish play/pause. Qattiq controller yoqilmaydi, shuning uchun
- *    media3'ning murakkab controller layoutlari ishga tushmaydi (minSdk 21).
+ *  - Ekranni bosish play/pause; bosib turib gorizontal surish — Story
+ *    Scrubbing (vaqtni tanlash, `SeekParameters.CLOSEST_SYNC` bilan tez).
+ *  - Qattiq controller yoqilmaydi (minSdk 21).
  *
  * Like/ko'rish ko'rsatkichlari optimistik yangilanadi; yozuv [ReelsRepository]
  * orqali Firestore'ga ketadi (calls orqali qaytadi).
@@ -93,7 +99,18 @@ class ReelsAdapter(
     private val liked = HashMap<String, Boolean>()
     private val commentShown = HashMap<String, Int>()
 
-    private var player: ExoPlayer? = null
+    /**
+     * Ikki pleyerli hovuz: faol + "iliq" (keyingi reel oldindan tayyorlangan).
+     * Sahifa almashganda iliq pleyer faolga aylanadi — video tayyor holatda
+     * boshlanadi, `prepare()` kutishisiz. Bo'shagan pleyer keyingi sahifani
+     * oldindan tayyorlab qo'yadi (Instagram/Telegram uslubi).
+     */
+    private val players = arrayOfNulls<ExoPlayer>(2)
+    private val playerListeners = arrayOfNulls<Player.Listener>(2)
+    private var activePlayerIndex = 0
+    private val player: ExoPlayer? get() = players[activePlayerIndex]
+    private val warmPlayer: ExoPlayer? get() = players[1 - activePlayerIndex]
+    private var warmRunnable: Runnable? = null
     private var recyclerView: RecyclerView? = null
     private var activePos = -1
     private var activeHolder: PageHolder? = null
@@ -135,7 +152,7 @@ class ReelsAdapter(
             try {
                 val reel = h.reel ?: return@NotificationCenterDelegate
                 val ready = YuzStoryFeed.resolveVideoFile(account, reel, args.getOrNull(1) as? File)
-                if (ready != null) startMedia(h, ensurePlayer(), Uri.fromFile(ready), reel.id)
+                if (ready != null) startMedia(h, playerFor(reel.id), Uri.fromFile(ready), reel.id)
                 else showActivateError(h)
             } catch (_: Exception) {
                 showActivateError(h)
@@ -161,6 +178,7 @@ class ReelsAdapter(
     private fun cancelActivation() {
         pendingActivation?.let { mainHandler.removeCallbacks(it) }
         pendingActivation = null
+        cancelWarm()
     }
 
     private fun silence() {
@@ -221,12 +239,21 @@ class ReelsAdapter(
         return h
     }
 
-    private val playerListener = object : Player.Listener {
+    /**
+     * Har bir pleyer o'z listener'iga ega. Iliq pleyer fon rejimida
+     * tayyorlanadi — uning holati UI'ga ta'sir qilmasligi kerak, shuning
+     * uchun faqat faol pleyer hodisalari qabul qilinadi.
+     */
+    private fun createPlayerListener(p: ExoPlayer): Player.Listener = object : Player.Listener {
+        private fun isLive(): Boolean = !released && player === p
+
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (!isLive()) return
             playingHolder()?.setPlayingBadge(isPlaying)
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
+            if (!isLive()) return
             val holder = playingHolder() ?: return
             holder.pageProgress.visibility =
                 if (playbackState == Player.STATE_BUFFERING) View.VISIBLE else View.GONE
@@ -234,6 +261,7 @@ class ReelsAdapter(
         }
 
         override fun onRenderedFirstFrame() {
+            if (!isLive()) return
             val holder = playingHolder() ?: return
             val reel = holder.reel ?: return
             renderedReelId = reel.id
@@ -245,6 +273,7 @@ class ReelsAdapter(
         }
 
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            if (!isLive()) return
             val holder = playingHolder() ?: return
             silence()
             if (playAttempts < 3) {
@@ -294,9 +323,11 @@ class ReelsAdapter(
         cancelPendingRetry()
         cancelStoryPoll()
         pendingStoryFileName = null
+        cancelWarm()
         activeHolder?.playerView?.player = null
         if (retained < 0) {
             player?.clearMediaItems()
+            warmPlayer?.clearMediaItems()
             userPaused = false
         }
         renderedReelId = null
@@ -328,7 +359,9 @@ class ReelsAdapter(
             cancelPendingRetry()
             cancelStoryPoll()
             pendingStoryFileName = null
+            cancelWarm()
             player?.clearMediaItems()
+            warmPlayer?.clearMediaItems()
             activeHolder?.playerView?.player = null
             activeHolder = null
             // O'chirilgan sahifa o'rniga keyingi (yoki oldingi) reel keladi —
@@ -405,6 +438,7 @@ class ReelsAdapter(
     override fun onViewRecycled(holder: PageHolder) {
         super.onViewRecycled(holder)
         // #113: recycling ham layout-dispatch'da yuradi.
+        holder.cancelScrubState()
         try {
             holder.playerView.player = null
             holder.storyThumb.clearImage()
@@ -422,6 +456,7 @@ class ReelsAdapter(
     }
 
     override fun onViewDetachedFromWindow(holder: PageHolder) {
+        holder.cancelScrubState()
         if (holder === activeHolder) {
             silence()
             generation++
@@ -462,6 +497,8 @@ class ReelsAdapter(
     fun setActivePosition(pos: Int) {
         if (released || pos !in items.indices) return
         if (pos != activePos) {
+            cancelWarm()
+            activeHolder?.cancelScrubState()
             silence()
             generation++
             cancelActivation()
@@ -549,14 +586,7 @@ class ReelsAdapter(
         try {
             // Disk kesh: oldindan yuklangan bo'laklar keshdan o'qiladi, qolgani
             // oqim davomida yoziladi. Qayta ko'rishda video deyarli darhol ochiladi.
-            val source = ProgressiveMediaSource.Factory(remoteDataSourceFactory())
-                .createMediaSource(
-                    MediaItem.Builder()
-                        .setUri(Uri.parse(reel.videoUrl))
-                        .setMediaId(reel.id)
-                        .build()
-                )
-            startSource(h, ensurePlayer(), source, reel.id)
+            startSource(h, playerFor(reel.id), buildRemoteSource(reel), reel.id)
         } catch (_: Exception) {
             showActivateError(h)
         }
@@ -589,11 +619,14 @@ class ReelsAdapter(
             h.storyThumb.visibility = View.VISIBLE
             h.pageProgress.visibility = View.GONE
             registerViewOnce(reel)
+            // Foto hikoya pleyer talab qilmaydi, lekin keyingi reel iliq
+            // tayyorlanishi kerak — sahifa almashishi bir zumda bo'lsin.
+            scheduleWarm(300L)
             return
         }
         val ready = YuzStoryFeed.resolveVideoFile(account, reel)
         if (ready != null) {
-            startMedia(h, ensurePlayer(), Uri.fromFile(ready), reel.id)
+            startMedia(h, playerFor(reel.id), Uri.fromFile(ready), reel.id)
             return
         }
         // Oqim: fayl to'liq yuklanishini kutmasdan ijro etamiz — past
@@ -622,7 +655,7 @@ class ReelsAdapter(
                 )
                 h.storyThumb.visibility = View.VISIBLE
                 h.pageProgress.visibility = View.VISIBLE
-                startSource(h, ensurePlayer(), source, reel.id)
+                startSource(h, playerFor(reel.id), source, reel.id)
                 return
             } catch (_: Exception) {
                 // Oqim manbasi qurilmasa — pastdagi "yuklab, keyin ijro" yo'li.
@@ -647,7 +680,7 @@ class ReelsAdapter(
                     val f = YuzStoryFeed.resolveVideoFile(account, reel)
                     if (f != null) {
                         pendingStoryFileName = null
-                        startMedia(h, ensurePlayer(), Uri.fromFile(f), reel.id)
+                        startMedia(h, playerFor(reel.id), Uri.fromFile(f), reel.id)
                         return
                     }
                     if (++ticks >= 60 && !FileLoader.getInstance(account).isLoadingFile(
@@ -678,17 +711,22 @@ class ReelsAdapter(
      * yaramaydi.
      */
     private fun startSource(h: PageHolder, p: ExoPlayer, source: MediaSource, reelId: String) {
-        if (!canPlay(h)) return
+        if (!canPlay(h) || player !== p) return
         cancelStoryPoll()
         cancelPendingRetry()
         pendingStoryFileName = null
         h.playerView.player = p
+        // Scrub'dan keyin pleyerda CLOSEST_SYNC qolgan bo'lishi mumkin —
+        // oddiy ijro uchun aniq seek'ka qaytaramiz.
+        p.setSeekParameters(SeekParameters.EXACT)
         if (p.currentMediaItem?.mediaId != reelId || p.playbackState == Player.STATE_IDLE) {
             silence()
             renderedReelId = null
             p.setMediaSource(source)
             p.prepare()
         }
+        // Iliq pleyer shu media'ni allaqachon buferlagan bo'lsa — holat
+        // READY bo'ladi va video bir zumda boshlanadi.
         h.pageProgress.visibility = if (p.playbackState == Player.STATE_READY) View.GONE else View.VISIBLE
         if (renderedReelId == reelId) {
             h.storyThumb.visibility = View.GONE
@@ -699,6 +737,7 @@ class ReelsAdapter(
         h.refreshSoundUi()
         mainHandler.removeCallbacks(progressTicker)
         mainHandler.post(progressTicker)
+        scheduleWarm()
     }
 
     private var remoteFactory: CacheDataSource.Factory? = null
@@ -716,11 +755,12 @@ class ReelsAdapter(
     }
 
     private fun startMedia(h: PageHolder, p: ExoPlayer, uri: Uri, reelId: String) {
-        if (!canPlay(h)) return
+        if (!canPlay(h) || player !== p) return
         cancelStoryPoll()
         cancelPendingRetry()
         pendingStoryFileName = null
         h.playerView.player = p
+        p.setSeekParameters(SeekParameters.EXACT)
         if (p.currentMediaItem?.mediaId != reelId || p.playbackState == Player.STATE_IDLE) {
             silence()
             renderedReelId = null
@@ -737,6 +777,7 @@ class ReelsAdapter(
         h.refreshSoundUi()
         mainHandler.removeCallbacks(progressTicker)
         mainHandler.post(progressTicker)
+        scheduleWarm()
     }
 
     /**
@@ -751,6 +792,8 @@ class ReelsAdapter(
 
     fun pausePlayback() {
         playbackEnabled = false
+        cancelWarm()
+        activeHolder?.cancelScrubState()
         silence()
         generation++
         cancelActivation()
@@ -870,24 +913,34 @@ class ReelsAdapter(
         NotificationCenter.getInstance(account).removeObserver(downloadObserver, NotificationCenter.fileLoadFailed)
         activeHolder?.playerView?.player = null
         activeHolder = null
-        player?.let {
-            it.removeListener(playerListener)
-            it.release()
+        for (i in players.indices) {
+            val p = players[i] ?: continue
+            playerListeners[i]?.let { p.removeListener(it) }
+            p.release()
+            players[i] = null
+            playerListeners[i] = null
         }
-        player = null
+        activePlayerIndex = 0
     }
 
+    /** Faol slot pleyeri — PlayerView'ga shu biriktiriladi. */
     private fun ensurePlayer(): ExoPlayer {
-        player?.let { return it }
+        players[activePlayerIndex]?.let { return it }
+        return createPlayer(activePlayerIndex)
+    }
+
+    private fun createPlayer(slot: Int): ExoPlayer {
         val slowNet = NetworkReachability.kind(appContext) == NetworkReachability.NetKind.CELLULAR
         val loadControl = DefaultLoadControl.Builder()
             // media3 1.0.2 API: min, max, playback, rebuffer (ms)
             .setBufferDurationsMs(
-                if (slowNet) 500 else 800,
-                if (slowNet) 6000 else 12000,
-                if (slowNet) 120 else 150,
-                if (slowNet) 300 else 400
+                if (slowNet) 700 else 1200,
+                if (slowNet) 12000 else 30000,
+                if (slowNet) 100 else 100,
+                if (slowNet) 350 else 200
             )
+            // Orqaga bufer — barmoq bilan orqaga surilganda qayta yuklash bo'lmaydi.
+            .setBackBuffer(if (slowNet) 5000 else 15000, false)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
         val created = ExoPlayer.Builder(appContext)
@@ -904,9 +957,121 @@ class ReelsAdapter(
             .build()
         created.repeatMode = Player.REPEAT_MODE_ONE
         created.volume = 0f
-        created.addListener(playerListener)
-        player = created
+        created.playWhenReady = false
+        val listener = createPlayerListener(created)
+        created.addListener(listener)
+        players[slot] = created
+        playerListeners[slot] = listener
         return created
+    }
+
+    /** Firebase reel'i — keshlangan HTTP progressiv manba. */
+    private fun buildRemoteSource(reel: Reel): MediaSource =
+        ProgressiveMediaSource.Factory(remoteDataSourceFactory())
+            .createMediaSource(
+                MediaItem.Builder()
+                    .setUri(Uri.parse(reel.videoUrl))
+                    .setMediaId(reel.id)
+                    .build()
+            )
+
+    /**
+     * Iloji bo'lsa iliq pleyerni faolga almashtiradi: sahifa almashganda
+     * `prepare()` ham, tarmoq kutishi ham bo'lmaydi. Aks holda joriy faol
+     * pleyerda yangi manba ochiladi.
+     */
+    private fun playerFor(reelId: String): ExoPlayer {
+        val active = ensurePlayer()
+        if (active.currentMediaItem?.mediaId == reelId) return active
+        val idleIndex = 1 - activePlayerIndex
+        val idle = players[idleIndex]
+        if (idle != null && idle.currentMediaItem?.mediaId == reelId &&
+            idle.playbackState != Player.STATE_IDLE
+        ) {
+            activeHolder?.playerView?.player = null
+            active.volume = 0f
+            active.pause()
+            activePlayerIndex = idleIndex
+            return idle
+        }
+        return active
+    }
+
+    private fun cancelWarm() {
+        warmRunnable?.let { mainHandler.removeCallbacks(it) }
+        warmRunnable = null
+    }
+
+    /**
+     * Faol sahifa barqarorlashgach keyingi reel'ni iliq pleyerga oldindan
+     * yuklaymiz. Kechikish — snap animatsiyasi tugasin, tarmoq esa hozirgi
+     * videoga berilsin.
+     */
+    private fun scheduleWarm(delayMs: Long = 400L) {
+        cancelWarm()
+        if (released || !playbackEnabled) return
+        val r = Runnable {
+            warmRunnable = null
+            warmNext()
+        }
+        warmRunnable = r
+        mainHandler.postDelayed(r, delayMs)
+    }
+
+    private fun warmNext() {
+        if (released || !playbackEnabled || activeHolder?.isScrubbing == true) return
+        val nextPos = when {
+            activePos + 1 in items.indices -> activePos + 1
+            activePos - 1 in items.indices -> activePos - 1
+            else -> return
+        }
+        val reel = items[nextPos]
+        val idleIndex = 1 - activePlayerIndex
+        val idle = players[idleIndex] ?: createPlayer(idleIndex)
+        if (idle.currentMediaItem?.mediaId == reel.id) return
+        idle.stop()
+        idle.volume = 0f
+        idle.playWhenReady = false
+        idle.setSeekParameters(SeekParameters.EXACT)
+        try {
+            when {
+                reel.isStory && !reel.storyIsVideo -> return
+                reel.isStory -> {
+                    val ready = YuzStoryFeed.resolveVideoFile(account, reel)
+                    if (ready != null) {
+                        idle.setMediaItem(
+                            MediaItem.Builder()
+                                .setUri(Uri.fromFile(ready))
+                                .setMediaId(reel.id)
+                                .build()
+                        )
+                    } else {
+                        val item = YuzStoryFeed.findStoryItem(account, reel.storyDialogId, reel.storyId)
+                            ?: return
+                        idle.setMediaSource(
+                            ProgressiveMediaSource.Factory {
+                                YuzStoryStreamDataSource(account, item)
+                            }.createMediaSource(
+                                MediaItem.Builder()
+                                    .setUri(
+                                        YuzStoryStreamDataSource.buildUri(
+                                            reel.storyDialogId,
+                                            reel.storyId
+                                        )
+                                    )
+                                    .setMediaId(reel.id)
+                                    .build()
+                            )
+                        )
+                    }
+                }
+                reel.videoUrl.isBlank() -> return
+                else -> idle.setMediaSource(buildRemoteSource(reel))
+            }
+            idle.prepare()
+        } catch (_: Exception) {
+            // Iliq tayyorlash — yordamchi yo'l: xatosi faol ijroni buzmaydi.
+        }
     }
 
     /**
@@ -944,6 +1109,11 @@ class ReelsAdapter(
     // Ko'z ikonkasi XML tarafda (drawableStart/ImageView) — bu yerda faqat son.
     private fun viewsLabel(count: Int): String = compactCount(count)
 
+    private companion object {
+        /** Story Scrubbing: bosib turish shu vaqtdan keyin faollashadi (ms). */
+        const val SCRUB_HOLD_MS = 320L
+    }
+
     inner class PageHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val playerView: PlayerView = itemView.findViewById(R.id.playerView)
         val ivThumbnail: ImageView = itemView.findViewById(R.id.ivThumbnail)
@@ -977,6 +1147,25 @@ class ReelsAdapter(
         val tvError: TextView = itemView.findViewById(R.id.tvReelError)
 
         var reel: Reel? = null
+
+        // --- Story Scrubbing: bosib turib, barmoq bilan vaqtni tanlash ---
+        private val scrubHud: LinearLayout = itemView.findViewById(R.id.reelScrubHud)
+        private val tvScrubTime: TextView = itemView.findViewById(R.id.tvScrubTime)
+        private val scrubBar: ProgressBar = itemView.findViewById(R.id.scrubBar)
+        private val touchSlop = ViewConfiguration.get(appContext).scaledTouchSlop.toFloat()
+        private var holdRunnable: Runnable? = null
+        private var downX = 0f
+        private var downY = 0f
+        private var scrubbing = false
+        private var preScrubPlaying = false
+        private var scrubAnchorX = 0f
+        private var scrubStartMs = 0L
+        private var scrubDurationMs = 0L
+        private var scrubTargetMs = 0L
+        private var lastSeekAt = 0L
+        private var lastTickSecond = -1
+
+        val isScrubbing: Boolean get() = scrubbing
 
         /**
          * To'liq ekranda: bir bosish = play/pause, ikki bosish = like.
@@ -1071,9 +1260,165 @@ class ReelsAdapter(
         private fun bindTouch() {
             playerView.isClickable = true
             playerView.setOnTouchListener { _, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        downX = event.x
+                        downY = event.y
+                        scheduleHold()
+                    }
+
+                    MotionEvent.ACTION_MOVE -> {
+                        if (scrubbing) {
+                            scrubTo(event.x)
+                            return@setOnTouchListener true
+                        }
+                        // Barmoq siljidi — bu bosib turish emas, scroll/tap.
+                        if (abs(event.x - downX) > touchSlop || abs(event.y - downY) > touchSlop) {
+                            cancelHold()
+                        }
+                    }
+
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        cancelHold()
+                        if (scrubbing) {
+                            cancelScrubState(apply = true)
+                            // Scrub tugadi — tap detector'ga UP bermaymiz,
+                            // aks holda u buni oddiy bosish deb play/pause qiladi.
+                            return@setOnTouchListener true
+                        }
+                    }
+                }
                 tapDetector.onTouchEvent(event)
                 true
             }
+        }
+
+        private fun scheduleHold() {
+            cancelHold()
+            if (reel == null) return
+            val r = Runnable {
+                holdRunnable = null
+                beginScrub(downX)
+            }
+            holdRunnable = r
+            mainHandler.postDelayed(r, SCRUB_HOLD_MS)
+        }
+
+        private fun cancelHold() {
+            holdRunnable?.let { mainHandler.removeCallbacks(it) }
+            holdRunnable = null
+        }
+
+        /**
+         * 320ms bosib turilgach scrub faollashadi: ijro pauza qilinadi, ovoz
+         * o'chadi va barmoq harakati vaqtni tanlaydi (CLOSEST_SYNC — kalit
+         * kadrlarga sakrash, ya'ni tez).
+         */
+        private fun beginScrub(x: Float) {
+            if (scrubbing) return
+            val r = reel ?: return
+            if (r.isStory && !r.storyIsVideo) return
+            if (!canPlay(this)) return
+            val p = player ?: return
+            if (p.currentMediaItem?.mediaId != r.id) return
+            val duration = p.duration
+            if (duration <= 0L || duration == C.TIME_UNSET) return
+            scrubbing = true
+            scrubAnchorX = x
+            scrubStartMs = p.currentPosition.coerceIn(0L, duration)
+            scrubTargetMs = scrubStartMs
+            scrubDurationMs = duration
+            preScrubPlaying = p.playWhenReady
+            lastSeekAt = 0L
+            lastTickSecond = (scrubStartMs / 1000L).toInt()
+            p.setSeekParameters(SeekParameters.CLOSEST_SYNC)
+            p.volume = 0f
+            p.playWhenReady = false
+            updateScrubUi()
+            scrubHud.animate().cancel()
+            scrubHud.alpha = 0f
+            scrubHud.visibility = View.VISIBLE
+            scrubHud.animate().alpha(1f).setDuration(110L).start()
+            itemView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            // HUD markazda — ovoz belgisi uning ostida qolib ketmasin.
+            hideSoundUi()
+            // Gorizontal surishni RecyclerView tortib olmasin.
+            itemView.parent?.requestDisallowInterceptTouchEvent(true)
+        }
+
+        private fun scrubTo(x: Float) {
+            if (!scrubbing) return
+            val p = player ?: return
+            val d = scrubDurationMs
+            if (d <= 0L) return
+            val span = (itemView.width.coerceAtLeast(1) * 0.75f).coerceAtLeast(dpF(120f))
+            val delta = ((x - scrubAnchorX) / span) * d
+            scrubTargetMs = (scrubStartMs + delta.toLong()).coerceIn(0L, d)
+            updateScrubUi()
+            val now = SystemClock.uptimeMillis()
+            if (lastSeekAt == 0L || now - lastSeekAt >= 60L) {
+                lastSeekAt = now
+                try {
+                    p.seekTo(scrubTargetMs)
+                } catch (_: Exception) {
+                }
+            }
+            val second = (scrubTargetMs / 1000L).toInt()
+            if (second != lastTickSecond) {
+                lastTickSecond = second
+                itemView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            }
+        }
+
+        private fun updateScrubUi() {
+            tvScrubTime.text = "${scrubLabel(scrubTargetMs)} / ${scrubLabel(scrubDurationMs)}"
+            if (scrubDurationMs > 0L) {
+                scrubBar.progress =
+                    ((scrubTargetMs * 1000L) / scrubDurationMs).toInt().coerceIn(0, 1000)
+            }
+        }
+
+        private fun scrubLabel(ms: Long): String {
+            val total = (ms / 1000L).coerceAtLeast(0L)
+            return String.format(java.util.Locale.US, "%d:%02d", total / 60L, total % 60L)
+        }
+
+        private fun hideScrubHud() {
+            scrubHud.animate().cancel()
+            scrubHud.visibility = View.GONE
+            scrubHud.alpha = 1f
+            scrubBar.progress = 0
+        }
+
+        /**
+         * Scrub holatini majburiy yakunlaydi (bind/recycle/detach/release).
+         * `apply=false` — sahifa almashmoqda: seek qilinmaydi, faqat tozalanadi.
+         */
+        fun cancelScrubState(apply: Boolean = false) {
+            cancelHold()
+            if (!scrubbing) {
+                hideScrubHud()
+                return
+            }
+            scrubbing = false
+            val p = player
+            val mine = p != null && p.currentMediaItem?.mediaId == reel?.id
+            if (p != null && mine) {
+                try {
+                    p.setSeekParameters(SeekParameters.EXACT)
+                    if (apply) p.seekTo(scrubTargetMs)
+                    // Scrub ovozni 0 qilib, pauza holatida qoldirgan edi —
+                    // holat har qanday yo'lda tiklanadi.
+                    p.volume = if (muted || userPaused) 0f else 1f
+                    p.playWhenReady = preScrubPlaying && !userPaused && this === activeHolder
+                } catch (_: Exception) {
+                }
+            }
+            // Scrub paytida yashirilgan markaziy ovoz belgisi qaytadi.
+            if (this === activeHolder) refreshSoundUi()
+            hideScrubHud()
+            itemView.parent?.requestDisallowInterceptTouchEvent(false)
+            if (apply) scheduleWarm(250L)
         }
 
         private fun likeFromDoubleTap() {
@@ -1156,6 +1501,7 @@ class ReelsAdapter(
         }
 
         fun bind(reel: Reel) {
+            cancelScrubState()
             this.reel = reel
             playbackBar.progress = 0
             errorRow.visibility = View.GONE
@@ -1402,7 +1748,8 @@ class ReelsAdapter(
          */
         fun setPlayingBadge(isPlaying: Boolean) {
             cancelBadgeHide()
-            if (isPlaying) {
+            // Scrub paytida pauza texnik sabab — yirik play belgisi chiqmaydi.
+            if (isPlaying || scrubbing) {
                 fadeOutBadge()
                 return
             }

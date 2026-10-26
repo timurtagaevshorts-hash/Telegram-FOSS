@@ -35,9 +35,11 @@ object YuzReelPreloader {
 
     private const val TAG = "YuzReelPreloader"
 
-    // #99: tarmoq turiga qarab oldindan yuklash hajmi.
-    private const val WARM_BYTES_WIFI = 2_500_000L
-    private const val WARM_BYTES_CELLULAR = 700_000L
+    // #99: tarmoq turiga qarab oldindan yuklash hajmi. Wi-Fi'da keyingi
+    // video to'liqroq (4 MB) illyutatsiya qilinadi — sahifa almashganda
+    // birinchi kadr keshdan chiqadi, scrubbing paytida ham uzilish bo'lmaydi.
+    private const val WARM_BYTES_WIFI = 4_000_000L
+    private const val WARM_BYTES_CELLULAR = 1_200_000L
     private const val NONE = 0L
 
     /** oldinga nechta reel illyutatsiya qilinadi (qorin bu tomonda siljitiladi). */
