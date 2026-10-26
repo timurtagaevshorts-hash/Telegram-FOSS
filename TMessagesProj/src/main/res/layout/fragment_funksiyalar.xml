@@ -45,64 +45,74 @@
             android:layout_marginEnd="@dimen/yuz_gutter"
             android:visibility="gone" />
 
-        <!-- AI — rasmli hero: ovoz yordamchisi butun ekranning qahramoni. -->
+        <!-- Music player — muqova, ijro holati va ekvalayzer bilan keng karta. -->
         <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardAi"
-            style="@style/FuncsionHero">
+            android:id="@+id/cardMusiqa"
+            style="@style/FuncsionMusic"
+            android:layout_marginTop="@dimen/yuz_space_4">
 
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="248dp">
-
-                <ImageView
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:contentDescription="@null"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/func_ai_hero" />
+                android:layout_height="wrap_content">
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:background="@drawable/bg_func_hero_scrim" />
+                    android:background="@drawable/bg_func_music_glow" />
 
-                <ImageView
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_gravity="top|start"
-                    android:layout_marginStart="@dimen/yuz_space_4"
-                    android:layout_marginTop="@dimen/yuz_space_4"
-                    android:background="@drawable/bg_func_violet"
-                    android:contentDescription="@null"
-                    android:padding="11dp"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ic_yuz_mic"
-                    android:tint="#FFFFFF" />
+                <LinearLayout style="@style/FuncsionMusicRow">
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="bottom"
-                    android:orientation="vertical"
-                    android:padding="@dimen/yuz_space_5">
+                    <FrameLayout
+                        android:layout_width="88dp"
+                        android:layout_height="88dp">
 
-                    <TextView
-                        style="@style/FuncsionHeroTitle"
-                        android:layout_width="match_parent"
+                        <ImageView
+                            style="@style/FuncsionMusicCover"
+                            android:src="@drawable/func_music_photo" />
+
+                        <ImageView
+                            style="@style/FuncsionMusicBadge"
+                            android:layout_gravity="bottom|end"
+                            android:layout_marginEnd="6dp"
+                            android:layout_marginBottom="6dp" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="@string/func_ai_title" />
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
 
-                    <TextView
-                        style="@style/FuncsionHeroDesc"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="40dp"
-                        android:maxLines="2"
-                        android:text="@string/func_ai_desc" />
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
-                    <TextView
-                        style="@style/FuncsionHeroCta"
-                        android:text="@string/func_ai_cta" />
+                            <TextView
+                                style="@style/FuncsionMusicTitle"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/func_musiqa_title" />
+
+                            <ImageView
+                                android:id="@+id/musicTileEq"
+                                style="@style/FuncsionEq" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/musicTileDesc"
+                            style="@style/FuncsionTileDesc"
+                            android:maxLines="2"
+                            android:minLines="1"
+                            android:text="@string/func_musiqa_desc" />
+                    </LinearLayout>
+
+                    <ImageView
+                        style="@style/FuncsionChevron"
+                        android:layout_marginStart="@dimen/yuz_space_2" />
                 </LinearLayout>
             </FrameLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -239,81 +249,73 @@
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/contentSection"
-            style="@style/FuncsionSection"
-            android:text="@string/funksiyalar_section_content" />
-
-        <!-- Music player — muqova, ijro holati va ekvalayzer bilan keng karta. -->
+        <!-- AI — rasmli hero: ovoz yordamchisi butun ekranning qahramoni. -->
         <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardMusiqa"
-            style="@style/FuncsionMusic">
+            android:id="@+id/cardAi"
+            style="@style/FuncsionHero"
+            android:layout_marginTop="@dimen/yuz_space_6">
 
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+                android:layout_height="248dp">
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/func_ai_hero" />
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:background="@drawable/bg_func_music_glow" />
+                    android:background="@drawable/bg_func_hero_scrim" />
 
-                <LinearLayout style="@style/FuncsionMusicRow">
+                <ImageView
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="top|start"
+                    android:layout_marginStart="@dimen/yuz_space_4"
+                    android:layout_marginTop="@dimen/yuz_space_4"
+                    android:background="@drawable/bg_func_violet"
+                    android:contentDescription="@null"
+                    android:padding="11dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_yuz_mic"
+                    android:tint="#FFFFFF" />
 
-                    <FrameLayout
-                        android:layout_width="88dp"
-                        android:layout_height="88dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom"
+                    android:orientation="vertical"
+                    android:padding="@dimen/yuz_space_5">
 
-                        <ImageView
-                            style="@style/FuncsionMusicCover"
-                            android:src="@drawable/func_music_photo" />
-
-                        <ImageView
-                            style="@style/FuncsionMusicBadge"
-                            android:layout_gravity="bottom|end"
-                            android:layout_marginEnd="6dp"
-                            android:layout_marginBottom="6dp" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
+                    <TextView
+                        style="@style/FuncsionHeroTitle"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:text="@string/func_ai_title" />
 
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
+                    <TextView
+                        style="@style/FuncsionHeroDesc"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="40dp"
+                        android:maxLines="2"
+                        android:text="@string/func_ai_desc" />
 
-                            <TextView
-                                style="@style/FuncsionMusicTitle"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="@string/func_musiqa_title" />
-
-                            <ImageView
-                                android:id="@+id/musicTileEq"
-                                style="@style/FuncsionEq" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/musicTileDesc"
-                            style="@style/FuncsionTileDesc"
-                            android:maxLines="2"
-                            android:minLines="1"
-                            android:text="@string/func_musiqa_desc" />
-                    </LinearLayout>
-
-                    <ImageView
-                        style="@style/FuncsionChevron"
-                        android:layout_marginStart="@dimen/yuz_space_2" />
+                    <TextView
+                        style="@style/FuncsionHeroCta"
+                        android:text="@string/func_ai_cta" />
                 </LinearLayout>
             </FrameLayout>
         </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:id="@+id/contentSection"
+            style="@style/FuncsionSection"
+            android:text="@string/funksiyalar_section_content" />
 
         <LinearLayout
             android:id="@+id/rowContent"
