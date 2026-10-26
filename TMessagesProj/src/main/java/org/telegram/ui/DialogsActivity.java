@@ -2233,6 +2233,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 // Oxirgi chat bar ostida qolib ketmasligi uchun ro'yxat oxiri
                 // (pastga skroll) bar'ni yashiradi — pastdagi onScrolled qoidasi.
                 final int yuzBottomPad = 0;
+                // #192: kesim shartsiz o'chirilgan — padding maydoni ham
+                // chiziladi, shu sababli qatorlar bar ortidan birinchi
+                // layout'danoq davom etadi (avval faqat padding o'zgarganda
+                // yoqilardi va ba'zi holatlarda bar orqasi bo'sh qolardi).
+                setClipToPadding(false);
                 // YuzGram #93b: gumbaz reyka ENDI suzuvchi — chatlar ro'yxati
                 // butun kenglikda (maketdagi kabi), shisha gumbaz ostidan o'tadi.
                 if (yuzChatRail != null && yuzChatRail.getVisibility() == VISIBLE) {
@@ -2249,9 +2254,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         || 0 != getPaddingRight()) {
                     setTopGlowOffset(t);
                     setPadding(0, t, 0, yuzBottomPad);
-                    // YuzGram #167: padding maydonini ham chizamiz — qatorlar
-                    // bar ortigacha davom etadi, oxirgi qator esa to'liq ochiladi.
-                    setClipToPadding(false);
                     if (hasStories) {
                         parentPage.progressView.setPaddingTop(Math.max(0, t - dp(DialogStoriesCell.HEIGHT_IN_DP)));
                     } else {

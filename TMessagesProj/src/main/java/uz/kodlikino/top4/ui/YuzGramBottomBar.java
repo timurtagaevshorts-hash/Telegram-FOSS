@@ -53,11 +53,13 @@ public class YuzGramBottomBar extends View {
     // YuzGram #96/#102/#108: sirt shaffof shisha — ostidan o'tayotgan chat
     // qatorlari aniq ko'rinadi (#102 talab: "orqasi korinsin"; #108: "bar
     // shaffof bolsin").
-    // #185: chat ro'yxati endi bar ORTIDAN davom etadi (padding 0), shuning
-    // uchun sirt 0x4D→0x8C quyuqlashdi: qatorlar shishadan ko'rinib turadi,
-    // lekin bar yorliqlari matn ustida ham o'qiladi. Kontrast border + pill
-    // + soya hisobiga saqlanadi.
-    private static final int SURFACE = 0x8C0C1626;      // chuqur to'q-ko'k yarim shaffof sirt
+    // #185: chat ro'yxati endi bar ORTIDAN davom etadi (padding 0).
+    // #192: sirt yassi rang emas, vertikal gradient: tepada shisha deyarli
+    // ochiq (qatorlar yaqqol ko'rinadi), pastda yorliqlar zonasi quyuqlashadi
+    // (matn kontrasti saqlanadi). Shu bilan bar orqasi "bo'sh qora lenta"
+    // bo'lib ko'rinmaydi.
+    private static final int GLASS_TOP = 0x520C1626;    // ~32% — qatorlar ko'rinadi
+    private static final int GLASS_BOTTOM = 0xAA0C1626; // ~67% — yorliqlar o'qiladi
     private static final int BORDER = 0x662AABEE;       // brend-ko'k neon border (#2AABEE)
     private static final int GLOW_BLUE = 0x992AABEE;    // tashqi nur (#2AABEE)
     private static final int PILL_START = 0xFF38B6FF;   // och-ko'k (rail ACTIVE_START)
@@ -109,6 +111,11 @@ public class YuzGramBottomBar extends View {
     // Gradient faqat 1x1 birlik katakda quriladi; har kadrda Matrix orqali
     // pill o'lchamiga masshtablanadi — shuning uchun per-frame Shader yaratilmaydi.
     private LinearGradient pillGrad;
+
+    // Shisha sirt gradienti panel o'lchamiga bog'liq — o'lcham o'zgarganda qayta quriladi.
+    private LinearGradient glassGrad;
+    private float glassTop = Float.NaN;
+    private float glassBottom = Float.NaN;
 
     public interface OnTabSelectedListener {
         void onTabSelected(int tab);
@@ -330,10 +337,11 @@ public class YuzGramBottomBar extends View {
                 panelLeft - AndroidUtilities.dp(20), panelTop - AndroidUtilities.dp(20),
                 panelRight + AndroidUtilities.dp(20), panelBottom + AndroidUtilities.dp(20), null);
 
-        surfacePaint.setColor(SURFACE);
+        surfacePaint.setShader(glassGradient(panelTop, panelBottom));
         surfacePaint.setShadowLayer(AndroidUtilities.dp(15), 0, AndroidUtilities.dp(2), GLOW_BLUE);
         canvas.drawRoundRect(panelRect, corner, corner, surfacePaint);
         surfacePaint.clearShadowLayer();
+        surfacePaint.setShader(null);
 
         // border + tepadagi nozik yorug' chiziq (sirt "ustidagi" neon chiroyi)
         borderPaint.setColor(BORDER);
@@ -394,6 +402,20 @@ public class YuzGramBottomBar extends View {
             float ty = textBaseline + (1f - prox) * AndroidUtilities.dp(0.8f);
             canvas.drawText(LABELS[i], cx, ty, textPaint);
         }
+    }
+
+    /**
+     * Shisha sirt gradienti: panel tepasida ochiq, yorliqlar zonasida quyuq.
+     * Panel o'lchami o'zgarmaguncha shader qayta qurilmaydi.
+     */
+    private LinearGradient glassGradient(float top, float bottom) {
+        if (glassGrad == null || glassTop != top || glassBottom != bottom || bottom <= top) {
+            glassGrad = new LinearGradient(0f, top, 0f, bottom,
+                    GLASS_TOP, GLASS_BOTTOM, Shader.TileMode.CLAMP);
+            glassTop = top;
+            glassBottom = bottom;
+        }
+        return glassGrad;
     }
 
     /**
