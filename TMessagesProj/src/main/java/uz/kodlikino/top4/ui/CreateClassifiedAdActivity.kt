@@ -35,6 +35,7 @@ import uz.kodlikino.top4.utils.ClassifiedAdRepository
 import uz.kodlikino.top4.utils.ClassifiedAdStorageHelper
 import uz.kodlikino.top4.utils.ClassifiedLocationHelper
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
+import uz.kodlikino.top4.utils.YuzPriceInput
 import uz.kodlikino.top4.utils.YuzUploadUi
 
 /**
@@ -168,6 +169,7 @@ class CreateClassifiedAdActivity(
         }
 
         btnPublish?.setOnClickListener { publishAd() }
+        etPrice?.let { YuzPriceInput.attach(it) }
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -196,7 +198,7 @@ class CreateClassifiedAdActivity(
             existingCreatedAt = ad.createdAt
             etModel?.setText(ad.model)
             etTitle?.setText(ad.title)
-            etPrice?.setText(if (ad.price > 0L) ad.price.toString() else "")
+            etPrice?.setText(if (ad.price > 0L) YuzPriceInput.format(ad.price.toString()) else "")
             existingAddress = ad.address
             selectedRegion = ad.region
             if (ad.region.isNotBlank()) btnPickRegion?.text = ad.region
@@ -274,7 +276,7 @@ class CreateClassifiedAdActivity(
         val model = etModel?.text?.toString()?.trim().orEmpty()
         val description = etDescription?.text?.toString()?.trim().orEmpty()
         val phone = etPhone?.text?.toString()?.trim().orEmpty()
-        val price = (etPrice?.text?.toString()?.filter { it.isDigit() } ?: "").toLongOrNull() ?: 0L
+        val price = YuzPriceInput.parse(etPrice?.text) ?: 0L
 
         if (model.isBlank()) { etModel?.error = getString(R.string.classified_model_required); return }
         if (title.isBlank()) { etTitle?.error = getString(R.string.classified_title_required); return }

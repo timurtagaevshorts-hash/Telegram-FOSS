@@ -4,6 +4,8 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.Priority
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.resource.bitmap.CenterCrop
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.google.android.material.card.MaterialCardView
@@ -20,6 +22,7 @@ object JobCardCardBinder {
         card: JobCard,
         cardRoot: MaterialCardView,
         tvType: TextView,
+        tvOwn: TextView,
         tvTitle: TextView,
         tvSubtitle: TextView,
         tvSalary: TextView,
@@ -35,6 +38,13 @@ object JobCardCardBinder {
         tvTitle.text = card.title.ifBlank { card.description.take(60) }
         tvSubtitle.text = card.description.take(120).ifBlank { card.location }
         tvSubtitle.visibility = if (tvSubtitle.text.isNullOrBlank()) View.GONE else View.VISIBLE
+
+        if (isOwn) {
+            tvOwn.visibility = View.VISIBLE
+            tvOwn.text = cardRoot.context.getString(R.string.classified_own_badge)
+        } else {
+            tvOwn.visibility = View.GONE
+        }
 
         if (card.listingType == JobCardListingTypes.HIRING) {
             tvSalary.visibility = View.VISIBLE
@@ -68,11 +78,18 @@ object JobCardCardBinder {
             addressRow = locationRow,
             addressIcon = ivLocationIcon,
             imageCard = null,
-            tvModel = tvSubtitle
+            tvModel = null
+        )
+        // Feed — tekis lenta: soya o'rniga hoshiya ishlaydi (e'lon kartalari bilan bitta til).
+        cardRoot.cardElevation = 0f
+        ivLocationIcon.setColorFilter(
+            androidx.core.content.ContextCompat.getColor(cardRoot.context, R.color.yuz_text_muted)
         )
 
-        if (isOwn) {
-            cardRoot.strokeWidth = (2f * cardRoot.resources.displayMetrics.density).toInt()
+        cardRoot.strokeWidth = if (isOwn) {
+            (2f * cardRoot.resources.displayMetrics.density).toInt()
+        } else {
+            (1f * cardRoot.resources.displayMetrics.density).toInt()
         }
 
         val url = card.displayImageUrl()
@@ -82,11 +99,14 @@ object JobCardCardBinder {
             Glide.with(ivThumb)
                 .load(url)
                 .transform(CenterCrop())
-                .transition(DrawableTransitionOptions.withCrossFade())
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .priority(Priority.HIGH)
+                .transition(DrawableTransitionOptions.withCrossFade(120))
                 .placeholder(R.drawable.bg_classified_image_placeholder)
                 .error(R.drawable.bg_classified_image_placeholder)
                 .into(ivThumb)
         } else {
+            Glide.with(ivThumb).clear(ivThumb)
             ivThumb.setImageResource(R.drawable.bg_classified_image_placeholder)
         }
     }

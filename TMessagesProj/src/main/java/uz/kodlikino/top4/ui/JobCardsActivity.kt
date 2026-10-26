@@ -28,6 +28,7 @@ import uz.kodlikino.top4.models.JobCardListingTypes
 import uz.kodlikino.top4.utils.ClassifiedLocationHelper
 import uz.kodlikino.top4.utils.JobCardRepository
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
+import uz.kodlikino.top4.utils.YuzPriceInput
 
 /**
  * "Ish kartasi" (job board) bo'limi — Funksiyalar hub'ichidan ochiladi.
@@ -115,6 +116,9 @@ class JobCardsActivity : BaseFragment() {
                         1 -> JobCardListingTypes.SEEKING_WORK
                         else -> JobCardListingTypes.HIRING
                     }
+                    // Boshqa tab ro'yxati ko'rinib turmasin — darhol tozalanadi.
+                    allCards = emptyList()
+                    applyFilter()
                     attachListener()
                 }
 
@@ -147,9 +151,11 @@ class JobCardsActivity : BaseFragment() {
         }
         setupDateChips()
         setupSortChips()
+        etJobMinSalary?.let { YuzPriceInput.attach(it) }
+        etJobMaxSalary?.let { YuzPriceInput.attach(it) }
         root.findViewById<MaterialButton>(R.id.btnJobFilterApply)?.setOnClickListener {
-            filterMinSalary = etJobMinSalary?.text?.toString()?.trim()?.toLongOrNull()
-            filterMaxSalary = etJobMaxSalary?.text?.toString()?.trim()?.toLongOrNull()
+            filterMinSalary = YuzPriceInput.parse(etJobMinSalary?.text)
+            filterMaxSalary = YuzPriceInput.parse(etJobMaxSalary?.text)
             filterLocation = etJobLocation?.text?.toString()?.trim().orEmpty()
             btnRegionPicker?.text = ClassifiedLocationHelper.pickerLabel(filterLocation)
             filterPanel?.visibility = View.GONE
@@ -185,7 +191,7 @@ class JobCardsActivity : BaseFragment() {
 
     private fun attachListener() {
         cardsListener?.remove()
-        progressBar?.visibility = View.VISIBLE
+        if (allCards.isEmpty()) progressBar?.visibility = View.VISIBLE
         emptyState?.visibility = View.GONE
         val uid = currentUid()
         adapter.setMyUid(uid)
@@ -232,6 +238,12 @@ class JobCardsActivity : BaseFragment() {
             2 -> list.sortedWith(compareBy({ it.salaryAmount <= 0L }, { it.salaryAmount }))
             3 -> list.sortedByDescending { it.salaryAmount }
             else -> list
+        }
+        // Har qanday saralashda ham o'z kartalari ro'yxat boshida turadi.
+        val uid = currentUid()
+        val own = if (uid.isBlank()) emptyList() else list.filter { it.ownerUid == uid }
+        if (own.isNotEmpty()) {
+            list = own + list.filter { it.ownerUid != uid }
         }
         adapter.submit(list)
         emptyState?.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE

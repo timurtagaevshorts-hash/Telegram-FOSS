@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/yuz_space_1"
+    android:paddingTop="@dimen/yuz_space_3"
+    android:paddingEnd="@dimen/yuz_space_1"
+    android:paddingBottom="@dimen/yuz_space_2">
+
+    <TextView
+        android:id="@+id/tvSectionTitle"
+        style="@style/YuzLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:letterSpacing="0.06"
+        android:maxLines="1" />
+
+    <TextView
+        android:id="@+id/tvSectionCount"
+        style="@style/YuzLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/yuz_space_2"
+        android:textColor="@color/yuz_text_muted" />
+</LinearLayout>

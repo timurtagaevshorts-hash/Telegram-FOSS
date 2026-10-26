@@ -35,6 +35,7 @@ import uz.kodlikino.top4.models.ClassifiedAdCategories
 import uz.kodlikino.top4.utils.ClassifiedAdRepository
 import uz.kodlikino.top4.utils.ClassifiedLocationHelper
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
+import uz.kodlikino.top4.utils.YuzPriceInput
 
 /**
  * "Elonlar" (classifieds) bo'limi — YuzGram pastki navigatsiyasining 2-tab'i.
@@ -82,6 +83,7 @@ class ElonlarActivity : BaseFragment() {
     private var filterLocation = ""
     private var filterDays = 0
     private var sortMode = 0
+    private var ownAdsCount = 0
     private val feedShuffleSeed = System.currentTimeMillis()
     private var scope: CoroutineScope? = null
 
@@ -127,8 +129,14 @@ class ElonlarActivity : BaseFragment() {
             layoutManager = LinearLayoutManager(context)
             this.adapter = this@ElonlarActivity.adapter
             clipToPadding = false
-            setPadding(0, 0, 0, YuzGramBottomBar.height())
+            val side = AndroidUtilities.dp(12f)
+            setPadding(side, 0, side, YuzGramBottomBar.height())
         }
+        adapter.attach(themed)
+
+        // Narx filtrlari ham "1 000" ko'rinishida yoziladi — saqlashda raqamlar olinadi.
+        etFilterMinPrice?.let { YuzPriceInput.attach(it) }
+        etFilterMaxPrice?.let { YuzPriceInput.attach(it) }
 
         setupCategoryChips(themed)
 
@@ -177,8 +185,8 @@ class ElonlarActivity : BaseFragment() {
             }
         })
         root.findViewById<MaterialButton>(R.id.btnFilterApply)?.setOnClickListener {
-            filterMinPrice = etFilterMinPrice?.text?.toString()?.trim()?.toLongOrNull()
-            filterMaxPrice = etFilterMaxPrice?.text?.toString()?.trim()?.toLongOrNull()
+            filterMinPrice = YuzPriceInput.parse(etFilterMinPrice?.text)
+            filterMaxPrice = YuzPriceInput.parse(etFilterMaxPrice?.text)
             filterLocation = etFilterLocation?.text?.toString()?.trim().orEmpty()
             // Paneldagi manzil qidiruv qatoriga ham qaytarilsin (ikki maydon chalkashmasin).
             if (etSearchAddress?.text?.toString()?.trim() != filterLocation) {
@@ -210,6 +218,7 @@ class ElonlarActivity : BaseFragment() {
             mineOnly = !mineOnly
             updateMyAdsButton()
             startAdsListener()
+            rvAds?.scrollToPosition(0)
         }
         updateMyAdsButton()
 
@@ -219,18 +228,32 @@ class ElonlarActivity : BaseFragment() {
         return root
     }
 
-    /** "Mening e'lonlarim" tugmasining holati — yoqilganda to'ldirilgan ko'k pill. */
+    /**
+     * "Mening e'lonlarim" tugmasi: e'lonlar sonini ko'rsatadi, faol rejimda esa
+     * "Barcha e'lonlar"ga aylanadi — foydalanuvchi qanday holatda turganini
+     * rangdan tashqari matn bilan ham biladi.
+     */
     private fun updateMyAdsButton() {
         val btn = btnMyAds ?: return
         val ctx = themedContext ?: context ?: return
         btn.setBackgroundResource(
             if (mineOnly) R.drawable.bg_yuz_pill_active else R.drawable.bg_yuz_pill
         )
-        btn.setTextColor(
-            androidx.core.content.ContextCompat.getColor(
-                ctx,
-                if (mineOnly) R.color.yuz_text_on_accent else R.color.yuz_text_secondary
-            )
+        val textColor = androidx.core.content.ContextCompat.getColor(
+            ctx,
+            if (mineOnly) R.color.yuz_text_on_accent else R.color.yuz_text_secondary
+        )
+        btn.setTextColor(textColor)
+        btn.text = when {
+            mineOnly -> ctx.getString(R.string.classified_all_ads)
+            ownAdsCount > 0 -> ctx.getString(R.string.classified_my_ads_count, ownAdsCount)
+            else -> ctx.getString(R.string.classified_my_ads)
+        }
+        btn.setIconStart(
+            if (mineOnly) R.drawable.ic_yuz_loop else R.drawable.ic_yuz_tag,
+            sizeDp = 14,
+            gapDp = 6,
+            tintColor = textColor
         )
     }
 
@@ -344,7 +367,8 @@ class ElonlarActivity : BaseFragment() {
 
     private fun startAdsListener() {
         adsListener?.remove()
-        progressBar?.visibility = View.VISIBLE
+        // Yangilanishda ro'yxat joyida qoladi — spinner faqat bo'sh ekranda.
+        if (allAds.isEmpty()) progressBar?.visibility = View.VISIBLE
         adapter.setMyUid(currentUid())
         // Firestore snapshot listener Android'da default main-thread'da yetkazadi.
         if (mineOnly) {
@@ -413,8 +437,15 @@ class ElonlarActivity : BaseFragment() {
             3 -> filtered.sortedByDescending { it.price }
             else -> filtered
         }
+        // Saralash qanday bo'lishidan qat'i nazar o'z e'lonlari tepada turadi.
+        val own = if (uid.isBlank()) emptyList() else filtered.filter { it.ownerUid == uid }
+        ownAdsCount = own.size
+        if (own.isNotEmpty()) {
+            filtered = own + filtered.filter { it.ownerUid != uid }
+        }
         adapter.setMyUid(uid)
-        adapter.submit(filtered)
+        adapter.submit(filtered, showSections = !mineOnly)
+        updateMyAdsButton()
         emptyState?.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
         rvAds?.visibility = if (filtered.isEmpty()) View.GONE else View.VISIBLE
     }

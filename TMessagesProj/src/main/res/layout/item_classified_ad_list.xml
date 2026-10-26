@@ -4,7 +4,7 @@
     android:id="@+id/adItemRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="@dimen/yuz_space_3"
+    android:layout_marginBottom="@dimen/yuz_space_2"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground"
@@ -17,73 +17,129 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
+        android:gravity="top"
         android:orientation="horizontal"
         android:padding="@dimen/yuz_space_3">
 
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            app:cardCornerRadius="@dimen/yuz_radius_sm"
-            app:cardElevation="0dp"
-            app:strokeWidth="0dp">
+        <FrameLayout
+            android:layout_width="104dp"
+            android:layout_height="104dp"
+            android:background="@drawable/bg_yuz_thumb"
+            android:clipToOutline="true">
 
             <ImageView
                 android:id="@+id/ivAdImage"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:scaleType="centerCrop"
-                android:src="@drawable/bg_shimmer_placeholder" />
+                android:contentDescription="@null"
+                android:scaleType="centerCrop" />
 
             <TextView
                 android:id="@+id/tvAdBadge"
+                style="@style/YuzBadge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="bottom|start"
+                android:layout_gravity="top|start"
                 android:layout_margin="@dimen/yuz_space_2"
                 android:background="@drawable/bg_chat_nav_new_badge"
                 android:backgroundTint="@color/yuz_action"
                 android:paddingStart="@dimen/yuz_space_2"
-                android:paddingTop="2dp"
+                android:paddingTop="1dp"
                 android:paddingEnd="@dimen/yuz_space_2"
-                android:paddingBottom="2dp"
-                android:text="Yangi"
-                android:textColor="@color/yuz_on_action"
-                android:textSize="@dimen/yuz_text_micro"
-                android:textStyle="bold" />
-        </com.google.android.material.card.MaterialCardView>
+                android:paddingBottom="1dp"
+                android:textColor="@color/yuz_on_action" />
+
+            <TextView
+                android:id="@+id/tvAdOwn"
+                style="@style/YuzBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:layout_margin="@dimen/yuz_space_2"
+                android:background="@drawable/bg_yuz_tag_own"
+                android:paddingStart="@dimen/yuz_space_2"
+                android:paddingTop="1dp"
+                android:paddingEnd="@dimen/yuz_space_2"
+                android:paddingBottom="1dp"
+                android:textColor="@color/yuz_gold"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvAdImageCount"
+                style="@style/YuzBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="@dimen/yuz_space_1"
+                android:background="@drawable/bg_classified_image_count_badge"
+                android:paddingStart="5dp"
+                android:paddingTop="1dp"
+                android:paddingEnd="5dp"
+                android:paddingBottom="1dp"
+                android:textColor="@color/yuz_on_media_dim"
+                android:visibility="gone" />
+        </FrameLayout>
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/yuz_space_4"
+            android:layout_marginStart="@dimen/yuz_space_3"
             android:layout_weight="1"
             android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvAdMeta"
+                style="@style/YuzLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:letterSpacing="0.06"
+                android:maxLines="1"
+                android:textColor="@color/yuz_action" />
 
             <TextView
                 android:id="@+id/tvAdTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:ellipsize="end"
+                android:includeFontPadding="false"
                 android:maxLines="2"
                 android:textColor="@color/yuz_text"
-                android:textSize="@dimen/yuz_text_body"
+                android:textSize="@dimen/yuz_text_section"
                 android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/tvAdSubtitle"
+            <LinearLayout
+                android:id="@+id/adLocationRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/yuz_space_1"
-                android:ellipsize="end"
-                android:maxLines="2"
-                android:textColor="@color/yuz_text_secondary"
-                android:textSize="@dimen/yuz_text_secondary" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_location_pin"
+                    app:tint="@color/yuz_text_muted" />
+
+                <TextView
+                    android:id="@+id/tvAdLocation"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/yuz_text_muted"
+                    android:textSize="@dimen/yuz_text_caption" />
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/yuz_space_3"
+                android:layout_marginTop="@dimen/yuz_space_2"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -91,46 +147,27 @@
                     android:id="@+id/tvAdPrice"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/bg_classified_price_badge"
-                    android:backgroundTint="@color/yuz_stroke_soft"
-                    android:paddingStart="@dimen/yuz_space_2"
-                    android:paddingTop="@dimen/yuz_space_1"
-                    android:paddingEnd="@dimen/yuz_space_2"
-                    android:paddingBottom="@dimen/yuz_space_1"
-                    android:text="Reklama"
-                    android:textColor="@color/yuz_text"
-                    android:textSize="@dimen/yuz_text_micro" />
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/yuz_gold"
+                    android:textSize="@dimen/yuz_text_body"
+                    android:textStyle="bold" />
 
-                <LinearLayout
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/tvAdAuthor"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/yuz_space_3"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <ImageView
-                        android:layout_width="12dp"
-                        android:layout_height="12dp"
-                        android:src="@drawable/ic_group"
-                        app:tint="@color/yuz_text_secondary" />
-
-                    <TextView
-                        android:id="@+id/tvAdAuthor"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/yuz_space_1"
-                        android:text="TechWorld"
-                        android:textColor="@color/yuz_text_secondary"
-                        android:textSize="@dimen/yuz_text_micro" />
-                </LinearLayout>
+                    android:layout_marginStart="@dimen/yuz_space_2"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/yuz_text_muted"
+                    android:textSize="@dimen/yuz_text_caption" />
             </LinearLayout>
         </LinearLayout>
-
-        <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:layout_marginStart="@dimen/yuz_space_2"
-            android:src="@drawable/ic_edit"
-            app:tint="@color/yuz_stroke_strong" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

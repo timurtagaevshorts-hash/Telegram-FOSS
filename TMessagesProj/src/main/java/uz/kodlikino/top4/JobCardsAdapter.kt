@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
 import org.telegram.messenger.R
@@ -22,9 +23,20 @@ class JobCardsAdapter(
     }
 
     fun submit(list: List<JobCard>) {
+        val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize(): Int = items.size
+
+            override fun getNewListSize(): Int = list.size
+
+            override fun areItemsTheSame(oldPosition: Int, newPosition: Int): Boolean =
+                items[oldPosition].id == list[newPosition].id
+
+            override fun areContentsTheSame(oldPosition: Int, newPosition: Int): Boolean =
+                items[oldPosition] == list[newPosition]
+        })
         items.clear()
         items.addAll(list)
-        notifyDataSetChanged()
+        diff.dispatchUpdatesTo(this)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -42,6 +54,7 @@ class JobCardsAdapter(
     inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val cardRoot: MaterialCardView = itemView.findViewById(R.id.jobCardRoot)
         private val tvType: TextView = itemView.findViewById(R.id.tvJobType)
+        private val tvOwn: TextView = itemView.findViewById(R.id.tvJobOwn)
         private val tvTitle: TextView = itemView.findViewById(R.id.tvJobTitle)
         private val tvSubtitle: TextView = itemView.findViewById(R.id.tvJobSubtitle)
         private val tvSalary: TextView = itemView.findViewById(R.id.tvJobSalary)
@@ -57,6 +70,7 @@ class JobCardsAdapter(
                 card = card,
                 cardRoot = cardRoot,
                 tvType = tvType,
+                tvOwn = tvOwn,
                 tvTitle = tvTitle,
                 tvSubtitle = tvSubtitle,
                 tvSalary = tvSalary,

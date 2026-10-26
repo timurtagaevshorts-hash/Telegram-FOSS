@@ -37,6 +37,7 @@ import uz.kodlikino.top4.utils.ClassifiedLocationHelper
 import uz.kodlikino.top4.utils.JobCardRepository
 import uz.kodlikino.top4.utils.JobCardStorageHelper
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
+import uz.kodlikino.top4.utils.YuzPriceInput
 import uz.kodlikino.top4.utils.YuzUploadUi
 
 /**
@@ -149,6 +150,7 @@ class CreateJobCardActivity(
 
         updateFieldsForType(spinnerListingType?.selectedItemPosition ?: 0)
         updateSalaryFieldForType()
+        etSalary?.let { YuzPriceInput.attach(it) }
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         return root
@@ -235,7 +237,7 @@ class CreateJobCardActivity(
         val salaryAmount = if (listingType == JobCardListingTypes.HIRING &&
             selectedSalaryType() != JobCardSalaryTypes.NEGOTIABLE
         ) {
-            (etSalary?.text?.toString()?.filter { it.isDigit() } ?: "").toLongOrNull() ?: 0L
+            YuzPriceInput.parse(etSalary?.text) ?: 0L
         } else {
             0L
         }
@@ -264,8 +266,6 @@ class CreateJobCardActivity(
                 val uid = YuzGramAdsAuth.ensureSignedIn(account)
                 var imageUrl = ""
                 pickedUri?.let { uri ->
-                    val ctx = themedContext
-                        ?: org.telegram.messenger.ApplicationLoader.applicationContext
                     imageUrl = JobCardStorageHelper.uploadImage(uid, cardId, uri)
                     if (imageUrl.isBlank()) {
                         imageUrl = JobCardRepository.findLatestImageUrlForOwner(uid, excludeId = cardId)

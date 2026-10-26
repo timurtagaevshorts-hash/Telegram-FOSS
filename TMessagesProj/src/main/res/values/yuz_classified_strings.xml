@@ -97,4 +97,11 @@
 <string name="classified_viewer_close">Yopish</string>
 <string name="classified_viewer_counter">%1$d / %2$d</string>
 <string name="classified_viewer_hint">Barmoqlarni yoying — yaqinlashtirish</string>
+<string name="classified_my_ads_count">Mening e\'lonlarim · %1$d</string>
+<string name="classified_all_ads">Barcha e\'lonlar</string>
+<string name="classified_section_my_ads">Sizning e\'lonlaringiz</string>
+<string name="classified_section_other_ads">Boshqa e\'lonlar</string>
+<string name="classified_own_badge">Sizning</string>
+<string name="classified_images_count_badge">+%1$d</string>
+<string name="classified_badge_new">Yangi</string>
 </resources>

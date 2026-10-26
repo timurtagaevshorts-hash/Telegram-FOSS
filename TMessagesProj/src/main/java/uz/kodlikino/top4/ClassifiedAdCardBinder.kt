@@ -4,14 +4,20 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.Priority
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.resource.bitmap.CenterCrop
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.google.android.material.card.MaterialCardView
 import org.telegram.messenger.R
 import uz.kodlikino.top4.models.ClassifiedAd
 import uz.kodlikino.top4.models.ClassifiedAdCardTheme
+import uz.kodlikino.top4.models.ClassifiedAdCategories
 
 object ClassifiedAdCardBinder {
+
+    /** "Yangi" nishoni faqat birinchi sutkadagi e'lonlarga. */
+    private const val NEW_BADGE_WINDOW_MS = 24L * 60L * 60L * 1000L
 
     fun bind(
         ad: ClassifiedAd,
@@ -100,31 +106,87 @@ object ClassifiedAdCardBinder {
         ad: ClassifiedAd,
         ivAdImage: ImageView,
         tvAdBadge: TextView,
+        tvAdOwn: TextView,
+        tvAdImageCount: TextView,
+        tvAdMeta: TextView,
         tvAdTitle: TextView,
-        tvAdSubtitle: TextView,
+        tvAdLocation: TextView,
+        locationRow: View,
         tvAdPrice: TextView,
-        tvAdAuthor: TextView
+        tvAdAuthor: TextView,
+        isOwn: Boolean,
+        sizePx: Int
     ) {
-        tvAdTitle.text = ad.title.ifBlank { ad.description.take(50) }
-        tvAdSubtitle.text = ad.description.take(80)
+        val ctx = ivAdImage.context
+        tvAdTitle.text = ad.title.ifBlank { ad.description.take(80) }
+
+        val meta = ad.model.ifBlank {
+            if (ad.category.isNotBlank() && ad.category != ClassifiedAdCategories.OTHER) {
+                ClassifiedAdCategories.label(ad.category)
+            } else ""
+        }
+        tvAdMeta.text = meta
+        tvAdMeta.visibility = if (meta.isBlank()) View.GONE else View.VISIBLE
+
+        val location = ad.region.ifBlank { ad.address }
+        if (location.isBlank()) {
+            locationRow.visibility = View.GONE
+        } else {
+            locationRow.visibility = View.VISIBLE
+            tvAdLocation.text = location
+        }
+
         tvAdPrice.text = ad.formattedPrice()
         tvAdAuthor.text = ad.ownerName.ifBlank { "Top4 Foydalanuvchi" }
 
-        val images = ad.imageUrls.filter { it.isNotBlank() }
-        val primary = images.firstOrNull().orEmpty()
-
-        if (primary.isNotBlank()) {
-            Glide.with(ivAdImage)
-                .load(primary)
-                .transform(CenterCrop())
-                .transition(DrawableTransitionOptions.withCrossFade())
-                .placeholder(R.drawable.bg_shimmer_placeholder)
-                .into(ivAdImage)
+        if (isOwn) {
+            tvAdOwn.visibility = View.VISIBLE
+            tvAdOwn.text = ctx.getString(R.string.classified_own_badge)
+            tvAdBadge.visibility = View.GONE
         } else {
-            ivAdImage.setImageResource(R.drawable.ic_logo)
+            tvAdOwn.visibility = View.GONE
+            val isNew = System.currentTimeMillis() - ad.createdAt < NEW_BADGE_WINDOW_MS
+            if (isNew) {
+                tvAdBadge.text = ctx.getString(R.string.classified_badge_new)
+                tvAdBadge.visibility = View.VISIBLE
+            } else {
+                tvAdBadge.visibility = View.GONE
+            }
         }
 
-        val isNew = System.currentTimeMillis() - ad.createdAt < 24 * 60 * 60 * 1000L
-        tvAdBadge.visibility = if (isNew) View.VISIBLE else View.GONE
+        val images = ad.imageUrls.filter { it.isNotBlank() }
+        if (images.size > 1) {
+            tvAdImageCount.text =
+                ctx.getString(R.string.classified_images_count_badge, images.size - 1)
+            tvAdImageCount.visibility = View.VISIBLE
+        } else {
+            tvAdImageCount.visibility = View.GONE
+        }
+
+        val primary = images.firstOrNull().orEmpty()
+        if (primary.isNotBlank()) {
+            ivAdImage.clearColorFilter()
+            ivAdImage.scaleType = ImageView.ScaleType.CENTER_CROP
+            ivAdImage.setPadding(0, 0, 0, 0)
+            val request = Glide.with(ivAdImage)
+                .load(primary)
+                .transform(CenterCrop())
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .priority(Priority.HIGH)
+                .transition(DrawableTransitionOptions.withCrossFade(120))
+                .placeholder(R.drawable.bg_classified_image_placeholder)
+                .error(R.drawable.bg_classified_image_placeholder)
+            if (sizePx > 0) request.override(sizePx)
+            request.into(ivAdImage)
+        } else {
+            Glide.with(ivAdImage).clear(ivAdImage)
+            val pad = (28 * ctx.resources.displayMetrics.density).toInt()
+            ivAdImage.scaleType = ImageView.ScaleType.CENTER_INSIDE
+            ivAdImage.setPadding(pad, pad, pad, pad)
+            ivAdImage.setColorFilter(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.yuz_text_muted)
+            )
+            ivAdImage.setImageResource(ClassifiedAdCategories.icon(ad.category))
+        }
     }
 }
