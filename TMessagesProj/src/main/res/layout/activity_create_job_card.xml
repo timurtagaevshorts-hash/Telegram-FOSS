@@ -192,30 +192,14 @@
                     android:textColor="@color/yuz_text" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/yuz_space_3"
-                android:hint="@string/job_board_location_hint"
-                app:hintTextColor="@color/yuz_text_secondary">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etLocation"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textCapSentences"
-                    android:maxLines="1"
-                    android:textColor="@color/yuz_text" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- #75: hudud tanlagichi — filtr qidiruvi region maydoniga tayanadi. -->
+            <!-- #75: hudud tanlagichi — filtr qidiruvi region maydoniga tayanadi.
+                 Erkin matnli manzil maydoni olib tashlandi (faqat viloyat/tuman). -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnJobPickRegion"
                 style="@style/YuzButtonSecondary"
                 android:layout_width="match_parent"
                 android:layout_height="@dimen/yuz_button"
-                android:layout_marginTop="@dimen/yuz_space_2"
+                android:layout_marginTop="@dimen/yuz_space_3"
                 android:text="@string/classified_region_optional"
                 android:textSize="@dimen/yuz_text_secondary"
                 app:icon="@drawable/ic_location_pin"

@@ -201,29 +201,8 @@
                     android:textColor="@color/yuz_text" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/yuz_space_3"
-                android:hint="@string/classified_address_hint"
-                app:boxBackgroundColor="@color/classified_field_bg"
-                app:boxStrokeColor="@color/yuz_action"
-                app:hintTextColor="@color/yuz_text_muted"
-                app:startIconDrawable="@drawable/ic_location_pin"
-                app:startIconTint="@color/yuz_action">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etAddress"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:imeOptions="actionNext"
-                    android:inputType="textCapSentences"
-                    android:maxLines="1"
-                    android:textColor="@color/yuz_text" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- #75: hudud tanlagichi — filtr qidiruvi region maydoniga tayanadi. -->
+            <!-- #75: hudud tanlagichi — filtr qidiruvi region maydoniga tayanadi.
+                 Erkin matnli manzil maydoni olib tashlandi (faqat viloyat/tuman). -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPickRegion"
                 style="@style/YuzButtonSecondary"

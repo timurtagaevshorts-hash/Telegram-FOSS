@@ -5,7 +5,6 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.text.InputType
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
@@ -45,7 +44,8 @@ import uz.kodlikino.top4.utils.YuzUploadUi
  * KinoTOP4'dagi [androidx.appcompat.app.AppCompatActivity] `CreateJobCardActivity`
  * moslashtirildi: PremiumManager/UserBlockRepository/ClassifiedPriceInputHelper/
  * region spinner (ClassifiedLocationHelper) bu fork'da yo'q — shuning uchun
- * narx raqam filtri bilan, manzil oddiy matn bilan, mavzu doim qora, premium/blok
+ * narx raqam filtri bilan, joylashuv faqat viloyat/tuman tanlagichi orqali,
+ * mavzu doim qora, premium/blok
  * tekshiruvisiz. Rasm tanlash `onActivityResultFragment`, yozuvdan oldin
  * [YuzGramAdsAuth.ensureSignedIn] chaqiriladi.
  */
@@ -71,7 +71,6 @@ class CreateJobCardActivity(
     private var etSalary: TextInputEditText? = null
     private var spinnerSalaryType: Spinner? = null
     private var etPhone: TextInputEditText? = null
-    private var etLocation: TextInputEditText? = null
     private var btnPickRegion: MaterialButton? = null
     private var selectedRegion = ""
     private var uploadProgress: ProgressBar? = null
@@ -106,7 +105,6 @@ class CreateJobCardActivity(
         etSalary = root.findViewById(R.id.etSalary)
         spinnerSalaryType = root.findViewById(R.id.spinnerSalaryType)
         etPhone = root.findViewById(R.id.etPhone)
-        etLocation = root.findViewById(R.id.etLocation)
         btnPickRegion = root.findViewById(R.id.btnJobPickRegion)
         uploadProgress = root.findViewById(R.id.uploadProgress)
         btnPublish = root.findViewById(R.id.btnPublish)
@@ -114,14 +112,6 @@ class CreateJobCardActivity(
         toolbar?.apply {
             YuzTopInset.applyPadding(this)
             setNavigationOnClickListener { removeSelfFromStack() }
-        }
-
-        etLocation?.apply {
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-            isFocusable = true
-            isFocusableInTouchMode = true
-            isClickable = true
-            isLongClickable = true
         }
 
         // #75: viloyat/tuman tanlagichi — filtr qidiruvi uchun region maydoni to'lsin.
@@ -234,7 +224,6 @@ class CreateJobCardActivity(
         val title = etTitle?.text?.toString()?.trim().orEmpty()
         val description = etDescription?.text?.toString()?.trim().orEmpty()
         val phone = etPhone?.text?.toString()?.trim().orEmpty()
-        val location = etLocation?.text?.toString()?.trim().orEmpty()
 
         if (title.isBlank()) {
             etTitle?.error = getString(R.string.job_board_title_required); return
@@ -290,7 +279,7 @@ class CreateJobCardActivity(
                     listingType = listingType,
                     title = title,
                     description = description,
-                    location = location,
+                    location = selectedRegion,
                     phone = phone,
                     salaryAmount = salaryAmount,
                     salaryType = salaryType,

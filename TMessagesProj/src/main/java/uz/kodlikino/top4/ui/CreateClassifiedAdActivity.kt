@@ -48,7 +48,8 @@ import uz.kodlikino.top4.utils.YuzUploadUi
  *  - yozuvdan oldin [YuzGramAdsAuth.ensureSignedIn] Telegram identitetini Firebase Auth
  *    `tg_<id>` sessiyasiga almashtiradi (Firestore/Storage qoidalari shuni talab qiladi).
  *
- * Tema tanlagich o'chirilgan (faqat black). Manzil oddiy matn maydoni sifatida ishlaydi.
+ * Tema tanlagich o'chirilgan (faqat black). Joylashuv faqat viloyat/tuman
+ * tanlagichi orqali kiritiladi — erkin matnli manzil maydoni yo'q.
  */
 class CreateClassifiedAdActivity(
     private val editingAdId: String? = null
@@ -68,7 +69,6 @@ class CreateClassifiedAdActivity(
     private var etModel: TextInputEditText? = null
     private var etTitle: TextInputEditText? = null
     private var etPrice: TextInputEditText? = null
-    private var etAddress: TextInputEditText? = null
     private var btnPickRegion: MaterialButton? = null
     private var selectedRegion = ""
     private var etPhone: TextInputEditText? = null
@@ -80,6 +80,7 @@ class CreateClassifiedAdActivity(
     private val imageItems = mutableListOf<ClassifiedAdImageThumbAdapter.ImageItem>()
     private var imageThumbAdapter: ClassifiedAdImageThumbAdapter? = null
     private var existingCreatedAt: Long = System.currentTimeMillis()
+    private var existingAddress = ""
     private var removedRemoteUrls = mutableListOf<String>()
 
     private var scope: CoroutineScope? = null
@@ -105,7 +106,6 @@ class CreateClassifiedAdActivity(
         etModel = root.findViewById(R.id.etModel)
         etTitle = root.findViewById(R.id.etTitle)
         etPrice = root.findViewById(R.id.etPrice)
-        etAddress = root.findViewById(R.id.etAddress)
         btnPickRegion = root.findViewById(R.id.btnPickRegion)
         etPhone = root.findViewById(R.id.etPhone)
         etDescription = root.findViewById(R.id.etDescription)
@@ -116,19 +116,6 @@ class CreateClassifiedAdActivity(
         toolbar?.apply {
             YuzTopInset.applyPadding(this)
             setNavigationOnClickListener { removeSelfFromStack() }
-        }
-
-        // Manzil — oddiy matn maydoni (KinoTOP4'dagi joy tanlagich bu portda yo'q).
-        // Eski XML'da `focusable="false"` + `inputType="none"` qoldig'i bor edi:
-        // maydon bosilganda klaviatura chiqmas, "manzilni tanlab bo'lmaydi" deb
-        // shikoyat qilingan edi. Endi ham matnada, ham defensive ravishda focusable.
-        etAddress?.apply {
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-            isFocusable = true
-            isFocusableInTouchMode = true
-            isClickable = true
-            isLongClickable = true
         }
 
         // #75: viloyat/tuman tanlagichi — filtr qidiruvi uchun region maydoni to'lsin.
@@ -210,7 +197,7 @@ class CreateClassifiedAdActivity(
             etModel?.setText(ad.model)
             etTitle?.setText(ad.title)
             etPrice?.setText(if (ad.price > 0L) ad.price.toString() else "")
-            etAddress?.setText(ad.address)
+            existingAddress = ad.address
             selectedRegion = ad.region
             if (ad.region.isNotBlank()) btnPickRegion?.text = ad.region
             etPhone?.setText(ad.phone)
@@ -286,14 +273,12 @@ class CreateClassifiedAdActivity(
         val title = etTitle?.text?.toString()?.trim().orEmpty()
         val model = etModel?.text?.toString()?.trim().orEmpty()
         val description = etDescription?.text?.toString()?.trim().orEmpty()
-        val address = etAddress?.text?.toString()?.trim().orEmpty()
         val phone = etPhone?.text?.toString()?.trim().orEmpty()
         val price = (etPrice?.text?.toString()?.filter { it.isDigit() } ?: "").toLongOrNull() ?: 0L
 
         if (model.isBlank()) { etModel?.error = getString(R.string.classified_model_required); return }
         if (title.isBlank()) { etTitle?.error = getString(R.string.classified_title_required); return }
         if (description.isBlank()) { etDescription?.error = getString(R.string.classified_description_required); return }
-        if (address.isBlank()) { etAddress?.error = getString(R.string.classified_address_required); return }
         if (phone.isBlank()) { etPhone?.error = getString(R.string.classified_phone_required); return }
         if (imageItems.isEmpty()) { toast(R.string.classified_images_required); return }
 
@@ -353,7 +338,9 @@ class CreateClassifiedAdActivity(
                     price = price,
                     category = category,
                     imageUrls = allUrls,
-                    address = address,
+                    // Erkin matnli manzil maydoni yo'q — joylashuv viloyat/tuman
+                    // tanlagichidan olinadi; eski e'lonning manzili saqlanadi.
+                    address = selectedRegion.ifBlank { existingAddress },
                     phone = phone,
                     ownerUid = uid,
                     ownerName = ownerName,
