@@ -63,7 +63,7 @@ object YuzgramAiBrain {
     private fun httpPostJson(url: String, jsonBody: String): String? {
         // #160: OkHttp + IPv4-first DNS. HttpURLConnection bitta manzilni
         // sinardi va qora tuynuk IPv6'da so'rov butunlay so'nardi.
-        val r = YuzNet.postJson(url, jsonBody, 6000, 12000, "YuzgramAI/1.0") ?: return null
+        val r = YuzNet.postJson(url, jsonBody, 4000, 9000, "YuzgramAI/1.0") ?: return null
         if (r.code !in 200..299) {
             rateLimitedMessage = rateText(r)
             return null
@@ -213,7 +213,7 @@ object YuzgramAiBrain {
         "Bu haqida aniq manba topa olmadim. Savolni boshqacha ayting, yoki xabar yuborish kabi buyruq bering."
 
     private fun httpGet(url: String): String? {
-        val r = YuzNet.get(url, 5000, 5000, "YuzgramAI/1.0") ?: return null
+        val r = YuzNet.get(url, 3000, 3500, "YuzgramAI/1.0") ?: return null
         return if (r.code in 200..299) r.body else null
     }
 }

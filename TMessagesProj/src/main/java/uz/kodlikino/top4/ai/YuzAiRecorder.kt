@@ -103,13 +103,13 @@ class YuzAiRecorder(
                     voiceSeen = true
                     lastVoiceAt = now
                 }
-                // 3200 -> 4500 ms: foydalanuvchi signaldan keyin 2-3 soniya
-                // o'ylanib gapirsa ham yozuv yopilib qolmaydi.
-                if (!voiceSeen && totalMs > 4500L) break
-                // 750 -> 550 ms: so'z orasidagi pauzalar saqlanadi, lekin
-                // buyruq tugagach javob ~0.2 s tezroq boshlanadi.
-                if (voiceSeen && now - lastVoiceAt > 550L) break
-                if (totalMs > 8000L) break
+                // 4500 -> 3800 ms: signaldan keyin o'ylanib gapirsa ham
+                // yozuv yopilib qolmaydi, lekin jim bosish tezroq tugaydi.
+                if (!voiceSeen && totalMs > 3800L) break
+                // 550 -> 400 ms: so'z orasidagi pauzalar saqlanadi, buyruq
+                // tugagach javob ~0.15 s tezroq boshlanadi.
+                if (voiceSeen && now - lastVoiceAt > 400L) break
+                if (totalMs > 6500L) break
                 for (i in 0 until n) {
                     val v = chunk[i].toInt()
                     pcm.write((v and 0xFF))

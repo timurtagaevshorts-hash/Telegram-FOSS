@@ -40,7 +40,7 @@ object YuzAiCloud {
                 // eski mavzu yangi savolga aralashmaydi.
                 // #157: 30s o'qish vaqti orbni osib qo'yardi — 15s'da zaxira
                 // (tizim mikrofoni) ishga tushadi.
-                val resp = post("$BASE/voice", body.toString(), 8000, 20000) ?: return@withContext null
+                val resp = post("$BASE/voice", body.toString(), 6000, 15000) ?: return@withContext null
                 val j = JSONObject(resp)
                 if (j.has("error") && !j.has("i")) return@withContext null
                 val audio = j.optString("ab64").takeIf { it.isNotBlank() }?.let {
@@ -64,7 +64,7 @@ object YuzAiCloud {
     suspend fun speakText(text: String): ByteArray? = withContext(Dispatchers.IO) {
         try {
             val body = JSONObject().put("text", text)
-            val resp = post("$BASE/speak", body.toString(), 6000, 20000) ?: return@withContext null
+            val resp = post("$BASE/speak", body.toString(), 5000, 8000) ?: return@withContext null
             val b64 = JSONObject(resp).optString("audio")
             if (b64.isBlank()) null else Base64.decode(b64, Base64.NO_WRAP)
         } catch (_: Exception) {

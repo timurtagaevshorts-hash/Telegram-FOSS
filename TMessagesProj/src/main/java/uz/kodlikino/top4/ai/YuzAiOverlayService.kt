@@ -70,7 +70,18 @@ class YuzAiOverlayService : Service() {
      */
     private enum class Phase { IDLE, LISTENING, THINKING, SPEAKING }
 
+    /**
+     * Tinglash yo'li: tizimli SpeechRecognizer (tez — audio yuklanmaydi) yoki
+     * zaxira bulut oqimi (AudioRecord + /voice). Tizim tanishi mavjud bo'lmasa
+     * yoki xato bersa — bulutga tushamiz.
+     */
+    private enum class ListenMode { NONE, RECOGNIZER, CLOUD }
+
     @Volatile private var phase = Phase.IDLE
+    @Volatile private var listenMode = ListenMode.NONE
+    @Volatile private var listenStartedAt = 0L
+    private var sessionToken = 0
+    private var sessionAccount = 0
     private var interactionSeq = 0
     @Volatile private var peerNamesCache: List<String> = emptyList()
     private var voice: YuzAiVoice? = null
@@ -219,8 +230,17 @@ class YuzAiOverlayService : Service() {
                         Phase.IDLE -> beginListening()
                         Phase.LISTENING ->
                             // Ikkinchi bosish — yozuvni yakunlab, aytilganini yuboramiz.
-                            if (recorder.isRecording()) recorder.finish()
-                            else { recorder.cancel(); resetIdle() }
+                            when (listenMode) {
+                                ListenMode.RECOGNIZER ->
+                                    if (listenStartedAt != 0L &&
+                                        SystemClock.elapsedRealtime() - listenStartedAt > 350L
+                                    ) voice?.finishListening()
+                                    else abortListen()
+                                ListenMode.CLOUD ->
+                                    if (recorder.isRecording()) recorder.finish()
+                                    else { recorder.cancel(); resetIdle() }
+                                ListenMode.NONE -> resetIdle()
+                            }
                         Phase.THINKING -> cancelInteraction()
                         Phase.SPEAKING -> {
                             voice?.stopSpeaking()
@@ -236,7 +256,7 @@ class YuzAiOverlayService : Service() {
                         dragged = true
                         // Sudrab ko'chirish — tasodifiy yozuvni to'xtatadi.
                         when (phase) {
-                            Phase.LISTENING -> recorder.cancel()
+                            Phase.LISTENING -> abortListen()
                             Phase.THINKING -> cancelInteraction()
                             else -> Unit
                         }
@@ -257,13 +277,17 @@ class YuzAiOverlayService : Service() {
                     ) {
                         // Ushlab turilgan — qo'yib yuborilishi bilan yakunlaymiz.
                         pushToTalk = true
-                        recorder.finish()
+                        when (listenMode) {
+                            ListenMode.RECOGNIZER -> voice?.finishListening()
+                            ListenMode.CLOUD -> recorder.finish()
+                            ListenMode.NONE -> Unit
+                        }
                     }
                     true
                 }
                 MotionEvent.ACTION_CANCEL -> {
                     when (phase) {
-                        Phase.LISTENING -> recorder.cancel()
+                        Phase.LISTENING -> abortListen()
                         Phase.THINKING -> cancelInteraction()
                         else -> Unit
                     }
@@ -300,10 +324,50 @@ class YuzAiOverlayService : Service() {
 
     private val voiceCallbacks = object : YuzAiVoice.Callbacks {
         override fun onListeningStarted() = Unit
+
         override fun onPartial(text: String) = Unit
-        override fun onResult(text: String) = Unit
-        override fun onListenError(message: String, retry: Boolean) = Unit
+
+        override fun onLevel(level: Float) {
+            if (listenMode == ListenMode.RECOGNIZER && phase == Phase.LISTENING) {
+                orb?.level = level
+            }
+        }
+
+        override fun onResult(text: String) {
+            if (listenMode != ListenMode.RECOGNIZER) return
+            listenMode = ListenMode.NONE
+            listenStartedAt = 0L
+            val token = sessionToken
+            if (!isCurrent(token)) return
+            orb?.level = 0f
+            val said = text.trim()
+            if (said.isBlank()) {
+                // Tizim tanimadi — bulut zaxirasi (foydalanuvchi qayta gapiradi).
+                cloudListen(token, sessionAccount)
+                return
+            }
+            phase = Phase.THINKING
+            setOrb(YuzAiOrbView.Mode.THINKING)
+            handleUtterance(said, sessionAccount)
+        }
+
+        override fun onListenError(message: String, retry: Boolean) {
+            if (listenMode != ListenMode.RECOGNIZER) return
+            listenMode = ListenMode.NONE
+            listenStartedAt = 0L
+            val token = sessionToken
+            if (!isCurrent(token)) return
+            if (message.isNotBlank()) {
+                // Ruxsat/tarmoq kabi qat'iy xato — qayta tinglashning foydasi yo'q.
+                speak(message)
+                return
+            }
+            // Tanilmadi / jim qoldi — AudioRecord + /voice zaxirasiga o'tamiz.
+            cloudListen(token, sessionAccount)
+        }
+
         override fun onListeningStopped() = Unit
+
         override fun onSpeakFinished() {
             if (phase == Phase.SPEAKING) resetIdle()
         }
@@ -313,6 +377,8 @@ class YuzAiOverlayService : Service() {
 
     private fun resetIdle() {
         phase = Phase.IDLE
+        listenMode = ListenMode.NONE
+        listenStartedAt = 0L
         setOrb(YuzAiOrbView.Mode.IDLE)
     }
 
@@ -334,27 +400,66 @@ class YuzAiOverlayService : Service() {
         }
         val account = UserConfig.selectedAccount
         val token = ++interactionSeq
+        sessionToken = token
+        sessionAccount = account
         phase = Phase.LISTENING
         pushToTalk = false
+        listenMode = ListenMode.NONE
+        listenStartedAt = 0L
         recorder.prepare()
         setOrb(YuzAiOrbView.Mode.LISTENING)
         orb?.level = 0f
-        v.playReadySignal()
         // Ism hovuzini yozuv davomida qurib qo'yamiz — transkript kelganda kutish yo'q.
         scope.launch(Dispatchers.IO) {
             runCatching { YuzAiEngine.peers(account) }.getOrNull()?.let { peers ->
                 peerNamesCache = peers.map { it.name }.take(120)
             }
         }
+        // Uzoq jim turgandan keyin TLS qayta qurilmasin — fon rejimida isitamiz.
+        scope.launch(Dispatchers.IO) { runCatching { YuzAiCloud.warmup() } }
+        // TEZKOR YO'L: tizimli nutq tanishi — audio yuklanmaydi, matn kelishi
+        // bilan buyruq lokal bajariladi. Mavjud bo'lmasa — bulut zaxirasi.
+        if (v.canListen()) {
+            listenMode = ListenMode.RECOGNIZER
+            v.playReadySignal()
+            mainHandler.postDelayed({
+                if (!isCurrent(token) || phase != Phase.LISTENING ||
+                    listenMode != ListenMode.RECOGNIZER
+                ) return@postDelayed
+                listenStartedAt = SystemClock.elapsedRealtime()
+                v.startListening(announce = false)
+            }, 90L)
+        } else {
+            cloudListen(token, account)
+        }
+    }
+
+    /**
+     * Zaxira yo'l: AudioRecord+VAD -> worker /voice (STT+niyat+javob).
+     * Tizim tanishi mavjud bo'lmagan yoki xato bergan holatda ishlatiladi.
+     */
+    private fun cloudListen(token: Int, account: Int) {
+        if (!isCurrent(token)) return
+        listenMode = ListenMode.CLOUD
+        phase = Phase.LISTENING
+        pushToTalk = false
+        listenStartedAt = 0L
+        setOrb(YuzAiOrbView.Mode.LISTENING)
+        orb?.level = 0f
+        recorder.prepare()
+        voice?.playReadySignal()
         scope.launch {
             // Signal tugashi bilan yozishni boshlaymiz — beep mikrofonga
             // buyruq bo'lib tushmasin (80 ms signal + qisqa quyruq).
             delay(90L)
-            if (!isCurrent(token)) return@launch
+            if (!isCurrent(token) || phase != Phase.LISTENING ||
+                listenMode != ListenMode.CLOUD
+            ) return@launch
             if (recorder.wasCancelled()) {
                 resetIdle()
                 return@launch
             }
+            listenStartedAt = SystemClock.elapsedRealtime()
             val wav = try {
                 withContext(Dispatchers.IO) { recorder.recordBlocking() }
             } catch (_: Exception) {
@@ -373,6 +478,8 @@ class YuzAiOverlayService : Service() {
                 return@launch
             }
             phase = Phase.THINKING
+            listenMode = ListenMode.NONE
+            listenStartedAt = 0L
             setOrb(YuzAiOrbView.Mode.THINKING)
             var names = peerNamesCache
             if (names.isEmpty()) {
@@ -406,6 +513,36 @@ class YuzAiOverlayService : Service() {
             resetIdle()
             handleResult(res, account)
         }
+    }
+
+    /** Tizim tanishidan kelgan matn: lokal buyruq darhol, savol — miyaga. */
+    private fun handleUtterance(text: String, account: Int) {
+        val pending = pendingPeer
+        if (pending != null) {
+            pendingPeer = null
+            sendTo(pending, text, account)
+            return
+        }
+        val intent = try {
+            YuzAiEngine.parse(text, account)
+        } catch (_: Exception) {
+            YuzAiEngine.Intent.Ask(text)
+        }
+        if (intent is YuzAiEngine.Intent.Ask) {
+            answer(text, null)
+            return
+        }
+        execute(intent, account)
+    }
+
+    /** Dragging/bekor: joriy tinglashni to'xtatib, orbni tinch holatga qaytaradi. */
+    private fun abortListen() {
+        listenMode = ListenMode.NONE
+        listenStartedAt = 0L
+        interactionSeq++
+        runCatching { recorder.cancel() }
+        runCatching { voice?.stopListening() }
+        resetIdle()
     }
 
     private fun handleResult(res: YuzVoiceResult, account: Int) {

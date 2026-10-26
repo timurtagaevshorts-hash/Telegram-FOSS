@@ -71,6 +71,8 @@ class YuzAiActivity : BaseFragment() {
     }
     private var cloudBusy = false
     private var listeningPending = false
+    // Tizimli SpeechRecognizer sessiyasi ketmoqda (bulut oqimi emas).
+    private var recognizerPending = false
     private var cloudTtsBlockedUntil = 0L
     // Har yangi muloqot eski asinxron javob/TTS'ni bekor qiladi — kechikkan
     // javob yangi buyruq ustidan yozib yubormasin.
@@ -124,12 +126,30 @@ class YuzAiActivity : BaseFragment() {
                 statusView.text = text
             }
 
+            override fun onLevel(level: Float) {
+                if (::orb.isInitialized) orb.level = level
+            }
+
             override fun onResult(text: String) {
+                recognizerPending = false
+                cloudBusy = false
                 handleUtterance(text)
             }
 
             override fun onListenError(message: String, retry: Boolean) {
                 setOrb(YuzAiOrbView.Mode.IDLE)
+                if (recognizerPending) {
+                    recognizerPending = false
+                    cloudBusy = false
+                    if (message.isNotBlank()) {
+                        statusView.text = message
+                        assistant(message)
+                        return
+                    }
+                    // Tizim nutq tanishi ishlamadi — AudioRecord + /voice zaxirasi.
+                    startCloudFlow()
+                    return
+                }
                 val msg = when {
                     message.isNotBlank() -> message
                     retry -> ctx.getString(R.string.ai_network_voice)
@@ -153,7 +173,7 @@ class YuzAiActivity : BaseFragment() {
                 setOrb(YuzAiOrbView.Mode.IDLE)
                 val armed = autoListenArmed
                 autoListenArmed = false
-                if (armed) scheduleListen(420L)
+                if (armed) scheduleListen(260L)
             }
         })
 
@@ -179,7 +199,7 @@ class YuzAiActivity : BaseFragment() {
             // Ekranga kirganda: ovozli salom YO'Q — faqat signal va tinglash.
             fragmentView?.postDelayed({
                 if (screenActive && !cloudBusy && parentActivity != null) beginListening()
-            }, 420L)
+            }, 220L)
         }
     }
 
@@ -209,6 +229,8 @@ class YuzAiActivity : BaseFragment() {
                 // Hali signal/kechikish bosqichi — yozuvni bekor qilamiz.
                 listeningPending -> {
                     recorder.cancel()
+                    recognizerPending = false
+                    voice?.stopListening()
                     interactionSeq++
                     listeningPending = false
                     cloudBusy = false
@@ -217,6 +239,8 @@ class YuzAiActivity : BaseFragment() {
                 }
                 // Javob kutilmoqda — bekor qilamiz; kechikkan javob aytilmaydi.
                 else -> {
+                    recognizerPending = false
+                    voice?.stopListening()
                     interactionSeq++
                     cloudBusy = false
                     setOrb(YuzAiOrbView.Mode.IDLE)
@@ -303,7 +327,37 @@ class YuzAiActivity : BaseFragment() {
         }
         if (voice?.isListening() == true) voice?.stopListening()
         autoListenArmed = false
-        startCloudFlow()
+        val v = voice
+        // TEZKOR YO'L: tizim nutq tanishi — audio yuklanmaydi va buyruq
+        // transkript kelishi bilanoq lokal bajariladi. Mavjud bo'lmasa — bulut.
+        if (v != null && v.canListen()) startRecognizerFlow(v) else startCloudFlow()
+    }
+
+    /**
+     * Tizimli SpeechRecognizer bilan tinglash. Natija matni kelishi bilan
+     * YuzAiEngine lokal buyruqni darhol bajaradi; savol /chat'ga ketadi.
+     * Xato bo'lsa — AudioRecord + /voice zaxirasiga o'tiladi.
+     */
+    private fun startRecognizerFlow(v: YuzAiVoice) {
+        if (cloudBusy) return
+        clearChoices()
+        cloudBusy = true
+        listeningPending = false
+        recognizerPending = true
+        val seq = ++interactionSeq
+        statusView.text = ctx.getString(R.string.ai_listening)
+        setOrb(YuzAiOrbView.Mode.LISTENING)
+        v.playReadySignal()
+        val acc = currentAccount
+        // Ism hovuzi va TLS bir vaqtda qizisin — transkript kelganda kutish yo'q.
+        scope.launch(Dispatchers.IO) { runCatching { YuzAiEngine.peers(acc) } }
+        scope.launch(Dispatchers.IO) { runCatching { YuzAiCloud.warmup() } }
+        fragmentView?.postDelayed({
+            if (!screenActive || parentActivity == null || seq != interactionSeq ||
+                !recognizerPending
+            ) return@postDelayed
+            v.startListening(announce = false)
+        }, 90L)
     }
 
     private fun scheduleListen(delayMs: Long) {
@@ -311,7 +365,7 @@ class YuzAiActivity : BaseFragment() {
         root.postDelayed({
             if (parentActivity == null || !screenActive || cloudBusy) return@postDelayed
             if (voice?.isSpeaking() == true) {
-                scheduleListen(600L)
+                scheduleListen(400L)
                 return@postDelayed
             }
             beginListening()
@@ -336,6 +390,8 @@ class YuzAiActivity : BaseFragment() {
         val acc = currentAccount
         // Hovuz qurish disk/contacts bilan ishlaydi — UI thread'ni band qilmaymiz.
         scope.launch(Dispatchers.IO) { runCatching { YuzAiEngine.peers(acc) } }
+        // Uzoq jim turgandan keyin TLS qayta qurilmasin.
+        scope.launch(Dispatchers.IO) { runCatching { YuzAiCloud.warmup() } }
         scope.launch {
             // Beep (80 ms) tugashi uchun qisqa pauza — signal mikrofonga tushmasin.
             delay(90L)
@@ -714,7 +770,7 @@ class YuzAiActivity : BaseFragment() {
         val seq = interactionSeq
         scope.launch {
             val b = try {
-                withTimeoutOrNull(850L) { YuzAiCloud.speakText(text) }
+                withTimeoutOrNull(550L) { YuzAiCloud.speakText(text) }
             } catch (_: Exception) {
                 null
             }
@@ -946,6 +1002,7 @@ class YuzAiActivity : BaseFragment() {
     private fun stopAll() {
         autoListenArmed = false
         clearChoices()
+        recognizerPending = false
         interactionSeq++
         // Bekor qilingan oqim endi bayroqlarni o'zi tiklamaydi (seq tekshiruvi) —
         // shu yerda tozalaymiz, aks holda tugma "band" bo'lib qoladi.

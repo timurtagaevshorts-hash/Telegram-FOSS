@@ -31,6 +31,8 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
     interface Callbacks {
         fun onListeningStarted()
         fun onPartial(text: String)
+        /** Mikrofon darajasi (0..1) — orb animatsiyasi uchun. */
+        fun onLevel(level: Float) = Unit
         fun onResult(text: String)
         fun onListenError(message: String, retry: Boolean)
         fun onListeningStopped()
@@ -51,6 +53,24 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
     private var lastSpeakId = "yuz_ai_0"
     private var cloudPlayer: MediaPlayer? = null
     private var cloudFile: File? = null
+
+    /**
+     * Tizim tanishi jim qotib qolsa (natija ham, xato ham kelmasa) —
+     * 12 s dan keyin sessiya yopiladi. Aks holda "tinglayapman" holati
+     * abadiy qolib, tugma javob bermayotgandek ko'rinardi.
+     */
+    private val listenTimeout = Runnable {
+        if (released || !listening) return@Runnable
+        ignoreNextError = true
+        listening = false
+        muteRecognizerCue(false)
+        try {
+            recognizer?.cancel()
+        } catch (_: Exception) {
+        }
+        callbacks.onListeningStopped()
+        callbacks.onListenError("", true)
+    }
 
     /**
      * Worker'dan kelgan WAV (inson ovozi) bilan gapirish. Xato bo'lsa — tizim TTS'ga tushadi.
@@ -155,13 +175,17 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
         false
     }
 
-    fun startListening() {
+    /**
+     * [announce] = false — beep+vibratsiya chaqiruvchi tomonda allaqachon
+     * berilgan (takroriy signal mikrofonga tushmasin).
+     */
+    fun startListening(announce: Boolean = true) {
         if (released || speaking || listening) return
         mainHandler.post {
             if (released || speaking || listening) return@post
             languageIndex = 0
             ignoreNextError = false
-            playReadySignal()
+            if (announce) playReadySignal()
             if (!canListen() || !ensureRecognizer()) {
                 callbacks.onListenError("Mikrofon mavjud emas.", false)
                 return@post
@@ -172,6 +196,7 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
 
     fun stopListening() {
         mainHandler.post {
+            mainHandler.removeCallbacks(listenTimeout)
             ignoreNextError = true
             listening = false
             muteRecognizerCue(false)
@@ -181,6 +206,17 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
             } catch (_: Exception) {
             }
             callbacks.onListeningStopped()
+        }
+    }
+
+    /** Push-to-talk: yozuvni yakunlaydi, natija saqlanadi (bekor qilish emas). */
+    fun finishListening() {
+        mainHandler.post {
+            if (released || !listening) return@post
+            try {
+                recognizer?.stopListening()
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -402,11 +438,16 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
         }
 
         override fun onBeginningOfSpeech() = Unit
-        override fun onRmsChanged(rmsdB: Float) = Unit
+        override fun onRmsChanged(rmsdB: Float) {
+            if (!listening) return
+            // RMS dB odatda -2 (jim) .. 10 (baland) — orb uchun 0..1 ga keltiramiz.
+            callbacks.onLevel(((rmsdB + 2f) / 12f).coerceIn(0f, 1f))
+        }
         override fun onBufferReceived(buffer: ByteArray?) = Unit
         override fun onEndOfSpeech() = Unit
 
         override fun onError(error: Int) {
+            mainHandler.removeCallbacks(listenTimeout)
             muteRecognizerCue(false)
             if (ignoreNextError || released) {
                 ignoreNextError = false
@@ -428,6 +469,7 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
         }
 
         override fun onResults(results: Bundle?) {
+            mainHandler.removeCallbacks(listenTimeout)
             muteRecognizerCue(false)
             listening = false
             callbacks.onListeningStopped()
@@ -455,15 +497,17 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, appContext.packageName)
-            // 2200/1800 -> 1300/1100 ms: qisqa buyruq ("salom", "Sardorga yoz")
-            // tugagach natija ~1 s tezroq keladi; 400 ms minimal — juda
+            // 1300/1100 -> 1000/850 ms: qisqa buyruq ("salom", "Sardorga yoz")
+            // tugagach natija ~0.3 s tezroq keladi; 350 ms minimal — juda
             // erta kesib yubormaydi.
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1300L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1100L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 400L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 850L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 350L)
         }
         listening = true
         callbacks.onListeningStarted()
+        mainHandler.removeCallbacks(listenTimeout)
+        mainHandler.postDelayed(listenTimeout, LISTEN_TIMEOUT_MS)
         try {
             muteRecognizerCue(true)
             recognizer?.startListening(intent)
@@ -525,6 +569,7 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
     companion object {
         private const val TAG = "YuzAiVoice"
         private const val CUE_RESTORE_MS = 60_000L
+        private const val LISTEN_TIMEOUT_MS = 12_000L
         private const val ERROR_LANGUAGE_NOT_SUPPORTED = 13
         private const val ERROR_LANGUAGE_UNAVAILABLE = 14
 
