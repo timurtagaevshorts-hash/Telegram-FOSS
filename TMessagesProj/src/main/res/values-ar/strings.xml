@@ -3365,18 +3365,18 @@
     <string name="ViewMessageStatistic">إحصائيات المنشور</string>
     <string name="ViewMessage">فتح الرسالة</string>
     <!--Intro view-->
-    <string name="Page1Title">تيليجرام</string>
+    <string name="Page1Title">YuzGram</string>
     <string name="Page2Title">سريع</string>
     <string name="Page3Title">مجاني</string>
     <string name="Page4Title">آمن</string>
     <string name="Page5Title">قوي</string>
     <string name="Page6Title">مرتبط بالسحاب</string>
     <string name="Page1Message">تطبيق المراسلة **الأسرعُ** عالميًّا.\nإنه **مجانيٌّ** و**آمنٌ** كذلك.</string>
-    <string name="Page2Message">**تيليجرام** يوصل الرّسائل أسرع من\nأي تطبيق آخر.</string>
-    <string name="Page3Message">**تيليجرام** مجّاني للأبد. لا إعلانات.\nدون رسوم اشتراك.</string>
-    <string name="Page4Message">يحمي **تيليجرام** رسائلك\nمن هجمات المخترقين.</string>
-    <string name="Page5Message">لا يفرض **تيليجرام** قيودًا على\nحجم وسائطك ومحادثاتك.</string>
-    <string name="Page6Message">يتيح لك **تيليجرام** الوصول لرسائلك\nمن أجهزة متعددة.</string>
+    <string name="Page2Message">**YuzGram** يوصل الرّسائل أسرع من\nأي تطبيق آخر.</string>
+    <string name="Page3Message">**YuzGram** مجّاني للأبد. لا إعلانات.\nدون رسوم اشتراك.</string>
+    <string name="Page4Message">يحمي **YuzGram** رسائلك\nمن هجمات المخترقين.</string>
+    <string name="Page5Message">لا يفرض **YuzGram** قيودًا على\nحجم وسائطك ومحادثاتك.</string>
+    <string name="Page6Message">يتيح لك **YuzGram** الوصول لرسائلك\nمن أجهزة متعددة.</string>
     <string name="StartMessaging">ابدأ المراسلة</string>
     <!-- VoIP -->
     <string name="AccountSettings">إعدادات الحساب</string>
