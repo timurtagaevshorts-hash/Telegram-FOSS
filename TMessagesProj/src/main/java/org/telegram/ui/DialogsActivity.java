@@ -2940,7 +2940,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         return barBottom + dp(10);
     }
 
-    /** YuzGram #93b: gumbaz pastki-o'ng burchakda, nav bar ustida turadi. */
+    /** YuzGram #193b: vertikal filtr ustuni pastki-o'ng burchakda, nav bar ustida. */
     private int yuzChatRailBottomMargin() {
         return uz.kodlikino.top4.ui.YuzGramBottomBar.height() + dp(6);
     }
@@ -5559,9 +5559,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             yuzChatAd.setVisibility(View.GONE);
             contentView.addView(yuzChatAd, adLp);
             refreshYuzChatAd();
-            // YuzGram #93: filtr reykasi — maketdagi kabi O'NG CHEKKADAGI yarim
-            // aylanadigan vertikal ustun (sarlavha bloki emas). Ro'yxat unga
-            // o'ng padding bilan chekinadi.
+            // YuzGram #193b: filtr ustuni — O'NG CHEKKADAGI ixcham vertikal
+            // shisha kapsula (36dp ko'rinadigan kenglik); nom faqat fokusdagi
+            // donaning chapiga chiqadi. Ro'yxat ustidan erkin o'tadi.
             yuzChatRail = new uz.kodlikino.top4.ui.YuzGramChatWheel(context);
             yuzChatRail.setListener(index -> selectYuzGramFilter(index));
             yuzChatRail.setOnAddFolder(() -> presentFragment(new FiltersSetupActivity()));
