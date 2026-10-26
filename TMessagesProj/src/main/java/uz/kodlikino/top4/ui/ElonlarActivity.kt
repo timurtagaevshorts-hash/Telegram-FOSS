@@ -34,6 +34,7 @@ import uz.kodlikino.top4.models.ClassifiedAd
 import uz.kodlikino.top4.models.ClassifiedAdCategories
 import uz.kodlikino.top4.utils.ClassifiedAdRepository
 import uz.kodlikino.top4.utils.ClassifiedLocationHelper
+import uz.kodlikino.top4.utils.YuzAdUploads
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzPriceInput
 
@@ -84,6 +85,13 @@ class ElonlarActivity : BaseFragment() {
     private var filterDays = 0
     private var sortMode = 0
     private var ownAdsCount = 0
+
+    private var adUploadBanner: View? = null
+    private var adUploadBannerTitle: TextView? = null
+    private var adUploadBannerSubtitle: TextView? = null
+    private var adUploadBannerProgress: ProgressBar? = null
+    private var adUploadBannerAction: ImageButton? = null
+    private val adUploadListener = Runnable { refreshAdUploadBanner() }
     private val feedShuffleSeed = System.currentTimeMillis()
     private var scope: CoroutineScope? = null
 
@@ -121,6 +129,16 @@ class ElonlarActivity : BaseFragment() {
         btnRegionPicker = root.findViewById(R.id.btnFilterRegionPicker)
         chipGroupDate = root.findViewById(R.id.chipGroupAdsDate)
         chipGroupSort = root.findViewById(R.id.chipGroupAdsSort)
+        adUploadBanner = root.findViewById(R.id.adUploadBanner)
+        adUploadBannerTitle = root.findViewById(R.id.adUploadBannerTitle)
+        adUploadBannerSubtitle = root.findViewById(R.id.adUploadBannerSubtitle)
+        adUploadBannerProgress = root.findViewById(R.id.adUploadBannerProgress)
+        adUploadBannerAction = root.findViewById(R.id.adUploadBannerAction)
+        adUploadBannerAction?.setOnClickListener {
+            val item = YuzAdUploads.bannerFor(currentAccount) ?: return@setOnClickListener
+            val ctx = themedContext ?: context ?: return@setOnClickListener
+            if (item.failed) YuzAdUploads.retry(ctx, item.id) else YuzAdUploads.dismiss(ctx, item.id)
+        }
 
         // Status bari bilan tepada bo'sh qora joy qolmasin — haqiqiy inset.
         YuzTopInset.applyPadding(adsAppBar)
@@ -450,13 +468,54 @@ class ElonlarActivity : BaseFragment() {
         rvAds?.visibility = if (filtered.isEmpty()) View.GONE else View.VISIBLE
     }
 
+    /**
+     * Feed tepasidagi doimiy yuklash tasmasi. Yuklash fon xizmatida davom etadi,
+     * shuning uchun foydalanuvchi feed'ga qaytganda ham foiz shu yerda ko'rinadi.
+     * Xato bo'lsa — «Qayta urinish», ketayotgan bo'lsa — «Bekor qilish».
+     */
+    private fun refreshAdUploadBanner() {
+        val banner = adUploadBanner ?: return
+        val ctx = themedContext ?: context
+        val item = YuzAdUploads.bannerFor(currentAccount)
+        if (ctx == null || item == null) {
+            banner.visibility = View.GONE
+            return
+        }
+        banner.visibility = View.VISIBLE
+        val name = item.displayTitle.takeIf { it.isNotBlank() }
+            ?: ctx.getString(R.string.classified_pending_title)
+        if (item.failed) {
+            adUploadBannerTitle?.text = ctx.getString(R.string.classified_pending_failed)
+            adUploadBannerSubtitle?.text = ctx.getString(
+                R.string.classified_pending_failed_hint,
+                name,
+                item.error.ifBlank { ctx.getString(R.string.classified_upload_failed) }
+            )
+            adUploadBannerProgress?.visibility = View.GONE
+            adUploadBannerAction?.setImageResource(R.drawable.ic_yuz_loop)
+            adUploadBannerAction?.contentDescription = ctx.getString(R.string.classified_pending_retry)
+        } else {
+            adUploadBannerTitle?.text =
+                ctx.getString(R.string.classified_pending_progress, item.progress)
+            adUploadBannerSubtitle?.text =
+                ctx.getString(R.string.classified_pending_subtitle, name)
+            adUploadBannerProgress?.visibility = View.VISIBLE
+            adUploadBannerProgress?.progress = item.progress
+            adUploadBannerAction?.setImageResource(R.drawable.ic_yuz_close)
+            adUploadBannerAction?.contentDescription = ctx.getString(R.string.classified_pending_cancel)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         actionBar?.visibility = View.GONE
         if (fragmentView != null) startAdsListener()
+        YuzAdUploads.addListener(adUploadListener)
+        refreshAdUploadBanner()
     }
 
     override fun onPause() {
+        YuzAdUploads.removeListener(adUploadListener)
         adsListener?.remove()
         adsListener = null
         super.onPause()

@@ -500,6 +500,8 @@
              #156: targetSdk 34+ da foregroundServiceType MAJBURIY — tipsiz
              startForeground() MissingForegroundServiceTypeException beradi. -->
         <service android:name="uz.kodlikino.top4.services.ReelUploadService" android:exported="false" android:enabled="true" android:foregroundServiceType="dataSync" />
+        <!-- E'lon yuklash fon xizmati — feed'dan chiqqandan keyin ham yuklash davom etadi. -->
+        <service android:name="uz.kodlikino.top4.services.ClassifiedAdUploadService" android:exported="false" android:enabled="true" android:foregroundServiceType="dataSync" />
         <!-- #135: AI tezkor tugmasi — boshqa ilovalar ustida suzuvchi orb. -->
         <service
             android:name="uz.kodlikino.top4.ai.YuzAiOverlayService"

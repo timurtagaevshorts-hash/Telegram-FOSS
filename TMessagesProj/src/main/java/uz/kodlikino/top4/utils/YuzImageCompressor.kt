@@ -23,8 +23,9 @@ import java.io.FileOutputStream
  *    xato "permission" ko'rinishida chiqqani uchun tarmoq/ruxsat muammosidek
  *    tuyuladi.
  *
- * Siqilgan rasm ~0.5–1.2 MB: yuklash bir necha soniyada tugaydi va 15 MB
- * chegarasiga hech qachon urilmaydi.
+ * Siqilgan rasm ~0.3–0.8 MB (1280 px): telefonda to'liq ekranda ham sifatli
+ * ko'rinadi, yuklash esa bir necha barobar tez tugaydi va 15 MB chegarasiga
+ * hech qachon urilmaydi.
  *
  * EXIF muhimi: qayta kodlash EXIF'ni yo'qotadi, shuning uchun burilish
  * (rotation) avval Bitmap'ga qo'llanadi — aks holda portretdagi rasmlar yon
@@ -38,13 +39,13 @@ object YuzImageCompressor {
     private const val TAG = "YuzImageCompressor"
 
     /** Yuklashdan oldin saqlanadigan eng katta tomon (px). */
-    private const val MAX_LONG_EDGE = 1600
+    private const val MAX_LONG_EDGE = 1280
 
     /** Maqsadli hajm (bayt); kattaroq bo'lsa JPEG sifati pasaytiriladi. */
-    private const val TARGET_BYTES = 1_200_000
+    private const val TARGET_BYTES = 800_000
 
     /** Shundan kichik fayllarni qayta kodlamaymiz — tezroq va sifat buzilmaydi. */
-    private const val PASS_THROUGH_BYTES = 900_000L
+    private const val PASS_THROUGH_BYTES = 700_000L
 
     private const val MIN_QUALITY = 46
 
@@ -73,7 +74,7 @@ object YuzImageCompressor {
             // 90/270 gradusda kenglik/balandlik o'rin almashadi, lekin eng katta
             // tomon o'zgarmaydi — shuning uchun ikkala holatda ham bitta qiymat.
             val longEdge = maxOf(srcW, srcH)
-            if (rotation == 0 && longEdge <= MAX_LONG_EDGE && sourceBytes <= PASS_THROUGH_BYTES * 3) {
+            if (rotation == 0 && longEdge <= MAX_LONG_EDGE && sourceBytes <= PASS_THROUGH_BYTES) {
                 return null
             }
 

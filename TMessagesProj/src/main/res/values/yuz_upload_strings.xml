@@ -14,6 +14,24 @@
     <string name="classified_upload_images">Rasm yuklanmoqda… %1$d%% (%2$d/%3$d)</string>
     <string name="classified_saving">E\'lon saqlanmoqda…</string>
 
+    <!-- Fon yuklash (2026-10-26): "Joylash"dan keyin ekran yopiladi, holat feed
+         banneri + tizim bildirishnomasida ko'rinadi. -->
+    <string name="classified_upload_channel">E\'lon yuklash</string>
+    <string name="classified_upload_started">E\'lon fonda yuklanmoqda — ilovadan foydalanishingiz mumkin</string>
+    <string name="classified_upload_done">E\'lon joylandi</string>
+    <string name="classified_upload_failed">E\'lon yuklanmadi</string>
+    <string name="classified_upload_failed_title">E\'lon joylanmadi</string>
+    <string name="classified_upload_offline">Internet yo\'q — ulangach qayta urinib ko\'ring</string>
+    <string name="classified_upload_phase_prepare">Tayyorlanmoqda…</string>
+    <string name="classified_upload_progress">Yuklanmoqda… %1$d%% (%2$d/%3$d)</string>
+    <string name="classified_pending_title">E\'lon yuklanmoqda</string>
+    <string name="classified_pending_progress">E\'lon yuklanmoqda… %1$d%%</string>
+    <string name="classified_pending_subtitle">«%1$s» · fonda davom etadi</string>
+    <string name="classified_pending_failed">Yuklanmadi</string>
+    <string name="classified_pending_failed_hint">«%1$s» · %2$s</string>
+    <string name="classified_pending_cancel">Bekor qilish</string>
+    <string name="classified_pending_retry">Qayta urinish</string>
+
     <string name="reels_cancel_upload">Yuklashni bekor qilish</string>
     <string name="reels_upload_canceled">Yuklash bekor qilindi</string>
 </resources>

@@ -262,24 +262,6 @@
               click listener yo'q edi (o'lik UI foydalanuvchini chalkashtirardi).
             -->
 
-            <TextView
-                android:id="@+id/tvUploadStatus"
-                style="@style/YuzBodySecondary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/yuz_space_3"
-                android:visibility="gone" />
-
-            <ProgressBar
-                android:id="@+id/uploadProgress"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/yuz_space_3"
-                android:max="100"
-                android:progressTint="@color/yuz_action"
-                android:visibility="gone" />
-
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPublish"
                 style="@style/YuzButton"

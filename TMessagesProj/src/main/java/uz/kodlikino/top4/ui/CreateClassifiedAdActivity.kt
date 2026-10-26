@@ -10,7 +10,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
-import android.widget.ProgressBar
 import android.widget.Spinner
 import android.widget.Toast
 import androidx.appcompat.widget.Toolbar
@@ -23,20 +22,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
-import org.telegram.messenger.UserConfig
 import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.ClassifiedAdImageThumbAdapter
-import uz.kodlikino.top4.models.ClassifiedAd
-import uz.kodlikino.top4.models.ClassifiedAdCardThemes
 import uz.kodlikino.top4.models.ClassifiedAdCategories
+import uz.kodlikino.top4.services.ClassifiedAdUploadService
 import uz.kodlikino.top4.utils.ClassifiedAdRepository
-import uz.kodlikino.top4.utils.ClassifiedAdStorageHelper
 import uz.kodlikino.top4.utils.ClassifiedLocationHelper
+import uz.kodlikino.top4.utils.YuzAdUploads
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzPriceInput
-import uz.kodlikino.top4.utils.YuzUploadUi
 
 /**
  * "Elon joylash" (Faza D) — yangi e'lon yaratish / mavjud e'lonni tahrirlash ekrani.
@@ -74,18 +69,15 @@ class CreateClassifiedAdActivity(
     private var selectedRegion = ""
     private var etPhone: TextInputEditText? = null
     private var etDescription: TextInputEditText? = null
-    private var uploadProgress: ProgressBar? = null
-    private var tvUploadStatus: android.widget.TextView? = null
     private var btnPublish: MaterialButton? = null
 
     private val imageItems = mutableListOf<ClassifiedAdImageThumbAdapter.ImageItem>()
     private var imageThumbAdapter: ClassifiedAdImageThumbAdapter? = null
     private var existingCreatedAt: Long = System.currentTimeMillis()
     private var existingAddress = ""
-    private var removedRemoteUrls = mutableListOf<String>()
+    private val removedRemoteUrls = mutableListOf<String>()
 
     private var scope: CoroutineScope? = null
-    private var publishing = false
 
     private fun currentUid(): String = YuzGramAdsAuth.expectedUid(currentAccount)
 
@@ -110,8 +102,6 @@ class CreateClassifiedAdActivity(
         btnPickRegion = root.findViewById(R.id.btnPickRegion)
         etPhone = root.findViewById(R.id.etPhone)
         etDescription = root.findViewById(R.id.etDescription)
-        uploadProgress = root.findViewById(R.id.uploadProgress)
-        tvUploadStatus = root.findViewById(R.id.tvUploadStatus)
         btnPublish = root.findViewById(R.id.btnPublish)
 
         toolbar?.apply {
@@ -266,8 +256,17 @@ class CreateClassifiedAdActivity(
         }
     }
 
+    /**
+     * Yuklashni fonda boshlaydi va ekranni darhol yopadi.
+     *
+     * Nega shunday (2026-10-26 "juda sekin, ilovani ishlataversin" shikoyati):
+     * avval yuklash shu fragment scope'ida ketardi — ekrandan chiqilsa uzilardi,
+     * shuning uchun orqaga qaytish bloklanib, ekran yoniq ushlab turilardi.
+     * Endi ish [ClassifiedAdUploadService]ga o'tadi: foydalanuvchi ilovadan
+     * bemalol foydalanadi, holat Elonlar feed'idagi banner + bildirishnomada
+     * ko'rinadi, xato bo'lsa o'sha yerdan "Qayta urinish" bor.
+     */
     private fun publishAd() {
-        if (publishing) return
         if (currentUid().isBlank()) {
             toast(R.string.classified_sign_in_required)
             return
@@ -289,91 +288,46 @@ class CreateClassifiedAdActivity(
             ?: ClassifiedAdCategories.OTHER
 
         val localUris = imageItems.filterIsInstance<ClassifiedAdImageThumbAdapter.ImageItem.Local>()
-            .map { it.uri }
+            .map { it.uri.toString() }
         val existingUrls = imageItems.filterIsInstance<ClassifiedAdImageThumbAdapter.ImageItem.Remote>()
             .map { it.url }
         val adId = editingAdId?.takeIf { it.isNotBlank() } ?: System.currentTimeMillis().toString()
+        // Erkin matnli manzil maydoni yo'q — joylashuv viloyat/tuman
+        // tanlagichidan olinadi; eski e'lonning manzili saqlanadi.
+        val region = selectedRegion
+        val now = System.currentTimeMillis()
 
-        val user = UserConfig.getInstance(currentAccount).currentUser
-        val ownerName = listOfNotNull(
-            user?.first_name?.takeIf { it.isNotBlank() },
-            user?.last_name?.takeIf { it.isNotBlank() }
-        ).joinToString(" ").orEmpty()
+        val upload = YuzAdUploads.Upload(
+            id = adId,
+            adId = adId,
+            account = currentAccount,
+            title = title,
+            model = model,
+            description = description,
+            price = price,
+            category = category,
+            phone = phone,
+            region = region,
+            address = region.ifBlank { existingAddress },
+            createdAt = existingCreatedAt,
+            localUris = localUris,
+            existingUrls = existingUrls,
+            removedUrls = removedRemoteUrls.toList(),
+            startedAt = now
+        )
 
-        val account = currentAccount
-        publishing = true
-        btnPublish?.isEnabled = false
-        uploadProgress?.visibility = View.VISIBLE
-        uploadProgress?.progress = 0
-        tvUploadStatus?.visibility = View.VISIBLE
-        tvUploadStatus?.text = if (localUris.isEmpty()) {
-            getString(R.string.classified_saving)
-        } else {
-            getString(R.string.classified_upload_images, 0, 0, localUris.size)
+        val ctx = parentActivity ?: context ?: org.telegram.messenger.ApplicationLoader.applicationContext
+            ?: return
+        try {
+            YuzAdUploads.begin(upload)
+            ClassifiedAdUploadService.startUpload(ctx, adId)
+        } catch (e: Exception) {
+            YuzAdUploads.complete(adId)
+            toast(e.message ?: getString(R.string.classified_publish_failed))
+            return
         }
-        // Ekran o'chib qolmasa yuklash sekinlashadi (ba'zi tovushlarda) — publish
-        // tugaguncha ekranni yonib turishga majburlaymiz.
-        keepScreenOn(true)
-
-        val s = scope ?: return
-        s.launch {
-            try {
-                val uid = YuzGramAdsAuth.ensureSignedIn(account)
-                // Siqish ContentResolver talab qiladi — fragment attach bo'lmasa
-                // ham ishlashi uchun ApplicationLoader'ga fallback.
-                val uploadContext = themedContext ?: context
-                    ?: org.telegram.messenger.ApplicationLoader.applicationContext
-                val uploaded = ClassifiedAdStorageHelper.uploadImages(
-                    uploadContext, uid, adId, localUris
-                ) { pct, done, total ->
-                    uploadProgress?.progress = pct
-                    tvUploadStatus?.text =
-                        getString(R.string.classified_upload_images, pct, done, total)
-                }
-                tvUploadStatus?.text = getString(R.string.classified_saving)
-                val allUrls = (existingUrls + uploaded).filter { it.isNotBlank() }.take(5)
-                val ad = ClassifiedAd(
-                    id = adId,
-                    title = title,
-                    model = model,
-                    description = description,
-                    price = price,
-                    category = category,
-                    imageUrls = allUrls,
-                    // Erkin matnli manzil maydoni yo'q — joylashuv viloyat/tuman
-                    // tanlagichidan olinadi; eski e'lonning manzili saqlanadi.
-                    address = selectedRegion.ifBlank { existingAddress },
-                    phone = phone,
-                    ownerUid = uid,
-                    ownerName = ownerName,
-                    ownerPhotoUrl = "",
-                    createdAt = existingCreatedAt,
-                    isActive = true,
-                    cardTheme = ClassifiedAdCardThemes.BLACK,
-                    region = selectedRegion
-                )
-                ClassifiedAdRepository.saveAd(ad)
-                if (removedRemoteUrls.isNotEmpty()) {
-                    ClassifiedAdStorageHelper.deleteImages(removedRemoteUrls.toList())
-                }
-                keepScreenOn(false)
-                toast(R.string.classified_published)
-                removeSelfFromStack()
-            } catch (e: Exception) {
-                publishing = false
-                btnPublish?.isEnabled = true
-                uploadProgress?.visibility = View.GONE
-                tvUploadStatus?.visibility = View.GONE
-                keepScreenOn(false)
-                val reason = e.message ?: getString(R.string.classified_publish_failed)
-                // Uzun sabab toast'da o'qilmaydi — dialog + "Qayta urinish".
-                YuzUploadUi.showError(themedContext ?: context, reason) { publishAd() }
-            }
-        }
-    }
-
-    private fun keepScreenOn(on: Boolean) {
-        YuzUploadUi.keepScreenOn(parentActivity, on)
+        toast(R.string.classified_upload_started)
+        removeSelfFromStack()
     }
 
     private fun toast(text: String) {
@@ -402,23 +356,9 @@ class CreateClassifiedAdActivity(
         actionBar?.visibility = View.GONE
     }
 
-    /**
-     * Yuklash ketayotganda orqaga qaytish — scope'yni buzadi va yuklash abadiy
-     * "to'xtamaydi" holatiga tushadi. Shuning uchun publish davomida orqaga
-     * ruxsat bermaymiz (BaseFragment: true = fragment yopiladi, false = biz holat).
-     */
-    override fun onBackPressed(): Boolean {
-        if (publishing) {
-            toast(getString(R.string.classified_saving))
-            return false
-        }
-        return super.onBackPressed()
-    }
-
     override fun onFragmentDestroy() {
         scope?.cancel()
         scope = null
-        keepScreenOn(false)
         super.onFragmentDestroy()
     }
 }

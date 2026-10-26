@@ -6,29 +6,37 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicIntegerArray
 
 /**
  * Elon rasmlarini Cloud Storage'ga yuklaydi (`classified_ads/{uid}/{adId}_{i}.jpg`).
- * KinoTOP4'dan ko'chirildi; Firebase Auth endi [YuzGramAdsAuth] orqali `tg_<id>`
- * sessiyasini ta'minlagani uchun `user.uid == uid` tekshiruvi o'rinli.
  *
- * [YuzUploadWatchdog] + urinishlar: oldin bitta rasm "tutaqib" qolsa butun e'lon
- * abadiy yuklanayotgan holatda qolardi. Endi har bir rasm uchun to'xtab qolish
- * kuzatiladi va kerak bo'lsa qaytadan urinish boradi.
+ * Tezlik (2026-10-26 "juda sekin" shikoyati): avval rasmlar KETMA-KET
+ * siqilib, keyin ketma-ket yuklanardi — 5 rasm sekin tarmoqda daqiqalab
+ * cho'zilardi. Endi siqish (2 tadan) va yuklash (3 tadan) parallel: siqilgan
+ * rasm darhol yuklashga ketadi, keyingisi shu payt siqiladi. Umumiy vaqt
+ * deyarli rasm soniga bo'linadi, xotira esa chegara bilan himoyalangan.
  *
- * Rasm avval [YuzImageCompressor] bilan siqiladi — telefon kamerasining 8–15 MB li
- * fayllari mobil internetda yuklab bo'lmas edi va storage.rules 15 MB chegarasiga
- * urilardi.
+ * [YuzUploadWatchdog] + urinishlar saqlanadi: bitta rasm tutaqib qolsa butun
+ * e'lon abadiy "yuklanmoqda" holatida qolmaydi. Ruxsat xatosi (qoidalar/15 MB
+ * chegara) darhol foydalanuvchi tilidagi xabarga aylanadi.
  */
 object ClassifiedAdStorageHelper {
 
     private const val TAG = "ClassifiedAdStorage"
     private const val UPLOAD_ATTEMPTS = 3
+    private const val MAX_PARALLEL_COMPRESS = 2
+    private const val MAX_PARALLEL_UPLOAD = 3
 
     private val storage = FirebaseStorage.getInstance()
 
@@ -50,75 +58,94 @@ object ClassifiedAdStorageHelper {
 
         val appContext = context.applicationContext
         val files = uris.take(5)
-        val urls = mutableListOf<String>()
-        files.forEachIndexed { index, uri ->
-            val ref = storage.reference.child("classified_ads/$uid/${adId}_$index.jpg")
-            val metadata = StorageMetadata.Builder()
-                .setContentType("image/jpeg")
-                .setCacheControl("public, max-age=31536000")
-                .build()
-            // Siqilgan fayl barcha urinishlarda qayta ishlatiladi (bir marta
-            // kodlash yetarli), oxirida o'chiriladi.
-            var lastError: Exception? = null
-            var uploaded = false
-            // Siqish (decode + resize + JPEG loop) CPU-shog'al — Main thread'ni
-            // bloklamasligi uchun IO'ga o'tkazamiz. Aks holda katta rasmda ekran
-            // bir necha soniya qotib, "juda uzoq saqlamoqda" hissi berardi.
-            val compressed: File? = withContext(Dispatchers.IO) {
-                YuzImageCompressor.compressForUpload(appContext, uri)
-            }
-            val payload = compressed?.let { Uri.fromFile(it) } ?: uri
-            try {
-                for (attempt in 1..UPLOAD_ATTEMPTS) {
+        val total = files.size
+        val results = arrayOfNulls<String>(total)
+        val fractions = AtomicIntegerArray(total)
+        val completed = AtomicInteger(0)
+
+        fun report(index: Int, percent: Int) {
+            fractions.set(index, percent.coerceIn(0, 100))
+            var sum = 0
+            for (i in 0 until total) sum += fractions.get(i)
+            onProgress(sum / total, completed.get(), total)
+        }
+
+        coroutineScope {
+            val compressSem = Semaphore(MAX_PARALLEL_COMPRESS)
+            val uploadSem = Semaphore(MAX_PARALLEL_UPLOAD)
+            files.forEachIndexed { index, uri ->
+                launch(Dispatchers.IO) {
+                    val compressed: File? = compressSem.withPermit {
+                        YuzImageCompressor.compressForUpload(appContext, uri)
+                    }
                     try {
-                        YuzUploadWatchdog.awaitWithStall(
-                            ref.putFile(payload, metadata),
-                            "Rasm ${index + 1}"
-                        ) { snap ->
-                            // Jonli progress: baytlar kelganda mebel yangilanadi,
-                            // foydalanuvchi jarayon tirikligini ko'radi.
-                            val tot = snap.totalByteCount.coerceAtLeast(1L)
-                            val frac = (snap.bytesTransferred.toFloat() / tot).coerceIn(0f, 1f)
-                            val pct = (((index + frac) * 100) / files.size).toInt().coerceIn(0, 100)
-                            onProgress(pct, index + 1, files.size)
+                        val ref = storage.reference
+                            .child("classified_ads/$uid/${adId}_$index.jpg")
+                        val metadata = StorageMetadata.Builder()
+                            .setContentType("image/jpeg")
+                            .setCacheControl("public, max-age=31536000")
+                            .build()
+                        val payload = compressed?.let { Uri.fromFile(it) } ?: uri
+                        var lastError: Exception? = null
+                        var uploaded = false
+                        for (attempt in 1..UPLOAD_ATTEMPTS) {
+                            try {
+                                uploadSem.withPermit {
+                                    YuzUploadWatchdog.awaitWithStall(
+                                        ref.putFile(payload, metadata),
+                                        "Rasm ${index + 1}"
+                                    ) { snap ->
+                                        val bytes = snap.totalByteCount.coerceAtLeast(1L)
+                                        val fraction =
+                                            (snap.bytesTransferred.toFloat() / bytes)
+                                                .coerceIn(0f, 1f)
+                                        report(index, (fraction * 100).toInt())
+                                    }
+                                }
+                                results[index] = ref.downloadUrl.await().toString()
+                                uploaded = true
+                                break
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                lastError = e
+                                val message = e.message.orEmpty()
+                                if (message.contains("permission", true) ||
+                                    message.contains("unauthorized", true)
+                                ) {
+                                    throw IllegalStateException(
+                                        "Firebase Storage ruxsati rad etildi. Sabab: " +
+                                            "storage.rules yoyilmagan yoki rasm 15 MB dan " +
+                                            "katta (qoida chegarasi)."
+                                    )
+                                }
+                                Log.w(TAG, "rasm $index urinish $attempt: ${e.message}")
+                                if (attempt < UPLOAD_ATTEMPTS) delay(1500L * attempt)
+                            }
                         }
-                        urls.add(ref.downloadUrl.await().toString())
-                        uploaded = true
-                        break
-                    } catch (e: Exception) {
-                        lastError = e
-                        val message = e.message.orEmpty()
-                        if (message.contains("permission", true) ||
-                            message.contains("unauthorized", true)
-                        ) {
+                        if (!uploaded) {
                             throw IllegalStateException(
-                                "Firebase Storage ruxsati rad etildi. Sabab: storage.rules " +
-                                    "yoyilmagan yoki rasm 15 MB dan katta (qoida chegarasi)."
+                                "${index + 1}-rasm yuklanmadi ($UPLOAD_ATTEMPTS marta " +
+                                    "urinish). Internet sekin — mobil ma'lumotga o'tib " +
+                                    "qayta urinib ko'ring." +
+                                    lastError?.message?.let { " ($it)" }.orEmpty()
                             )
                         }
-                        Log.w(TAG, "rasm $index urinish $attempt: ${e.message}")
-                        if (attempt < UPLOAD_ATTEMPTS) delay(1500L * attempt)
+                        completed.incrementAndGet()
+                        report(index, 100)
+                    } finally {
+                        YuzImageCompressor.deleteQuietly(compressed)
                     }
                 }
-            } finally {
-                YuzImageCompressor.deleteQuietly(compressed)
             }
-            if (!uploaded) {
-                throw IllegalStateException(
-                    "${index + 1}-rasm yuklanmadi (${UPLOAD_ATTEMPTS} marta urinish). " +
-                        "Internet sekin — mobil ma'lumotga o'tib qayta urinib ko'ring." +
-                        lastError?.message?.let { " ($it)" }.orEmpty()
-                )
-            }
-            onProgress(((index + 1) * 100) / files.size, index + 1, files.size)
         }
-        return urls
+        return results.filterNotNull()
     }
 
     suspend fun deleteImages(urls: List<String>) {
-        urls.forEach { url ->
+        for (url in urls) {
             val trimmed = url.trim()
-            if (trimmed.isBlank()) return@forEach
+            if (trimmed.isBlank()) continue
             try {
                 storage.getReferenceFromUrl(trimmed).delete().await()
             } catch (_: Exception) {
