@@ -595,6 +595,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private int starsRow;
     private int businessRow;
     private int adminPanelRow;
+    private boolean yuzAdminPanelVisible;
     private int premiumSectionsRow;
 
     private int settingsTimerRow;
@@ -7817,6 +7818,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (listAdapter != null) {
             // saveScrollPosition();
             firstLayout = true;
+            // #189: premium sotib olingach/qaytarilgach admin qatorini
+            // qayta hisoblaymiz — aks holda u keyingi to'liq qurilishgacha eski holatda qoladi.
+            TLRPC.User rowUser = userId != 0 ? getMessagesController().getUser(userId) : null;
+            boolean showAdmin = !myProfile && rowUser != null && UserObject.isUserSelf(rowUser) && isYuzPremiumMember();
+            if (yuzAdminPanelVisible != showAdmin) {
+                updateRowsIds();
+            }
             listAdapter.notifyDataSetChanged();
         }
         if (!parentLayout.isInPreviewMode() && blurredView != null && blurredView.getVisibility() == View.VISIBLE) {
@@ -8510,6 +8518,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         return chatId != 0;
     }
 
+    /** #189: faol YuzGram Premium tarifi (Premium Kino yoki To'liq Premium). */
+    private boolean isYuzPremiumMember() {
+        Context context = ApplicationLoader.applicationContext;
+        return context != null && uz.kodlikino.top4.utils.YuzPremiumManager.from(context).isPremium(currentAccount);
+    }
+
     private void updateRowsIds() {
         int prevRowsCount = rowCount;
         rowCount = 0;
@@ -8537,6 +8551,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         starsRow = -1;
         businessRow = -1;
         adminPanelRow = -1;
+        yuzAdminPanelVisible = false;
         premiumSectionsRow = -1;
         privacyRow = -1;
         dataRow = -1;
@@ -8680,7 +8695,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 if (!getMessagesController().premiumFeaturesBlocked()) {
                     businessRow = rowCount++;
                 }
-                adminPanelRow = rowCount++;
+                // #189: admin panel faqat YuzGram Premium a'zolariga ko'rinadi.
+                yuzAdminPanelVisible = isYuzPremiumMember();
+                if (yuzAdminPanelVisible) {
+                    adminPanelRow = rowCount++;
+                }
                 if (premiumRow >= 0 || starsRow >= 0 || businessRow >= 0 || adminPanelRow >= 0) {
                     premiumSectionsRow = rowCount++;
                 }
