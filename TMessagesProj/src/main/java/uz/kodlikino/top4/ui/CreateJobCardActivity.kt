@@ -36,6 +36,7 @@ import uz.kodlikino.top4.models.JobCardSalaryTypes
 import uz.kodlikino.top4.utils.ClassifiedLocationHelper
 import uz.kodlikino.top4.utils.JobCardRepository
 import uz.kodlikino.top4.utils.JobCardStorageHelper
+import uz.kodlikino.top4.utils.YuzAdModeration
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzPriceInput
 import uz.kodlikino.top4.utils.YuzUploadUi
@@ -51,7 +52,8 @@ import uz.kodlikino.top4.utils.YuzUploadUi
  * [YuzGramAdsAuth.ensureSignedIn] chaqiriladi.
  */
 class CreateJobCardActivity(
-    private val initialListingType: String = JobCardListingTypes.HIRING
+    private val initialListingType: String = JobCardListingTypes.HIRING,
+    private val editCardId: String = ""
 ) : BaseFragment() {
 
     private companion object {
@@ -78,8 +80,12 @@ class CreateJobCardActivity(
     private var btnPublish: MaterialButton? = null
 
     private var pickedUri: Uri? = null
+    private var existingImageUrl = ""
+    private var existingCreatedAt = 0L
     private var publishing = false
     private var scope: CoroutineScope? = null
+
+    private val isEditMode: Boolean get() = editCardId.isNotBlank()
 
     private fun currentUid(): String = YuzGramAdsAuth.expectedUid(currentAccount)
 
@@ -153,7 +159,49 @@ class CreateJobCardActivity(
         etSalary?.let { YuzPriceInput.attach(it) }
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        if (isEditMode) {
+            toolbar?.title = getString(R.string.classified_job_edit_title)
+            loadCardForEdit()
+        }
         return root
+    }
+
+    /** Mavjud ish e'lonini tahrirlash uchun maydonlarni to'ldiradi. */
+    private fun loadCardForEdit() {
+        val s = scope ?: return
+        s.launch {
+            val card = JobCardRepository.getCardById(editCardId)
+            if (fragmentView == null) return@launch
+            if (card == null || card.ownerUid != currentUid()) {
+                toast(R.string.classified_ad_not_found)
+                removeSelfFromStack()
+                return@launch
+            }
+            existingCreatedAt = card.createdAt
+            existingImageUrl = card.imageUrl
+            spinnerListingType?.setSelection(
+                if (card.listingType == JobCardListingTypes.SEEKING_WORK) 1 else 0
+            )
+            etTitle?.setText(card.title)
+            etDescription?.setText(card.description)
+            etPhone?.setText(card.phone)
+            selectedRegion = card.region
+            if (card.region.isNotBlank()) btnPickRegion?.text = card.region
+            val salaryIndex = JobCardSalaryTypes.spinnerOrder.indexOf(card.salaryType)
+            if (salaryIndex >= 0) spinnerSalaryType?.setSelection(salaryIndex)
+            if (card.salaryAmount > 0L) {
+                etSalary?.setText(YuzPriceInput.format(card.salaryAmount.toString()))
+            }
+            if (card.imageUrl.isNotBlank()) {
+                ivPreview?.visibility = View.VISIBLE
+                tvPickImageLabel?.text = getString(R.string.job_board_change_image)
+                ivPreview?.let {
+                    Glide.with(it).load(card.imageUrl).centerCrop().into(it)
+                }
+            }
+            updateFieldsForType(spinnerListingType?.selectedItemPosition ?: 0)
+            updateSalaryFieldForType()
+        }
     }
 
     private fun spinnerListener(block: () -> Unit) =
@@ -253,7 +301,7 @@ class CreateJobCardActivity(
             user?.last_name?.takeIf { it.isNotBlank() }
         ).joinToString(" ").orEmpty()
 
-        val cardId = System.currentTimeMillis().toString()
+        val cardId = editCardId.ifBlank { System.currentTimeMillis().toString() }
         val account = currentAccount
         publishing = true
         btnPublish?.isEnabled = false
@@ -264,12 +312,10 @@ class CreateJobCardActivity(
         s.launch {
             try {
                 val uid = YuzGramAdsAuth.ensureSignedIn(account)
-                var imageUrl = ""
+                var imageUrl = existingImageUrl
                 pickedUri?.let { uri ->
                     imageUrl = JobCardStorageHelper.uploadImage(uid, cardId, uri)
-                    if (imageUrl.isBlank()) {
-                        imageUrl = JobCardRepository.findLatestImageUrlForOwner(uid, excludeId = cardId)
-                    }
+                    if (imageUrl.isBlank()) imageUrl = existingImageUrl
                 }
                 if (imageUrl.isBlank()) {
                     imageUrl = JobCardRepository.findLatestImageUrlForOwner(uid, excludeId = cardId)
@@ -288,11 +334,18 @@ class CreateJobCardActivity(
                     ownerUid = uid,
                     ownerName = ownerName,
                     ownerPhotoUrl = "",
+                    createdAt = existingCreatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
                     region = selectedRegion
                 )
                 JobCardRepository.saveCard(card)
                 keepScreenOn(false)
-                toast(R.string.job_board_published)
+                toast(
+                    if (YuzAdModeration.cachedEnabled()) {
+                        R.string.classified_submitted_for_review
+                    } else {
+                        R.string.job_board_published
+                    }
+                )
                 removeSelfFromStack()
             } catch (e: Exception) {
                 publishing = false

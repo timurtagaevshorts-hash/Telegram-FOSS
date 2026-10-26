@@ -24,10 +24,16 @@ data class ClassifiedAd(
     /** Viloyat/shahar nomi — filtrlash uchun. */
     val region: String = "",
     /** JobCard uchun maxsus: hiring, seeking_work. */
-    val listingType: String = ""
+    val listingType: String = "",
+    /** @see AdModeration — moderatsiya holati. */
+    val status: String = AdModeration.APPROVED,
+    /** Admin izohi (rad etish sababi). */
+    val moderationNote: String = "",
+    val moderatedAt: Long = 0L
 ) : Serializable {
 
-    fun isPubliclyVisible(): Boolean = isActive && !isBlocked
+    fun isPubliclyVisible(): Boolean =
+        isActive && !isBlocked && AdModeration.isApproved(status)
 
     fun primaryImage(): String = imageUrls.firstOrNull().orEmpty()
 

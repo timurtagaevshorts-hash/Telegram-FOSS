@@ -104,4 +104,13 @@
 <string name="classified_own_badge">Sizning</string>
 <string name="classified_images_count_badge">+%1$d</string>
 <string name="classified_badge_new">Yangi</string>
+<!-- Moderatsiya -->
+<string name="classified_status_pending">Tekshiruvda</string>
+<string name="classified_status_approved">Tasdiqlangan</string>
+<string name="classified_status_rejected">Rad etilgan</string>
+<string name="classified_submitted_for_review">E\'lon tekshiruvga yuborildi</string>
+<string name="classified_moderation_hint">Admin tasdiqlagach boshqalarga ko\'rinadi</string>
+<string name="classified_job_edit_title">Ish e\'lonini tahrirlash</string>
+<string name="classified_job_delete_confirm_title">Ish e\'lonini o\'chirasizmi?</string>
+<string name="classified_job_deleted">Ish e\'loni o\'chirildi</string>
 </resources>

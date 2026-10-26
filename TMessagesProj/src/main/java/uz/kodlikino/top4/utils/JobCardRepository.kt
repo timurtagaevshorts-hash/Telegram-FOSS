@@ -8,6 +8,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.tasks.await
+import uz.kodlikino.top4.models.AdModeration
 import uz.kodlikino.top4.models.ClassifiedAd
 import uz.kodlikino.top4.models.ClassifiedAdCardThemes
 import uz.kodlikino.top4.models.JobCard
@@ -66,7 +67,10 @@ object JobCardRepository {
                 createdAt = readTimestamp(data["createdAt"]),
                 isActive = data["isActive"] as? Boolean ?: true,
                 isBlocked = data["isBlocked"] as? Boolean ?: false,
-                region = data["region"] as? String ?: ""
+                region = data["region"] as? String ?: "",
+                status = AdModeration.normalize(data["status"] as? String),
+                moderationNote = data["moderationNote"] as? String ?: "",
+                moderatedAt = readLong(data["moderatedAt"])
             )
         } catch (e: Exception) {
             Log.e(TAG, "parseCard ${doc.id}: ${e.message}", e)
@@ -111,7 +115,10 @@ object JobCardRepository {
             isBlocked = card.isBlocked,
             cardTheme = card.cardTheme,
             region = card.region,
-            listingType = card.listingType
+            listingType = card.listingType,
+            status = card.status,
+            moderationNote = card.moderationNote,
+            moderatedAt = card.moderatedAt
         )
     }
 
@@ -150,7 +157,11 @@ object JobCardRepository {
                     return@addSnapshotListener
                 }
                 val list = snapshot?.documents?.mapNotNull { parseCard(it) }
-                    ?.filter { it.isPubliclyVisible() }
+                    ?.filter {
+                        it.isPubliclyVisible() ||
+                            // Egasi o'z tekshiruvdagi/rad etilgan e'lonini ko'ra oladi.
+                            (myUid.isNotBlank() && it.ownerUid == myUid && !it.isBlocked)
+                    }
                     ?: emptyList()
                 onUpdate(orderForFeed(list, myUid))
             }
@@ -179,7 +190,12 @@ object JobCardRepository {
                     return@addSnapshotListener
                 }
                 val list = snapshot?.documents?.mapNotNull { parseCard(it) }
-                    ?.filter { it.isPubliclyVisible() && it.listingType == listingType }
+                    ?.filter {
+                        it.listingType == listingType && (
+                            it.isPubliclyVisible() ||
+                                (myUid.isNotBlank() && it.ownerUid == myUid && !it.isBlocked)
+                            )
+                    }
                     ?: emptyList()
                 onUpdate(orderForFeed(list, myUid))
             }

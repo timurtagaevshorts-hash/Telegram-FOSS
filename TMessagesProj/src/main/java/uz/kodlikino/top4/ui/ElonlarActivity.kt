@@ -404,7 +404,10 @@ class ElonlarActivity : BaseFragment() {
             }
             return
         }
-        adsListener = ClassifiedAdRepository.listenActiveAds(shuffleForFeed = false) { ads ->
+        adsListener = ClassifiedAdRepository.listenActiveAds(
+            shuffleForFeed = false,
+            myUid = currentUid()
+        ) { ads ->
             if (fragmentView == null) return@listenActiveAds
             onAdsReceived(ads)
         }

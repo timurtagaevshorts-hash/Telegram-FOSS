@@ -28,6 +28,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,13 +40,17 @@ import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.models.AdBanner
+import uz.kodlikino.top4.models.AdModeration
+import uz.kodlikino.top4.models.ClassifiedAd
 import uz.kodlikino.top4.models.Movie
 import uz.kodlikino.top4.models.Reel
 import uz.kodlikino.top4.utils.AdBannerStorageHelper
+import uz.kodlikino.top4.utils.ClassifiedAdRepository
 import uz.kodlikino.top4.utils.KinoAdminAuth
 import uz.kodlikino.top4.utils.MoviesRepository
 import uz.kodlikino.top4.utils.ReelsRepository
 import uz.kodlikino.top4.utils.YuzAdminStats
+import uz.kodlikino.top4.utils.YuzAdModeration
 import uz.kodlikino.top4.utils.YuzAdStore
 import uz.kodlikino.top4.utils.YuzReelQuota
 import java.text.SimpleDateFormat
@@ -84,11 +89,13 @@ class KinoAdminActivity : BaseFragment() {
     private var btnTabReels: TextView? = null
     private var btnTabLimits: TextView? = null
     private var btnTabAds: TextView? = null
+    private var btnTabModeration: TextView? = null
     private var dashPanel: View? = null
     private var moviesPanel: View? = null
     private var reelsPanel: View? = null
     private var limitsPanel: View? = null
     private var adsPanel: View? = null
+    private var moderationPanel: View? = null
 
     private var progressDash: ProgressBar? = null
     private var tvStatsUpdated: TextView? = null
@@ -126,6 +133,19 @@ class KinoAdminActivity : BaseFragment() {
     private var adsProgress: ProgressBar? = null
     private var adsLoadedOnce = false
     private var ads: List<AdBanner> = emptyList()
+
+    private var rvModeration: RecyclerView? = null
+    private var moderationAdapter: ModerationAdminAdapter? = null
+    private var moderationEmpty: TextView? = null
+    private var moderationProgress: ProgressBar? = null
+    private var tvModerationPending: TextView? = null
+    private var tvModerationUpdated: TextView? = null
+    private var swModerationAuto: SwitchMaterial? = null
+    private var moderationLoadedOnce = false
+    private var moderationBusy = false
+    private var moderationAutoBusy = false
+    private var suppressModerationSwitch = false
+    private var moderationItems: List<ClassifiedAd> = emptyList()
 
     private var adPendingImage: Uri? = null
     private var adDialogPreview: YuzAdBannerView? = null
@@ -168,11 +188,13 @@ class KinoAdminActivity : BaseFragment() {
         btnTabReels = root.findViewById(R.id.btnTabReels)
         btnTabLimits = root.findViewById(R.id.btnTabLimits)
         btnTabAds = root.findViewById(R.id.btnTabAds)
+        btnTabModeration = root.findViewById(R.id.btnTabModeration)
         dashPanel = root.findViewById(R.id.dashPanel)
         moviesPanel = root.findViewById(R.id.moviesPanel)
         reelsPanel = root.findViewById(R.id.reelsPanel)
         limitsPanel = root.findViewById(R.id.limitsPanel)
         adsPanel = root.findViewById(R.id.adsPanel)
+        moderationPanel = root.findViewById(R.id.moderationPanel)
 
         progressDash = root.findViewById(R.id.progressDash)
         tvStatsUpdated = root.findViewById(R.id.tvStatsUpdated)
@@ -202,6 +224,13 @@ class KinoAdminActivity : BaseFragment() {
         adsEmpty = root.findViewById(R.id.tvAdminAdsEmpty)
         adsProgress = root.findViewById(R.id.progressAdminAds)
 
+        rvModeration = root.findViewById(R.id.rvAdminModeration)
+        moderationEmpty = root.findViewById(R.id.tvAdminModerationEmpty)
+        moderationProgress = root.findViewById(R.id.progressAdminModeration)
+        tvModerationPending = root.findViewById(R.id.tvModerationPending)
+        tvModerationUpdated = root.findViewById(R.id.tvModerationUpdated)
+        swModerationAuto = root.findViewById(R.id.swAdminModerationAuto)
+
         adapter = KinoAdminAdapter(
             themed, emptyList(),
             onEdit = { showMovieDialog(it) },
@@ -222,6 +251,14 @@ class KinoAdminActivity : BaseFragment() {
         rvAds?.layoutManager = LinearLayoutManager(themed)
         rvAds?.adapter = adsAdapter
 
+        moderationAdapter = ModerationAdminAdapter(
+            themed,
+            onApprove = { moderateAd(it, true) },
+            onReject = { moderateAd(it, false) }
+        )
+        rvModeration?.layoutManager = LinearLayoutManager(themed)
+        rvModeration?.adapter = moderationAdapter
+
         btnLogin?.setOnClickListener { doLogin() }
         root.findViewById<FloatingActionButton>(R.id.btnAddKino)?.setOnClickListener {
             showMovieDialog(null)
@@ -235,7 +272,13 @@ class KinoAdminActivity : BaseFragment() {
         btnTabReels?.setOnClickListener { showTab(TAB_REELS) }
         btnTabLimits?.setOnClickListener { showTab(TAB_LIMITS) }
         btnTabAds?.setOnClickListener { showTab(TAB_ADS) }
+        btnTabModeration?.setOnClickListener { showTab(TAB_MODERATION) }
         btnRefreshStats?.setOnClickListener { loadDashboard() }
+
+        swModerationAuto?.setOnCheckedChangeListener { _, checked ->
+            if (suppressModerationSwitch) return@setOnCheckedChangeListener
+            saveModerationAuto(!checked)
+        }
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         return root
@@ -286,15 +329,18 @@ class KinoAdminActivity : BaseFragment() {
         reelsPanel?.visibility = if (tab == TAB_REELS) View.VISIBLE else View.GONE
         limitsPanel?.visibility = if (tab == TAB_LIMITS) View.VISIBLE else View.GONE
         adsPanel?.visibility = if (tab == TAB_ADS) View.VISIBLE else View.GONE
+        moderationPanel?.visibility = if (tab == TAB_MODERATION) View.VISIBLE else View.GONE
         styleTab(btnTabDash, tab == TAB_DASH)
         styleTab(btnTabMovies, tab == TAB_MOVIES)
         styleTab(btnTabReels, tab == TAB_REELS)
         styleTab(btnTabLimits, tab == TAB_LIMITS)
         styleTab(btnTabAds, tab == TAB_ADS)
+        styleTab(btnTabModeration, tab == TAB_MODERATION)
         if (tab == TAB_MOVIES && adapter?.itemCount == 0) loadMovies()
         if (tab == TAB_REELS && !reelsLoadedOnce) loadReels()
         if (tab == TAB_LIMITS && !limitsLoadedOnce) loadLimits()
         if (tab == TAB_ADS && !adsLoadedOnce) loadAds()
+        if (tab == TAB_MODERATION && !moderationLoadedOnce) loadModeration()
     }
 
     private fun styleTab(chip: TextView?, active: Boolean) {
@@ -711,6 +757,116 @@ class KinoAdminActivity : BaseFragment() {
         }
     }
 
+    // ── E'lonlar moderatsiyasi ───────────────────────────────────────────
+
+    private fun moderationRank(ad: ClassifiedAd): Int =
+        if (AdModeration.normalize(ad.status) == AdModeration.PENDING) 0 else 1
+
+    private fun loadModeration() {
+        if (moderationBusy) return
+        val s = scope ?: return
+        moderationBusy = true
+        moderationLoadedOnce = true
+        moderationProgress?.visibility = View.VISIBLE
+        moderationEmpty?.visibility = View.GONE
+        s.launch {
+            val settings = YuzAdModeration.adminLoad()
+            val listResult = ClassifiedAdRepository.adminLoadAll()
+            moderationBusy = false
+            if (fragmentView == null) return@launch
+            moderationProgress?.visibility = View.GONE
+            settings.onSuccess { applyModerationAuto(!it) }
+            if (listResult.isFailure) {
+                toast(R.string.yuz_admin_moderation_load_failed)
+            }
+            moderationItems = listResult.getOrDefault(emptyList()).sortedWith(
+                compareBy({ moderationRank(it) }, { -it.createdAt })
+            )
+            moderationAdapter?.submit(moderationItems)
+            moderationEmpty?.visibility =
+                if (moderationItems.isEmpty()) View.VISIBLE else View.GONE
+            updateModerationHeader()
+            tvModerationUpdated?.text =
+                getString(R.string.yuz_admin_moderation_updated, timeFormat.format(Date()))
+            tvModerationUpdated?.visibility = View.VISIBLE
+        }
+    }
+
+    /** Switch — "tekshiruvsiz joylash"; saqlanadigan bayroq uning teskarisi. */
+    private fun applyModerationAuto(auto: Boolean) {
+        suppressModerationSwitch = true
+        swModerationAuto?.isChecked = auto
+        suppressModerationSwitch = false
+    }
+
+    private fun saveModerationAuto(auto: Boolean) {
+        if (moderationAutoBusy) return
+        val s = scope ?: return
+        moderationAutoBusy = true
+        swModerationAuto?.isEnabled = false
+        s.launch {
+            val result = YuzAdModeration.adminSave(!auto)
+            moderationAutoBusy = false
+            if (fragmentView == null) return@launch
+            swModerationAuto?.isEnabled = true
+            if (result.isSuccess) {
+                toast(R.string.yuz_admin_moderation_auto_saved)
+            } else {
+                val reason = result.exceptionOrNull()?.message ?: "xato"
+                toast(getString(R.string.yuz_admin_moderation_auto_failed, reason))
+                applyModerationAuto(!auto)
+            }
+        }
+    }
+
+    private fun updateModerationHeader() {
+        val pending = moderationItems.count {
+            AdModeration.normalize(it.status) == AdModeration.PENDING
+        }
+        tvModerationPending?.text =
+            getString(R.string.yuz_admin_moderation_pending_count, pending)
+    }
+
+    private fun moderateAd(ad: ClassifiedAd, approved: Boolean) {
+        val s = scope ?: return
+        s.launch {
+            val result = ClassifiedAdRepository.moderate(ad.id, approved)
+            if (fragmentView == null) return@launch
+            if (result.isSuccess) {
+                toast(
+                    if (approved) {
+                        R.string.yuz_admin_moderation_approved
+                    } else {
+                        R.string.yuz_admin_moderation_rejected
+                    }
+                )
+                updateModerationItem(ad.id, approved)
+            } else {
+                val reason = result.exceptionOrNull()?.message ?: "xato"
+                toast(getString(R.string.yuz_admin_moderation_failed, reason))
+            }
+        }
+    }
+
+    /** Ro'yxatni qayta yuklamasdan holatni joyida yangilaydi (teskari almashinuv). */
+    private fun updateModerationItem(id: String, approved: Boolean) {
+        moderationItems = moderationItems.map { ad ->
+            if (ad.id != id) {
+                ad
+            } else {
+                ad.copy(
+                    status = if (approved) AdModeration.APPROVED else AdModeration.REJECTED,
+                    isActive = approved,
+                    moderatedAt = System.currentTimeMillis()
+                )
+            }
+        }.sortedWith(compareBy({ moderationRank(it) }, { -it.createdAt }))
+        moderationAdapter?.submit(moderationItems)
+        updateModerationHeader()
+        moderationEmpty?.visibility =
+            if (moderationItems.isEmpty()) View.VISIBLE else View.GONE
+    }
+
     private fun showAdDialog(existing: AdBanner?) {
         val themed = themedContext ?: return
         val view = LayoutInflater.from(themed).inflate(R.layout.dialog_admin_ad, null)
@@ -1067,6 +1223,8 @@ class KinoAdminActivity : BaseFragment() {
         reelsAdapter = null
         rvAds?.adapter = null
         adsAdapter = null
+        rvModeration?.adapter = null
+        moderationAdapter = null
         scope?.cancel()
         scope = null
         super.onFragmentDestroy()
@@ -1098,6 +1256,7 @@ class KinoAdminActivity : BaseFragment() {
         private const val TAB_REELS = 2
         private const val TAB_LIMITS = 3
         private const val TAB_ADS = 4
+        private const val TAB_MODERATION = 5
         private const val REQ_PICK_AD_IMAGE = 4473
     }
 }

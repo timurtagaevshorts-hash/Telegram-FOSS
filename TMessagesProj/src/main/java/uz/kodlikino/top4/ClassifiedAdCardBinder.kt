@@ -10,6 +10,7 @@ import com.bumptech.glide.load.resource.bitmap.CenterCrop
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.google.android.material.card.MaterialCardView
 import org.telegram.messenger.R
+import uz.kodlikino.top4.models.AdModeration
 import uz.kodlikino.top4.models.ClassifiedAd
 import uz.kodlikino.top4.models.ClassifiedAdCardTheme
 import uz.kodlikino.top4.models.ClassifiedAdCategories
@@ -140,8 +141,15 @@ object ClassifiedAdCardBinder {
         tvAdAuthor.text = ad.ownerName.ifBlank { "Top4 Foydalanuvchi" }
 
         if (isOwn) {
+            // O'z e'lonida "Sizning" o'rniga moderatsiya holati ko'rinadi:
+            // foydalanuvchi e'loni tekshiruvda yoki rad etilganini darhol biladi.
             tvAdOwn.visibility = View.VISIBLE
-            tvAdOwn.text = ctx.getString(R.string.classified_own_badge)
+            tvAdOwn.text = ctx.getString(AdModeration.labelRes(ad.status))
+            tvAdOwn.setTextColor(
+                androidx.core.content.ContextCompat.getColor(
+                    ctx, AdModeration.colorRes(ad.status)
+                )
+            )
             tvAdBadge.visibility = View.GONE
         } else {
             tvAdOwn.visibility = View.GONE

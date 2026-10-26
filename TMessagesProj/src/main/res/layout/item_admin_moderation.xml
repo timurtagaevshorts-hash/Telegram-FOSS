@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Admin "E'lonlar" tab qatori: rasm + turi/sarlavha/meta + status + tasdiq/rad -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="@dimen/yuz_space_2"
+    android:background="@drawable/bg_profile_modern_card"
+    android:orientation="vertical"
+    android:padding="@dimen/yuz_space_3">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/ivModerationThumb"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="@drawable/bg_classified_image_placeholder"
+            android:contentDescription="@string/yuz_admin_moderation_kind_ad"
+            android:scaleType="centerCrop" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/yuz_space_3"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvModerationKind"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/yuz_action"
+                android:textSize="@dimen/yuz_text_caption"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvModerationTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_body"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvModerationMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_1"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textColor="@color/yuz_text_secondary"
+                android:textSize="@dimen/yuz_text_caption" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvModerationStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/yuz_space_2"
+            android:background="@drawable/bg_classified_category_badge"
+            android:paddingStart="@dimen/yuz_space_2"
+            android:paddingTop="3dp"
+            android:paddingEnd="@dimen/yuz_space_2"
+            android:paddingBottom="3dp"
+            android:textSize="@dimen/yuz_text_caption"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/moderationActions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/yuz_space_2"
+        android:gravity="end"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnModerationReject"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:paddingStart="@dimen/yuz_space_4"
+            android:paddingEnd="@dimen/yuz_space_4"
+            android:text="@string/yuz_admin_moderation_reject"
+            android:textAllCaps="false"
+            android:textColor="@color/yuz_danger"
+            android:textSize="@dimen/yuz_text_caption"
+            app:backgroundTint="@color/yuz_field"
+            app:cornerRadius="10dp"
+            app:strokeColor="@color/yuz_danger"
+            app:strokeWidth="1dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnModerationApprove"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="@dimen/yuz_space_2"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:paddingStart="@dimen/yuz_space_4"
+            android:paddingEnd="@dimen/yuz_space_4"
+            android:text="@string/yuz_admin_moderation_approve"
+            android:textAllCaps="false"
+            android:textColor="@color/yuz_on_action"
+            android:textSize="@dimen/yuz_text_caption"
+            app:backgroundTint="@color/yuz_action"
+            app:cornerRadius="10dp" />
+    </LinearLayout>
+</LinearLayout>

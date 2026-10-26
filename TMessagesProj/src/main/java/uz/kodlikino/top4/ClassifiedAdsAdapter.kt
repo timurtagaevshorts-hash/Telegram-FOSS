@@ -4,6 +4,7 @@ import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
@@ -151,6 +152,9 @@ class ClassifiedAdsAdapter(
         private val locationRow: View = itemView.findViewById(R.id.adLocationRow)
         private val tvAdPrice: TextView = itemView.findViewById(R.id.tvAdPrice)
         private val tvAdAuthor: TextView = itemView.findViewById(R.id.tvAdAuthor)
+        private val actionsRow: View = itemView.findViewById(R.id.adActionsRow)
+        private val btnEdit: ImageButton = itemView.findViewById(R.id.btnAdEdit)
+        private val btnDelete: ImageButton = itemView.findViewById(R.id.btnAdDelete)
 
         fun bind(row: Row.Ad) {
             ClassifiedAdCardBinder.bindList(
@@ -169,6 +173,10 @@ class ClassifiedAdsAdapter(
                 sizePx = thumbSizePx
             )
             cardRoot.setOnClickListener { onAdClick(row.ad) }
+            // Tahrirlash/o'chirish faqat o'z e'lonida ko'rinadi.
+            actionsRow.visibility = if (row.own) View.VISIBLE else View.GONE
+            btnEdit.setOnClickListener { onEditClick?.invoke(row.ad) }
+            btnDelete.setOnClickListener { onDeleteClick?.invoke(row.ad) }
         }
     }
 

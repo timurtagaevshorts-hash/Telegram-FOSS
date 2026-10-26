@@ -11,6 +11,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
@@ -19,6 +20,11 @@ import com.google.android.material.floatingactionbutton.ExtendedFloatingActionBu
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.BaseFragment
@@ -57,9 +63,14 @@ class JobCardsActivity : BaseFragment() {
     private var chipGroupSort: ChipGroup? = null
 
     private var themedContext: Context? = null
-    private val adapter = JobCardsAdapter { openDetail(it) }
+    private val adapter = JobCardsAdapter(
+        onCardClick = { openDetail(it) },
+        onEditClick = { openEdit(it) },
+        onDeleteClick = { confirmDelete(it) }
+    )
     private var cardsListener: ListenerRegistration? = null
     private var currentType: String = JobCardListingTypes.HIRING
+    private var scope: CoroutineScope? = null
 
     private var allCards: List<JobCard> = emptyList()
     private var searchQuery = ""
@@ -186,6 +197,7 @@ class JobCardsActivity : BaseFragment() {
             presentFragment(CreateJobCardActivity(currentType), false)
         }
 
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         return root
     }
 
@@ -300,6 +312,36 @@ class JobCardsActivity : BaseFragment() {
         presentFragment(JobCardDetailActivity(card.id), false)
     }
 
+    private fun openEdit(card: JobCard) {
+        presentFragment(CreateJobCardActivity(card.listingType, card.id), false)
+    }
+
+    private fun confirmDelete(card: JobCard) {
+        val themed = themedContext ?: context ?: return
+        val title = card.title.ifBlank { card.description.take(60) }
+        AlertDialog.Builder(themed)
+            .setTitle(R.string.classified_job_delete_confirm_title)
+            .setMessage(themed.getString(R.string.classified_delete_confirm_message, title))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.classified_delete) { _, _ -> deleteCard(card) }
+            .show()
+    }
+
+    private fun deleteCard(card: JobCard) {
+        val s = scope ?: return
+        val account = currentAccount
+        s.launch {
+            try {
+                YuzGramAdsAuth.ensureSignedIn(account)
+                JobCardRepository.deleteCard(card.id)
+                toast(R.string.classified_job_deleted)
+            } catch (e: Exception) {
+                val ctx = themedContext ?: context ?: return@launch
+                Toast.makeText(ctx, "O'chirib bo'lmadi: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         actionBar?.visibility = View.GONE
@@ -315,6 +357,8 @@ class JobCardsActivity : BaseFragment() {
     override fun onFragmentDestroy() {
         cardsListener?.remove()
         cardsListener = null
+        scope?.cancel()
+        scope = null
         super.onFragmentDestroy()
     }
 

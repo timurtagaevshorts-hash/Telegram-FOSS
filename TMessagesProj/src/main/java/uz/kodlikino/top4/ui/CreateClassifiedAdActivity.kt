@@ -29,6 +29,7 @@ import uz.kodlikino.top4.models.ClassifiedAdCategories
 import uz.kodlikino.top4.services.ClassifiedAdUploadService
 import uz.kodlikino.top4.utils.ClassifiedAdRepository
 import uz.kodlikino.top4.utils.ClassifiedLocationHelper
+import uz.kodlikino.top4.utils.YuzAdModeration
 import uz.kodlikino.top4.utils.YuzAdUploads
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzPriceInput
@@ -326,7 +327,13 @@ class CreateClassifiedAdActivity(
             toast(e.message ?: getString(R.string.classified_publish_failed))
             return
         }
-        toast(R.string.classified_upload_started)
+        toast(
+            if (YuzAdModeration.cachedEnabled()) {
+                R.string.classified_submitted_for_review
+            } else {
+                R.string.classified_upload_started
+            }
+        )
         removeSelfFromStack()
     }
 

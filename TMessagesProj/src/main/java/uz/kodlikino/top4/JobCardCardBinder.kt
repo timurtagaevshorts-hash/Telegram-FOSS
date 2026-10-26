@@ -10,6 +10,7 @@ import com.bumptech.glide.load.resource.bitmap.CenterCrop
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.google.android.material.card.MaterialCardView
 import org.telegram.messenger.R
+import uz.kodlikino.top4.models.AdModeration
 import uz.kodlikino.top4.models.ClassifiedAd
 import uz.kodlikino.top4.models.ClassifiedAdCardTheme
 import uz.kodlikino.top4.models.JobCard
@@ -41,7 +42,12 @@ object JobCardCardBinder {
 
         if (isOwn) {
             tvOwn.visibility = View.VISIBLE
-            tvOwn.text = cardRoot.context.getString(R.string.classified_own_badge)
+            tvOwn.text = cardRoot.context.getString(AdModeration.labelRes(card.status))
+            tvOwn.setTextColor(
+                androidx.core.content.ContextCompat.getColor(
+                    cardRoot.context, AdModeration.colorRes(card.status)
+                )
+            )
         } else {
             tvOwn.visibility = View.GONE
         }

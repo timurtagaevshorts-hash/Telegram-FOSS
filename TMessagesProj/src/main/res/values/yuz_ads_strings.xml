@@ -16,6 +16,24 @@
     <!-- Admin: tablar -->
     <string name="yuz_admin_tab_limits">Limitlar</string>
     <string name="yuz_admin_tab_ads">Reklama</string>
+    <string name="yuz_admin_tab_moderation">E\'lonlar</string>
+
+    <!-- Admin: e'lonlar moderatsiyasi -->
+    <string name="yuz_admin_moderation_auto">Tekshiruvsiz joylash</string>
+    <string name="yuz_admin_moderation_auto_hint">Yoqilsa yangi e\'lonlar avtomatik tasdiqlanadi va darhol hammaga ko\'rinadi</string>
+    <string name="yuz_admin_moderation_pending_count">Tekshiruvda: %1$d ta</string>
+    <string name="yuz_admin_moderation_empty">Hozircha e\'lon yo\'q</string>
+    <string name="yuz_admin_moderation_approve">Tasdiqlash</string>
+    <string name="yuz_admin_moderation_reject">Rad etish</string>
+    <string name="yuz_admin_moderation_approved">E\'lon tasdiqlandi</string>
+    <string name="yuz_admin_moderation_rejected">E\'lon rad etildi</string>
+    <string name="yuz_admin_moderation_failed">Amal bajarilmadi: %1$s</string>
+    <string name="yuz_admin_moderation_load_failed">E\'lonlarni yuklab bo\'lmadi</string>
+    <string name="yuz_admin_moderation_updated">Yangilangan: %1$s</string>
+    <string name="yuz_admin_moderation_auto_saved">Tekshiruv rejimi saqlandi</string>
+    <string name="yuz_admin_moderation_auto_failed">Sozlamani saqlab bo\'lmadi: %1$s</string>
+    <string name="yuz_admin_moderation_kind_ad">E\'lon</string>
+    <string name="yuz_admin_moderation_kind_job">Ish e\'loni</string>
 
     <!-- Admin: reels limitlari -->
     <string name="yuz_admin_limits_title">Reels joylash limitlari</string>

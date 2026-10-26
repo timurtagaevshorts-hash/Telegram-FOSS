@@ -145,6 +145,37 @@
                     android:textColor="@color/yuz_text_muted"
                     android:textSize="@dimen/yuz_text_caption" />
             </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/jobActionsRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_2"
+                android:gravity="end"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <ImageButton
+                    android:id="@+id/btnJobEdit"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="@drawable/bg_yuz_chip"
+                    android:contentDescription="@string/classified_edit"
+                    android:padding="7dp"
+                    android:src="@drawable/ic_edit"
+                    android:tint="@color/yuz_text_secondary" />
+
+                <ImageButton
+                    android:id="@+id/btnJobDelete"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="@dimen/yuz_space_2"
+                    android:background="@drawable/bg_yuz_chip"
+                    android:contentDescription="@string/classified_delete"
+                    android:padding="7dp"
+                    android:src="@drawable/ic_delete"
+                    android:tint="@color/yuz_danger" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

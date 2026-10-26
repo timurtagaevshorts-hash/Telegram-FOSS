@@ -26,10 +26,15 @@ data class JobCard(
     val createdAt: Long = System.currentTimeMillis(),
     val isActive: Boolean = true,
     val isBlocked: Boolean = false,
-    val region: String = ""
+    val region: String = "",
+    /** @see AdModeration — moderatsiya holati. */
+    val status: String = AdModeration.APPROVED,
+    val moderationNote: String = "",
+    val moderatedAt: Long = 0L
 ) : Serializable {
 
-    fun isPubliclyVisible(): Boolean = isActive && !isBlocked
+    fun isPubliclyVisible(): Boolean =
+        isActive && !isBlocked && AdModeration.isApproved(status)
 
     fun formattedSalary(): String {
         if (listingType == JobCardListingTypes.SEEKING_WORK) return ""

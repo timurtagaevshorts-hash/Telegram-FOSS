@@ -9,6 +9,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.tasks.await
+import uz.kodlikino.top4.models.AdModeration
 import uz.kodlikino.top4.models.ClassifiedAd
 import uz.kodlikino.top4.models.ClassifiedAdCardThemes
 import uz.kodlikino.top4.models.ClassifiedAdCategories
@@ -61,7 +62,10 @@ object ClassifiedAdRepository {
                 isBlocked = data["isBlocked"] as? Boolean ?: false,
                 cardTheme = data["cardTheme"] as? String ?: ClassifiedAdCardThemes.BLACK,
                 region = data["region"] as? String ?: "",
-                listingType = data["listingType"] as? String ?: ""
+                listingType = data["listingType"] as? String ?: "",
+                status = AdModeration.normalize(data["status"] as? String),
+                moderationNote = data["moderationNote"] as? String ?: "",
+                moderatedAt = readLong(data["moderatedAt"])
             )
         } catch (e: Exception) {
             Log.e(TAG, "parseAd ${doc.id}: ${e.message}", e)
@@ -161,8 +165,10 @@ object ClassifiedAdRepository {
     fun listenActiveAds(
         limit: Long = 100,
         shuffleForFeed: Boolean = true,
+        myUid: String = "",
         onUpdate: (List<ClassifiedAd>) -> Unit
     ): ListenerRegistration {
+        val uid = myUid.trim()
         return db.collection(COLLECTION)
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .limit(limit)
@@ -172,7 +178,13 @@ object ClassifiedAdRepository {
                     return@addSnapshotListener
                 }
                 val list = snapshot?.documents?.mapNotNull { doc -> parseAd(doc) }
-                    ?.filter { it.isPubliclyVisible() && isMarketplaceAd(it) } ?: emptyList()
+                    ?.filter {
+                        isMarketplaceAd(it) && (
+                            it.isPubliclyVisible() ||
+                                // Egasi o'z tekshiruvdagi/rad etilgan e'lonini ko'ra oladi.
+                                (uid.isNotBlank() && it.ownerUid == uid && !it.isBlocked)
+                            )
+                    } ?: emptyList()
                 onUpdate(if (shuffleForFeed) orderForPublicFeed(list) else list)
             }
     }
@@ -244,6 +256,13 @@ object ClassifiedAdRepository {
         // Yangi e'lon uchun mavjudlikni serverdan so'rash ortiqcha — bir roundtrip tejaladi.
         val existing = if (isNew) null else getAdById(id)
         val preservedBlocked = existing?.isBlocked ?: ad.isBlocked
+        // Moderatsiya yoniq bo'lsa har bir yangi yoki tahrirlangan e'lon qayta
+        // tekshiruvga tushadi; o'chiq bo'lsa darhol tasdiqlangan hisoblanadi.
+        val status = if (YuzAdModeration.loadEnabled(forceRefresh = true)) {
+            AdModeration.PENDING
+        } else {
+            AdModeration.APPROVED
+        }
         val payload = ad.copy(
             id = id,
             title = title,
@@ -255,11 +274,14 @@ object ClassifiedAdRepository {
             phone = ad.phone.trim().take(MAX_PHONE_CHARS),
             ownerName = ad.ownerName.trim().take(MAX_NAME_CHARS),
             ownerPhotoUrl = ad.ownerPhotoUrl.trim(),
-            isActive = true,
+            isActive = status == AdModeration.APPROVED,
             isBlocked = preservedBlocked,
             cardTheme = ad.cardTheme.ifBlank { existing?.cardTheme ?: ClassifiedAdCardThemes.BLACK },
             region = ad.region.trim().take(MAX_REGION_CHARS),
-            listingType = ad.listingType.trim().take(MAX_LISTING_TYPE_CHARS)
+            listingType = ad.listingType.trim().take(MAX_LISTING_TYPE_CHARS),
+            status = status,
+            moderationNote = "",
+            moderatedAt = 0L
         )
         val data = hashMapOf(
             "id" to id,
@@ -279,7 +301,10 @@ object ClassifiedAdRepository {
             "isBlocked" to payload.isBlocked,
             "cardTheme" to payload.cardTheme,
             "region" to payload.region,
-            "listingType" to payload.listingType
+            "listingType" to payload.listingType,
+            "status" to payload.status,
+            "moderationNote" to payload.moderationNote,
+            "moderatedAt" to payload.moderatedAt
         )
         try {
             db.collection(COLLECTION).document(id).set(data).await()
@@ -303,6 +328,52 @@ object ClassifiedAdRepository {
 
     suspend fun setActive(id: String, active: Boolean) {
         if (id.isBlank()) return
+        if (active) {
+            val ad = getAdById(id)
+            if (ad != null && !AdModeration.isApproved(ad.status)) {
+                throw IllegalStateException("E'lon hali tekshiruvdan o'tmagan")
+            }
+        }
         db.collection(COLLECTION).document(id).update("isActive", active).await()
+    }
+
+    // ── Moderatsiya (admin panel) ────────────────────────────────────────
+
+    /** Admin paneli uchun: barcha e'lonlar (ish kartalari ham shu kolleksiyada). */
+    suspend fun adminLoadAll(limit: Long = 200): Result<List<ClassifiedAd>> {
+        return try {
+            val list = db.collection(COLLECTION)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(limit)
+                .get().await()
+                .documents
+                .mapNotNull { doc -> parseAd(doc) }
+            Result.success(list)
+        } catch (e: Exception) {
+            Log.e(TAG, "adminLoadAll: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Tasdiqlash yoki rad etish. Tasdiqlangan e'lon darhol hammaga ko'rinadi,
+     * rad etilgani faqat egasiga qoladi (u tahrirlab qayta yuborishi mumkin).
+     */
+    suspend fun moderate(id: String, approved: Boolean, note: String = ""): Result<Unit> {
+        if (id.isBlank()) return Result.failure(IllegalArgumentException("E'lon id bo'sh"))
+        return try {
+            db.collection(COLLECTION).document(id).update(
+                mapOf(
+                    "status" to if (approved) AdModeration.APPROVED else AdModeration.REJECTED,
+                    "isActive" to approved,
+                    "moderationNote" to note.trim(),
+                    "moderatedAt" to System.currentTimeMillis()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "moderate $id: ${e.message}", e)
+            Result.failure(e)
+        }
     }
 }

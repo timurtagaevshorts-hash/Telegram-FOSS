@@ -3,6 +3,7 @@ package uz.kodlikino.top4
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
@@ -12,7 +13,9 @@ import org.telegram.messenger.R
 import uz.kodlikino.top4.models.JobCard
 
 class JobCardsAdapter(
-    private val onCardClick: (JobCard) -> Unit
+    private val onCardClick: (JobCard) -> Unit,
+    private val onEditClick: ((JobCard) -> Unit)? = null,
+    private val onDeleteClick: ((JobCard) -> Unit)? = null
 ) : RecyclerView.Adapter<JobCardsAdapter.VH>() {
 
     private val items = mutableListOf<JobCard>()
@@ -63,6 +66,9 @@ class JobCardsAdapter(
         private val ivLocation: ImageView = itemView.findViewById(R.id.ivJobLocationIcon)
         private val ivThumb: ImageView = itemView.findViewById(R.id.ivJobThumb)
         private val thumbFrame: View = itemView.findViewById(R.id.jobThumbFrame)
+        private val actionsRow: View = itemView.findViewById(R.id.jobActionsRow)
+        private val btnEdit: ImageButton = itemView.findViewById(R.id.btnJobEdit)
+        private val btnDelete: ImageButton = itemView.findViewById(R.id.btnJobDelete)
 
         fun bind(card: JobCard) {
             val isOwn = card.ownerUid.isNotBlank() && card.ownerUid == myUid
@@ -82,6 +88,9 @@ class JobCardsAdapter(
                 isOwn = isOwn
             )
             cardRoot.setOnClickListener { onCardClick(card) }
+            actionsRow.visibility = if (isOwn) View.VISIBLE else View.GONE
+            btnEdit.setOnClickListener { onEditClick?.invoke(card) }
+            btnDelete.setOnClickListener { onDeleteClick?.invoke(card) }
         }
     }
 }
