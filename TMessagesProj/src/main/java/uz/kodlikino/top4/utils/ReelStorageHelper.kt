@@ -31,8 +31,18 @@ object ReelStorageHelper {
 
     private const val TAG = "ReelStorageHelper"
     private const val UPLOAD_ATTEMPTS = 3
+    // Reel fayllari hech qachon qayta yozilmaydi (har yuklash — yangi nom) —
+    // shuning uchun uzoq muddatli keshlash xavfsiz va CDN/telefon keshini
+    // to'liq ishlatadi.
+    private const val MEDIA_CACHE_CONTROL = "public, max-age=31536000"
 
     private val storage = FirebaseStorage.getInstance()
+
+    private fun mediaMetadata(contentType: String): StorageMetadata =
+        StorageMetadata.Builder()
+            .setContentType(contentType)
+            .setCacheControl(MEDIA_CACHE_CONTROL)
+            .build()
 
     /**
      * @return yuklangan videoning olinadigan (download) URL'i.
@@ -71,9 +81,7 @@ object ReelStorageHelper {
         if (user.uid != uid) throw IllegalStateException("Foydalanuvchi tasdiqlanmadi")
 
         val ref = storage.reference.child("user_reels/$uid/$fileName")
-        val metadata = StorageMetadata.Builder()
-            .setContentType(videoContentType(fileName))
-            .build()
+        val metadata = mediaMetadata(videoContentType(fileName))
 
         var lastError: Exception? = null
         for (attempt in 1..UPLOAD_ATTEMPTS) {
@@ -120,6 +128,48 @@ object ReelStorageHelper {
         attempt: Int,
         onSnapshot: (UploadTask.TaskSnapshot) -> Unit
     ) = YuzUploadWatchdog.awaitWithStall(task, "Video (urinish $attempt)", onSnapshot)
+
+    /**
+     * Reel posteri — `user_reel_thumbs/{uid}/{fileName}`.
+     *
+     * Nima uchun alohida yo'l: `user_reels` qoidasi faqat video contentType
+     * qabul qiladi, JPEG u yerga sig'maydi. Poster ixtiyoriy qism: ruxsat
+     * bo'lmasa yoki tarmoq uzilsa `""` qaytaramiz — butun yuklashni
+     * yiqitmaymiz (postersiz reel avvalgidek ishlayveradi).
+     */
+    suspend fun uploadThumbnail(uid: String, fileName: String, file: File): String {
+        if (uid.isBlank() || fileName.isBlank()) return ""
+        if (!file.exists() || file.length() <= 0L) return ""
+        val user = FirebaseAuth.getInstance().currentUser ?: return ""
+        if (user.uid != uid) return ""
+        val ref = storage.reference.child("user_reel_thumbs/$uid/$fileName")
+        repeat(2) { attempt ->
+            try {
+                ref.putFile(Uri.fromFile(file), mediaMetadata("image/jpeg")).await()
+                return ref.downloadUrl.await().toString()
+            } catch (e: Exception) {
+                Log.w(TAG, "thumbnail $fileName urinish ${attempt + 1}: ${e.message}")
+                if (attempt == 0) delay(800L)
+            }
+        }
+        return ""
+    }
+
+    /** Reel o'chirilganda posterini ham Storage'dan olib tashlaydi. */
+    suspend fun deleteThumbnail(uid: String, url: String) {
+        if (uid.isBlank() || url.isBlank()) return
+        val name = try {
+            Uri.decode(url.substringBefore('?').substringAfterLast('/'))
+        } catch (_: Exception) {
+            ""
+        }
+        if (name.isBlank()) return
+        try {
+            storage.reference.child("user_reel_thumbs/$uid/$name").delete().await()
+        } catch (e: Exception) {
+            Log.w(TAG, "deleteThumbnail $name: ${e.message}")
+        }
+    }
 
     /**
      * Reel videosini Storage'dan o'chiradi (`user_reels/{uid}/{file}`).

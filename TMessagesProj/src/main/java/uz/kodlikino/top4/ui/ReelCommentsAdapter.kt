@@ -183,10 +183,12 @@ class ReelCommentsAdapter(
                     Glide.with(ivAvatar)
                         .load(photo)
                         .apply(RequestOptions.circleCropTransform())
-                        .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                        .override(AndroidUtilities.dp(30f), AndroidUtilities.dp(30f))
+                        .diskCacheStrategy(DiskCacheStrategy.ALL)
                         .error(R.drawable.bg_classified_image_placeholder)
                         .into(ivAvatar)
                 } else {
+                    Glide.with(ivAvatar).clear(ivAvatar)
                     ivAvatar.visibility = View.GONE
                     ivAvatar.setImageDrawable(null)
                     tvAvatar.visibility = View.VISIBLE

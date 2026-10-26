@@ -327,6 +327,15 @@ class ReelUploadService : Service() {
             }
             ensureNotCancelled()
 
+            // Poster — feed va profil grid'ida video boshlangunicha ko'rinadigan
+            // kadr. Ixtiyoriy: ruxsat/tarmoq bo'lmasa `""` qoladi va reel
+            // avvalgidek (postersiz) joylanadi.
+            val thumbUrl = if (req.thumbPath.isNotBlank()) {
+                ReelStorageHelper.uploadThumbnail(uid, "${req.id}.jpg", File(req.thumbPath))
+            } else {
+                ""
+            }
+
             // Firestore: 95–100%.
             report(req, 95, YuzReelUploads.Phase.SAVE,
                 getString(R.string.reels_upload_phase_save), force = true)
@@ -339,7 +348,7 @@ class ReelUploadService : Service() {
             val reel = Reel(
                 id = req.id,
                 videoUrl = url,
-                thumbnailUrl = "",
+                thumbnailUrl = thumbUrl,
                 views = 0,
                 title = req.caption,
                 hashtags = req.hashtags,

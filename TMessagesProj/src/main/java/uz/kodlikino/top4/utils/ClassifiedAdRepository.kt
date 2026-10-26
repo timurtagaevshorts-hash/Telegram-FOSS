@@ -2,10 +2,12 @@ package uz.kodlikino.top4.utils
 
 import android.util.Log
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.Source
 import kotlinx.coroutines.tasks.await
 import uz.kodlikino.top4.models.ClassifiedAd
 import uz.kodlikino.top4.models.ClassifiedAdCardThemes
@@ -21,6 +23,15 @@ object ClassifiedAdRepository {
     private const val COLLECTION = COLLECTION_NAME
     /** Yangi e'lonlar random tartibda yuqoriroq chiqishi uchun yarim hayot (7 kun). */
     private const val FEED_RECENCY_HALF_LIFE_MS = 7L * 24L * 60L * 60L * 1000L
+    private const val MAX_TITLE_CHARS = 160
+    private const val MAX_MODEL_CHARS = 120
+    private const val MAX_DESCRIPTION_CHARS = 4000
+    private const val MAX_ADDRESS_CHARS = 200
+    private const val MAX_PHONE_CHARS = 32
+    private const val MAX_NAME_CHARS = 120
+    private const val MAX_REGION_CHARS = 120
+    private const val MAX_LISTING_TYPE_CHARS = 32
+    private const val MAX_IMAGES = 5
     private val db = FirebaseFirestore.getInstance()
 
     fun parseDocument(doc: DocumentSnapshot): ClassifiedAd? = parseAd(doc)
@@ -29,7 +40,7 @@ object ClassifiedAdRepository {
         return try {
             val data = doc.data ?: return null
             val imageUrls = when (val raw = data["imageUrls"]) {
-                is List<*> -> raw.mapNotNull { it as? String }.filter { it.isNotBlank() }
+                is List<*> -> raw.mapNotNull { safeImageUrl(it as? String ?: "") }
                 else -> emptyList()
             }
             ClassifiedAd(
@@ -44,7 +55,7 @@ object ClassifiedAdRepository {
                 phone = data["phone"] as? String ?: "",
                 ownerUid = data["ownerUid"] as? String ?: "",
                 ownerName = data["ownerName"] as? String ?: "",
-                ownerPhotoUrl = data["ownerPhotoUrl"] as? String ?: "",
+                ownerPhotoUrl = safeImageUrl(data["ownerPhotoUrl"] as? String ?: "").orEmpty(),
                 createdAt = readTimestamp(data["createdAt"]),
                 isActive = data["isActive"] as? Boolean ?: true,
                 isBlocked = data["isBlocked"] as? Boolean ?: false,
@@ -72,6 +83,21 @@ object ClassifiedAdRepository {
             is Timestamp -> value.toDate().time
             else -> System.currentTimeMillis()
         }
+    }
+
+    private fun requireAdWriter(ownerUid: String) {
+        if (ownerUid.isBlank()) {
+            throw IllegalArgumentException("E'lon egasi aniqlanmadi — Telegram orqali qayta kiring.")
+        }
+        val authUid = FirebaseAuth.getInstance().currentUser?.uid
+        if (authUid != null && authUid != ownerUid) {
+            throw IllegalStateException("Sessiya boshqa akkauntga bog'langan — Telegram orqali qayta kiring.")
+        }
+    }
+
+    private fun safeImageUrl(raw: String): String? {
+        val url = raw.trim()
+        return if (url.startsWith("https://") || url.startsWith("http://")) url else null
     }
 
     /** Kunlik barqaror seed — listener har safar ro'yxatni silkitmasligi uchun. */
@@ -163,6 +189,17 @@ object ClassifiedAdRepository {
         }
     }
 
+    /** Detail ekrani uchun disk-kesh nusxasi — tarmoqdan javob kelguncha darhol chiziladi. */
+    suspend fun getAdByIdFromCache(id: String): ClassifiedAd? {
+        if (id.isBlank()) return null
+        return try {
+            val doc = db.collection(COLLECTION).document(id).get(Source.CACHE).await()
+            if (!doc.exists()) null else parseAd(doc)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     suspend fun getUserAds(uid: String): List<ClassifiedAd> {
         if (uid.isBlank()) return emptyList()
         return try {
@@ -199,15 +236,30 @@ object ClassifiedAdRepository {
     }
 
     suspend fun saveAd(ad: ClassifiedAd) {
+        requireAdWriter(ad.ownerUid)
+        val title = ad.title.trim().take(MAX_TITLE_CHARS)
+        if (title.isBlank()) throw IllegalArgumentException("E'lon sarlavhasi bo'sh bo'lmasin")
+        val isNew = ad.id.isBlank()
         val id = ad.id.ifBlank { System.currentTimeMillis().toString() }
-        val existing = if (id.isNotBlank()) getAdById(id) else null
+        // Yangi e'lon uchun mavjudlikni serverdan so'rash ortiqcha — bir roundtrip tejaladi.
+        val existing = if (isNew) null else getAdById(id)
         val preservedBlocked = existing?.isBlocked ?: ad.isBlocked
         val payload = ad.copy(
             id = id,
-            imageUrls = ad.imageUrls.filter { it.isNotBlank() }.take(5),
+            title = title,
+            model = ad.model.trim().take(MAX_MODEL_CHARS),
+            description = ad.description.trim().take(MAX_DESCRIPTION_CHARS),
+            price = ad.price.coerceAtLeast(0L),
+            imageUrls = ad.imageUrls.mapNotNull { safeImageUrl(it) }.distinct().take(MAX_IMAGES),
+            address = ad.address.trim().take(MAX_ADDRESS_CHARS),
+            phone = ad.phone.trim().take(MAX_PHONE_CHARS),
+            ownerName = ad.ownerName.trim().take(MAX_NAME_CHARS),
+            ownerPhotoUrl = ad.ownerPhotoUrl.trim(),
             isActive = true,
             isBlocked = preservedBlocked,
-            cardTheme = ad.cardTheme.ifBlank { existing?.cardTheme ?: ClassifiedAdCardThemes.BLACK }
+            cardTheme = ad.cardTheme.ifBlank { existing?.cardTheme ?: ClassifiedAdCardThemes.BLACK },
+            region = ad.region.trim().take(MAX_REGION_CHARS),
+            listingType = ad.listingType.trim().take(MAX_LISTING_TYPE_CHARS)
         )
         val data = hashMapOf(
             "id" to id,

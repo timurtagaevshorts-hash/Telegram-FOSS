@@ -1,11 +1,13 @@
 package uz.kodlikino.top4.utils
 
 import android.util.Log
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.Source
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.tasks.await
@@ -25,6 +27,10 @@ object ReelsRepository {
     private const val COMMENTS = "comments"
     private const val FEED_LIMIT = 100L
     private const val COMMENTS_LIMIT = 200L
+    /** Firestore hujjati hajmi chegarasi (1 MiB) — matn maydonlarini shundan uzoq tutamiz. */
+    private const val MAX_TITLE_CHARS = 2000
+    private const val MAX_COMMENT_CHARS = 1000
+    private const val MAX_NAME_CHARS = 120
     /**
      * Hikoya ko'rishlarini sanash yo'li: `stories/{storyKey}/reactions/{uid}` —
      * bitta hujjat = bitta noyob ko'ruvchi. Qoidalarda bu subkolleksiya kirgan
@@ -35,6 +41,21 @@ object ReelsRepository {
     private const val STORY_VIEWS = "reactions"
 
     private val db = FirebaseFirestore.getInstance()
+
+    /** Faqat http(s) manzillar: begona hujjat `file://` sxemasi bilan lokal faylni ochmasin. */
+    private fun httpUrlOrNull(raw: String?): String? {
+        val url = raw?.trim().orEmpty()
+        return if (url.startsWith("https://") || url.startsWith("http://")) url else null
+    }
+
+    private fun sanitizeReel(reel: Reel): Reel? {
+        val video = httpUrlOrNull(reel.videoUrl) ?: return null
+        return reel.copy(
+            videoUrl = video,
+            thumbnailUrl = httpUrlOrNull(reel.thumbnailUrl).orEmpty(),
+            uploadedByPhotoUrl = httpUrlOrNull(reel.uploadedByPhotoUrl).orEmpty()
+        )
+    }
 
     /**
      * In-memory feed keshi (oldingi loyihadagi `ReelsDataCache` g'oyasi).
@@ -65,69 +86,107 @@ object ReelsRepository {
      * bo'sh ro'yxat — haqiqatan ham reels yo'q. Ekranda "bo'sh" va "yuklanmadi"
      * xabarlarini chalkashtirmaslik uchun kerak.
      */
-    suspend fun getReelsOrNull(): List<Reel>? {
+    suspend fun getReelsOrNull(): List<Reel>? = readFeed(Source.DEFAULT)
+
+    /**
+     * Disk keşidan tezkor o'qish — tarmoq javobini kutmasdan tasmani
+     * to'ldirish uchun (sovuq start, sekin internet, oflayn). Bo'sh bo'lsa
+     * chaqiruvchi oddiy [getReelsOrNull] bilan davom etadi.
+     */
+    suspend fun getReelsFromCache(): List<Reel>? = readFeed(Source.CACHE)
+
+    private suspend fun readFeed(source: Source): List<Reel>? {
         return try {
             val snapshot = db.collection(COLLECTION)
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .limit(FEED_LIMIT)
-                .get()
+                .get(source)
                 .await()
             val result = snapshot.documents.mapNotNull { doc ->
                 try {
                     val reel = doc.toObject(Reel::class.java) ?: return@mapNotNull null
-                    reel.copy(id = reel.id.ifBlank { doc.id })
-                        .takeIf { it.videoUrl.isNotBlank() }
+                    sanitizeReel(reel.copy(id = reel.id.ifBlank { doc.id }))
                 } catch (e: Exception) {
                     Log.e(TAG, "parse ${doc.id}: ${e.message}", e)
                     null
                 }
             }
-            cachedFeed = result
+            // Xotira keshi faqat bo'sh bo'lmagan natija bilan yangilanadi:
+            // "hali kesh yo'q" holati tasmani bo'shatib yubormasin.
+            if (result.isNotEmpty()) cachedFeed = result
             result
         } catch (e: Exception) {
-            Log.e(TAG, "getReels: ${e.message}", e)
+            // CACHE o'qishi ma'lumot yo'qligida ham xato beradi — bu odatiy hol.
+            if (source == Source.CACHE) {
+                Log.d(TAG, "readFeed(cache): ${e.message}")
+            } else {
+                Log.e(TAG, "getReels: ${e.message}", e)
+            }
             null
         }
     }
 
     /** Muayyan uid tomonidan yuklangan reel'lar (monetizatsiya va kontent boshqaruvi uchun). */
-    suspend fun getReelsByUploader(uid: String): List<Reel> {
-        if (uid.isBlank()) return emptyList()
+    suspend fun getReelsByUploader(uid: String): List<Reel> =
+        readByUploader(uid, Source.DEFAULT) ?: emptyList()
+
+    /** Profil grid'i uchun disk keşidan tezkor o'qish. */
+    suspend fun getReelsByUploaderFromCache(uid: String): List<Reel>? =
+        readByUploader(uid, Source.CACHE)
+
+    private suspend fun readByUploader(uid: String, source: Source): List<Reel>? {
+        if (uid.isBlank()) return null
         return try {
             val snapshot = db.collection(COLLECTION)
                 .whereEqualTo("uploadedByUid", uid)
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .limit(FEED_LIMIT)
-                .get()
+                .get(source)
                 .await()
             val result = snapshot.documents.mapNotNull { doc ->
                 try {
                     val reel = doc.toObject(Reel::class.java) ?: return@mapNotNull null
-                    reel.copy(id = reel.id.ifBlank { doc.id })
-                        .takeIf { !it.isStory && it.videoUrl.isNotBlank() }
+                    sanitizeReel(reel.copy(id = reel.id.ifBlank { doc.id }))
+                        ?.takeIf { !it.isStory }
                 } catch (e: Exception) {
                     Log.e(TAG, "parse ${doc.id}: ${e.message}", e)
                     null
                 }
             }
-            synchronized(cachedByUploader) { cachedByUploader[uid] = result }
+            if (result.isNotEmpty()) {
+                synchronized(cachedByUploader) { cachedByUploader[uid] = result }
+            }
             result
         } catch (e: Exception) {
-            Log.e(TAG, "getReelsByUploader: ${e.message}", e)
-            emptyList()
+            if (source == Source.CACHE) {
+                Log.d(TAG, "readByUploader(cache) $uid: ${e.message}")
+            } else {
+                Log.e(TAG, "getReelsByUploader: ${e.message}", e)
+            }
+            null
         }
     }
 
     /** Yangi reel hujjatini `reels/{id}` ga yozadi. */
     suspend fun saveReel(reel: Reel) {
         val id = reel.id.ifBlank { System.currentTimeMillis().toString() }
+        val videoUrl = httpUrlOrNull(reel.videoUrl)
+        if (videoUrl == null || reel.uploadedByUid.isBlank()) {
+            throw IllegalArgumentException("Reel ma'lumotlari to'liq emas — qayta urinib ko'ring")
+        }
+        // Sessiya boshqa Telegram akkauntga o'tgan bo'lsa yozuv egasi
+        // chalkashmasin: qoida `uploadedByUid == auth.uid` talab qiladi.
+        val authUid = FirebaseAuth.getInstance().currentUser?.uid
+        if (authUid != null && authUid != reel.uploadedByUid) {
+            throw IllegalStateException("Sessiya boshqa akkauntga bog'langan — Telegram orqali qayta kiring.")
+        }
         val data = hashMapOf<String, Any>(
             "id" to id,
-            "videoUrl" to reel.videoUrl,
-            "thumbnailUrl" to reel.thumbnailUrl,
+            "videoUrl" to videoUrl,
+            "thumbnailUrl" to httpUrlOrNull(reel.thumbnailUrl).orEmpty(),
             "views" to reel.views,
-            "title" to reel.title,
-            "hashtags" to reel.hashtags,
+            "title" to reel.title.trim().take(MAX_TITLE_CHARS),
+            "hashtags" to reel.hashtags.take(MAX_TITLE_CHARS),
             "monetizationEnabled" to reel.monetizationEnabled,
             "movieUrl" to reel.movieUrl,
             "adTitle" to reel.adTitle,
@@ -136,8 +195,8 @@ object ReelsRepository {
             "likeCount" to reel.likeCount,
             "createdAt" to reel.createdAt,
             "uploadedByUid" to reel.uploadedByUid,
-            "uploadedByName" to reel.uploadedByName,
-            "uploadedByPhotoUrl" to reel.uploadedByPhotoUrl,
+            "uploadedByName" to reel.uploadedByName.take(MAX_NAME_CHARS),
+            "uploadedByPhotoUrl" to httpUrlOrNull(reel.uploadedByPhotoUrl).orEmpty(),
             "isUserUpload" to reel.isUserUpload
         )
         try {
@@ -181,6 +240,10 @@ object ReelsRepository {
      */
     suspend fun setLiked(reelId: String, uid: String, liked: Boolean, actorName: String = "", actorPhoto: String = "") {
         if (reelId.isBlank() || uid.isBlank()) return
+        val authUid = FirebaseAuth.getInstance().currentUser?.uid
+        if (authUid != null && authUid != uid) {
+            throw IllegalStateException("Sessiya boshqa akkauntga bog'langan — Telegram orqali qayta kiring.")
+        }
         val reelRef = db.collection(COLLECTION).document(reelId)
         val likeRef = reelRef.collection(LIKES).document(uid)
         // Tranzaksiya — sonni ikki marta oshirib/kamaytirib yubormaslik
@@ -377,14 +440,20 @@ object ReelsRepository {
      *
      * @return `null` — o'qish xatosi (tarmoq/ruxsat), bo'sh ro'yxat — izoh yo'q.
      */
-    suspend fun getComments(reelId: String): List<ReelComment>? {
+    suspend fun getComments(reelId: String): List<ReelComment>? = readComments(reelId, Source.DEFAULT)
+
+    /** Disk keşidan izohlar — panel qayta ochilganda tarmoqni kutmaydi. */
+    suspend fun getCommentsFromCache(reelId: String): List<ReelComment>? =
+        readComments(reelId, Source.CACHE)
+
+    private suspend fun readComments(reelId: String, source: Source): List<ReelComment>? {
         if (reelId.isBlank()) return emptyList()
         return try {
             val snapshot = db.collection(COLLECTION).document(reelId)
                 .collection(COMMENTS)
                 .orderBy("createdAt", Query.Direction.ASCENDING)
                 .limit(COMMENTS_LIMIT)
-                .get().await()
+                .get(source).await()
             snapshot.documents.mapNotNull { doc ->
                 try {
                     val c = doc.toObject(ReelComment::class.java) ?: return@mapNotNull null
@@ -398,7 +467,11 @@ object ReelsRepository {
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "getComments $reelId: ${e.message}", e)
+            if (source == Source.CACHE) {
+                Log.d(TAG, "comments(cache) $reelId: ${e.message}")
+            } else {
+                Log.e(TAG, "getComments $reelId: ${e.message}", e)
+            }
             null
         }
     }
@@ -423,9 +496,20 @@ object ReelsRepository {
         if (reelId.isBlank() || comment.text.isBlank() || comment.userId.isBlank()) {
             throw IllegalArgumentException("Izoh matni bo'sh")
         }
+        val authUid = FirebaseAuth.getInstance().currentUser?.uid
+        if (authUid != null && authUid != comment.userId) {
+            throw IllegalStateException("Sessiya boshqa akkauntga bog'langan — Telegram orqali qayta kiring.")
+        }
+        val text = comment.text.trim().take(MAX_COMMENT_CHARS)
+        if (text.isEmpty()) throw IllegalArgumentException("Izoh matni bo'sh")
         val docRef = db.collection(COLLECTION).document(reelId)
             .collection(COMMENTS).document()
-        val saved = comment.copy(id = docRef.id, reelId = reelId)
+        val saved = comment.copy(
+            id = docRef.id,
+            reelId = reelId,
+            text = text,
+            authorName = comment.authorName.trim().take(MAX_NAME_CHARS)
+        )
         val data = hashMapOf<String, Any>(
             "id" to docRef.id,
             "reelId" to reelId,

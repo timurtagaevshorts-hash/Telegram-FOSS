@@ -15,6 +15,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.Toolbar
 import androidx.core.content.ContextCompat
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import kotlinx.coroutines.CoroutineScope
@@ -104,16 +105,30 @@ class JobCardDetailActivity(
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         val s = scope ?: return root
         s.launch {
-            val card = JobCardRepository.getCardById(cardId)
             myUid = YuzGramAdsAuth.expectedUid(currentAccount)
+            // Keshdagi nusxa tarmoq javobini kutmasdan darhol chiziladi.
+            val cached = JobCardRepository.getCardByIdFromCache(cardId)
             if (fragmentView == null) return@launch
-            if (card == null || !card.isActive ||
-                (!card.isPubliclyVisible() && card.ownerUid != myUid)
+            if (cached != null && cached.isActive &&
+                (cached.isPubliclyVisible() || cached.ownerUid == myUid)
             ) {
+                bind(cached)
+            }
+            val card = JobCardRepository.getCardById(cardId)
+            if (fragmentView == null) return@launch
+            if (card == null) {
+                if (loadedCard == null) {
+                    toast(R.string.job_board_not_found)
+                    removeSelfFromStack()
+                }
+                return@launch
+            }
+            if (!card.isActive || (!card.isPubliclyVisible() && card.ownerUid != myUid)) {
                 toast(R.string.job_board_not_found)
                 removeSelfFromStack()
                 return@launch
             }
+            if (card == loadedCard) return@launch
             bind(card)
         }
         return root
@@ -163,6 +178,7 @@ class JobCardDetailActivity(
             Glide.with(themed)
                 .load(url)
                 .centerCrop()
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
                 .placeholder(R.drawable.bg_classified_image_placeholder)
                 .error(R.drawable.bg_classified_image_placeholder)
                 .into(hero)

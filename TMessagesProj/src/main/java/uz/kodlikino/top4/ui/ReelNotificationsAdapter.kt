@@ -8,8 +8,10 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.resource.bitmap.CircleCrop
 import com.bumptech.glide.request.RequestOptions
+import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import uz.kodlikino.top4.models.ReelNotification
 import java.text.SimpleDateFormat
@@ -96,8 +98,11 @@ class ReelNotificationsAdapter(
                 Glide.with(ivPhoto)
                     .load(item.actorPhotoUrl)
                     .apply(RequestOptions.circleCropTransform())
+                    .override(AndroidUtilities.dp(42f), AndroidUtilities.dp(42f))
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .into(ivPhoto)
             } else {
+                Glide.with(ivPhoto).clear(ivPhoto)
                 ivPhoto.visibility = View.GONE
                 ivPhoto.setImageDrawable(null)
             }
@@ -105,9 +110,13 @@ class ReelNotificationsAdapter(
             if (item.reelThumbUrl.isNotBlank()) {
                 Glide.with(ivReelThumb)
                     .load(item.reelThumbUrl)
+                    .override(AndroidUtilities.dp(46f), AndroidUtilities.dp(60f))
                     .centerCrop()
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .placeholder(R.drawable.bg_classified_image_placeholder)
                     .into(ivReelThumb)
             } else {
+                Glide.with(ivReelThumb).clear(ivReelThumb)
                 ivReelThumb.setImageDrawable(null)
             }
 

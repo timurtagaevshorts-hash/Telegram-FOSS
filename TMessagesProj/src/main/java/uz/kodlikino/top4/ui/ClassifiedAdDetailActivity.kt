@@ -72,6 +72,7 @@ class ClassifiedAdDetailActivity(
     private var scope: CoroutineScope? = null
     private var loadedAd: ClassifiedAd? = null
     private var phoneNumber: String = ""
+    private var tabMediator: TabLayoutMediator? = null
 
     private fun currentUid(): String {
         val id = UserConfig.getInstance(currentAccount).clientUserId
@@ -128,14 +129,29 @@ class ClassifiedAdDetailActivity(
                 removeSelfFromStack()
                 return@launch
             }
+            val myUid = currentUid()
+            // Keshdagi nusxa tarmoq javobini kutmasdan darhol chiziladi.
+            val cached = ClassifiedAdRepository.getAdByIdFromCache(adId)
+            if (fragmentView == null) return@launch
+            if (cached != null && (cached.isPubliclyVisible() || cached.ownerUid == myUid)) {
+                loadedAd = cached
+                bindAd(cached)
+            }
             val ad = ClassifiedAdRepository.getAdById(adId)
             if (fragmentView == null) return@launch
-            val myUid = currentUid()
-            if (ad == null || (!ad.isPubliclyVisible() && ad.ownerUid != myUid)) {
+            if (ad == null) {
+                if (loadedAd == null) {
+                    toast(R.string.classified_ad_not_found)
+                    removeSelfFromStack()
+                }
+                return@launch
+            }
+            if (!ad.isPubliclyVisible() && ad.ownerUid != myUid) {
                 toast(R.string.classified_ad_not_found)
                 removeSelfFromStack()
                 return@launch
             }
+            if (ad == loadedAd) return@launch
             loadedAd = ad
             bindAd(ad)
         }
@@ -165,6 +181,8 @@ class ClassifiedAdDetailActivity(
         phoneNumber = ad.phone
 
         val images = ad.imageUrls.filter { it.isNotBlank() }
+        tabMediator?.detach()
+        tabMediator = null
         if (images.isEmpty()) {
             vpImages?.visibility = View.GONE
             tabImageIndicator?.visibility = View.GONE
@@ -175,7 +193,9 @@ class ClassifiedAdDetailActivity(
             val tab = tabImageIndicator
             val vp = vpImages
             if (tab != null && vp != null) {
-                TabLayoutMediator(tab, vp) { _, _ -> }.attach()
+                val mediator = TabLayoutMediator(tab, vp) { _, _ -> }
+                mediator.attach()
+                tabMediator = mediator
             }
         }
     }

@@ -10,6 +10,7 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.Priority
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
@@ -45,10 +46,15 @@ class ProfileReelsAdapter(
         private const val TYPE_PENDING = 0
         private const val TYPE_REEL = 1
         private const val PAYLOAD_PROGRESS = "progress"
+        /** Grid ochilishida birinchi ekran posterlarini oldindan yuklaymiz. */
+        private const val PREFETCH_COUNT = 9
     }
 
     private val reels = ArrayList<Reel>()
     private val pending = ArrayList<YuzReelUploads.Upload>()
+
+    /** Katak o'lchami bir marta hisoblanadi (har bind'da displayMetrics o'qilmaydi). */
+    private val cellSide: Int by lazy { squareSide() }
 
     /** Boshqaruv rejimi — ✕ belgilarini ko'rsatadi. */
     var manageMode: Boolean = false
@@ -71,6 +77,32 @@ class ProfileReelsAdapter(
         reels.clear()
         reels.addAll(list)
         notifyDataSetChangedSafe()
+        prefetchThumbnails(list)
+    }
+
+    /**
+     * Birinchi ekran posterlarini past prioritetda oldindan yuklaymiz: grid
+     * ochilganda kataklar bo'sh joydan emas, tayyor rasmdan chiziladi.
+     */
+    private fun prefetchThumbnails(list: List<Reel>) {
+        val side = cellSide
+        list.asSequence()
+            .map { it.thumbnailUrl }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(PREFETCH_COUNT)
+            .forEach { url ->
+                try {
+                    Glide.with(appContext)
+                        .load(url)
+                        .override(side, side)
+                        .centerCrop()
+                        .diskCacheStrategy(DiskCacheStrategy.ALL)
+                        .priority(Priority.LOW)
+                        .preload()
+                } catch (_: Exception) {
+                }
+            }
     }
 
     /** Yuklanayotgan reels ro'yxati (trekerdan). */
@@ -156,11 +188,12 @@ class ProfileReelsAdapter(
 
         fun bind(upload: YuzReelUploads.Upload) {
             itemView.layoutParams = itemView.layoutParams?.apply {
-                height = squareSide()
+                height = cellSide
             }
             if (upload.thumbPath.isNotBlank()) {
                 Glide.with(thumb)
                     .load(File(upload.thumbPath))
+                    .override(cellSide, cellSide)
                     .centerCrop()
                     .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
                     .placeholder(R.drawable.bg_classified_image_placeholder)
@@ -197,7 +230,7 @@ class ProfileReelsAdapter(
 
         fun square() {
             itemView.layoutParams = itemView.layoutParams?.apply {
-                height = squareSide()
+                height = cellSide
             }
         }
 
@@ -206,12 +239,15 @@ class ProfileReelsAdapter(
             if (reel.thumbnailUrl.isNotBlank()) {
                 Glide.with(thumb)
                     .load(reel.thumbnailUrl)
+                    .override(cellSide, cellSide)
                     .centerCrop()
-                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .placeholder(R.drawable.bg_classified_image_placeholder)
                     .error(R.drawable.bg_classified_image_placeholder)
                     .into(thumb)
             } else {
+                // Holder qayta ishlatilganda oldingi reelning rasmi qolib ketmasin.
+                Glide.with(thumb).clear(thumb)
                 thumb.setImageDrawable(null)
                 thumb.setBackgroundColor(ContextCompat.getColor(appContext, R.color.yuz_bg))
             }

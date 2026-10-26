@@ -166,6 +166,21 @@ class YuzProfileReelsView(
             progressView.visibility = View.VISIBLE
         }
         s.launch {
+            // Sovuq start: xotira keshisiz ham disk keşi gridni birinchi kadrda
+            // beradi (tarmoq sekin/oflayn bo'lsa ham). Keyin tarmoq yangilaydi.
+            if (cached == null) {
+                val disk = try {
+                    ReelsRepository.getReelsByUploaderFromCache(myUid)
+                } catch (_: Exception) {
+                    null
+                }
+                if (disk != null && disk.isNotEmpty() && reels.isEmpty() && host.parentActivity != null) {
+                    reels = disk
+                    adapter.submit(disk)
+                    updateEmptyState()
+                    progressView.visibility = View.GONE
+                }
+            }
             // Firestore o'qish sessiya talab qiladi; o'z profilida haqiqiy
             // imzo uid'ni qayta tekshiramiz, begona profilida maqsad o'zgarmaydi.
             val uid = try {
@@ -229,7 +244,10 @@ class YuzProfileReelsView(
             try {
                 YuzGramAdsAuth.ensureSignedIn(account)
                 ReelsRepository.deleteReel(reel.id)
-                if (myUid.isNotBlank()) ReelStorageHelper.deleteVideo(myUid, reel.videoUrl)
+                if (myUid.isNotBlank()) {
+                    ReelStorageHelper.deleteVideo(myUid, reel.videoUrl)
+                    ReelStorageHelper.deleteThumbnail(myUid, reel.thumbnailUrl)
+                }
                 if (host.parentActivity == null) return@launch
                 val idx = reels.indexOfFirst { it.id == reel.id }
                 if (idx >= 0) {

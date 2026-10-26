@@ -20,6 +20,9 @@ import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.PagerSnapHelper
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.bumptech.glide.Priority
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -741,6 +744,24 @@ class ReelsActivity @JvmOverloads constructor(
                     }
                 }
             }
+            // 1b) Xotira keshi bo'sh (sovuq start) — Firestore disk keşi.
+            if (cached == null && currentReels.isEmpty()) {
+                val disk = try {
+                    if (filterUid.isBlank()) ReelsRepository.getReelsFromCache()
+                    else ReelsRepository.getReelsByUploaderFromCache(filterUid)
+                } catch (_: Exception) {
+                    null
+                }
+                if (disk != null && disk.isNotEmpty() && fragmentView != null && currentReels.isEmpty()) {
+                    val quick = composeFeed(stories, disk)
+                    if (quick.isNotEmpty()) {
+                        try {
+                            renderReels(quick, keepPosition)
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+            }
             // 2) Tarmoqdan Firebase reelslarini yangilaymiz; xato bo'lsa kesh
             // yoki faqat hikoyalar bilan davom etamiz.
             val firebase = try {
@@ -850,6 +871,31 @@ class ReelsActivity @JvmOverloads constructor(
     private fun preloadNeighbours(center: Int) {
         if (!playbackVisible) return
         YuzStoryFeed.prepareNeighbours(currentAccount, currentReels, center, foreground = true)
+        preloadPosters(center)
+    }
+
+    /**
+     * Qo'shni Firebase reel'larining posterlari — sahifa almashganda qora ekran
+     * o'rniga darhol kadr ko'rinadi. Past prioritet: faol video oqimini bosmaydi.
+     */
+    private fun preloadPosters(center: Int) {
+        val hostView = fragmentView ?: return
+        val w = (AndroidUtilities.displaySize.x / 2).coerceAtLeast(360)
+        val h = (AndroidUtilities.displaySize.y / 2).coerceAtLeast(640)
+        for (off in -1..2) {
+            val url = currentReels.getOrNull(center + off)?.thumbnailUrl.orEmpty()
+            if (url.isBlank()) continue
+            try {
+                Glide.with(hostView)
+                    .load(url)
+                    .override(w, h)
+                    .centerCrop()
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .priority(Priority.LOW)
+                    .preload()
+            } catch (_: Exception) {
+            }
+        }
     }
 
     /** id ketma-ketligi bir xilmi — faqat "tasma almashdimi"ni bilamiz. */
@@ -1070,6 +1116,7 @@ class ReelsActivity @JvmOverloads constructor(
                 val signedUid = YuzGramAdsAuth.ensureSignedIn(account)
                 ReelsRepository.deleteReel(reel.id)
                 ReelStorageHelper.deleteVideo(signedUid, reel.videoUrl)
+                ReelStorageHelper.deleteThumbnail(signedUid, reel.thumbnailUrl)
                 if (fragmentView == null) return@launch
                 // currentReels/selectedPosition adapter bilan birga yangilanadi —
                 // aks holda o'chirilgan reel indeksi bo'yicha "arvoh" sahifa qoladi.
@@ -1139,6 +1186,24 @@ class ReelsActivity @JvmOverloads constructor(
             if (loadedCommentCount == 0) View.VISIBLE else View.GONE
         commentsJob = s.launch {
             try {
+                // Disk keşi: panel ikkinchi marta ochilganda izohlar darhol
+                // ko'rinadi, tarmoq javobi keyin ro'yxatni yangilaydi.
+                val cachedComments = try {
+                    ReelsRepository.getCommentsFromCache(reelId)
+                } catch (_: Exception) {
+                    null
+                }
+                if (cachedComments != null && cachedComments.isNotEmpty() &&
+                    fragmentView != null && commentsReelId == reelId && seq == commentsLoadSeq
+                ) {
+                    commentsAdapter?.submit(cachedComments)
+                    loadedCommentCount = cachedComments.size
+                    commentsProgress?.visibility = View.GONE
+                    commentsList?.visibility = View.VISIBLE
+                    commentsEmpty?.visibility = View.GONE
+                    updateCommentsTitle()
+                    commentsLayoutManager?.scrollToPositionWithOffset(cachedComments.size - 1, 0)
+                }
                 val comments = ReelsRepository.getComments(reelId)
                 if (fragmentView == null || commentsReelId != reelId || seq != commentsLoadSeq) return@launch
                 commentsProgress?.visibility = View.GONE

@@ -18,6 +18,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import uz.kodlikino.top4.models.AdBanner
@@ -239,7 +240,15 @@ class YuzAdBannerView @JvmOverloads constructor(
         } else {
             image.visibility = VISIBLE
             try {
-                Glide.with(this).load(local ?: imageUrl).centerCrop().into(image)
+                // Rasm aynan karta o'lchamida decode qilinadi — admin yuklagan
+                // katta JPEG telefon xotirasini bekorga egallamaydi.
+                val width = AndroidUtilities.displaySize.x
+                Glide.with(this)
+                    .load(local ?: imageUrl)
+                    .override(width, heightForWidthPx(width))
+                    .centerCrop()
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .into(image)
             } catch (_: Exception) {
                 image.visibility = GONE
             }

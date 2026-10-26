@@ -53,9 +53,13 @@ class ClassifiedAdImageThumbAdapter(
 
         fun bind(item: ImageItem, position: Int) {
             val cornerPx = (12 * itemView.resources.displayMetrics.density).toInt()
+            // 80dp katak uchun to'liq o'lchamli kamera rasmini decode qilish
+            // ortiqcha: siqilgan nusxa disk keshdan bir zumda chiqadi.
+            val sidePx = (80 * itemView.resources.displayMetrics.density).toInt()
             val options = RequestOptions()
                 .transform(CenterCrop(), RoundedCorners(cornerPx))
-                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                .override(sidePx)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
                 .placeholder(R.drawable.bg_classified_image_placeholder)
                 .error(R.drawable.bg_classified_image_placeholder)
             when (item) {

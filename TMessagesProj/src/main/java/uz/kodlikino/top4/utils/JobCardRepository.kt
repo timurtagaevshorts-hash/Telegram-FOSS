@@ -6,6 +6,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.Source
 import kotlinx.coroutines.tasks.await
 import uz.kodlikino.top4.models.ClassifiedAd
 import uz.kodlikino.top4.models.ClassifiedAdCardThemes
@@ -36,10 +37,10 @@ object JobCardRepository {
                 else -> return null
             }
             val imageUrls = when (val raw = data["imageUrls"]) {
-                is List<*> -> raw.mapNotNull { it as? String }.filter { it.isNotBlank() }
+                is List<*> -> raw.mapNotNull { safeImageUrl(it as? String) }
                 else -> emptyList()
             }
-            val legacyImage = data["imageUrl"] as? String ?: ""
+            val legacyImage = safeImageUrl(data["imageUrl"] as? String).orEmpty()
             val imageUrl = imageUrls.firstOrNull()?.takeIf { it.isNotBlank() }
                 ?: legacyImage.takeIf { it.isNotBlank() }
                 ?: ""
@@ -61,7 +62,7 @@ object JobCardRepository {
                 cardTheme = data["cardTheme"] as? String ?: ClassifiedAdCardThemes.BLACK,
                 ownerUid = data["ownerUid"] as? String ?: "",
                 ownerName = data["ownerName"] as? String ?: "",
-                ownerPhotoUrl = data["ownerPhotoUrl"] as? String ?: "",
+                ownerPhotoUrl = safeImageUrl(data["ownerPhotoUrl"] as? String).orEmpty(),
                 createdAt = readTimestamp(data["createdAt"]),
                 isActive = data["isActive"] as? Boolean ?: true,
                 isBlocked = data["isBlocked"] as? Boolean ?: false,
@@ -77,6 +78,11 @@ object JobCardRepository {
         is Number -> value.toLong()
         is String -> value.toLongOrNull() ?: 0L
         else -> 0L
+    }
+
+    private fun safeImageUrl(raw: String?): String? {
+        val url = raw?.trim().orEmpty()
+        return if (url.startsWith("https://") || url.startsWith("http://")) url else null
     }
 
     private fun readTimestamp(value: Any?): Long = when (value) {
@@ -195,8 +201,22 @@ object JobCardRepository {
         }
     }
 
-    suspend fun findLatestImageUrlForOwner(ownerUid: String, excludeId: String = ""): String {
-        val uid = ownerUid.trim()
+    /** Detail ekrani uchun disk-kesh nusxasi — tarmoq javobigacha darhol chiziladi. */
+    suspend fun getCardByIdFromCache(id: String): JobCard? {
+        if (id.isBlank()) return null
+        return try {
+            val primary = db.collection(COLLECTION_NAME).document(id).get(Source.CACHE).await()
+            if (primary.exists()) {
+                parseCard(primary)?.let { return it }
+            }
+            val legacy = db.collection(LEGACY_COLLECTION).document(id).get(Source.CACHE).await()
+            if (!legacy.exists()) null else parseCard(legacy)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun findLatestImageUrlForOwner(ownerUid: String, excludeId: String = ""): String {        val uid = ownerUid.trim()
         if (uid.isBlank()) return ""
         return try {
             db.collection(COLLECTION_NAME)
@@ -220,7 +240,9 @@ object JobCardRepository {
 
     suspend fun saveCard(card: JobCard) {
         val id = card.id.ifBlank { System.currentTimeMillis().toString() }
-        val existing = getCardById(id)
+        // Ish kartasini tahrirlash oqimi yo'q — yangi karta uchun serverdan
+        // mavjudlikni so'rash 2 ortiqcha roundtrip. Keshdagi nusxa yetarli.
+        val existing = getCardByIdFromCache(id)
         val payload = card.copy(
             id = id,
             isActive = true,

@@ -6,6 +6,8 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.Priority
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import org.telegram.messenger.R
 
@@ -41,9 +43,13 @@ class ClassifiedAdDetailImageAdapter(
         private val ivImage: ImageView = itemView.findViewById(R.id.ivDetailImage)
 
         fun bind(url: String, index: Int) {
+            val dm = ivImage.resources.displayMetrics
             Glide.with(ivImage)
                 .load(url)
+                .override(dm.widthPixels, dm.heightPixels)
                 .fitCenter()
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .priority(Priority.HIGH)
                 .transition(DrawableTransitionOptions.withCrossFade())
                 .placeholder(R.color.yuz_surface)
                 .error(R.color.yuz_surface)

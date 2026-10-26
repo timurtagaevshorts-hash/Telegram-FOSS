@@ -38,6 +38,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.Priority
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
 import org.telegram.messenger.R
@@ -1220,6 +1221,11 @@ class ReelsAdapter(
         }
 
         /** Muallif avatari: Telegram avatari -> YuzGram rasm -> bosh harf. */
+        /** Poster decode o'lchami — ekranning yarmi (past internetda 2–4x tez). */
+        private fun thumbWidth(): Int = (AndroidUtilities.displaySize.x / 2).coerceAtLeast(360)
+
+        private fun thumbHeight(): Int = (AndroidUtilities.displaySize.y / 2).coerceAtLeast(640)
+
         private fun bindAvatar(reel: Reel) {
             val dialogId = if (reel.isStory) reel.storyDialogId
             else reel.uploadedByUid.removePrefix("tg_").toLongOrNull() ?: 0L
@@ -1241,9 +1247,11 @@ class ReelsAdapter(
                 Glide.with(ivAvatarPhoto)
                     .load(photo)
                     .apply(RequestOptions.circleCropTransform())
-                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                    .override(AndroidUtilities.dp(34f), AndroidUtilities.dp(34f))
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .into(ivAvatarPhoto)
             } else {
+                Glide.with(ivAvatarPhoto).clear(ivAvatarPhoto)
                 ivAvatarPhoto.visibility = View.GONE
                 ivAvatarPhoto.setImageDrawable(null)
                 tvAvatarInitial.visibility = View.VISIBLE
@@ -1539,14 +1547,19 @@ class ReelsAdapter(
                 storyThumb.visibility = View.GONE
                 ivThumbnail.visibility = View.VISIBLE
                 if (reel.thumbnailUrl.isNotBlank()) {
+                    // Poster ekranning yarmida decode qilinadi: to'liq o'lchamli
+                    // decode past internetda sezilarli kechikish beradi.
                     Glide.with(ivThumbnail)
                         .load(reel.thumbnailUrl)
+                        .override(thumbWidth(), thumbHeight())
                         .centerCrop()
-                        .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                        .diskCacheStrategy(DiskCacheStrategy.ALL)
+                        .priority(Priority.HIGH)
                         .placeholder(R.drawable.bg_classified_image_placeholder)
                         .error(R.drawable.bg_classified_image_placeholder)
                         .into(ivThumbnail)
                 } else {
+                    Glide.with(ivThumbnail).clear(ivThumbnail)
                     ivThumbnail.setImageDrawable(null)
                     ivThumbnail.setBackgroundColor(ContextCompat.getColor(appContext, R.color.yuz_bg))
                 }
