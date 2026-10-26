@@ -317,6 +317,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private final Drawable[] verifiedCheckDrawable = new Drawable[2];
     private final CrossfadeDrawable[] verifiedCrossfadeDrawable = new CrossfadeDrawable[2];
     private final CrossfadeDrawable[] premiumCrossfadeDrawable = new CrossfadeDrawable[2];
+    private final Drawable[] yuzPremiumBadgeDrawable = new Drawable[2];
     private ScamDrawable scamDrawable;
     private UndoView undoView;
     private OverlaysView overlaysView;
@@ -9002,6 +9003,15 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         return premiumCrossfadeDrawable[a];
     }
 
+    /** #190: YuzGram Premium a'zosining ism yonidagi oltin yulduz belgisi. */
+    private Drawable getYuzPremiumBadgeDrawable(int a) {
+        if (yuzPremiumBadgeDrawable[a] == null) {
+            Drawable drawable = ContextCompat.getDrawable(ApplicationLoader.applicationContext, R.drawable.ic_yuz_star);
+            yuzPremiumBadgeDrawable[a] = drawable != null ? drawable.mutate() : null;
+        }
+        return yuzPremiumBadgeDrawable[a];
+    }
+
     private Drawable getEmojiStatusDrawable(TLRPC.EmojiStatus emojiStatus, boolean switchable, boolean animated, int a) {
         if (emojiStatusDrawable[a] == null) {
             emojiStatusDrawable[a] = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(nameTextView[a], AndroidUtilities.dp(24), a == 0 ? AnimatedEmojiDrawable.CACHE_TYPE_EMOJI_STATUS : AnimatedEmojiDrawable.CACHE_TYPE_KEYBOARD);
@@ -9202,6 +9212,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 } : null);
                 Drawable leftIcon = currentEncryptedChat != null ? getLockIconDrawable() : null;
                 boolean rightIconIsPremium = false, rightIconIsStatus = false;
+                boolean rightIconIsYuzPremium = false;
                 nameTextView[a].setRightDrawableOutside(a == 0);
                 if (a == 0) {
                     if (user.scam || user.fake) {
@@ -9221,6 +9232,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         rightIconIsStatus = true;
                         rightIconIsPremium = false;
                         nameTextView[a].setRightDrawable(getEmojiStatusDrawable(user.emoji_status, false, false, a));
+                        nameTextViewRightDrawableContentDescription = LocaleController.getString(R.string.AccDescrPremium);
+                    } else if (user.self && isYuzPremiumMember()) {
+                        // #190: YuzGram Premium a'zosining oltin yulduzi.
+                        rightIconIsStatus = false;
+                        rightIconIsPremium = true;
+                        rightIconIsYuzPremium = true;
+                        nameTextView[a].setRightDrawable(getYuzPremiumBadgeDrawable(a));
                         nameTextViewRightDrawableContentDescription = LocaleController.getString(R.string.AccDescrPremium);
                     } else if (getMessagesController().isPremiumUser(user)) {
                         rightIconIsStatus = false;
@@ -9243,6 +9261,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         rightIconIsStatus = true;
                         rightIconIsPremium = false;
                         nameTextView[a].setRightDrawable(getEmojiStatusDrawable(user.emoji_status, true, true, a));
+                    } else if (user.self && isYuzPremiumMember()) {
+                        rightIconIsStatus = false;
+                        rightIconIsPremium = true;
+                        rightIconIsYuzPremium = true;
+                        nameTextView[a].setRightDrawable(getYuzPremiumBadgeDrawable(a));
                     } else if (getMessagesController().isPremiumUser(user)) {
                         rightIconIsStatus = false;
                         rightIconIsPremium = true;
@@ -9255,7 +9278,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 if (a == 1 && (rightIconIsStatus || rightIconIsPremium)) {
                     nameTextView[a].setRightDrawableOutside(true);
                 }
-                if (user.self && getMessagesController().isPremiumUser(user)) {
+                if (user.self && rightIconIsYuzPremium) {
+                    nameTextView[a].setRightDrawableOnClick(v -> presentFragment(new uz.kodlikino.top4.ui.YuzPremiumActivity(), false));
+                } else if (user.self && getMessagesController().isPremiumUser(user)) {
                     nameTextView[a].setRightDrawableOnClick(v -> {
                         showStatusSelect();
                     });

@@ -26,6 +26,7 @@
     <string name="premium_checking_purchases">Xaridlar tekshirilmoqda…</string>
     <string name="premium_restore_not_found">Play hisobida bu ilova uchun xarid topilmadi</string>
     <string name="premium_full_already_active">Sizda allaqachon To\'liq Premium faol — bu tarif kerak emas</string>
+    <string name="premium_badge_desc">YuzGram Premium a\'zosi</string>
 
     <!-- Sozlamalar ro'yxatidagi premium qatori (Telegram Premium o'rniga) -->
     <string name="YuzGramPremium">YuzGram Premium</string>
