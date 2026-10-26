@@ -101,10 +101,12 @@ class YuzAiRecorder(
                     voiceSeen = true
                     lastVoiceAt = now
                 }
-                if (!voiceSeen && totalMs > 4000L) break
-                // 1100 -> 750 ms: gap tugashini kutish qisqardi (so'z orasi
-                // pauzalar 500 ms'dan kam, xavfsiz; ~0.35 s tezkor his).
-                if (voiceSeen && now - lastVoiceAt > 750L) break
+                // 4000 -> 3200 ms: jim tugash tezroq aniqlanadi — foydalanuvchi
+                // "eshitilmadi" javobini kutib qolmaydi.
+                if (!voiceSeen && totalMs > 3200L) break
+                // 750 -> 550 ms: so'z orasidagi pauzalar saqlanadi, lekin
+                // buyruq tugagach javob ~0.2 s tezroq boshlanadi.
+                if (voiceSeen && now - lastVoiceAt > 550L) break
                 if (totalMs > 8000L) break
                 for (i in 0 until n) {
                     val v = chunk[i].toInt()

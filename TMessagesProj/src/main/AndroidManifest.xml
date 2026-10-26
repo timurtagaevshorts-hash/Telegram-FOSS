@@ -403,6 +403,14 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:theme="@style/Theme.TMessages.Transparent"/>
+        <!-- AI: bir xil ismga bir nechta chat topilganda markazdagi avatarli
+            tanlov. Tezkor tugma (xizmat) ham shu Activity'ni ochadi. -->
+        <activity
+            android:name="uz.kodlikino.top4.ai.YuzAiChatPickerActivity"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Theme.YuzGramAiPicker" />
         <!-- YuzGram #72: kino ko'rish — avvalgi mustaqil landshaft fullscreen
             pleyer (donor VideoPlayerActivity o'rniga). -->
         <activity

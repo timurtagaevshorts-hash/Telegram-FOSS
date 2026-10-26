@@ -94,6 +94,8 @@ class YuzAiOverlayService : Service() {
         }
         voice = YuzAiVoice(this, voiceCallbacks)
         addBubble()
+        // DNS+TLS oldindan isitiladi — birinchi buyruq handshake'ni kutmaydi.
+        scope.launch(Dispatchers.IO) { runCatching { YuzAiCloud.warmup() } }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -103,6 +105,7 @@ class YuzAiOverlayService : Service() {
     override fun onDestroy() {
         destroyed = true
         running = false
+        YuzAiChatPickerActivity.listener = null
         scope.cancel()
         runCatching { recorder.cancel() }
         runCatching { voice?.release() }
@@ -384,7 +387,24 @@ class YuzAiOverlayService : Service() {
             }
         } else emptyList()
         if (named.size > 1 && res.intent in MULTI_PEER_INTENTS) {
-            speakWhich(res.peerName, named)
+            val kind = when (res.intent) {
+                "send" -> YuzAiEngine.ChoiceKind.SEND
+                "call" -> YuzAiEngine.ChoiceKind.CALL
+                else -> YuzAiEngine.ChoiceKind.OPEN
+            }
+            showPicker(
+                YuzAiEngine.Intent.NeedChoice(
+                    res.peerName.trim(),
+                    named.map {
+                        YuzAiEngine.ChoiceOption(
+                            it,
+                            if (kind == YuzAiEngine.ChoiceKind.SEND) res.message.trim() else ""
+                        )
+                    },
+                    kind
+                ),
+                account
+            )
             return
         }
         val peer = named.firstOrNull()
@@ -417,12 +437,51 @@ class YuzAiOverlayService : Service() {
             is YuzAiEngine.Intent.Call -> openApp()
             is YuzAiEngine.Intent.Goto -> openApp()
             is YuzAiEngine.Intent.PlayMusic -> playMusic(intent.query)
-            is YuzAiEngine.Intent.NeedChoice -> speakWhich(intent.label, intent.options.map { it.peer })
+            is YuzAiEngine.Intent.NeedChoice -> showPicker(intent, account)
             is YuzAiEngine.Intent.Ask -> answer(intent.question, null)
         }
     }
 
-    /** Overlayda tanlash chiplari yo'q — noto'g'ri chatga yubormasdan variantlarni aytamiz. */
+    /**
+     * Bir xil ismli bir nechta chat: ekran markazida avatarli ro'yxat.
+     * Tanlov Activity callback'i orqali qaytadi (xizmatda ActivityResult yo'q).
+     * Oyna ochilmasa — ishonchli zaxira: variantlarni ovoz bilan aytamiz.
+     */
+    private fun showPicker(choice: YuzAiEngine.Intent.NeedChoice, account: Int) {
+        pendingPeer = null
+        setOrb(YuzAiOrbView.Mode.IDLE)
+        val peers = choice.options.map { it.peer }
+        val message = if (choice.kind == YuzAiEngine.ChoiceKind.SEND) {
+            choice.options.firstOrNull()?.text.orEmpty()
+        } else {
+            ""
+        }
+        val started = runCatching {
+            YuzAiChatPickerActivity.listener = { index ->
+                YuzAiChatPickerActivity.listener = null
+                val option = choice.options.getOrNull(index)
+                if (option != null) {
+                    when (choice.kind) {
+                        YuzAiEngine.ChoiceKind.SEND ->
+                            if (option.text.isBlank()) askBody(option.peer)
+                            else sendTo(option.peer, option.text, account)
+                        YuzAiEngine.ChoiceKind.OPEN,
+                        YuzAiEngine.ChoiceKind.CALL -> openApp()
+                    }
+                }
+            }
+            startActivity(
+                YuzAiChatPickerActivity.intent(this, message, peers, account)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }.isSuccess
+        if (!started) {
+            YuzAiChatPickerActivity.listener = null
+            speakWhich(choice.label, peers)
+        }
+    }
+
+    /** Zaxira: tanlov oynasi ochilmasa — variantlarni ovoz bilan aytamiz. */
     private fun speakWhich(label: String, peers: List<YuzAiEngine.Peer>) {
         pendingPeer = null
         val names = peers.take(3).joinToString(", ") { p ->

@@ -60,4 +60,9 @@
     <string name="ai_quick_notif_title">AI tezkor tugma faol</string>
     <string name="ai_quick_notif_text">Bosib ushlab gapiring — qo\'yib yuborsangiz yordamchi bajaradi.</string>
     <string name="ai_quick_open_app">Ilovada davom eting.</string>
+
+    <!-- Bir xil ismga bir nechta chat topilganda — markazdagi avatarli tanlov -->
+    <string name="ai_picker_title">Chatni tanlang</string>
+    <string name="ai_picker_sending">Yuboriladi: «%1$s»</string>
+    <string name="ai_picker_cancel">Bekor qilish</string>
 </resources>

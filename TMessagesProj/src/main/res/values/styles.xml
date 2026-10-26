@@ -164,6 +164,17 @@
         <item name="android:windowNoTitle">true</item>
     </style>
 
+    <!-- AI chat tanlovi: to'liq ekranli shaffof fon, markazda karta.
+         Fon xizmatidan ham ochiladi — systemUiVisibility'ni Activity o'zi qo'yadi. -->
+    <style name="Theme.YuzGramAiPicker" parent="@android:style/Theme.Translucent.NoTitleBar">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
     <!--APP WIDGET-->
 
     <style name="Base.Theme.TMessages.AppWidget" parent="Theme.TMessages"/>

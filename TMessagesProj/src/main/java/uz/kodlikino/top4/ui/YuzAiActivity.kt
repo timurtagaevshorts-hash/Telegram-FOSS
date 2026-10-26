@@ -1,6 +1,7 @@
 package uz.kodlikino.top4.ui
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -34,6 +35,7 @@ import org.telegram.messenger.SendMessagesHelper
 import org.telegram.ui.ActionBar.BaseFragment
 import org.telegram.ui.ChatActivity
 import org.telegram.ui.Components.voip.VoIPHelper
+import uz.kodlikino.top4.ai.YuzAiChatPickerActivity
 import uz.kodlikino.top4.ai.YuzAiCloud
 import uz.kodlikino.top4.ai.YuzAiEngine
 import uz.kodlikino.top4.ai.YuzAiOverlayService
@@ -80,6 +82,8 @@ class YuzAiActivity : BaseFragment() {
     private var quickButton: ImageButton? = null
     private var quickPending = false
     private var choiceHolder: android.widget.HorizontalScrollView? = null
+    // Markazdagi avatarli tanlov ochiq bo'lsa — uning natijasi shu yerda.
+    private var pendingChoice: YuzAiEngine.Intent.NeedChoice? = null
 
     override fun createView(context: Context): View {
         ctx = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
@@ -690,7 +694,7 @@ class YuzAiActivity : BaseFragment() {
         val seq = interactionSeq
         scope.launch {
             val b = try {
-                withTimeoutOrNull(1100L) { YuzAiCloud.speakText(text) }
+                withTimeoutOrNull(850L) { YuzAiCloud.speakText(text) }
             } catch (_: Exception) {
                 null
             }
@@ -721,9 +725,9 @@ class YuzAiActivity : BaseFragment() {
     }
 
     /**
-     * Bir xil ismli bir nechta chat topilganda — savol + bosiladigan variant
-     * chiplari. Chiplar yangi buyruq boshlanishida olib tashlanadi, shunda
-     * eskirgan variant bosilib, noto'g'ri odamga xabar ketmaydi.
+     * Bir xil ismli bir nechta chat topilganda — ekran markazida avatarli
+     * ro'yxat. Ovozli savol aytilmaydi: tanlov darhol ochiladi (tezlik).
+     * Oyna ochilmasa — eski chip usuli zaxira bo'lib qoladi.
      */
     private fun askWhich(intent: YuzAiEngine.Intent.NeedChoice) {
         val m = ctx.getString(R.string.ai_choose_peer, intent.label)
@@ -731,9 +735,33 @@ class YuzAiActivity : BaseFragment() {
         assistant(m)
         setOrb(YuzAiOrbView.Mode.IDLE)
         autoListenArmed = false
-        voice?.speak(m)
-
         clearChoices()
+        pendingChoice = intent
+        val message = if (intent.kind == YuzAiEngine.ChoiceKind.SEND) {
+            intent.options.firstOrNull()?.text.orEmpty()
+        } else {
+            ""
+        }
+        val started = parentActivity != null && runCatching {
+            startActivityForResult(
+                YuzAiChatPickerActivity.intent(
+                    ctx, message, intent.options.map { it.peer }, currentAccount
+                ),
+                REQ_PICK
+            )
+        }.isSuccess
+        if (!started) {
+            pendingChoice = null
+            showChoiceChips(intent)
+        }
+    }
+
+    /**
+     * Zaxira: markazdagi oyna ochilmasa — bosiladigan variant chiplari.
+     * Chiplar yangi buyruq boshlanishida olib tashlanadi, shunda eskirgan
+     * variant bosilib, noto'g'ri odamga xabar ketmaydi.
+     */
+    private fun showChoiceChips(intent: YuzAiEngine.Intent.NeedChoice) {
         val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
         for (option in intent.options) {
             val duplicate = intent.options.count { it.peer.name == option.peer.name } > 1
@@ -935,6 +963,15 @@ class YuzAiActivity : BaseFragment() {
     }
 
     override fun onActivityResultFragment(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQ_PICK) {
+            val choice = pendingChoice
+            pendingChoice = null
+            if (resultCode == Activity.RESULT_OK && choice != null) {
+                val index = data?.getIntExtra(YuzAiChatPickerActivity.EXTRA_INDEX, -1) ?: -1
+                choice.options.getOrNull(index)?.let { executeChoice(choice, it) }
+            }
+            return
+        }
         if (requestCode != REQ_OVERLAY) return
         quickPending = false
         if (Settings.canDrawOverlays(ctx)) {
@@ -945,6 +982,7 @@ class YuzAiActivity : BaseFragment() {
     }
 
     override fun onFragmentDestroy() {
+        pendingChoice = null
         scope.cancel()
         stopAll()
         try {
@@ -959,5 +997,6 @@ class YuzAiActivity : BaseFragment() {
         private const val REQ_MIC = 501
         private const val REQ_OVERLAY = 502
         private const val REQ_MIC_QUICK = 503
+        private const val REQ_PICK = 504
     }
 }
