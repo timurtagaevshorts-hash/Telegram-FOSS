@@ -160,8 +160,12 @@ object YuzReelQuota {
         Result.failure(IllegalStateException("Limitlar yuklanmadi. Internetni tekshiring."))
     }
 
-    /** Admin panel uchun — `settings/app`ga yozish (faqat admin huquqi bilan). */
-    suspend fun saveLimits(limits: ReelLimits): Result<Unit> {
+    /**
+     * Admin panel uchun — `settings/app`ga yozish (faqat admin huquqi bilan).
+     * Muvaffaqiyatda oynada ko'rsatish uchun saqlangan (sanitize qilingan)
+     * qiymatlar qaytadi.
+     */
+    suspend fun saveLimits(limits: ReelLimits): Result<ReelLimits> {
         val clean = sanitize(
             limits.regularDaily, limits.premiumDaily,
             limits.regularMaxMb, limits.premiumMaxMb
@@ -180,7 +184,7 @@ object YuzReelQuota {
             memoryLimits = clean
             lastFetchAt = System.currentTimeMillis()
             persist(clean)
-            Result.success(Unit)
+            Result.success(clean)
         } catch (e: Exception) {
             Result.failure(
                 IllegalStateException("Limitlar saqlanmadi. Admin huquqini tekshiring.")
@@ -219,8 +223,16 @@ object YuzReelQuota {
         }
     }
 
-    suspend fun getRemainingUploads(uid: String, isPremium: Boolean): Int {
-        val limit = loadLimits().dailyLimit(isPremium)
+    /**
+     * Qolgan yuklashlar. [force] — admin panelda o'zgargan limit darhol
+     * ko'rinsin (CreateReel ekrani ochilganda bir marta yangilanadi).
+     */
+    suspend fun getRemainingUploads(
+        uid: String,
+        isPremium: Boolean,
+        force: Boolean = false
+    ): Int {
+        val limit = loadLimits(force).dailyLimit(isPremium)
         if (limit == 0) return Int.MAX_VALUE
         return (limit - getUploadCount(uid)).coerceAtLeast(0)
     }
@@ -289,12 +301,16 @@ object YuzReelQuota {
      * [IllegalStateException] bilan [Result.failure]. Muvaffaqiyatli natija
      * `true` — slot YOZILDI va xatoda [releaseUploadSlot] kerak; `false` —
      * tarif cheksiz, rollback shart emas.
+     *
+     * Limitlar har yuklashda `settings/app`dan majburiy o'qiladi: admin
+     * panel o'zgarishi "keyingi yuklashdan" haqiqatan amal qiladi (10 daqiqalik
+     * kesh faqat UI yorliqlariga tegishli).
      */
     suspend fun reserveUploadSlot(uid: String, isPremium: Boolean): Result<Boolean> {
         if (uid.isBlank()) {
             return Result.failure(IllegalStateException("Telegram orqali kiring"))
         }
-        val limit = loadLimits().dailyLimit(isPremium)
+        val limit = loadLimits(force = true).dailyLimit(isPremium)
         if (limit == 0) return Result.success(false)
         return try {
             val ref = db.collection(COLLECTION).document(uid)

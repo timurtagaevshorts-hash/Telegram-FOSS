@@ -99,7 +99,7 @@ class YuzPremiumManager private constructor(private val context: Context) {
     fun hasPremiumMovies(account: Int): Boolean =
         hasPremiumKino(account) || isFullPremium(account)
 
-    /** Reels haftalik limitining premium darajasi (Faza C: 30 ta/hafta). */
+    /** Reels uchun premium darajasi — admin panel belgilagan premium kunlik limit. */
     fun hasReelsBoost(account: Int): Boolean = isFullPremium(account)
 
     /**

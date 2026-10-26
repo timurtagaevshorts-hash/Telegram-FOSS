@@ -11,7 +11,6 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
-import com.google.firebase.storage.UploadTask
 import kotlinx.coroutines.*
 import org.telegram.messenger.FileLog
 import org.telegram.messenger.R
@@ -57,9 +56,6 @@ class ReelUploadService : android.app.Service() {
         private const val CHANNEL_NAME = "Reel yuklash"
 
         @Volatile
-        private var activeUpload: UploadTask? = null
-
-        @Volatile
         private var isUploading = false
 
         fun isUploading(): Boolean = isUploading
@@ -102,6 +98,10 @@ class ReelUploadService : android.app.Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var wakeLock: PowerManager.WakeLock? = null
 
+    /** Joriy yuklash job'i — "Bekor qilish" shu orqali haqiqatan uziladi. */
+    private var uploadJob: Job? = null
+    private var cancelRequested = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -134,13 +134,14 @@ class ReelUploadService : android.app.Service() {
                 val account = intent.getIntExtra(EXTRA_ACCOUNT, UserConfig.selectedAccount)
 
                 startForeground(NOTIFICATION_ID, createProgressNotification(0, "Tayyorlanmoqda..."))
-                performUpload(
+                uploadJob = performUpload(
                     videoUri, videoName, videoSize, caption, hashtags, monetization, account
                 )
             }
             ACTION_CANCEL -> {
-                activeUpload?.cancel()
-                stopSelf()
+                cancelRequested = true
+                uploadJob?.cancel()
+                if (uploadJob == null) stopSelf()
             }
         }
         return START_NOT_STICKY
@@ -154,9 +155,10 @@ class ReelUploadService : android.app.Service() {
         hashtags: String,
         monetization: Boolean,
         account: Int
-    ) {
+    ): Job {
         isUploading = true
-        scope.launch {
+        cancelRequested = false
+        return scope.launch {
             val id = System.currentTimeMillis().toString()
             val rawExt = videoName.substringAfterLast('.', "mp4")
                 .lowercase()
@@ -168,6 +170,7 @@ class ReelUploadService : android.app.Service() {
 
             var reservedUid: String? = null
             var slotReserved = false
+            var published = false
             var compressedFile: File? = null
             val boosted = YuzPremiumManager.from(this@ReelUploadService).hasReelsBoost(account)
 
@@ -176,17 +179,18 @@ class ReelUploadService : android.app.Service() {
                 updateNotification(0, "Kirish tekshirilmoqda...")
                 val uid = YuzGramAdsAuth.ensureSignedIn(account)
 
-                // Kvota tekshirish
+                // Kvota tekshirish — limitlar majburiy yangilanadi, shuning uchun
+                // admin panel o'zgarishi "keyingi yuklashdan" haqiqatan amal qiladi.
                 val reservation = YuzReelQuota.reserveUploadSlot(uid, boosted)
                 if (reservation.isFailure) {
                     val msg = reservation.exceptionOrNull()?.message
                         ?: YuzReelQuota.limitExceededMessage(boosted)
                     showErrorNotification(msg)
-                    stopSelf()
                     return@launch
                 }
                 reservedUid = uid
                 slotReserved = reservation.getOrDefault(false)
+                ensureNotCancelled()
 
                 // Siqish
                 updateNotification(0, "Video siqilmoqda...")
@@ -199,12 +203,13 @@ class ReelUploadService : android.app.Service() {
                         onProgress = { pct ->
                             updateNotification(pct / 2, "Siqish: $pct%") // 0-50%
                         },
-                        isCanceled = { !isUploading }
+                        isCanceled = { cancelRequested }
                     )
                 } catch (e: Exception) {
                     FileLog.e(e)
                     null
                 }
+                ensureNotCancelled()
 
                 // Yuklash
                 updateNotification(50, "Yuklanmoqda...")
@@ -222,6 +227,7 @@ class ReelUploadService : android.app.Service() {
                 } else {
                     ReelStorageHelper.uploadVideo(uid, "$id.$ext", videoUri, uploadProgressListener)
                 }
+                ensureNotCancelled()
 
                 // Firestore'ga saqlash
                 updateNotification(100, "Saqlanmoqda...")
@@ -249,27 +255,47 @@ class ReelUploadService : android.app.Service() {
                 )
                 ReelsRepository.saveReel(reel)
 
-                // Muvaffaqiyat
+                // Muvaffaqiyat — endi kvota sloti qaytarilmaydi.
+                published = true
                 showSuccessNotification()
+            } catch (e: CancellationException) {
+                // "Bekor qilish" — xato bildirishnomasi ko'rsatilmaydi,
+                // kvota sloti finally'da qaytariladi.
             } catch (e: Exception) {
                 FileLog.e(e)
-                reservedUid?.let {
-                    try {
-                        YuzReelQuota.releaseUploadSlot(it, slotReserved)
-                    } catch (_: Exception) {
+                if (!cancelRequested) {
+                    showErrorNotification(e.message ?: "Reel joylanmadi")
+                }
+            } finally {
+                if (!published) {
+                    val uid = reservedUid
+                    if (uid != null && slotReserved) {
+                        // Coroutine bekor qilingan bo'lsa ham rollback bajarilsin:
+                        // aks holda foydalanuvchi bekor qilgan yuklash uchun kunlik
+                        // limitdan bitta slot yo'qolib qolardi.
+                        withContext(NonCancellable) {
+                            try {
+                                YuzReelQuota.releaseUploadSlot(uid, true)
+                            } catch (_: Exception) {
+                            }
+                        }
                     }
                 }
-                val reason = e.message ?: "Reel joylanmadi"
-                showErrorNotification(reason)
-            } finally {
                 try {
                     compressedFile?.delete()
                 } catch (_: Exception) {
                 }
                 isUploading = false
+                cancelRequested = false
+                uploadJob = null
                 stopSelf()
             }
         }
+    }
+
+    /** Bekor qilish belgisi qo'yilgan bo'lsa — tozalash/rollback uchun uzilish. */
+    private fun ensureNotCancelled() {
+        if (cancelRequested) throw CancellationException("Yuklash bekor qilindi")
     }
 
     private fun createNotificationChannel() {

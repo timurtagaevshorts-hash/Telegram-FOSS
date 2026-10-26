@@ -49,8 +49,9 @@ import uz.kodlikino.top4.utils.YuzUploadUi
  * BIRINCHI KADRI LOCAL'ga ko'rsatiladi (MediaMetadataRetriever), feed'da esa
  * poster o'rniga video kadr kutiladi.
  *
- * Kunlik kvota: oddiy foydalanuvchi 5 ta/kun · 50 MB, To'liq Premium —
- * cheksiz · 100 MB — [YuzReelQuota] orqali (Firestore `user_reel_quota/{uid}`).
+ * Kunlik kvota va video hajmi admin panelda (Limitlar tabi) oddiy va premium
+ * foydalanuvchilar uchun alohida belgilanadi — [YuzReelQuota] (Firestore
+ * `settings/app` + `user_reel_quota/{uid}`).
  */
 class CreateReelActivity : BaseFragment() {
 
@@ -143,7 +144,7 @@ class CreateReelActivity : BaseFragment() {
         }
         val boosted = premiumBoost()
         s.launch {
-            val remaining = YuzReelQuota.getRemainingUploads(uid, boosted)
+            val remaining = YuzReelQuota.getRemainingUploads(uid, boosted, force = true)
             tvQuota?.text = YuzReelQuota.quotaSummaryLabel(boosted, remaining)
             tvQuota?.visibility = View.VISIBLE
         }
@@ -231,7 +232,8 @@ class CreateReelActivity : BaseFragment() {
                 return@launch
             }
             // Kunlik/hajm limitlari — admin panel sozlamasidan (settings/app).
-            YuzReelQuota.loadLimits()
+            // Majburiy o'qish: admin o'zgartirgan qiymat keyingi yuklashda darhol amal qiladi.
+            YuzReelQuota.loadLimits(force = true)
             val maxBytes = YuzReelQuota.maxFileBytes(premiumBoost())
             if (size > maxBytes) {
                 rejectVideo(YuzReelQuota.sizeLimitMessage(premiumBoost(), size))
@@ -325,22 +327,37 @@ class CreateReelActivity : BaseFragment() {
             toast(R.string.reels_sign_in_required)
             return
         }
+        val ctx = context ?: return
+        val s = scope ?: return
 
         // Instagram uslubida: yuklash fonda ketadi, ekran darhol yopiladi.
         // Foydalanuvchi notification'da progress ko'radi, boshqa ish qilishi mumkin.
+        // Lekin kunlik limit tugagan bo'lsa — ekranni yopmaymiz (yozilgan matn
+        // yo'qolmasin), shu yerda aniq xabar ko'rsatamiz.
         publishing = true
-        uz.kodlikino.top4.services.ReelUploadService.startUpload(
-            context = context ?: return,
-            videoUri = uri,
-            videoName = videoDisplayName,
-            videoSize = videoSizeBytes,
-            caption = caption,
-            hashtags = hashtags,
-            monetization = switchMonetization?.isChecked == true,
-            account = account
-        )
-        toast(getString(R.string.reels_uploading_in_background))
-        removeSelfFromStack()
+        s.launch {
+            val uid = YuzGramAdsAuth.expectedUid(account)
+            val boosted = premiumBoost()
+            val remaining = YuzReelQuota.getRemainingUploads(uid, boosted, force = true)
+            if (remaining <= 0) {
+                publishing = false
+                toast(YuzReelQuota.limitExceededMessage(boosted))
+                refreshQuotaLabel()
+                return@launch
+            }
+            uz.kodlikino.top4.services.ReelUploadService.startUpload(
+                context = ctx,
+                videoUri = uri,
+                videoName = videoDisplayName,
+                videoSize = videoSizeBytes,
+                caption = caption,
+                hashtags = hashtags,
+                monetization = switchMonetization?.isChecked == true,
+                account = account
+            )
+            toast(getString(R.string.reels_uploading_in_background))
+            removeSelfFromStack()
+        }
     }
 
     /**

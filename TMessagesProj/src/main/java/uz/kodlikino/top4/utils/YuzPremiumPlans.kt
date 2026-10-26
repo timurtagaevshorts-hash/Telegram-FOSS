@@ -42,7 +42,7 @@ object YuzPremiumPlans {
         upgradeNote = VALIDITY_NOTE,
         benefits = listOf(
             "Premium belgilangan kinolarni cheksiz tomosha",
-            "Reels limiti oddiy foydalanuvchi kabi (3 ta/hafta · 50 MB)"
+            "Reels limiti oddiy foydalanuvchidagidek qoladi"
         ),
         buttonText = "Tarifga ulanish"
     )
@@ -55,8 +55,8 @@ object YuzPremiumPlans {
         upgradeNote = "Premium Kino tarifidan o'tish narxi",
         benefits = listOf(
             "Barcha premium kinolar ochiq",
-            "Haftasiga 30 tagacha reel joylash",
-            "100 MB gacha video hajmi"
+            "Reels uchun alohida, yuqoriroq kunlik limit",
+            "Kattaroq video hajmi limiti"
         ),
         buttonText = "To'liq Premium olish"
     )

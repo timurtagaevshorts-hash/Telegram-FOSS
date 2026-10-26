@@ -607,20 +607,24 @@ class KinoAdminActivity : BaseFragment() {
 
     private fun loadLimits() {
         val s = scope ?: return
-        limitsLoadedOnce = true
         limitsBusy = true
         progressLimits?.visibility = View.VISIBLE
         tvLimitsUpdated?.text = ""
+        btnSaveLimits?.isEnabled = false
         s.launch {
             val result = YuzReelQuota.adminLoadLimits()
             if (fragmentView == null) return@launch
             limitsBusy = false
             progressLimits?.visibility = View.GONE
+            btnSaveLimits?.isEnabled = true
             val limits = result.getOrNull()
             if (limits == null) {
+                // Xato bo'lsa tab qayta ochilganda yana urinamiz.
+                limitsLoadedOnce = false
                 fillLimits(YuzReelQuota.cachedLimits())
                 toast(R.string.yuz_admin_limits_load_failed)
             } else {
+                limitsLoadedOnce = true
                 fillLimits(limits)
                 tvLimitsUpdated?.text = getString(
                     R.string.yuz_admin_limits_updated, timeFormat.format(Date())
@@ -667,6 +671,9 @@ class KinoAdminActivity : BaseFragment() {
             progressLimits?.visibility = View.GONE
             btnSaveLimits?.isEnabled = true
             if (result.isSuccess) {
+                // Serverda saqlangan (sanitize qilingan) qiymatlarni qayta ko'rsatamiz —
+                // maydonlar bilan haqiqiy holat ajralib qolmasin.
+                result.getOrNull()?.let { fillLimits(it) }
                 toast(R.string.yuz_admin_limits_saved)
                 tvLimitsUpdated?.text = getString(
                     R.string.yuz_admin_limits_updated, timeFormat.format(Date())
