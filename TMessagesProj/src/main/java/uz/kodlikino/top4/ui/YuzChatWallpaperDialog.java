@@ -348,9 +348,7 @@ public class YuzChatWallpaperDialog {
                     pickButton.setEnabled(true);
                     pickButton.setText(LocaleController.getString(R.string.yuz_wallpaper_pick));
                 }
-                if (dialog == null) {
-                    return;
-                }
+                // Oyna yopilgan bo'lsa ham rasm saqlangan — chat qatlami yangilanishi shart.
                 if (bitmap != null) {
                     showPreview(bitmap, YuzChatWallpaper.getOpacity(dialogId));
                     if (host != null) {

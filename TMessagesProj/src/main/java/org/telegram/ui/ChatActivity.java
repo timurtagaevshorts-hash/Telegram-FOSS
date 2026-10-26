@@ -1445,7 +1445,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     private final static int scheduled = 63;
     private final static int edit_quick_reply = 64;
 
-    private final static int yuz_chat_wallpaper = 69;
+    private final static int yuz_chat_wallpaper = 70;
 
     private final static int copy_business_link = 65;
     private final static int share_business_link = 66;
