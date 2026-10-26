@@ -1163,7 +1163,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                             }
                         }
                     } else if (!onlySelect || initialDialogsType == DIALOGS_TYPE_FORWARD) {
-                        h -= actionBar.getMeasuredHeight();
+                        // YuzGram #209: asosiy ildizda ro'yxat to'liq ekran — dock suzuvchi.
+                        // Aks holda sahifa action bar balandligiga (~84dp, status bar bilan)
+                        // qisqarib, dock ortida bo'sh lenta qoladi.
+                        if (!isYuzGramMainRoot()) {
+                            h -= actionBar.getMeasuredHeight();
+                        }
                     }
                     if (dialogsHintCell != null) {
                         h -= dialogsHintCell.height();

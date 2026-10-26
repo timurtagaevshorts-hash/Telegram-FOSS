@@ -1366,6 +1366,12 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter implements
             if (isTransitionSupport) {
                 height += AndroidUtilities.dp(1000);
             }
+            // YuzGram #209: asosiy chat root'da ro'yxat to'liq ekran (dock suzuvchi).
+            // Telegram'ning ko'rinmas oxirgi-bo'sh footer'i dock ortida bo'sh lenta
+            // bo'lib ko'rinardi — oxirgi qator ekran tubigacha tushsin.
+            if (!isTransitionSupport && parentFragment != null && parentFragment.isYuzGramMainRoot()) {
+                height = 0;
+            }
             super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
         }
     }
