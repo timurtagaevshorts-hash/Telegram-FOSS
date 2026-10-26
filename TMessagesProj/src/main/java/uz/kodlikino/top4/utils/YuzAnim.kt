@@ -70,8 +70,6 @@ object YuzAnim {
         v.rotation = 0f
     }
 
-    fun isPlayLoading(img: View?): Boolean = img != null && playSpinners.containsKey(img)
-
     /** Ko'tarilib kirish (pastki pler bari, navbat paneli). */
     fun slideInUp(v: View?, px: Float, durationMs: Long = 280L) {
         val t = v ?: return
