@@ -30,6 +30,7 @@ object YuzReelNotifyHub {
      * Faollikni yoqadi. Firebase sessiyasi ochilmaguncha listener ulanmaydi —
      * qoidalar `user_notifications` o'qishni faqat egasiga ruxsat beradi.
      */
+    @JvmStatic
     fun attach(context: Context, account: Int) {
         val appContext = context.applicationContext
         val expected = YuzGramAdsAuth.expectedUid(account)
@@ -59,6 +60,7 @@ object YuzReelNotifyHub {
     }
 
     /** Ilova fonda — tinglashni to'xtatamiz (batareya/trafik). */
+    @JvmStatic
     fun detach() {
         generation++
         listener?.remove()

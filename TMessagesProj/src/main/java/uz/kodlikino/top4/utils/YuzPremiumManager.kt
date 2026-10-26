@@ -143,6 +143,7 @@ class YuzPremiumManager private constructor(private val context: Context) {
         @Volatile
         private var instance: YuzPremiumManager? = null
 
+        @JvmStatic
         fun from(context: Context): YuzPremiumManager {
             instance?.let { return it }
             synchronized(this) {
