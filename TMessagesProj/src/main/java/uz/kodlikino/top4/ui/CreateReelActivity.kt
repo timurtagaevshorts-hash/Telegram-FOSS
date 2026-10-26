@@ -75,7 +75,7 @@ class CreateReelActivity : BaseFragment() {
     private var llPickPrompt: View? = null
     private var ivVideoPreview: ImageView? = null
     private var previewScrim: View? = null
-    private var btnPickOverlay: TextView? = null
+    private var btnPickOverlay: View? = null
     private var tvVideoDuration: TextView? = null
     private var tvVideoMeta: TextView? = null
     private var progressAnalyze: ProgressBar? = null
@@ -85,7 +85,6 @@ class CreateReelActivity : BaseFragment() {
     private var tvQuota: TextView? = null
     private var etReelName: TextInputEditText? = null
     private var etCaption: TextInputEditText? = null
-    private var etHashtags: TextInputEditText? = null
     private var btnPublish: MaterialButton? = null
 
     private var videoUri: Uri? = null
@@ -121,7 +120,6 @@ class CreateReelActivity : BaseFragment() {
         tvQuota = root.findViewById(R.id.tvQuotaInfo)
         etReelName = root.findViewById(R.id.etReelName)
         etCaption = root.findViewById(R.id.etCaption)
-        etHashtags = root.findViewById(R.id.etHashtags)
         btnPublish = root.findViewById(R.id.btnPublish)
 
         toolbar?.let { bar ->
@@ -317,15 +315,6 @@ class CreateReelActivity : BaseFragment() {
         return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
     }
 
-    /** "kino, #top" → "#kino #top" — tartib saqlanadi, duplikatlar o'chadi. */
-    private fun normalizeHashtags(raw: String): String {
-        return raw.split(Regex("[,;\\s]+"))
-            .map { it.trim().removePrefix("#") }
-            .filter { it.isNotBlank() }
-            .distinctBy { it.lowercase() }
-            .joinToString(" ") { "#$it" }
-    }
-
     private fun queryDisplayName(uri: Uri): String {
         val ctx = context ?: return uri.lastPathSegment.orEmpty()
         return try {
@@ -362,8 +351,8 @@ class CreateReelActivity : BaseFragment() {
         val description = etCaption?.text?.toString()?.trim().orEmpty()
         // Firestore'da alohida `description` maydoni yo'q — nom va tavsif bitta
         // `title` sifatida saqlanadi (feed'da caption bo'lib ko'rinadi).
+        // Hashtag maydoni yo'q: kerak bo'lsa tavsif ichida yoziladi.
         val title = if (description.isBlank()) name else "$name\n\n$description"
-        val hashtags = normalizeHashtags(etHashtags?.text?.toString().orEmpty())
         val account = currentAccount
         if (YuzGramAdsAuth.expectedUid(account).isBlank()) {
             toast(R.string.reels_sign_in_required)
@@ -400,7 +389,7 @@ class CreateReelActivity : BaseFragment() {
                     uri = uri.toString(),
                     fileName = videoDisplayName,
                     title = title,
-                    hashtags = hashtags,
+                    hashtags = "",
                     sizeBytes = videoSizeBytes,
                     thumbPath = thumbPath,
                     account = account,
@@ -416,7 +405,7 @@ class CreateReelActivity : BaseFragment() {
                     videoName = videoDisplayName,
                     videoSize = videoSizeBytes,
                     caption = title,
-                    hashtags = hashtags,
+                    hashtags = "",
                     thumbPath = thumbPath,
                     account = account
                 )

@@ -17,7 +17,6 @@
     <string name="reels_pick_video">Video tanlash</string>
     <string name="reels_change_video">Boshqa video</string>
     <string name="reels_caption_hint">Sarlavha / tavsif</string>
-    <string name="reels_hashtags_hint">#hashtag lar (ixtiyoriy)</string>
     <string name="reels_publish">Joylash</string>
     <string name="reels_publishing">Yuklanmoqda…</string>
     <string name="reels_video_required">Avval video tanlang</string>
@@ -30,7 +29,7 @@
     <string name="reels_upload_progress">Yuklanmoqda… %1$d%% · %2$s / %3$s</string>
 
     <string name="reels_like">Yoqtirish</string>
-    <string name="reels_pick_video_subtitle">MP4 · 200 MB gacha · vertikal 9:16</string>
+    <string name="reels_pick_video_short">MP4 · 9:16</string>
     <string name="reels_video_chosen">Video tanlandi</string>
     <string name="reels_like_failed">Like saqlanmadi</string>
     <string name="reels_new">Yangi</string>
@@ -44,11 +43,9 @@
 
     <!-- Yuklash oynasi: sarlavha, maydon yorliqlari va fon holati -->
     <string name="reels_upload_heading">Yangi reel</string>
-    <string name="reels_upload_subheading">Video tanlang, nom va tavsif yozing — yuklash fonda davom etadi.</string>
     <string name="reels_name_hint">Video nomi</string>
     <string name="reels_name_required">Video nomini kiriting</string>
     <string name="reels_description_hint">Tavsif (ixtiyoriy)</string>
-    <string name="reels_hashtags_helper">Bo\'sh joy yoki vergul bilan ajrating</string>
     <string name="reels_upload_hint_bg">Yuklash fonda ketadi — ekranni yopsangiz ham davom etadi</string>
     <string name="reels_upload_phase_prepare">Tayyorlanmoqda…</string>
     <string name="reels_upload_phase_compress">Siqilmoqda… %1$d%%</string>
