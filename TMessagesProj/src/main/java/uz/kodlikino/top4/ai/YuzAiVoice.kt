@@ -281,6 +281,9 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
     // eslab qolmasak, foydalanuvchining bildirishnoma ovozi majburan
     // yoqilib qoladi. Endi faqat haqiqatan o'zgartirilganda tegadi.
     private var cueMuted = false
+    // Foydalanuvchi bildirishnoma ovozini o'zi o'chirib qo'ygan bo'lsa,
+    // tinglashdan keyin uni "qayta yoqib" yubormasligimiz kerak.
+    private var cueWasSilent = false
 
     private fun playListenSignal() {
         try {
@@ -322,19 +325,60 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
     private fun muteRecognizerCue(mute: Boolean) {
         if (mute == cueMuted) return
         cueMuted = mute
+        val am = try {
+            appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        } catch (_: Exception) {
+            null
+        } ?: return
         try {
-            val am = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                am.adjustStreamVolume(
-                    AudioManager.STREAM_NOTIFICATION,
-                    if (mute) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE,
-                    0
-                )
+            if (mute) {
+                cueWasSilent = isStreamSilent(am, AudioManager.STREAM_NOTIFICATION)
+                setStreamSilent(am, true)
+                // Javob kelmasa ham (xizmat jim yopildi) ovoz abadiy
+                // o'chib qolmasin — ehtiyot taymeri.
+                mainHandler.removeCallbacks(cueRestore)
+                mainHandler.postDelayed(cueRestore, CUE_RESTORE_MS)
             } else {
-                @Suppress("DEPRECATION")
-                am.setStreamMute(AudioManager.STREAM_NOTIFICATION, mute)
+                mainHandler.removeCallbacks(cueRestore)
+                if (!cueWasSilent) setStreamSilent(am, false)
+                cueWasSilent = false
             }
         } catch (_: Exception) {
+        }
+    }
+
+    private val cueRestore = Runnable {
+        if (!cueMuted) return@Runnable
+        cueMuted = false
+        try {
+            val am = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (!cueWasSilent) setStreamSilent(am, false)
+        } catch (_: Exception) {
+        }
+        cueWasSilent = false
+    }
+
+    private fun isStreamSilent(am: AudioManager, stream: Int): Boolean = try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            am.isStreamMute(stream)
+        } else {
+            @Suppress("DEPRECATION")
+            am.getStreamVolume(stream) == 0
+        }
+    } catch (_: Exception) {
+        false
+    }
+
+    private fun setStreamSilent(am: AudioManager, mute: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            am.adjustStreamVolume(
+                AudioManager.STREAM_NOTIFICATION,
+                if (mute) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE,
+                0
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            am.setStreamMute(AudioManager.STREAM_NOTIFICATION, mute)
         }
     }
 
@@ -477,6 +521,7 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
 
     companion object {
         private const val TAG = "YuzAiVoice"
+        private const val CUE_RESTORE_MS = 60_000L
         private const val ERROR_LANGUAGE_NOT_SUPPORTED = 13
         private const val ERROR_LANGUAGE_UNAVAILABLE = 14
 

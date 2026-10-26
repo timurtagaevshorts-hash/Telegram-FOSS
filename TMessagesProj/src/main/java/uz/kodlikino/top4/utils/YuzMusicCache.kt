@@ -195,7 +195,15 @@ object YuzMusicCache {
     fun download(context: Context, track: YuzTrack, onProgress: ((Int) -> Unit)? = null, onDone: (DownloadResult) -> Unit) {
         val fresh = Inflight(track)
         fresh.userJoined = true
-        val existing = inflight.putIfAbsent(track.id, fresh)
+        var existing = inflight.putIfAbsent(track.id, fresh)
+        // Bekor qilingan operatsiya xaritada hali turgan bo'lishi mumkin
+        // (qayta urinish oralig'i) — unga ulanib qolmaymiz, aks holda
+        // foydalanuvchi bosgan qayta yuklash CANCELED bo'lib yo'qolardi.
+        var tries = 0
+        while (existing != null && existing.cancellation.canceled && tries++ < 3) {
+            inflight.remove(track.id, existing)
+            existing = inflight.putIfAbsent(track.id, fresh)
+        }
         val operation = existing ?: fresh
         // #155: fon prebuffer'iga attach bo'lgan taqdirda ham yuklash
         // "foydalanuvchiniki"ga aylanadi — bekor qilinmaydi, retry oladi.
@@ -255,12 +263,19 @@ object YuzMusicCache {
             round++
             if (ok || cancellation.canceled || !operation.userJoined || round >= 3) break
             Log.i(TAG, "download round $round FAILED vid=${operation.track.videoId} — 12s'dan keyin qayta")
-            try {
-                Thread.sleep(12_000L)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                break
+            // Bekor qilish 12 sekundgacha kutmasin: 200 ms bo'laklarda
+            // kutamiz va har bo'lakda bekor qilishni tekshiramiz.
+            var waited = 0L
+            while (waited < 12_000L && !cancellation.canceled) {
+                try {
+                    Thread.sleep(200L)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    break
+                }
+                waited += 200L
             }
+            if (cancellation.canceled) break
         }
         val result = when {
             ok -> DownloadResult.DONE
@@ -745,8 +760,11 @@ object YuzMusicCache {
                         cancellation: YuzDownloadCancellation): Boolean {
         return try {
             cancellation.commit {
-                if (!promote(context, tmp, track.id, ext)) return@commit false
+                // Indeks fayldan OLDIN yoziladi: jarayon rename va indeks
+                // orasida o'lsa, fayl indekssiz qolib "yuklangan, lekin
+                // ro'yxatda yo'q" holatiga tushmasin.
                 addToIndex(context, track)
+                if (!promote(context, tmp, track.id, ext)) return@commit false
                 true
             }
         } catch (_: IOException) {

@@ -310,11 +310,19 @@ class YuzPremiumActivity : BaseFragment() {
 
     private fun refreshPriceLabels() {
         val b = billing ?: return
+        val root = fragmentView ?: return
         for (plan in listOf(YuzPremiumPlans.PREMIUM_KINO, YuzPremiumPlans.FULL_PREMIUM)) {
             val isKino = plan.id == YuzPremiumPlans.PREMIUM_KINO.id
             val label = if (isKino) tvKinoPlayPrice else tvFullPlayPrice
             val btn = if (isKino) btnPayKino else btnPayFull
             val price = b.getFormattedPrice(plan.playProductId)
+            // Karta sarlavhasidagi summa ilova taxmini emas, Play haqiqatan
+            // yechadigan narx bo'lishi shart (Play siyosati + foydalanuvchi).
+            if (!price.isNullOrBlank()) {
+                root.findViewById<TextView>(
+                    if (isKino) R.id.tvKinoPrice else R.id.tvFullPrice
+                )?.text = price
+            }
             label?.visibility = View.VISIBLE
             label?.text = if (price.isNullOrBlank()) {
                 getString(R.string.premium_play_unavailable)

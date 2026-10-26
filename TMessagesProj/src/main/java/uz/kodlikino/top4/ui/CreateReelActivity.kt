@@ -24,6 +24,7 @@ import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.telegram.messenger.R
@@ -465,6 +466,7 @@ class CreateReelActivity : BaseFragment() {
     }
 
     override fun onFragmentDestroy() {
+        scope?.cancel()
         scope = null
         YuzUploadUi.keepScreenOn(parentActivity, false)
         super.onFragmentDestroy()

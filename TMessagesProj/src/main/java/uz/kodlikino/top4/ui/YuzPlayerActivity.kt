@@ -504,26 +504,28 @@ class YuzPlayerActivity : BaseFragment() {
         val t = YuzMusicEngine.currentTrack() ?: return
         heartBusy = true
         Thread {
-            val was = inFavorites(t)
-            if (was) {
-                val pl = YuzMusicEngine.playlists(ctx).firstOrNull { it.name == "Sevimli" }
-                if (pl != null) {
-                    val rest = pl.tracks.filter { it.id != t.id }
-                    YuzMusicEngine.playlistRemove(ctx, "Sevimli")
-                    for (x in rest) YuzMusicEngine.playlistAdd(ctx, "Sevimli", x)
+            var removed = false
+            try {
+                removed = inFavorites(t)
+                if (removed) {
+                    YuzMusicEngine.playlistRemoveTrack(ctx, "Sevimli", t.id)
+                } else {
+                    YuzMusicEngine.playlistAdd(ctx, "Sevimli", t)
                 }
-            } else {
-                YuzMusicEngine.playlistAdd(ctx, "Sevimli", t)
-            }
-            ui.post {
-                heartBusy = false
-                if (isFinishing) return@post
-                Toast.makeText(ctx,
-                    ctx.getString(
-                        if (was) R.string.musiqa_fav_removed else R.string.musiqa_fav_added
-                    ),
-                    Toast.LENGTH_SHORT).show()
-                syncButtons()
+            } catch (e: Exception) {
+                android.util.Log.i("YuzHeart", "favorite failed: " + e.javaClass.simpleName)
+            } finally {
+                val wasRemoved = removed
+                ui.post {
+                    heartBusy = false
+                    if (isFinishing) return@post
+                    Toast.makeText(ctx,
+                        ctx.getString(
+                            if (wasRemoved) R.string.musiqa_fav_removed else R.string.musiqa_fav_added
+                        ),
+                        Toast.LENGTH_SHORT).show()
+                    syncButtons()
+                }
             }
         }.start()
     }

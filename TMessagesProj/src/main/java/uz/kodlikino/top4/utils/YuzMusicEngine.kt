@@ -1031,6 +1031,22 @@ object YuzMusicEngine {
         savePlaylists(context, playlists(context).filter { it.name != name })
     }
 
+    /**
+     * Playlist'dan bitta trekni olib tashlaydi — bitta read-modify-write.
+     * Avvalgi "remove + N marta add" yo'li oraliqda jarayon o'lsa ro'yxatni
+     * qirqib qo'yardi.
+     */
+    fun playlistRemoveTrack(context: Context, name: String, trackId: Long): Boolean =
+        synchronized(plLock) {
+            val all = playlists(context)
+            val index = all.indexOfFirst { it.name == name }
+            if (index < 0) return@synchronized false
+            val rest = all[index].tracks.filterNot { it.id == trackId }
+            if (rest.size == all[index].tracks.size) return@synchronized false
+            all[index] = Playlist(name, rest)
+            savePlaylists(context, all)
+        }
+
     private fun savePlaylists(context: Context, list: List<Playlist>): Boolean {
         return try {
             val arr = JSONArray()

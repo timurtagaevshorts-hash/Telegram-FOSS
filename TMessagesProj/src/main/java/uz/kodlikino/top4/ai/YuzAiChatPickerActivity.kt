@@ -39,10 +39,17 @@ import kotlin.math.min
 class YuzAiChatPickerActivity : Activity() {
 
     private var picked = false
+    // Fon xizmati chaqirig'i (listener) va ilova ichidagi chaqiriq
+    // (setResult) aralashib ketmasligi uchun: token qaysi so'rovga tegishli
+    // ekanini aniqlaydi, overlayMode esa natija qayerga ketishini hal qiladi.
+    private var overlayMode = false
+    private var requestToken = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         overridePendingTransition(0, 0)
+        overlayMode = intent.getBooleanExtra(EXTRA_OVERLAY, false)
+        requestToken = intent.getIntExtra(EXTRA_TOKEN, 0)
         applyEdgeToEdge()
         val account = intent.getIntExtra(EXTRA_ACCOUNT, UserConfig.selectedAccount)
         setContentView(
@@ -303,8 +310,7 @@ class YuzAiChatPickerActivity : Activity() {
     private fun close(index: Int) {
         if (picked) return
         picked = true
-        val callback = listener
-        listener = null
+        val callback = takeOverlayCallback()
         if (callback != null) {
             if (index >= 0) callback.invoke(index)
         } else {
@@ -317,13 +323,28 @@ class YuzAiChatPickerActivity : Activity() {
         overridePendingTransition(0, 0)
     }
 
+    /**
+     * Statik callback faqat shu Activity'ni ochgan overlay so'roviga tegishli
+     * bo'lsa olinadi. Aks holda (ilova ichidagi tanlov, yoki eskirgan oyna)
+     * listener tegilmaydi — u yangi so'rovnikidir.
+     */
+    private fun takeOverlayCallback(): ((Int) -> Unit)? {
+        if (!overlayMode || requestToken == 0 || requestToken != overlayRequestToken) {
+            return null
+        }
+        val callback = listener
+        listener = null
+        overlayRequestToken = 0
+        return callback
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         close(-1)
     }
 
     override fun onDestroy() {
-        if (isFinishing) listener = null
+        if (isFinishing) takeOverlayCallback()
         super.onDestroy()
     }
 
@@ -338,6 +359,8 @@ class YuzAiChatPickerActivity : Activity() {
         private const val EXTRA_NAMES = "names"
         private const val EXTRA_USERNAMES = "usernames"
         private const val EXTRA_ACCOUNT = "account"
+        private const val EXTRA_OVERLAY = "overlay"
+        private const val EXTRA_TOKEN = "token"
         const val EXTRA_INDEX = "index"
 
         /**
@@ -347,18 +370,29 @@ class YuzAiChatPickerActivity : Activity() {
         @Volatile
         var listener: ((Int) -> Unit)? = null
 
+        /** Oxirgi overlay so'rovi tokeni — eskirgan oyna uni o'g'irlamasin. */
+        @Volatile
+        private var overlayRequestToken = 0
+
         @JvmStatic
+        @JvmOverloads
         fun intent(
             context: Context,
             message: String,
             peers: List<YuzAiEngine.Peer>,
-            account: Int
+            account: Int,
+            overlay: Boolean = false
         ): Intent = Intent(context, YuzAiChatPickerActivity::class.java).apply {
             putExtra(EXTRA_MESSAGE, message)
             putExtra(EXTRA_IDS, peers.map { it.dialogId }.toLongArray())
             putExtra(EXTRA_NAMES, peers.map { it.name }.toTypedArray())
             putExtra(EXTRA_USERNAMES, peers.map { it.username ?: "" }.toTypedArray())
             putExtra(EXTRA_ACCOUNT, account)
+            putExtra(EXTRA_OVERLAY, overlay)
+            if (overlay) {
+                overlayRequestToken += 1
+                putExtra(EXTRA_TOKEN, overlayRequestToken)
+            }
         }
     }
 }

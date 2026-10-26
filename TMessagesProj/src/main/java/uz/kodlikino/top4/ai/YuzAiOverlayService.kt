@@ -471,7 +471,7 @@ class YuzAiOverlayService : Service() {
                 }
             }
             startActivity(
-                YuzAiChatPickerActivity.intent(this, message, peers, account)
+                YuzAiChatPickerActivity.intent(this, message, peers, account, overlay = true)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
         }.isSuccess

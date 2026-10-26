@@ -115,7 +115,6 @@ class ReelNotificationsActivity : BaseFragment() {
             .map { it.reelId }.distinct()
         if (ids.isEmpty()) return
         val s = scope ?: return
-        val current = adapter?.snapshot().orEmpty()
         s.launch {
             val thumbs = try {
                 withContext(Dispatchers.IO) { loadThumbs(ids) }
@@ -123,8 +122,11 @@ class ReelNotificationsActivity : BaseFragment() {
                 emptyMap()
             }
             if (thumbs.isEmpty() || fragmentView == null) return@launch
+            // IO davomida kelgan yangi bildirmalar yo'qolmasin — joriy
+            // ro'yxatga qo'shamiz, retsept (old snapshot)ni qayta yubormaymiz.
+            val latest = adapter?.snapshot().orEmpty()
             adapter?.submit(
-                current.map { item ->
+                latest.map { item ->
                     val url = thumbs[item.reelId]
                     if (item.reelThumbUrl.isBlank() && !url.isNullOrBlank()) item.copy(reelThumbUrl = url) else item
                 }
