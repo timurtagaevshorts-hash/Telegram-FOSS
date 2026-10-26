@@ -77,6 +77,7 @@
     <string name="reels_comment_failed">Izoh yuborilmadi</string>
     <string name="reels_comment_reply_to">%1$s javob</string>
     <string name="reels_comment_replying_to">%1$s ga javob</string>
+    <string name="reels_comment_reply_action">Javob berish</string>
     <string name="reels_comment_now">hozirgina</string>
     <string name="reels_comment_minutes">%1$d daqiqa oldin</string>
     <string name="reels_comment_hours">%1$d soat oldin</string>

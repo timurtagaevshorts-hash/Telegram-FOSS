@@ -135,11 +135,14 @@ class ReelCommentsAdapter(
         private val tvText: TextView = itemView.findViewById(R.id.tvCommentText)
         private val tvTime: TextView = itemView.findViewById(R.id.tvCommentTime)
         private val tvReplyHint: TextView = itemView.findViewById(R.id.tvCommentReplyHint)
+        private val tvReply: TextView = itemView.findViewById(R.id.tvCommentReply)
 
         init {
             tgAvatar.setRoundRadius(AndroidUtilities.dp(15f))
             tgAvatar.getImageReceiver().setCurrentAccount(account)
             tgAvatar.visibility = View.GONE
+            // Instagram'dagi kabi vaqt yonidagi "Javob berish" belgisi.
+            tvReply.setIconStart(R.drawable.ic_yuz_reply, sizeDp = 12, gapDp = 4)
             avatarHost.addView(
                 tgAvatar,
                 FrameLayout.LayoutParams(
@@ -207,6 +210,7 @@ class ReelCommentsAdapter(
                 onReply(comment)
                 true
             }
+            tvReply.setOnClickListener(reply)
 
             // Muallif avatar/ismi — bosilsa o'sha foydalanuvchining profili ochiladi
             // (izoh YuzGram sessiyasida yozilgani uchun userId aniq `tg_<id>`).
