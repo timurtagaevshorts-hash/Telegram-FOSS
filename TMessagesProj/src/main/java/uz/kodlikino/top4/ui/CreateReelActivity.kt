@@ -407,17 +407,28 @@ class CreateReelActivity : BaseFragment() {
                     updatedAt = now
                 )
             )
-            ReelUploadService.startUpload(
-                context = ctx,
-                uploadId = id,
-                videoUri = uri,
-                videoName = videoDisplayName,
-                videoSize = videoSizeBytes,
-                caption = title,
-                hashtags = hashtags,
-                thumbPath = thumbPath,
-                account = account
-            )
+            try {
+                ReelUploadService.startUpload(
+                    context = ctx,
+                    uploadId = id,
+                    videoUri = uri,
+                    videoName = videoDisplayName,
+                    videoSize = videoSizeBytes,
+                    caption = title,
+                    hashtags = hashtags,
+                    thumbPath = thumbPath,
+                    account = account
+                )
+            } catch (e: Exception) {
+                // Servisni ishga tushirish taqiqlangan bo'lsa (fon cheklovi) —
+                // trekerda "yuklanmoqda" osilib qolmasin.
+                YuzReelUploads.fail(id, getString(R.string.reels_publish_failed))
+                publishing = false
+                btnPublish?.text = getString(R.string.reels_publish)
+                refreshPublishState()
+                toast(getString(R.string.reels_publish_failed))
+                return@launch
+            }
             toast(getString(R.string.reels_uploading_in_background))
             removeSelfFromStack()
         }
