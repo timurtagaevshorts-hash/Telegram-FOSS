@@ -122,13 +122,22 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         }
 
         override fun onPlayingChanged(playing: Boolean) {
-            // #128: play/pause almashinuvi uzluksiz — ikon so'nadi, yangisi
-            // "pop" bilan chiqadi.
-            YuzAnim.swapIcon(
-                btnPlayPause,
-                if (playing) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
-            )
+            if (YuzMusicEngine.isPreparing()) {
+                syncPlayButton()
+            } else {
+                // #128: play/pause almashinuvi uzluksiz — ikon so'nadi, yangisi
+                // "pop" bilan chiqadi.
+                YuzAnim.setPlayLoading(btnPlayPause, false)
+                YuzAnim.swapIcon(
+                    btnPlayPause,
+                    if (playing) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
+                )
+            }
             syncPlayingMark()
+        }
+
+        override fun onPreparingChanged(preparing: Boolean) {
+            syncPlayButton()
         }
 
         override fun onStatus(text: String?) {
@@ -328,7 +337,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         val track = YuzMusicEngine.currentTrack()
         if (track != null) {
             updateBarTrack(track)
-            btnPlayPause?.setImageResource(if (p.isPlaying) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play)
+            syncPlayButton()
         } else {
             playerBar?.visibility = View.GONE
         }
@@ -336,6 +345,20 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         btnLoop?.alpha = if (looping) 1.0f else 0.45f
         syncPlayingMark()
         updateProgress()
+    }
+
+    /** #213: pastki bardagi tugma — ochilish halqasi yoki ijro/pauza ikonkasi. */
+    private fun syncPlayButton() {
+        val b = btnPlayPause ?: return
+        if (YuzMusicEngine.isPreparing()) {
+            YuzAnim.setPlayLoading(b, true)
+            return
+        }
+        YuzAnim.setPlayLoading(b, false)
+        b.setImageResource(
+            if (YuzMusicEngine.playerOrNull()?.isPlaying == true) R.drawable.ic_yuz_pause
+            else R.drawable.ic_yuz_play
+        )
     }
 
     private fun syncPlayingMark() {

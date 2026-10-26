@@ -17,6 +17,7 @@ import com.bumptech.glide.Glide
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import org.telegram.ui.LaunchActivity
+import uz.kodlikino.top4.utils.YuzAnim
 import uz.kodlikino.top4.utils.YuzMusicEngine
 
 /**
@@ -148,9 +149,15 @@ object YuzMiniPlayer : Application.ActivityLifecycleCallbacks, YuzMusicEngine.Ob
             return
         }
         val p = YuzMusicEngine.playerOrNull()
-        b.findViewById<ImageButton>(R.id.btnMiniPlay).setImageResource(
-            if (p != null && p.isPlaying) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
-        )
+        val play = b.findViewById<ImageButton>(R.id.btnMiniPlay)
+        if (YuzMusicEngine.isPreparing()) {
+            YuzAnim.setPlayLoading(play, true)
+        } else {
+            YuzAnim.setPlayLoading(play, false)
+            play.setImageResource(
+                if (p != null && p.isPlaying) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
+            )
+        }
         tvTitle?.text = track!!.title
         tvArtist?.text = YuzMusicEngine.lastStatusText() ?: track.artist
         if (track.coverUrl.isNotBlank()) {
@@ -178,6 +185,10 @@ object YuzMiniPlayer : Application.ActivityLifecycleCallbacks, YuzMusicEngine.Ob
     }
 
     override fun onPlayingChanged(playing: Boolean) {
+        if (bar != null) ui.post { update() }
+    }
+
+    override fun onPreparingChanged(preparing: Boolean) {
         if (bar != null) ui.post { update() }
     }
 

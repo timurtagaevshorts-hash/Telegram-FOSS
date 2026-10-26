@@ -94,11 +94,30 @@ class YuzPlayerActivity : BaseFragment() {
         }
 
         override fun onPlayingChanged(playing: Boolean) {
+            // #213: qo'shiq hali ochilmoqda — halqa ikonni egallab turadi.
+            if (YuzMusicEngine.isPreparing()) {
+                YuzAnim.setPlayLoading(btnPlay, true)
+                return
+            }
+            YuzAnim.setPlayLoading(btnPlay, false)
             // #128: uzluksiz ikon almashinuvi + pop.
             YuzAnim.swapIcon(
                 btnPlay,
                 if (playing) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
             )
+        }
+
+        override fun onPreparingChanged(preparing: Boolean) {
+            if (destroyed) return
+            if (preparing) {
+                YuzAnim.setPlayLoading(btnPlay, true)
+            } else {
+                YuzAnim.setPlayLoading(btnPlay, false)
+                btnPlay?.setImageResource(
+                    if (YuzMusicEngine.playerOrNull()?.isPlaying == true) R.drawable.ic_yuz_pause
+                    else R.drawable.ic_yuz_play
+                )
+            }
         }
 
         override fun onStatus(text: String?) {
@@ -320,9 +339,14 @@ class YuzPlayerActivity : BaseFragment() {
 
     private fun syncButtons() {
         val p = YuzMusicEngine.playerOrNull()
-        btnPlay?.setImageResource(
-            if (p != null && p.isPlaying) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
-        )
+        if (YuzMusicEngine.isPreparing()) {
+            YuzAnim.setPlayLoading(btnPlay, true)
+        } else {
+            YuzAnim.setPlayLoading(btnPlay, false)
+            btnPlay?.setImageResource(
+                if (p != null && p.isPlaying) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
+            )
+        }
         btnShuffle?.alpha = if (p != null && p.shuffleModeEnabled) 1.0f else 0.45f
         when (p?.repeatMode) {
             Player.REPEAT_MODE_ONE -> {

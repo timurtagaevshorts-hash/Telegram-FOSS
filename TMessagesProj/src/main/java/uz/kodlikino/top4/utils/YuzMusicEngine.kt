@@ -56,6 +56,7 @@ object YuzMusicEngine {
         fun onItemChanged(item: MediaItem?) {}
         fun onPlayingChanged(playing: Boolean) {}
         fun onStatus(text: String?) {}
+        fun onPreparingChanged(preparing: Boolean) {}
     }
 
     private const val TAG = "YuzMusic"
@@ -99,6 +100,40 @@ object YuzMusicEngine {
 
     var queueTracks: List<YuzTrack> = emptyList()
         private set
+
+    /**
+     * #213: qo'shiq hali BOSHLANMADI (URL resolve + birinchi bufer). UI shu
+     * paytda play tugmasida aylanadigan halqa ko'rsatadi — sekin internetda
+     * "bosildi-yu hech narsa bo'lmadi" degan taassurot qolmasin.
+     */
+    @Volatile
+    private var preparing = false
+    // Halqa faqat HAQIQATAN kutish bo'lsa ko'rinadi: keshdagi/lokal qo'shiq
+    // 50-150ms ichida boshlanadi — bir zumlik "miltillash" bo'lmasin.
+    private var preparingShown = false
+    private val preparingNotify = Runnable {
+        if (preparing && !preparingShown) {
+            preparingShown = true
+            for (o in observers) runCatching { o.onPreparingChanged(true) }
+        }
+    }
+
+    /** UI ko'rsatayotgan holat (kechiktirilgan): play tugmasida halqa bormi. */
+    fun isPreparing(): Boolean = preparingShown
+
+    private fun setPreparing(on: Boolean) {
+        if (preparing == on) return
+        preparing = on
+        Log.i(TAG, "preparing=$on")
+        ui.removeCallbacks(preparingNotify)
+        if (on) {
+            ui.postDelayed(preparingNotify, 180L)
+            return
+        }
+        if (!preparingShown) return
+        preparingShown = false
+        for (o in observers) runCatching { o.onPreparingChanged(false) }
+    }
 
     private const val PREFS = "yuz_music_prefs"
     private const val KEY_RADIO = "radio_extend"
@@ -256,6 +291,7 @@ object YuzMusicEngine {
         if (p.currentMediaItem == null) return
         if (p.isPlaying) {
             p.pause()
+            setPreparing(false)
             return
         }
         if (p.playbackState == Player.STATE_ENDED) {
@@ -264,6 +300,9 @@ object YuzMusicEngine {
         if (p.playbackState == Player.STATE_IDLE) {
             p.prepare()
         }
+        // #213: tayyor bo'lmagan pleyerda play ham "yuklanmoqda" holatidan
+        // o'tadi — halqa qo'shiq boshlanguncha turadi.
+        setPreparing(p.playbackState != Player.STATE_READY)
         p.playWhenReady = true
         startMusicServiceOnce()
     }
@@ -291,10 +330,12 @@ object YuzMusicEngine {
         val load = DefaultLoadControl.Builder()
             // #86 sekin internet: buffer maqsadi kengaytirildi — 20s'lik
             // zaxira (sukut 15s) va 60s'gacha oldindan yuklash taroq
-            // uzilib qolsa ham ijro davom etishini ta'minlaydi. Boshlanish
-            // uchun 2s yetadi (eski 0.9s juda erta edi: o'yin boshlanib,
-            // birinchi oyna tugamay tinch holatga qaytardi).
-            .setBufferDurationsMs(20000, 60000, 2000, 4000)
+            // uzilib qolsa ham ijro davom etishini ta'minlaydi.
+            // #213 boshlanish tezligi: 2s -> 1.2s. Bufer chegarasi sekin
+            // taroqda ham ~1s audio (128kbps'da ~19KB) — qo'shiq darhol
+            // eshitila boshlaydi; uzilish bo'lsa rebuffer chegarasi 2.5s
+            // barqaror zaxirani talab qiladi (4s juda uzoq kutdirardi).
+            .setBufferDurationsMs(20000, 60000, 1200, 2500)
             // #157 orqaga seek: back buffer 0 edi — har bir orqaga siljish
             // oqimni qayta ochardi (0.3-1.5s jimlik + format almashish xavfi).
             // 60s ~1MB (128kbps) — seek buffer ichida bo'lsa darhol bajariladi.
@@ -362,6 +403,7 @@ object YuzMusicEngine {
                 when (state) {
                     Player.STATE_READY -> {
                         ui.removeCallbacks(bufferingWatchdog)
+                        setPreparing(false)
                         postStatus(null)
                         // #86: qo'shiq o'ynala boshladi demak tarmoq tirik —
                         // skip-bo'ron tozaladi, keyingisini yuklashni boshlaydi.
@@ -376,6 +418,7 @@ object YuzMusicEngine {
                     }
                     Player.STATE_BUFFERING -> {
                         ui.removeCallbacks(bufferingWatchdog)
+                        setPreparing(true)
                         // #84: progress kuzatuvi — har 2s'da buffered o'sishini
                         // tekshiramiz (birinchi ochilishda NPE JS parse ~15s
                         // olishi mumkin, shuning uchun darhol sanamaymiz).
@@ -386,6 +429,7 @@ object YuzMusicEngine {
                         ui.postDelayed(bufferingWatchdog, 2000L)
                     }
                     Player.STATE_ENDED -> {
+                        setPreparing(false)
                         // #152: oxirgi qo'shiq ham muddatidan oldin "tugasa"
                         // — radio-uzaytirish o'rniga avval oqimni tiklaymiz.
                         if (retryEarlyEnd(p, p.currentMediaItem, p.currentMediaItemIndex)) {
@@ -413,6 +457,7 @@ object YuzMusicEngine {
 
             override fun onPlayerError(error: PlaybackException) {
                 ui.removeCallbacks(bufferingWatchdog)
+                setPreparing(false)
                 // #161: keyingi give-up hisoboti uchun saqlab qolamiz.
                 lastError = "err=${error.errorCode} ${error.errorCodeName.take(48)}"
                 Log.i(TAG, "playerError code=${error.errorCode} vid=${tagOf(p.currentMediaItem)?.videoId}")
@@ -441,6 +486,7 @@ object YuzMusicEngine {
         for (t in bounded) seenIds.add(t.id)
         YuzYouTubeApi.resetRotation()
         Log.i(TAG, "playQueue n=${bounded.size} start=$idx vid=${bounded.getOrNull(idx)?.videoId}")
+        setPreparing(true)
         p.setMediaItems(bounded.map { buildItem(it) }, idx, C.TIME_UNSET)
         p.prepare()
         p.playWhenReady = true
@@ -457,6 +503,7 @@ object YuzMusicEngine {
         if (p.currentMediaItem == null) {
             queueTracks = listOf(track)
             queueGen++
+            setPreparing(true)
             p.setMediaItem(item)
             p.prepare()
             p.playWhenReady = true
@@ -611,6 +658,7 @@ object YuzMusicEngine {
         val p = player ?: return
         if (index in 0 until p.mediaItemCount) {
             p.seekTo(index, 0L)
+            setPreparing(true)
             p.playWhenReady = true
             prefetchNext(p, index)
         }
@@ -763,6 +811,7 @@ object YuzMusicEngine {
         // o'lgan belgi — navbatni aylib urinish taroqni ham, batareyani
         // ham yeydi. To'xtaymiz va foydalanuvchiga ochiq aytamiz.
         if (consecutiveSkips >= 4) {
+            setPreparing(false)
             postStatus(appCtx.getString(R.string.musiqa_st_weaknet))
             Log.i(TAG, "skip storm -> parked")
             return

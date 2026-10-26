@@ -1,10 +1,14 @@
 package uz.kodlikino.top4.utils
 
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.view.View
 import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.LinearInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
+import org.telegram.messenger.R
 
 /**
  * YuzGram #128: musiqa UI uchun silliq harakat yordamchilari — play/pause
@@ -33,6 +37,40 @@ object YuzAnim {
             pop(t, 0.72f)
         }.start()
     }
+
+    // Yuklanish halqalari tugma bo'yicha yuritiladi — aynan shu view'da
+    // animator ishlayotganini bilish uchun (qayta boshlash "sakrash" beradi).
+    private val playSpinners = java.util.WeakHashMap<View, ObjectAnimator>()
+
+    /**
+     * #213: qo'shiq ochilayotganda (resolve + birinchi bufer) play tugmasi
+     * o'rnida aylanadigan halqa. Tugma rangi (imageTintList) o'zgarmaydi.
+     */
+    fun setPlayLoading(img: ImageView?, loading: Boolean) {
+        val v = img ?: return
+        val running = playSpinners[v]
+        if (loading) {
+            if (running != null) return
+            v.animate().cancel()
+            v.rotation = 0f
+            v.alpha = 1f
+            v.setImageResource(R.drawable.ic_yuz_spinner)
+            val anim = ObjectAnimator.ofFloat(v, View.ROTATION, 0f, 360f).apply {
+                duration = 850L
+                repeatCount = ValueAnimator.INFINITE
+                interpolator = LinearInterpolator()
+            }
+            playSpinners[v] = anim
+            anim.start()
+            return
+        }
+        if (running == null) return
+        playSpinners.remove(v)
+        running.cancel()
+        v.rotation = 0f
+    }
+
+    fun isPlayLoading(img: View?): Boolean = img != null && playSpinners.containsKey(img)
 
     /** Ko'tarilib kirish (pastki pler bari, navbat paneli). */
     fun slideInUp(v: View?, px: Float, durationMs: Long = 280L) {
