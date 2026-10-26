@@ -10,6 +10,9 @@ import kotlin.math.sqrt
  * Mikrofonni oddiy WAV (16 kHz mono PCM16) fayliga yozadi — Gemini STT uchun.
  * RMS-based VAD: gap boshlanib ~0.75 s jimlik bo'lsa to'xtaydi, maksimum 8 s.
  * Umuman gap bo'lmasa null qaytadi (birinchi 4 s ichida) — kvota tejash uchun.
+ *
+ * Push-to-talk: tugma bosilganda [prepare], qo'yib yuborilganda [finish] —
+ * yozuv jimlikni kutmasdan darhol yakunlanadi.
  */
 class YuzAiRecorder(
     /** Xom RMS darajasi (0..1), orb animatsiyasi uchun — IO thread'idan keladi. */
@@ -18,12 +21,25 @@ class YuzAiRecorder(
 
     @Volatile private var cancelled = false
     @Volatile private var cancelRequested = false
+    @Volatile private var finishRequested = false
     @Volatile private var recording = false
 
     fun isRecording(): Boolean = recording
 
     /** Foydalanuvchi mikrofonni o'zi to'xtatganmi (jimlikdan farqlash uchun). */
     fun wasCancelled(): Boolean = cancelRequested
+
+    /** Yangi sessiya boshlanishidan OLDIN chaqiriladi — eski bayroqlar qolmaydi. */
+    fun prepare() {
+        cancelled = false
+        cancelRequested = false
+        finishRequested = false
+    }
+
+    /** Push-to-talk: qo'yib yuborilganda yozuvni bekor qilmasdan yakunlaydi. */
+    fun finish() {
+        finishRequested = true
+    }
 
     fun cancel() {
         cancelled = true
@@ -32,8 +48,7 @@ class YuzAiRecorder(
 
     /** Blocking — faqat IO thread'ida chaqiriladi. */
     fun recordBlocking(): ByteArray? {
-        cancelled = false
-        cancelRequested = false
+        if (cancelled || finishRequested) return null
         val rate = 16000
         val minBuf = try {
             AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
@@ -60,12 +75,11 @@ class YuzAiRecorder(
         var voiceSeen = false
         var levelTick = 0
         try {
-            cancelled = false
             rec.startRecording()
             recording = true
             var startedAt = 0L
             var lastVoiceAt = 0L
-            while (!cancelled) {
+            while (!cancelled && !finishRequested) {
                 val n = rec.read(chunk, 0, chunk.size)
                 if (n <= 0) break
                 val now = System.currentTimeMillis()

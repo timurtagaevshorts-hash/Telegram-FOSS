@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
@@ -67,6 +68,8 @@ class YuzAiActivity : BaseFragment() {
         if (::orb.isInitialized) orb.post { orb.level = level }
     }
     private var cloudBusy = false
+    private var listeningPending = false
+    private var cloudTtsBlockedUntil = 0L
     // Har yangi muloqot eski asinxron javob/TTS'ni bekor qiladi — kechikkan
     // javob yangi buyruq ustidan yozib yubormasin.
     private var interactionSeq = 0
@@ -196,8 +199,8 @@ class YuzAiActivity : BaseFragment() {
             return
         }
         if (cloudBusy) {
-            // Yozib olinayotganda tugma — bekor qilish.
-            if (recorder.isRecording()) {
+            // Yozib olinayotganda (yoki signal oldidan) tugma — bekor qilish.
+            if (recorder.isRecording() || listeningPending) {
                 recorder.cancel()
                 statusView.text = ctx.getString(R.string.ai_cancelled)
             }
@@ -305,6 +308,8 @@ class YuzAiActivity : BaseFragment() {
         if (cloudBusy) return
         clearChoices()
         cloudBusy = true
+        listeningPending = true
+        recorder.prepare()
         val seq = ++interactionSeq
         statusView.text = ctx.getString(R.string.ai_listening)
         setOrb(YuzAiOrbView.Mode.LISTENING)
@@ -313,8 +318,10 @@ class YuzAiActivity : BaseFragment() {
         // Hovuz qurish disk/contacts bilan ishlaydi — UI thread'ni band qilmaymiz.
         scope.launch(Dispatchers.IO) { runCatching { YuzAiEngine.peers(acc) } }
         scope.launch {
-            delay(190L)
+            // Beep (80 ms) tugashi uchun qisqa pauza — signal mikrofonga tushmasin.
+            delay(90L)
             if (!screenActive || parentActivity == null) {
+                listeningPending = false
                 cloudBusy = false
                 return@launch
             }
@@ -322,6 +329,8 @@ class YuzAiActivity : BaseFragment() {
                 withContext(Dispatchers.IO) { recorder.recordBlocking() }
             } catch (_: Exception) {
                 null
+            } finally {
+                listeningPending = false
             }
             if (::orb.isInitialized) orb.level = 0f
             if (parentActivity == null) {
@@ -347,7 +356,9 @@ class YuzAiActivity : BaseFragment() {
             setOrb(YuzAiOrbView.Mode.THINKING)
             statusView.text = ctx.getString(R.string.ai_processing)
             val names = try {
-                YuzAiEngine.peers(acc).map { it.name }.take(120)
+                withContext(Dispatchers.IO) {
+                    YuzAiEngine.peers(acc).map { it.name }.take(120)
+                }
             } catch (_: Exception) {
                 emptyList()
             }
@@ -671,15 +682,25 @@ class YuzAiActivity : BaseFragment() {
 
     private fun speakNice(text: String) {
         val v = voice ?: return
+        // /speak bir marta ishlamasa, 5 daqiqa tizim TTS bilan darhol gapiramiz.
+        if (SystemClock.elapsedRealtime() < cloudTtsBlockedUntil) {
+            v.speak(text)
+            return
+        }
         val seq = interactionSeq
         scope.launch {
             val b = try {
-                withTimeoutOrNull(1500L) { YuzAiCloud.speakText(text) }
+                withTimeoutOrNull(1100L) { YuzAiCloud.speakText(text) }
             } catch (_: Exception) {
                 null
             }
             if (!screenActive || parentActivity == null || cloudBusy || seq != interactionSeq) return@launch
-            if (b != null && b.size > 2000) v.playCloudAudio(b, text) else v.speak(text)
+            if (b != null && b.size > 2000) {
+                v.playCloudAudio(b, text)
+            } else {
+                cloudTtsBlockedUntil = SystemClock.elapsedRealtime() + 5 * 60_000L
+                v.speak(text)
+            }
         }
     }
 

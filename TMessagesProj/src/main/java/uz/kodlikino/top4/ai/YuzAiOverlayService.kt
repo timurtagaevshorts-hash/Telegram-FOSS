@@ -17,6 +17,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
@@ -45,11 +46,11 @@ import kotlin.math.abs
 
 /**
  * #135: tezkor AI tugmasi — ilovadan chiqqan holda ham ekran burchagida
- * turadigan suzuvchi orb. Bosilsa qisqa signal berib mikrofonni ochadi,
- * buyruqni /voice orqali tushunadi va joyida bajaradi (xabar yuborish,
- * musiqa qo'yish, savolga javob). Boshqa ilovalar bilan ishlashga xalaqit
- * bermaydi: oyna kichik, fokus olmaydi, faqat o'ziga tegishni ushlaydi va
- * mikrofon faqat bosilganda yozadi.
+ * turadigan suzuvchi orb. Tinch holatda kichik; bosib ushlab turilganda
+ * kattalashadi va mikrofonni ochadi, qo'yib yuborilganda buyruq darhol
+ * yuboriladi (/voice: xabar, musiqa, savol). Qisqa bosish ham ishlaydi —
+ * u holda yozuv jimlik aniqlamaguncha davom etadi. Oyna fokus olmaydi va
+ * faqat o'z maydonidagi teginishlarni ushlaydi.
  */
 class YuzAiOverlayService : Service() {
 
@@ -58,11 +59,13 @@ class YuzAiOverlayService : Service() {
 
     private var windowManager: WindowManager? = null
     private var bubble: FrameLayout? = null
+    private var bubbleButton: FrameLayout? = null
     private var orb: YuzAiOrbView? = null
 
     private var voice: YuzAiVoice? = null
     private var busy = false
     private var musicBusy = false
+    private var pushToTalk = false
     private var pendingPeer: YuzAiEngine.Peer? = null
     @Volatile private var destroyed = false
 
@@ -108,6 +111,7 @@ class YuzAiOverlayService : Service() {
             runCatching { windowManager?.removeView(view) }
         }
         bubble = null
+        bubbleButton = null
         orb = null
         super.onDestroy()
     }
@@ -117,15 +121,18 @@ class YuzAiOverlayService : Service() {
     private fun addBubble() {
         val wm = getSystemService(Context.WINDOW_SERVICE) as? WindowManager ?: return
         windowManager = wm
-        val size = dp(64)
+        val windowSize = dp(WINDOW_DP)
+        val idleSize = dp(IDLE_DP)
 
         val orbView = YuzAiOrbView(this)
         val icon = ImageView(this).apply {
             setImageResource(R.drawable.ic_yuz_mic)
             imageTintList = ColorStateList.valueOf(Color.WHITE)
         }
-        val container = FrameLayout(this).apply {
+        val button = FrameLayout(this).apply {
             contentDescription = getString(R.string.ai_quick_a11y)
+            isClickable = true
+            isFocusable = true
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(0xE6101A26.toInt())
@@ -139,7 +146,12 @@ class YuzAiOverlayService : Service() {
                     FrameLayout.LayoutParams.MATCH_PARENT
                 )
             )
-            addView(icon, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
+            addView(icon, FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER))
+        }
+
+        // Oyna kattalashgan holatga yetadi; ko'rinadigan tugma tinch holatda kichik.
+        val holder = FrameLayout(this).apply {
+            addView(button, FrameLayout.LayoutParams(idleSize, idleSize, Gravity.CENTER))
         }
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -149,24 +161,25 @@ class YuzAiOverlayService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
         val lp = WindowManager.LayoutParams(
-            size, size, type,
+            windowSize, windowSize, type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = screenWidth() - size - dp(8)
-            y = (screenHeight() * 0.6f).toInt().coerceAtMost(maxY(size))
+            x = screenWidth() - windowSize - dp(8)
+            y = (screenHeight() * 0.6f).toInt().coerceAtMost(maxY(windowSize))
         }
-        attachTouch(container, lp)
+        attachTouch(button, lp)
 
-        val added = runCatching { wm.addView(container, lp) }.isSuccess
+        val added = runCatching { wm.addView(holder, lp) }.isSuccess
         if (!added) {
             stopSelf()
             return
         }
-        bubble = container
+        bubble = holder
+        bubbleButton = button
         orb = orbView
         setOrb(YuzAiOrbView.Mode.IDLE)
     }
@@ -177,6 +190,7 @@ class YuzAiOverlayService : Service() {
         var startX = 0
         var startY = 0
         var dragged = false
+        var downAt = 0L
         val slop = dp(8)
 
         view.setOnTouchListener { _, event ->
@@ -187,28 +201,44 @@ class YuzAiOverlayService : Service() {
                     startX = lp.x
                     startY = lp.y
                     dragged = false
-                    view.animate().scaleX(0.94f).scaleY(0.94f).setDuration(90L).start()
+                    downAt = SystemClock.elapsedRealtime()
+                    if (busy) {
+                        // Yozuv ketayotganda yana bosish — bekor qilish.
+                        recorder.cancel()
+                    } else {
+                        if (voice?.isSpeaking() == true) voice?.stopSpeaking()
+                        beginListening()
+                    }
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = event.rawX - downRawX
                     val dy = event.rawY - downRawY
-                    if (!dragged && (abs(dx) > slop || abs(dy) > slop)) dragged = true
+                    if (!dragged && (abs(dx) > slop || abs(dy) > slop)) {
+                        dragged = true
+                        // Sudrab ko'chirish — tasodifiy yozuvni to'xtatadi.
+                        if (busy) recorder.cancel()
+                    }
                     if (dragged) {
                         lp.x = (startX + dx).toInt()
                         lp.y = (startY + dy).toInt()
                         clampPosition(lp)
-                        runCatching { windowManager?.updateViewLayout(view, lp) }
+                        bubble?.let { runCatching { windowManager?.updateViewLayout(it, lp) } }
                     }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    view.animate().scaleX(1f).scaleY(1f).setDuration(110L).start()
-                    if (dragged) snapToEdge(view, lp) else onBubbleTapped()
+                    if (dragged) {
+                        bubble?.let { snapToEdge(it, lp) }
+                    } else if (busy && SystemClock.elapsedRealtime() - downAt >= HOLD_MS) {
+                        // Ushlab turilgan — qo'yib yuborilishi bilan yakunlaymiz.
+                        pushToTalk = true
+                        recorder.finish()
+                    }
                     true
                 }
                 MotionEvent.ACTION_CANCEL -> {
-                    view.animate().scaleX(1f).scaleY(1f).setDuration(110L).start()
+                    if (busy) recorder.cancel()
                     true
                 }
                 else -> false
@@ -251,40 +281,28 @@ class YuzAiOverlayService : Service() {
         }
     }
 
-    private fun onBubbleTapped() {
+    private fun beginListening() {
+        if (busy) return
         val v = voice ?: return
-        if (busy) {
-            // Yozib olinayotganda qayta bosish — bekor qilish.
-            recorder.cancel()
-            return
-        }
-        if (v.isSpeaking()) {
-            v.stopSpeaking()
-            setOrb(YuzAiOrbView.Mode.IDLE)
-            return
-        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) !=
             PackageManager.PERMISSION_GRANTED
         ) {
             speak(getString(R.string.ai_mic_permission))
             return
         }
-        beginListening()
-    }
-
-    private fun beginListening() {
-        if (busy) return
         busy = true
+        pushToTalk = false
+        recorder.prepare()
         setOrb(YuzAiOrbView.Mode.LISTENING)
         orb?.level = 0f
-        voice?.playReadySignal()
+        v.playReadySignal()
         val account = UserConfig.selectedAccount
         // Ism hovuzini yozuv davomida qurib qo'yamiz — transkript kelganda kutish yo'q.
-        scope.launch { runCatching { YuzAiEngine.peers(account) } }
+        scope.launch(Dispatchers.IO) { runCatching { YuzAiEngine.peers(account) } }
         scope.launch {
-            // Signal tugashi bilan yozishni boshlaymiz — beep VAD'ga "gap"
-            // bo'lib ko'rinmasin (faqat 80ms, lekin jimlik taymeri chalkashadi).
-            delay(190L)
+            // Signal tugashi bilan yozishni boshlaymiz — beep mikrofonga
+            // buyruq bo'lib tushmasin (80 ms signal + qisqa quyruq).
+            delay(90L)
             if (destroyed) return@launch
             if (recorder.wasCancelled()) {
                 busy = false
@@ -306,12 +324,15 @@ class YuzAiOverlayService : Service() {
             if (wav == null) {
                 busy = false
                 setOrb(YuzAiOrbView.Mode.IDLE)
-                speak(getString(R.string.ai_heard_none))
+                // Push-to-talk'da jim qo'yib yuborilgan bo'lsa — uzun uzr emas.
+                if (!pushToTalk) speak(getString(R.string.ai_heard_none))
                 return@launch
             }
             setOrb(YuzAiOrbView.Mode.THINKING)
             val names = try {
-                YuzAiEngine.peers(account).map { it.name }.take(120)
+                withContext(Dispatchers.IO) {
+                    YuzAiEngine.peers(account).map { it.name }.take(120)
+                }
             } catch (_: Exception) {
                 emptyList()
             }
@@ -521,6 +542,12 @@ class YuzAiOverlayService : Service() {
         // Tinch holatda animatsiya to'xtaydi (overlay soatlab turadi —
         // doimiy kadr batareyani yeydi). Faqat ish vaqtida ko'rinadi.
         view.visibility = if (mode == YuzAiOrbView.Mode.IDLE) View.INVISIBLE else View.VISIBLE
+        // Tinch: kichik tugma; eshitish/o'ylash/gapirish: kattalashadi.
+        val target = if (mode == YuzAiOrbView.Mode.IDLE) 1f else ACTIVE_SCALE
+        bubbleButton?.animate()
+            ?.scaleX(target)?.scaleY(target)
+            ?.setDuration(if (mode == YuzAiOrbView.Mode.IDLE) 150L else 110L)
+            ?.start()
     }
 
     // --------------------------------------------------------- foreground
@@ -576,6 +603,10 @@ class YuzAiOverlayService : Service() {
     companion object {
         private const val CHANNEL_ID = "yuz_ai_quick"
         private const val NOTIF_ID = 23071
+        private const val WINDOW_DP = 64   // oyna: kattalashgan orb ham sig'adi
+        private const val IDLE_DP = 48     // tinch holatdagi ko'rinadigan tugma
+        private const val HOLD_MS = 450L   // shundan uzoq ushlansa — qo'yishda yakun
+        private const val ACTIVE_SCALE = 64f / 48f
         private val MULTI_PEER_INTENTS = setOf("send", "call", "open")
 
         @Volatile
