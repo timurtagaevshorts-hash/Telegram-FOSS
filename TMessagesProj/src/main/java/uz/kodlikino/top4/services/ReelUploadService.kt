@@ -4,14 +4,27 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
-import kotlinx.coroutines.*
+import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.telegram.messenger.ApplicationLoader
 import org.telegram.messenger.FileLog
 import org.telegram.messenger.R
 import org.telegram.messenger.UserConfig
@@ -22,62 +35,78 @@ import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzPremiumManager
 import uz.kodlikino.top4.utils.YuzReelCompressor
 import uz.kodlikino.top4.utils.YuzReelQuota
-import uz.kodlikino.top4.utils.YuzUploadWatchdog
+import uz.kodlikino.top4.utils.YuzReelUploads
 import java.io.File
 
 /**
  * Reel yuklashni fon davom ettiradigan service.
  *
- * Muammo: CreateReelActivity yopilganda coroutine scope bekor qilinadi va yuklash
- * uziladi. Foydalanuvchi "yuklanmoqda" ekranida qotib qoladi — boshqa ish qila olmaydi.
+ * Yuklash ekrani (CreateReelActivity) "Joylash" bosilishi bilan yopiladi va
+ * ish shu servisga o'tadi: siqish → Storage'ga yuklash → Firestore'ga yozish.
+ * Har bir qadam [YuzReelUploads] trekeriga yoziladi, shuning uchun profil >
+ * Reels grid'ida "yuklanmoqda" katagi progress bilan turadi.
  *
- * Yechim: Foreground Service — yuklash activity yopilganda ham davom etadi.
- * Notification'da progress ko'rsatiladi. Tugagach notification "Reel joylandi" ga
- * o'zgaradi va bosilganda ReelsActivity ochiladi.
+ * Navbat: avvalgi versiyada bitta global `isUploading` bayrog'i bor edi va
+ * ikkinchi reel jimgina yo'qolardi. Endi so'rovlar navbatga qo'yiladi va
+ * ketma-ket bajariladi — foydalanuvchi ketma-ket bir nechta reel joylashi
+ * mumkin, bekor qilish esa aynan bitta yuklashni (id bo'yicha) to'xtatadi.
  *
- * Instagram uslubida: foydalanuvchi video tanlab, ma'lumotlarni kiritib "Joylash"ni
- * bossin — ekran yopiladi, yuklash fonda ketadi. Notification'da progress ko'radi.
+ * Tezlik: siqish nishoni kichraytirildi (9 MB oddiy / 16 MB premium) — mobil
+ * tarmoqda yuklash vaqti qisqaradi, sifat esa 720p uchun yetarli.
  */
-class ReelUploadService : android.app.Service() {
+class ReelUploadService : Service() {
 
     companion object {
         const val ACTION_UPLOAD = "uz.kodlikino.top4.action.UPLOAD_REEL"
         const val ACTION_CANCEL = "uz.kodlikino.top4.action.CANCEL_UPLOAD"
+        const val EXTRA_UPLOAD_ID = "upload_id"
         const val EXTRA_VIDEO_URI = "video_uri"
         const val EXTRA_VIDEO_NAME = "video_name"
         const val EXTRA_VIDEO_SIZE = "video_size"
         const val EXTRA_CAPTION = "caption"
         const val EXTRA_HASHTAGS = "hashtags"
-        const val EXTRA_MONETIZATION = "monetization"
+        const val EXTRA_THUMB_PATH = "thumb_path"
         const val EXTRA_ACCOUNT = "account"
 
         private const val NOTIFICATION_ID = 20261022
         private const val CHANNEL_ID = "reel_upload"
         private const val CHANNEL_NAME = "Reel yuklash"
 
-        @Volatile
-        private var isUploading = false
+        /** Siqish nishonlari — kichikroq fayl, tezroq yuklash. */
+        private const val TARGET_BYTES_REGULAR = 9L * 1024L * 1024L
+        private const val TARGET_BYTES_PREMIUM = 16L * 1024L * 1024L
+        private const val SAVE_ATTEMPTS = 2
 
-        fun isUploading(): Boolean = isUploading
+        /** Treker va bildirishnomani har tikda yangilamaslik chegaralari. */
+        private const val TRACKER_TICK_MS = 700L
+        private const val NOTIFICATION_TICK_MS = 500L
+
+        @Volatile
+        private var runningCount = 0
+
+        /** Servisda navbatda yoki bajarilayotgan yuklash bormi. */
+        fun isUploading(): Boolean = runningCount > 0
 
         fun startUpload(
             context: Context,
+            uploadId: String,
             videoUri: Uri,
             videoName: String,
             videoSize: Long,
             caption: String,
             hashtags: String,
-            monetization: Boolean,
+            thumbPath: String,
             account: Int
         ) {
             val intent = Intent(context, ReelUploadService::class.java).apply {
                 action = ACTION_UPLOAD
+                putExtra(EXTRA_UPLOAD_ID, uploadId)
                 putExtra(EXTRA_VIDEO_URI, videoUri.toString())
                 putExtra(EXTRA_VIDEO_NAME, videoName)
                 putExtra(EXTRA_VIDEO_SIZE, videoSize)
                 putExtra(EXTRA_CAPTION, caption)
                 putExtra(EXTRA_HASHTAGS, hashtags)
-                putExtra(EXTRA_MONETIZATION, monetization)
+                putExtra(EXTRA_THUMB_PATH, thumbPath)
                 putExtra(EXTRA_ACCOUNT, account)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -87,20 +116,53 @@ class ReelUploadService : android.app.Service() {
             }
         }
 
-        fun cancelUpload(context: Context) {
-            val intent = Intent(context, ReelUploadService::class.java).apply {
+        /**
+         * Aynan [uploadId] yuklashini bekor qiladi. Servis ishlamayotgan bo'lsa
+         * chaqirilmaydi: `startService` fon holatida istisno beradi, trekerdagi
+         * yozuvni esa [YuzReelUploads.dismiss] o'zi olib tashlaydi.
+         */
+        fun cancelUpload(context: Context?, uploadId: String) {
+            if (uploadId.isBlank() || !isUploading()) return
+            val ctx = context ?: ApplicationLoader.applicationContext ?: return
+            val intent = Intent(ctx, ReelUploadService::class.java).apply {
                 action = ACTION_CANCEL
+                putExtra(EXTRA_UPLOAD_ID, uploadId)
             }
-            context.startService(intent)
+            try {
+                ctx.startService(intent)
+            } catch (e: Exception) {
+                FileLog.e(e)
+            }
         }
     }
 
+    private data class Request(
+        val id: String,
+        val uri: Uri,
+        val name: String,
+        val size: Long,
+        val caption: String,
+        val hashtags: String,
+        val thumbPath: String,
+        val account: Int
+    )
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val queue = ArrayDeque<Request>()
+    private var current: Request? = null
+    private var currentJob: Job? = null
+
+    @Volatile
+    private var currentCancelled = false
     private var wakeLock: PowerManager.WakeLock? = null
 
-    /** Joriy yuklash job'i — "Bekor qilish" shu orqali haqiqatan uziladi. */
-    private var uploadJob: Job? = null
-    private var cancelRequested = false
+    private var lastTrackerAt = 0L
+    private var lastNotificationAt = 0L
+    private var lastPhase: YuzReelUploads.Phase? = null
+
+    private var doneCount = 0
+    private var lastDoneName = ""
+    private var lastError = ""
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -113,189 +175,326 @@ class ReelUploadService : android.app.Service() {
             "YuzGram:ReelUpload"
         ).apply {
             setReferenceCounted(false)
-            acquire(10 * 60 * 1000L) // 10 daqiqa maksimal
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_UPLOAD -> {
-                if (isUploading) {
-                    // Allaqachon yuklayapti — qayta boshlamaymiz
+                // startForegroundService → 5 soniya ichida startForeground shart.
+                startForegroundSafe(getString(R.string.reels_upload_phase_prepare))
+                val request = parseRequest(intent)
+                if (request == null) {
+                    if (currentJob == null && queue.isEmpty()) finishService()
                     return START_NOT_STICKY
                 }
-                val videoUriStr = intent.getStringExtra(EXTRA_VIDEO_URI) ?: return START_NOT_STICKY
-                val videoUri = Uri.parse(videoUriStr)
-                val videoName = intent.getStringExtra(EXTRA_VIDEO_NAME) ?: "video.mp4"
-                val videoSize = intent.getLongExtra(EXTRA_VIDEO_SIZE, 0L)
-                val caption = intent.getStringExtra(EXTRA_CAPTION) ?: ""
-                val hashtags = intent.getStringExtra(EXTRA_HASHTAGS) ?: ""
-                val monetization = intent.getBooleanExtra(EXTRA_MONETIZATION, true)
-                val account = intent.getIntExtra(EXTRA_ACCOUNT, UserConfig.selectedAccount)
-
-                startForeground(NOTIFICATION_ID, createProgressNotification(0, "Tayyorlanmoqda..."))
-                uploadJob = performUpload(
-                    videoUri, videoName, videoSize, caption, hashtags, monetization, account
-                )
+                if (current?.id == request.id || queue.any { it.id == request.id }) {
+                    return START_NOT_STICKY
+                }
+                queue.addLast(request)
+                pump()
             }
             ACTION_CANCEL -> {
-                cancelRequested = true
-                uploadJob?.cancel()
-                if (uploadJob == null) stopSelf()
+                val id = intent.getStringExtra(EXTRA_UPLOAD_ID).orEmpty()
+                if (id.isNotBlank()) cancel(id)
             }
         }
         return START_NOT_STICKY
     }
 
-    private fun performUpload(
-        videoUri: Uri,
-        videoName: String,
-        videoSize: Long,
-        caption: String,
-        hashtags: String,
-        monetization: Boolean,
-        account: Int
-    ): Job {
-        isUploading = true
-        cancelRequested = false
-        return scope.launch {
-            val id = System.currentTimeMillis().toString()
-            val rawExt = videoName.substringAfterLast('.', "mp4")
-                .lowercase()
-                .takeIf { it.length in 2..4 && it.all { c -> c.isLetterOrDigit() } }
-            val ext = when (rawExt) {
-                "mov", "mkv", "webm", "3gp", "mp4" -> rawExt!!
-                else -> "mp4"
-            }
+    private fun parseRequest(intent: Intent): Request? {
+        val uriStr = intent.getStringExtra(EXTRA_VIDEO_URI) ?: return null
+        val id = intent.getStringExtra(EXTRA_UPLOAD_ID)?.takeIf { it.isNotBlank() }
+            ?: System.currentTimeMillis().toString()
+        return Request(
+            id = id,
+            uri = Uri.parse(uriStr),
+            name = intent.getStringExtra(EXTRA_VIDEO_NAME) ?: "video.mp4",
+            size = intent.getLongExtra(EXTRA_VIDEO_SIZE, 0L),
+            caption = intent.getStringExtra(EXTRA_CAPTION) ?: "",
+            hashtags = intent.getStringExtra(EXTRA_HASHTAGS) ?: "",
+            thumbPath = intent.getStringExtra(EXTRA_THUMB_PATH) ?: "",
+            account = intent.getIntExtra(EXTRA_ACCOUNT, UserConfig.selectedAccount)
+        )
+    }
 
-            var reservedUid: String? = null
-            var slotReserved = false
-            var published = false
-            var compressedFile: File? = null
-            val boosted = YuzPremiumManager.from(this@ReelUploadService).hasReelsBoost(account)
-
+    /** Navbatdan keyingi so'rovni olib, yuklashni boshlaydi. */
+    private fun pump() {
+        if (currentJob != null) return
+        val next = queue.removeFirstOrNull()
+        if (next == null) {
+            finishService()
+            return
+        }
+        current = next
+        currentCancelled = false
+        lastPhase = null
+        lastTrackerAt = 0L
+        lastNotificationAt = 0L
+        runningCount = 1
+        acquireWakeLock()
+        currentJob = scope.launch {
             try {
-                // Firebase auth
-                updateNotification(0, "Kirish tekshirilmoqda...")
-                val uid = YuzGramAdsAuth.ensureSignedIn(account)
-
-                // Kvota tekshirish — limitlar majburiy yangilanadi, shuning uchun
-                // admin panel o'zgarishi "keyingi yuklashdan" haqiqatan amal qiladi.
-                val reservation = YuzReelQuota.reserveUploadSlot(uid, boosted)
-                if (reservation.isFailure) {
-                    val msg = reservation.exceptionOrNull()?.message
-                        ?: YuzReelQuota.limitExceededMessage(boosted)
-                    showErrorNotification(msg)
-                    return@launch
-                }
-                reservedUid = uid
-                slotReserved = reservation.getOrDefault(false)
-                ensureNotCancelled()
-
-                // Siqish
-                updateNotification(0, "Video siqilmoqda...")
-                compressedFile = try {
-                    YuzReelCompressor.compress(
-                        context = applicationContext,
-                        uri = videoUri,
-                        sizeBytes = videoSize,
-                        targetBytes = if (boosted) 24L * 1024L * 1024L else 12L * 1024L * 1024L,
-                        onProgress = { pct ->
-                            updateNotification(pct / 2, "Siqish: $pct%") // 0-50%
-                        },
-                        isCanceled = { cancelRequested }
-                    )
-                } catch (e: Exception) {
-                    FileLog.e(e)
-                    null
-                }
-                ensureNotCancelled()
-
-                // Yuklash
-                updateNotification(50, "Yuklanmoqda...")
-                val uploadProgressListener: (Int, Long, Long) -> Unit = { pct, transferred, total ->
-                    val progress = 50 + (pct / 2) // 50-100%
-                    val transferredMB = transferred / (1024 * 1024)
-                    val totalMB = total / (1024 * 1024)
-                    updateNotification(progress, "Yuklanmoqda: $transferredMB/$totalMB MB")
-                }
-
-                val url = if (compressedFile != null) {
-                    ReelStorageHelper.uploadVideo(
-                        uid, "$id.mp4", compressedFile!!, uploadProgressListener
-                    )
-                } else {
-                    ReelStorageHelper.uploadVideo(uid, "$id.$ext", videoUri, uploadProgressListener)
-                }
-                ensureNotCancelled()
-
-                // Firestore'ga saqlash
-                updateNotification(100, "Saqlanmoqda...")
-                val user = UserConfig.getInstance(account).currentUser
-                val uploaderName = listOfNotNull(
-                    user?.first_name?.takeIf { it.isNotBlank() },
-                    user?.last_name?.takeIf { it.isNotBlank() }
-                ).joinToString(" ").orEmpty()
-
-                val reel = Reel(
-                    id = id,
-                    videoUrl = url,
-                    thumbnailUrl = "",
-                    views = 0,
-                    title = caption,
-                    hashtags = hashtags,
-                    monetizationEnabled = monetization,
-                    commentCount = 0,
-                    likeCount = 0,
-                    createdAt = System.currentTimeMillis(),
-                    uploadedByUid = uid,
-                    uploadedByName = uploaderName,
-                    uploadedByPhotoUrl = "",
-                    isUserUpload = true
-                )
-                ReelsRepository.saveReel(reel)
-
-                // Muvaffaqiyat — endi kvota sloti qaytarilmaydi.
-                published = true
-                showSuccessNotification()
-            } catch (e: CancellationException) {
-                // "Bekor qilish" — xato bildirishnomasi ko'rsatilmaydi,
-                // kvota sloti finally'da qaytariladi.
-            } catch (e: Exception) {
-                FileLog.e(e)
-                if (!cancelRequested) {
-                    showErrorNotification(e.message ?: "Reel joylanmadi")
-                }
+                performUpload(next)
             } finally {
-                if (!published) {
-                    val uid = reservedUid
-                    if (uid != null && slotReserved) {
-                        // Coroutine bekor qilingan bo'lsa ham rollback bajarilsin:
-                        // aks holda foydalanuvchi bekor qilgan yuklash uchun kunlik
-                        // limitdan bitta slot yo'qolib qolardi.
-                        withContext(NonCancellable) {
-                            try {
-                                YuzReelQuota.releaseUploadSlot(uid, true)
-                            } catch (_: Exception) {
-                            }
-                        }
-                    }
-                }
-                try {
-                    compressedFile?.delete()
-                } catch (_: Exception) {
-                }
-                isUploading = false
-                cancelRequested = false
-                uploadJob = null
-                stopSelf()
+                currentJob = null
+                current = null
+                currentCancelled = false
+                queue.removeAll { it.id == next.id }
+                pump()
             }
         }
     }
 
-    /** Bekor qilish belgisi qo'yilgan bo'lsa — tozalash/rollback uchun uzilish. */
+    private suspend fun performUpload(req: Request) {
+        var reservedUid: String? = null
+        var slotReserved = false
+        var published = false
+        var compressedFile: File? = null
+        val boosted = YuzPremiumManager.from(this).hasReelsBoost(req.account)
+
+        try {
+            report(req, 2, YuzReelUploads.Phase.PREPARE,
+                getString(R.string.reels_upload_phase_prepare), force = true)
+
+            if (!ApplicationLoader.isNetworkOnline()) {
+                throw UploadFailure(getString(R.string.reels_upload_offline))
+            }
+
+            val uid = YuzGramAdsAuth.ensureSignedIn(req.account)
+
+            // Kvota — admin panel limitlari majburiy yangilanadi.
+            val reservation = YuzReelQuota.reserveUploadSlot(uid, boosted)
+            if (reservation.isFailure) {
+                throw UploadFailure(
+                    reservation.exceptionOrNull()?.message
+                        ?: YuzReelQuota.limitExceededMessage(boosted)
+                )
+            }
+            reservedUid = uid
+            slotReserved = reservation.getOrDefault(false)
+            ensureNotCancelled()
+
+            // Siqish: umumiy progress 5–45%.
+            report(req, 5, YuzReelUploads.Phase.COMPRESS,
+                getString(R.string.reels_upload_phase_compress, 0), force = true)
+            compressedFile = try {
+                YuzReelCompressor.compress(
+                    context = applicationContext,
+                    uri = req.uri,
+                    sizeBytes = req.size,
+                    targetBytes = if (boosted) TARGET_BYTES_PREMIUM else TARGET_BYTES_REGULAR,
+                    onProgress = { pct ->
+                        report(
+                            req,
+                            5 + pct * 40 / 100,
+                            YuzReelUploads.Phase.COMPRESS,
+                            getString(R.string.reels_upload_phase_compress, pct)
+                        )
+                    },
+                    isCanceled = { currentCancelled }
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Siqish imkonsiz bo'lsa xom fayl yuboriladi.
+                FileLog.e(e)
+                null
+            }
+            ensureNotCancelled()
+
+            // Yuklash: 45–95%.
+            val fileName = compressedFile?.let { "${req.id}.mp4" } ?: "${req.id}.${extensionOf(req.name)}"
+            report(req, 45, YuzReelUploads.Phase.UPLOAD,
+                getString(R.string.reels_upload_phase_upload, 0), force = true)
+            val uploadProgress: (Int, Long, Long) -> Unit = { pct, transferred, total ->
+                report(
+                    req,
+                    45 + pct * 50 / 100,
+                    YuzReelUploads.Phase.UPLOAD,
+                    getString(
+                        R.string.reels_upload_progress,
+                        pct,
+                        humanBytes(transferred),
+                        humanBytes(total)
+                    )
+                )
+            }
+            val url = if (compressedFile != null) {
+                ReelStorageHelper.uploadVideo(uid, fileName, compressedFile, uploadProgress)
+            } else {
+                ReelStorageHelper.uploadVideo(uid, fileName, req.uri, uploadProgress)
+            }
+            ensureNotCancelled()
+
+            // Firestore: 95–100%.
+            report(req, 95, YuzReelUploads.Phase.SAVE,
+                getString(R.string.reels_upload_phase_save), force = true)
+            val user = UserConfig.getInstance(req.account).currentUser
+            val uploaderName = listOfNotNull(
+                user?.first_name?.takeIf { it.isNotBlank() },
+                user?.last_name?.takeIf { it.isNotBlank() }
+            ).joinToString(" ").orEmpty()
+
+            val reel = Reel(
+                id = req.id,
+                videoUrl = url,
+                thumbnailUrl = "",
+                views = 0,
+                title = req.caption,
+                hashtags = req.hashtags,
+                monetizationEnabled = true,
+                commentCount = 0,
+                likeCount = 0,
+                createdAt = System.currentTimeMillis(),
+                uploadedByUid = uid,
+                uploadedByName = uploaderName,
+                uploadedByPhotoUrl = "",
+                isUserUpload = true
+            )
+            saveToFirestore(reel)
+
+            published = true
+            doneCount++
+            lastDoneName = req.name
+            YuzReelUploads.complete(req.id)
+        } catch (e: CancellationException) {
+            // Bekor qilish — xato ko'rsatilmaydi, kvota finally'da qaytadi.
+            try {
+                YuzReelUploads.complete(req.id)
+            } catch (_: Exception) {
+            }
+        } catch (e: Exception) {
+            FileLog.e(e)
+            if (!currentCancelled) {
+                val message = e.message?.takeIf { it.isNotBlank() }
+                    ?: getString(R.string.reels_publish_failed)
+                lastError = message
+                YuzReelUploads.fail(req.id, message)
+            }
+        } finally {
+            if (!published) {
+                val uid = reservedUid
+                if (uid != null && slotReserved) {
+                    withContext(NonCancellable) {
+                        try {
+                            YuzReelQuota.releaseUploadSlot(uid, true)
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+            }
+            try {
+                compressedFile?.delete()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /**
+     * Firestore yozuvi qisqa tarmoq uzilishida yo'qolmasin: 2 urinish.
+     * Ruxsat xatosi (qoidalar/auth) takrorlashdan foyda yo'q — darhol chiqadi.
+     */
+    private suspend fun saveToFirestore(reel: Reel) {
+        var last: Exception? = null
+        for (attempt in 1..SAVE_ATTEMPTS) {
+            try {
+                ReelsRepository.saveReel(reel)
+                return
+            } catch (e: Exception) {
+                last = e
+                val message = e.message.orEmpty()
+                if (message.contains("ruxsat", true) || message.contains("permission", true)) {
+                    throw e
+                }
+                FileLog.w("ReelUpload save attempt $attempt/$SAVE_ATTEMPTS: $message")
+                if (attempt < SAVE_ATTEMPTS) delay(1500L * attempt)
+            }
+        }
+        throw last ?: UploadFailure(getString(R.string.reels_publish_failed))
+    }
+
+    private fun extensionOf(name: String): String {
+        val raw = name.substringAfterLast('.', "").lowercase()
+        return if (raw.length in 2..4 && raw.all { it.isLetterOrDigit() }) raw else "mp4"
+    }
+
+    /** Treker + bildirishnomani chegaralangan tezlikda yangilaydi. */
+    private fun report(
+        req: Request,
+        overall: Int,
+        phase: YuzReelUploads.Phase,
+        text: String,
+        force: Boolean = false
+    ) {
+        val now = SystemClock.elapsedRealtime()
+        if (force || phase != lastPhase || now - lastTrackerAt >= TRACKER_TICK_MS) {
+            lastPhase = phase
+            lastTrackerAt = now
+            YuzReelUploads.phase(req.id, overall, phase)
+        }
+        if (force || now - lastNotificationAt >= NOTIFICATION_TICK_MS) {
+            lastNotificationAt = now
+            updateNotification(req, overall, text)
+        }
+    }
+
     private fun ensureNotCancelled() {
-        if (cancelRequested) throw CancellationException("Yuklash bekor qilindi")
+        if (currentCancelled) throw CancellationException("Yuklash bekor qilindi")
+    }
+
+    private fun cancel(id: String) {
+        if (current?.id == id) {
+            currentCancelled = true
+            currentJob?.cancel()
+            return
+        }
+        if (queue.removeAll { it.id == id }) {
+            if (currentJob == null && queue.isEmpty()) finishService()
+        }
+    }
+
+    private fun acquireWakeLock() {
+        try {
+            val lock = wakeLock ?: return
+            if (!lock.isHeld) lock.acquire(60 * 60 * 1000L)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            wakeLock?.let { if (it.isHeld) it.release() }
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * Navbat bo'shadi: foreground'ni yechib, natija bildirishnomasini qo'yadi.
+     * Avval `stopForeground(REMOVE)` — aks holda natija bildirishnomasi
+     * aynan shu id bilan darhol o'chirilib ketardi.
+     */
+    private fun finishService() {
+        runningCount = 0
+        releaseWakeLock()
+        val doneName = lastDoneName
+        val error = lastError
+        val done = doneCount
+        doneCount = 0
+        lastDoneName = ""
+        lastError = ""
+        stopForegroundCompat()
+        when {
+            error.isNotBlank() -> showResultNotification(
+                getString(R.string.reels_publish_failed),
+                error
+            )
+            done > 0 -> showResultNotification(
+                getString(R.string.reels_published),
+                doneName
+            )
+        }
+        stopSelf()
     }
 
     private fun createNotificationChannel() {
@@ -313,88 +512,113 @@ class ReelUploadService : android.app.Service() {
         }
     }
 
-    private fun createProgressNotification(progress: Int, text: String): Notification {
-        val intent = Intent(this, org.telegram.ui.LaunchActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+    private fun startForegroundSafe(text: String) {
+        try {
+            val title = current?.name?.takeIf { it.isNotBlank() }
+                ?: getString(R.string.reels_pending_title)
+            startForeground(NOTIFICATION_ID, buildProgressNotification(title, text, 0))
+        } catch (e: Exception) {
+            FileLog.e(e)
         }
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+    }
 
+    private fun buildProgressNotification(
+        title: String,
+        text: String,
+        progress: Int
+    ): Notification {
+        val id = current?.id.orEmpty()
         val cancelIntent = Intent(this, ReelUploadService::class.java).apply {
             action = ACTION_CANCEL
+            putExtra(EXTRA_UPLOAD_ID, id)
         }
-        val cancelPendingIntent = PendingIntent.getService(
-            this, 0, cancelIntent,
+        val cancelPending = PendingIntent.getService(
+            this,
+            if (id.isBlank()) 1 else id.hashCode(),
+            cancelIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
+        val queueSuffix = if (queue.isEmpty()) "" else " · +${queue.size}"
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Reel yuklanmoqda")
-            .setContentText(text)
-            .setSmallIcon(R.drawable.ic_close_white)
-            .setContentIntent(pendingIntent)
+            .setSmallIcon(R.drawable.ic_yuz_gallery)
+            .setColor(ContextCompat.getColor(this, R.color.yuz_action))
+            .setContentTitle(title)
+            .setContentText(text + queueSuffix)
+            .setContentIntent(launchPendingIntent())
+            .setOnlyAlertOnce(true)
             .setOngoing(true)
-            .setProgress(100, progress, false)
-            .addAction(R.drawable.ic_close_white, "Bekor qilish", cancelPendingIntent)
+            .setSilent(true)
+            .setProgress(100, progress.coerceIn(0, 100), false)
+            .addAction(R.drawable.ic_yuz_close, getString(R.string.reels_pending_cancel), cancelPending)
             .build()
     }
 
-    private fun updateNotification(progress: Int, text: String) {
-        val nm = getSystemService(NotificationManager::class.java)
-        nm.notify(NOTIFICATION_ID, createProgressNotification(progress, text))
+    private fun updateNotification(req: Request, progress: Int, text: String) {
+        acquireWakeLock()
+        try {
+            val title = req.name.takeIf { it.isNotBlank() }
+                ?: getString(R.string.reels_pending_title)
+            val nm = getSystemService(NotificationManager::class.java)
+            nm.notify(NOTIFICATION_ID, buildProgressNotification(title, text, progress))
+        } catch (e: Exception) {
+            FileLog.e(e)
+        }
     }
 
-    private fun showSuccessNotification() {
+    private fun showResultNotification(title: String, text: String) {
+        try {
+            val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_yuz_gallery)
+                .setColor(ContextCompat.getColor(this, R.color.yuz_action))
+                .setContentTitle(title)
+                .setContentText(text)
+                .setContentIntent(launchPendingIntent())
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(true)
+                .build()
+            val nm = getSystemService(NotificationManager::class.java)
+            nm.notify(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            FileLog.e(e)
+        }
+    }
+
+    private fun launchPendingIntent(): PendingIntent {
         val intent = Intent(this, org.telegram.ui.LaunchActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
-        val pendingIntent = PendingIntent.getActivity(
+        return PendingIntent.getActivity(
             this, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Reel joylandi")
-            .setContentText("Reel profilingizga qo'shildi")
-            .setSmallIcon(R.drawable.ic_close_white)
-            .setContentIntent(pendingIntent)
-            .setOngoing(false)
-            .setAutoCancel(true)
-            .build()
-
-        val nm = getSystemService(NotificationManager::class.java)
-        nm.notify(NOTIFICATION_ID, notification)
     }
 
-    private fun showErrorNotification(message: String) {
-        val intent = Intent(this, org.telegram.ui.LaunchActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+    private fun stopForegroundCompat() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+        } catch (e: Exception) {
+            FileLog.e(e)
         }
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+    }
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Reel joylanmadi")
-            .setContentText(message)
-            .setSmallIcon(R.drawable.ic_close_white)
-            .setContentIntent(pendingIntent)
-            .setOngoing(false)
-            .setAutoCancel(true)
-            .build()
-
-        val nm = getSystemService(NotificationManager::class.java)
-        nm.notify(NOTIFICATION_ID, notification)
+    private fun humanBytes(bytes: Long): String {
+        if (bytes <= 0L) return "0 MB"
+        val mb = bytes / (1024.0 * 1024.0)
+        return if (mb >= 1.0) "%.1f MB".format(mb) else "%.0f KB".format(bytes / 1024.0)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        wakeLock?.let {
-            if (it.isHeld) it.release()
-        }
+        runningCount = 0
+        releaseWakeLock()
         scope.cancel()
     }
+
+    /** Xato matni foydalanuvchiga tayyor — qayta o'rashsiz ko'rsatiladi. */
+    private class UploadFailure(message: String) : Exception(message)
 }

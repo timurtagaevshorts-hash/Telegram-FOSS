@@ -30,7 +30,7 @@
     <string name="reels_upload_progress">Yuklanmoqda… %1$d%% · %2$s / %3$s</string>
 
     <string name="reels_like">Yoqtirish</string>
-    <string name="reels_pick_video_subtitle">Video tanlang — 200 MB gacha, mp4</string>
+    <string name="reels_pick_video_subtitle">MP4 · 200 MB gacha · vertikal 9:16</string>
     <string name="reels_video_chosen">Video tanlandi</string>
     <string name="reels_like_failed">Like saqlanmadi</string>
     <string name="reels_new">Yangi</string>
@@ -42,9 +42,24 @@
     <string name="reels_saving">Reel saqlanmoqda…</string>
     <string name="reels_uploading_in_background">Reel fonda yuklanmoqda</string>
 
-    <!-- #76 professional upload: monetizatsiya tugmasi -->
-    <string name="reels_monetization_title">Daromadga ulash</string>
-    <string name="reels_monetization_subtitle">Reel ko\'rishlari daromad hisobiga qo\'shiladi</string>
+    <!-- Yuklash oynasi: sarlavha, maydon yorliqlari va fon holati -->
+    <string name="reels_upload_heading">Yangi reel</string>
+    <string name="reels_upload_subheading">Video tanlang, nom va tavsif yozing — yuklash fonda davom etadi.</string>
+    <string name="reels_name_hint">Video nomi</string>
+    <string name="reels_name_required">Video nomini kiriting</string>
+    <string name="reels_description_hint">Tavsif (ixtiyoriy)</string>
+    <string name="reels_hashtags_helper">Bo\'sh joy yoki vergul bilan ajrating</string>
+    <string name="reels_upload_hint_bg">Yuklash fonda ketadi — ekranni yopsangiz ham davom etadi</string>
+    <string name="reels_upload_phase_prepare">Tayyorlanmoqda…</string>
+    <string name="reels_upload_phase_compress">Siqilmoqda… %1$d%%</string>
+    <string name="reels_upload_phase_upload">Yuklanmoqda… %1$d%%</string>
+    <string name="reels_upload_phase_save">Saqlanmoqda…</string>
+    <string name="reels_upload_offline">Internet yo\'q — ulangach qayta urinib ko\'ring</string>
+    <string name="reels_pending_title">Yuklanmoqda</string>
+    <string name="reels_pending_failed">Yuklanmadi</string>
+    <string name="reels_pending_cancel">Yuklashni bekor qilish</string>
+    <string name="reels_pending_cancel_confirm">«%1$s» yuklanishi bekor qilinsinmi?</string>
+    <string name="reels_pending_tap">Reel yuklanmoqda — biroz kuting</string>
 
     <!-- Ovoz tugmasi: ikon holatni, yozuv tugilish harakatini bildiradi. -->
     <string name="reels_sound_on">Ovozni o\'chirish</string>

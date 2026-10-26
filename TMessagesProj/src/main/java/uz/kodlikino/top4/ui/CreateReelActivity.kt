@@ -8,14 +8,16 @@ import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.widget.Toolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
@@ -26,32 +28,35 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.BaseFragment
+import uz.kodlikino.top4.services.ReelUploadService
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzPremiumManager
 import uz.kodlikino.top4.utils.YuzReelQuota
+import uz.kodlikino.top4.utils.YuzReelUploads
 import uz.kodlikino.top4.utils.YuzUploadUi
+import java.io.File
+import java.io.FileOutputStream
 
 /**
- * "Reel joylash" — video tanlash, Firebase Storage'ga yuklash va Firestore `reels`
- * kolleksiyasiga yozish ekrani.
+ * "Reel joylash" — video tanlash, nom/tavsif yozish va yuklashni fonda
+ * boshlash ekrani.
  *
- * [CreateClassifiedAdActivity] bilan bir xil Telegram uslubida yozildi ([BaseFragment]
- * + [ContextThemeWrapper] Material temasi ostida), chunki Elonlar/Reels bir butun.
+ * Yuklashning o'zi [ReelUploadService] ichida ketadi: ekran darhol yopiladi,
+ * progress bildirishnomada va profil > Reels grid'idagi "yuklanmoqda" katagida
+ * ko'rinadi ([YuzReelUploads] trekeri).
  *
- * Muhim chegaralar (deployment qoidalari bilan bir xil):
- *  - Storage yo'li `user_reels/{uid}/{file}` va `contentType` video turdan bo'lishi shart,
- *    hajm 200 MB dan kichik ([MAX_VIDEO_BYTES]) — aks holda rules yozuvni rad etadi;
- *  - `uploadedByUid` `tg_<clientUserId>` bo'ladi ([YuzGramAdsAuth]) — Firestore
- *    create qoidasi aynan shu indifikatorni talab qiladi.
+ * Muhim chegaralar (Firebase qoidalari bilan bir xil):
+ *  - Storage yo'li `user_reels/{uid}/{file}`, contentType video turidan, hajm
+ *    200 MB dan kichik ([MAX_VIDEO_BYTES]) — aks holda qoidalar yozuvni rad etadi;
+ *  - `uploadedByUid` = `tg_<clientUserId>` ([YuzGramAdsAuth]) — Firestore create
+ *    qoidasi aynan shu identifikatorni talab qiladi.
  *
- * Shu sababli rasm poster (thumbnail) YUKLANMAYDI — `user_reels/` yo'li faqat
- * video contentType'ga ruxsat beradi. Upload ekranida tanlangan videoning
- * BIRINCHI KADRI LOCAL'ga ko'rsatiladi (MediaMetadataRetriever), feed'da esa
- * poster o'rniga video kadr kutiladi.
+ * Poster rasm yuklanmaydi (rules faqat video contentType'ga ruxsat beradi):
+ * tanlangan videoning birinchi kadri lokal saqlanadi va faqat yuklash jarayonida
+ * profildagi katakda ko'rsatiladi.
  *
- * Kunlik kvota va video hajmi admin panelda (Limitlar tabi) oddiy va premium
- * foydalanuvchilar uchun alohida belgilanadi — [YuzReelQuota] (Firestore
- * `settings/app` + `user_reel_quota/{uid}`).
+ * Kunlik kvota va hajm limiti admin panelda (Limitlar tabi) oddiy va premium
+ * foydalanuvchilar uchun alohida — [YuzReelQuota].
  */
 class CreateReelActivity : BaseFragment() {
 
@@ -59,7 +64,7 @@ class CreateReelActivity : BaseFragment() {
         private const val REQ_PICK_VIDEO = 4481
         private const val MAX_VIDEO_BYTES = 200L * 1024L * 1024L
 
-        /** Preview kadri ekranda chiqishi yetarli — memory uchun kichraytiriladi. */
+        /** Preview kadri ekranda va grid katagida yetarli — memory uchun kichraytiriladi. */
         private const val MAX_PREVIEW_PX = 540
     }
 
@@ -68,13 +73,16 @@ class CreateReelActivity : BaseFragment() {
     private var btnPickVideo: View? = null
     private var llPickPrompt: View? = null
     private var ivVideoPreview: ImageView? = null
+    private var previewScrim: View? = null
     private var btnPickOverlay: TextView? = null
     private var tvVideoDuration: TextView? = null
     private var tvVideoMeta: TextView? = null
-    private var switchMonetization: SwitchCompat? = null
+    private var progressAnalyze: ProgressBar? = null
     private var tvPickVideoLabel: TextView? = null
     private var tvVideoName: TextView? = null
+    private var quotaCard: View? = null
     private var tvQuota: TextView? = null
+    private var etReelName: TextInputEditText? = null
     private var etCaption: TextInputEditText? = null
     private var etHashtags: TextInputEditText? = null
     private var btnPublish: MaterialButton? = null
@@ -82,6 +90,7 @@ class CreateReelActivity : BaseFragment() {
     private var videoUri: Uri? = null
     private var videoDisplayName: String = ""
     private var videoSizeBytes: Long = -1L
+    private var previewFrame: Bitmap? = null
 
     private var scope: CoroutineScope? = null
     private var publishing = false
@@ -100,13 +109,16 @@ class CreateReelActivity : BaseFragment() {
         btnPickVideo = root.findViewById(R.id.btnPickVideo)
         llPickPrompt = root.findViewById(R.id.llPickPrompt)
         ivVideoPreview = root.findViewById(R.id.ivVideoPreview)
+        previewScrim = root.findViewById(R.id.previewScrim)
         btnPickOverlay = root.findViewById(R.id.btnPickOverlay)
         tvVideoDuration = root.findViewById(R.id.tvVideoDuration)
         tvVideoMeta = root.findViewById(R.id.tvVideoMeta)
-        switchMonetization = root.findViewById(R.id.switchMonetization)
+        progressAnalyze = root.findViewById(R.id.progressAnalyze)
         tvPickVideoLabel = root.findViewById(R.id.tvPickVideoLabel)
         tvVideoName = root.findViewById(R.id.tvVideoName)
+        quotaCard = root.findViewById(R.id.quotaCard)
         tvQuota = root.findViewById(R.id.tvQuotaInfo)
+        etReelName = root.findViewById(R.id.etReelName)
         etCaption = root.findViewById(R.id.etCaption)
         etHashtags = root.findViewById(R.id.etHashtags)
         btnPublish = root.findViewById(R.id.btnPublish)
@@ -119,7 +131,18 @@ class CreateReelActivity : BaseFragment() {
         btnPickVideo?.setOnClickListener { pickVideo() }
         btnPublish?.setOnClickListener { publishReel() }
 
+        val watcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                refreshPublishState()
+            }
+        }
+        etReelName?.addTextChangedListener(watcher)
+        etCaption?.addTextChangedListener(watcher)
+
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        refreshPublishState()
         refreshQuotaLabel()
         return root
     }
@@ -139,14 +162,14 @@ class CreateReelActivity : BaseFragment() {
         val s = scope ?: return
         val uid = YuzGramAdsAuth.expectedUid(currentAccount)
         if (uid.isBlank()) {
-            tvQuota?.visibility = View.GONE
+            quotaCard?.visibility = View.GONE
             return
         }
         val boosted = premiumBoost()
         s.launch {
             val remaining = YuzReelQuota.getRemainingUploads(uid, boosted, force = true)
             tvQuota?.text = YuzReelQuota.quotaSummaryLabel(boosted, remaining)
-            tvQuota?.visibility = View.VISIBLE
+            quotaCard?.visibility = View.VISIBLE
         }
     }
 
@@ -174,17 +197,19 @@ class CreateReelActivity : BaseFragment() {
         videoDisplayName = queryDisplayName(uri)
         tvVideoName?.text = videoDisplayName
         tvVideoName?.visibility = View.VISIBLE
+        refreshPublishState()
         analyzeVideo(uri)
     }
 
     /**
-     * Bir IO o'tida: hajm (Storage 200 MB + tier limiti), davomiylik va LOCAL
-     * preview kadri (MediaMetadataRetriever). Rasm poster yuklanmaydi — rules
-     * `user_reels/` ostida faqat video contentType'ni yozishga qo'yadi.
+     * Bir IO o'tida: hajm (Storage 200 MB + tier limiti), davomiylik va lokal
+     * preview kadri (MediaMetadataRetriever). Kadr keyinchalik profildagi
+     * "yuklanmoqda" katagiga ham yoziladi.
      */
     private fun analyzeVideo(uri: Uri) {
         val ctx = context ?: return
         val s = scope ?: return
+        progressAnalyze?.visibility = View.VISIBLE
         s.launch {
             val info = withContext(Dispatchers.IO) {
                 // ContentResolver'dan aniq hajm: OpenableColumns.SIZE + fd.statSize.
@@ -225,6 +250,7 @@ class CreateReelActivity : BaseFragment() {
                 }
                 Triple(size, durationMs, frame)
             }
+            progressAnalyze?.visibility = View.GONE
             val size = info.first
             // Storage qoidasi 200 MB, tier limiti 50/100 MB — tanlashda tekshiriladi.
             if (size > MAX_VIDEO_BYTES) {
@@ -241,9 +267,11 @@ class CreateReelActivity : BaseFragment() {
             }
             videoSizeBytes = size
             val frame = info.third
+            previewFrame = frame
             if (frame != null) {
                 ivVideoPreview?.setImageBitmap(frame)
                 ivVideoPreview?.visibility = View.VISIBLE
+                previewScrim?.visibility = View.VISIBLE
                 btnPickOverlay?.visibility = View.VISIBLE
                 llPickPrompt?.visibility = View.GONE
             }
@@ -266,14 +294,17 @@ class CreateReelActivity : BaseFragment() {
     private fun rejectVideo(message: String) {
         videoUri = null
         videoSizeBytes = -1L
+        previewFrame = null
         ivVideoPreview?.setImageDrawable(null)
         ivVideoPreview?.visibility = View.GONE
+        previewScrim?.visibility = View.GONE
         btnPickOverlay?.visibility = View.GONE
         tvVideoDuration?.visibility = View.GONE
         tvVideoMeta?.visibility = View.GONE
         llPickPrompt?.visibility = View.VISIBLE
         tvPickVideoLabel?.text = getString(R.string.reels_pick_video)
         tvVideoName?.visibility = View.GONE
+        refreshPublishState()
         toast(message)
     }
 
@@ -309,6 +340,12 @@ class CreateReelActivity : BaseFragment() {
         }
     }
 
+    private fun refreshPublishState() {
+        val ready = videoUri != null && !etReelName?.text.isNullOrBlank()
+        btnPublish?.isEnabled = ready && !publishing
+        btnPublish?.alpha = if (ready && !publishing) 1f else 0.45f
+    }
+
     private fun publishReel() {
         if (publishing) return
         val uri = videoUri
@@ -316,11 +353,15 @@ class CreateReelActivity : BaseFragment() {
             toast(getString(R.string.reels_video_required))
             return
         }
-        val caption = etCaption?.text?.toString()?.trim().orEmpty()
-        if (caption.isBlank()) {
-            etCaption?.error = getString(R.string.reels_caption_required)
+        val name = etReelName?.text?.toString()?.trim().orEmpty()
+        if (name.isBlank()) {
+            etReelName?.error = getString(R.string.reels_name_required)
             return
         }
+        val description = etCaption?.text?.toString()?.trim().orEmpty()
+        // Firestore'da alohida `description` maydoni yo'q — nom va tavsif bitta
+        // `title` sifatida saqlanadi (feed'da caption bo'lib ko'rinadi).
+        val title = if (description.isBlank()) name else "$name\n\n$description"
         val hashtags = normalizeHashtags(etHashtags?.text?.toString().orEmpty())
         val account = currentAccount
         if (YuzGramAdsAuth.expectedUid(account).isBlank()) {
@@ -330,33 +371,70 @@ class CreateReelActivity : BaseFragment() {
         val ctx = context ?: return
         val s = scope ?: return
 
-        // Instagram uslubida: yuklash fonda ketadi, ekran darhol yopiladi.
-        // Foydalanuvchi notification'da progress ko'radi, boshqa ish qilishi mumkin.
-        // Lekin kunlik limit tugagan bo'lsa — ekranni yopmaymiz (yozilgan matn
-        // yo'qolmasin), shu yerda aniq xabar ko'rsatamiz.
         publishing = true
+        refreshPublishState()
+        btnPublish?.text = getString(R.string.reels_publishing)
+        val id = System.currentTimeMillis().toString()
+        val frame = previewFrame
+
         s.launch {
             val uid = YuzGramAdsAuth.expectedUid(account)
             val boosted = premiumBoost()
             val remaining = YuzReelQuota.getRemainingUploads(uid, boosted, force = true)
             if (remaining <= 0) {
                 publishing = false
+                btnPublish?.text = getString(R.string.reels_publish)
+                refreshPublishState()
                 toast(YuzReelQuota.limitExceededMessage(boosted))
                 refreshQuotaLabel()
                 return@launch
             }
-            uz.kodlikino.top4.services.ReelUploadService.startUpload(
+            val thumbPath = withContext(Dispatchers.IO) {
+                saveThumbnail(frame, YuzReelUploads.thumbPathFor(id))
+            }
+            val now = System.currentTimeMillis()
+            YuzReelUploads.begin(
+                YuzReelUploads.Upload(
+                    id = id,
+                    uri = uri.toString(),
+                    fileName = videoDisplayName,
+                    title = title,
+                    hashtags = hashtags,
+                    sizeBytes = videoSizeBytes,
+                    thumbPath = thumbPath,
+                    account = account,
+                    startedAt = now,
+                    updatedAt = now
+                )
+            )
+            ReelUploadService.startUpload(
                 context = ctx,
+                uploadId = id,
                 videoUri = uri,
                 videoName = videoDisplayName,
                 videoSize = videoSizeBytes,
-                caption = caption,
+                caption = title,
                 hashtags = hashtags,
-                monetization = switchMonetization?.isChecked == true,
+                thumbPath = thumbPath,
                 account = account
             )
             toast(getString(R.string.reels_uploading_in_background))
             removeSelfFromStack()
+        }
+    }
+
+    /** Preview kadrini profildagi "yuklanmoqda" katagi uchun JPEG qilib saqlaydi. */
+    private fun saveThumbnail(bitmap: Bitmap?, path: String): String {
+        if (bitmap == null || path.isBlank()) return ""
+        return try {
+            val file = File(path)
+            file.parentFile?.mkdirs()
+            FileOutputStream(file).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 82, out)
+            }
+            file.absolutePath
+        } catch (e: Exception) {
+            ""
         }
     }
 

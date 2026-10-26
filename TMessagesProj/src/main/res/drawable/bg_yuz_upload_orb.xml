@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bo'sh holatdagi "video tanlash" orbi: brend aksenti 12% + 30% hoshiya. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#1F2AABEE" />
+    <stroke
+        android:width="@dimen/yuz_stroke"
+        android:color="#4D2AABEE" />
+</shape>

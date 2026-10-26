@@ -24,14 +24,17 @@ import uz.kodlikino.top4.models.Reel
 import uz.kodlikino.top4.utils.ReelStorageHelper
 import uz.kodlikino.top4.utils.ReelsRepository
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
+import uz.kodlikino.top4.utils.YuzReelUploads
 
 /**
  * Native Telegram profilidagi "Reels" tab kontenti (arxiv postlar o'rniga).
  * [SharedMediaLayout] bu view'ni tab tanlanganda media sahifasi ustiga to'siq
  * (opaque) qatlam sifatida qo'yadi — foydalanuvchining o'z reel'lari 3 ustunli
  * grid'da ko'rinadi, katak bosilsa scoped [ReelsActivity] feed ochiladi.
- * [isSelf]=true (o'z profili) bo'lgandagina ✕ bilan o'chirish rejimi yonadi;
- * begona profilida faqat ko'rish.
+ *
+ * O'z profilida ([isSelf]) grid tepasida yuklanayotgan reels ham turadi:
+ * yozuvlar [YuzReelUploads] trekeridan olinadi va yuklash tugagach o'z-o'zidan
+ * Firestore'dagi reel bilan almashtiriladi. Begona profilida faqat ko'rish.
  */
 class YuzProfileReelsView(
     context: Context,
@@ -50,6 +53,15 @@ class YuzProfileReelsView(
     private var myUid: String = targetUid
     private var reels: List<Reel> = emptyList()
     private var loading = false
+
+    /** Oldingi treker holati: yuklash tugaganini shu bilan sezamiz (id → xato). */
+    private var lastPending: Map<String, Boolean> = emptyMap()
+
+    /**
+     * Yuklash trekeri har progress tikida chaqiriladi — `notifyDataSetChanged`
+     * o'rniga faqat kataklarning progress'i yangilanadi (adapter payload).
+     */
+    private val uploadsListener = Runnable { refreshPending() }
 
     init {
         // Media sahifalarni to'liq yopishi uchun noto'qiladigan (opaque) fon.
@@ -74,7 +86,9 @@ class YuzProfileReelsView(
 
         adapter = ProfileReelsAdapter(context,
             onClick = { index -> openFeed(index) },
-            onDelete = { reel -> confirmDelete(reel) })
+            onDelete = { reel -> confirmDelete(reel) },
+            onPendingTap = { toast(context.getString(R.string.reels_pending_tap)) },
+            onPendingCancel = { upload -> confirmCancel(upload) })
         // O'chirish faqat o'z profilida; begona profilida grid view-only.
         adapter.manageMode = isSelf
         recyclerView = RecyclerView(context)
@@ -87,9 +101,25 @@ class YuzProfileReelsView(
             LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT.toFloat()))
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (isSelf) {
+            YuzReelUploads.addListener(uploadsListener)
+            refreshPending()
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        YuzReelUploads.removeListener(uploadsListener)
+        scope?.cancel()
+        scope = null
+        super.onDetachedFromWindow()
+    }
+
     /** Tab ko'rsatilganda — yangi/nimcha bo'lgan reel'larni qayta yuklaydi. */
     fun refresh() {
         if (scope == null) scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        refreshPending()
         load()
     }
 
@@ -98,11 +128,43 @@ class YuzProfileReelsView(
         host.presentFragment(ReelsActivity(myUid, index), false)
     }
 
+    /** Trekerdagi yuklanayotgan reels — faqat o'z profilida ko'rinadi. */
+    private fun refreshPending() {
+        if (!isSelf) {
+            lastPending = emptyMap()
+            adapter.submitPending(emptyList())
+            updateEmptyState()
+            return
+        }
+        val list = YuzReelUploads.listForAccount(account)
+        val ids = list.associate { it.id to it.failed }
+        val finishedOk = lastPending.any { (id, failed) -> !failed && !ids.containsKey(id) }
+        lastPending = ids
+        adapter.submitPending(list)
+        updateEmptyState()
+        // Yuklash muvaffaqiyatli tugadi — Firestore'dagi yangi reel grid'ga qo'shiladi.
+        if (finishedOk && !loading && scope != null) load()
+    }
+
+    private fun updateEmptyState() {
+        val empty = reels.isEmpty() && adapter.itemCount == 0
+        emptyView.visibility = if (empty) View.VISIBLE else View.GONE
+        recyclerView.visibility = if (empty) View.GONE else View.VISIBLE
+    }
+
     private fun load() {
         if (loading) return
         val s = scope ?: return
         loading = true
-        progressView.visibility = View.VISIBLE
+        // Kesh bo'lsa grid birinchi kadrda ko'rinadi; tarmoq javobi keyin keladi.
+        val cached = ReelsRepository.peekReelsByUploader(myUid)
+        if (cached != null && cached.isNotEmpty()) {
+            reels = cached
+            adapter.submit(cached)
+            updateEmptyState()
+        } else {
+            progressView.visibility = View.VISIBLE
+        }
         s.launch {
             // Firestore o'qish sessiya talab qiladi; o'z profilida haqiqiy
             // imzo uid'ni qayta tekshiramiz, begona profilida maqsad o'zgarmaydi.
@@ -121,9 +183,7 @@ class YuzProfileReelsView(
             if (host.parentActivity == null) return@launch
             reels = list
             adapter.submit(list)
-            val empty = list.isEmpty()
-            emptyView.visibility = if (empty) View.VISIBLE else View.GONE
-            recyclerView.visibility = if (empty) View.GONE else View.VISIBLE
+            updateEmptyState()
             progressView.visibility = View.GONE
         }
     }
@@ -143,6 +203,26 @@ class YuzProfileReelsView(
         }
     }
 
+    /** ✕ — yuklashni bekor qilish (faol) yoki xato yozuvni tozalash. */
+    private fun confirmCancel(upload: YuzReelUploads.Upload) {
+        val activity = host.parentActivity ?: return
+        val name = upload.title.lineSequence().firstOrNull()?.takeIf { it.isNotBlank() }
+            ?: upload.fileName
+        try {
+            AlertDialog.Builder(activity)
+                .setMessage(context.getString(R.string.reels_pending_cancel_confirm, name))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.reels_pending_cancel) { _, _ ->
+                    YuzReelUploads.dismiss(context, upload.id, cancelRunning = !upload.failed)
+                    refreshPending()
+                }
+                .show()
+        } catch (_: Exception) {
+            YuzReelUploads.dismiss(context, upload.id, cancelRunning = !upload.failed)
+            refreshPending()
+        }
+    }
+
     private fun deleteReel(reel: Reel) {
         val s = scope ?: return
         s.launch {
@@ -156,10 +236,7 @@ class YuzProfileReelsView(
                     adapter.removeAt(idx)
                     reels = reels.filter { it.id != reel.id }
                 }
-                if (reels.isEmpty()) {
-                    emptyView.visibility = View.VISIBLE
-                    recyclerView.visibility = View.GONE
-                }
+                updateEmptyState()
                 toast(context.getString(R.string.reels_deleted))
             } catch (e: Exception) {
                 if (host.parentActivity == null) return@launch
@@ -170,11 +247,5 @@ class YuzProfileReelsView(
 
     private fun toast(text: String) {
         Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
-    }
-
-    override fun onDetachedFromWindow() {
-        scope?.cancel()
-        scope = null
-        super.onDetachedFromWindow()
     }
 }

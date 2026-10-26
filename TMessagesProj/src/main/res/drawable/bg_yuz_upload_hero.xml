@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Yuklash ekranining media kartasi: ko'tarilgan sir + ingichka hoshiya.
+     Ichidagi preview `clipToOutline` bilan shu radiusga kesiladi. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:endColor="#0B1017"
+        android:startColor="#18222F" />
+    <stroke
+        android:width="@dimen/yuz_stroke"
+        android:color="@color/yuz_stroke_soft" />
+    <corners android:radius="@dimen/yuz_radius_card" />
+</shape>
