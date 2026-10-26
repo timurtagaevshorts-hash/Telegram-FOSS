@@ -6115,6 +6115,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     protected void onPause() {
         super.onPause();
         isResumed = false;
+        uz.kodlikino.top4.utils.YuzReelNotifyHub.detach();
         NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.stopAllHeavyOperations, 4096);
         ApplicationLoader.mainInterfacePaused = true;
         int account = currentAccount;
@@ -6306,6 +6307,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             }
         }
         resyncYuzGramBottomBar();
+        // YuzGram: Reels like/izoh bildirishnomalari butun ilova bo'ylab kelsin.
+        uz.kodlikino.top4.utils.YuzReelNotifyHub.attach(this, currentAccount);
         ConnectionsManager.getInstance(currentAccount).setAppPaused(false, false);
         updateCurrentConnectionState(currentAccount);
         if (PhotoViewer.hasInstance() && PhotoViewer.getInstance().isVisible()) {

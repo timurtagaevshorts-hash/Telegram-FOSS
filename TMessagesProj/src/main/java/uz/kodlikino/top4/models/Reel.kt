@@ -40,10 +40,9 @@ data class Reel(
     /** arxiv/profilga saqlangan hikoya (muddati tugagan) */
     val storyArchived: Boolean = false,
     /**
-     * Ko'rish/reaksiya sonlari manbada mavjudmi. Telegram boshqa odamning
-     * oddiy hikoyasida bu sonlarni bermaydi (`StoryItem.views == null`) —
-     * bunday holatda soxta 0 ko'rsatmaymiz. Firebase reel'larida doim true.
-     * Faqat UI — Firestore'da saqlanmaydi.
+     * Ko'rish/layk/izoh sonlari ko'rsatiladimi. Hikoyalarda ham hisoblagichlar
+     * Firebase'dan olinadi ([uz.kodlikino.top4.utils.ReelsRepository.getStoryStats]);
+     * Firebase reel'larida doim true. Faqat UI — Firestore'da saqlanmaydi.
      */
     val statsAvailable: Boolean = true
 ) : Serializable {

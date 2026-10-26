@@ -741,8 +741,8 @@ class ReelsAdapter(
 
     /**
      * Ko'rish dedup'i — bir o'rnatishda bir marta. Ko'rsatilgan sonni bu yerda
-     * o'zgartirmaymiz: hikoyada Telegram `views_count`, Firebase'da Firestore
-     * hisoblagichi yagona manba.
+     * o'zgartirmaymiz: Firebase hisoblagichi (hikoyada noyob ko'ruvchi hujjati)
+     * yagona manba.
      */
     private fun registerViewOnce(reel: Reel) {
         if (!YuzViewedReels.markViewed(appContext, reel.id, account)) return
@@ -792,16 +792,32 @@ class ReelsAdapter(
         for (i in items.indices) {
             val fresh = byId[items[i].id] ?: continue
             val old = items[i]
-            if (old.views == fresh.views && old.likeCount == fresh.likeCount &&
-                old.commentCount == fresh.commentCount && old.statsAvailable == fresh.statsAvailable &&
-                old.isLikedByMe == fresh.isLikedByMe
+            // Hikoya modeli statistikani bilmaydi — sonlar Firebase'dan
+            // ([applyServerStats]) yuklanadi. Feed qayta qurilganda ular
+            // nolga tushib ketmasligi uchun eski qiymatlar saqlanadi.
+            val merged = if (fresh.isStory) {
+                fresh.copy(
+                    views = old.views,
+                    likeCount = old.likeCount,
+                    commentCount = old.commentCount,
+                    isLikedByMe = old.isLikedByMe,
+                    statsAvailable = old.statsAvailable
+                )
+            } else {
+                fresh
+            }
+            if (old.views == merged.views && old.likeCount == merged.likeCount &&
+                old.commentCount == merged.commentCount && old.statsAvailable == merged.statsAvailable &&
+                old.isLikedByMe == merged.isLikedByMe
             ) continue
-            items[i] = fresh
-            likeShown.remove(fresh.id)
-            commentShown.remove(fresh.id)
-            // Hikoyada like holati ham Telegram'dan keladi; Firebase'da
-            // `liked` map'ini saqlaymiz (model bu holatni bilmaydi).
-            if (fresh.isStory) liked.remove(fresh.id)
+            items[i] = merged
+            // Hikoyada feed statistikani olib kelmaydi — optimistik qatlam
+            // (yangi layk/izoh) Firebase javobigacha saqlanishi kerak.
+            if (!merged.isStory) {
+                likeShown.remove(fresh.id)
+                commentShown.remove(fresh.id)
+                liked.remove(fresh.id)
+            }
             if (fresh.id == activeId) activeChanged = true
         }
         if (activeChanged) {
@@ -828,33 +844,6 @@ class ReelsAdapter(
         // faqat yozuv hali yetib bormagan holat uchun qoladi.
         if (old.likeCount != likeCount) likeShown.remove(reelId)
         if (old.commentCount != commentCount) commentShown.remove(reelId)
-        val holder = activeHolder
-        if (holder?.reel?.id == reelId) holder.applyStats(items[idx])
-    }
-
-    /** Telegram hikoyasining jonli statistikasi (views/reaksiyalar). */
-    fun applyStoryStats(
-        reelId: String,
-        views: Int,
-        likes: Int,
-        likedByMe: Boolean,
-        available: Boolean
-    ) {
-        val idx = items.indexOfFirst { it.id == reelId }
-        if (idx < 0) return
-        val old = items[idx]
-        if (old.views == views && old.likeCount == likes && old.isLikedByMe == likedByMe &&
-            old.statsAvailable == available
-        ) return
-        items[idx] = old.copy(
-            views = views,
-            likeCount = likes,
-            isLikedByMe = likedByMe,
-            statsAvailable = available
-        )
-        // Telegram — yagona manba; optimistik son kerak emas.
-        likeShown.remove(reelId)
-        liked[reelId] = likedByMe
         val holder = activeHolder
         if (holder?.reel?.id == reelId) holder.applyStats(items[idx])
     }
@@ -1323,8 +1312,8 @@ class ReelsAdapter(
         }
 
         /**
-         * Telegram boshqa odamning oddiy hikoyasida ko'rish/reaksiya sonini
-         * bermaydi (`StoryItem.views == null`) — soxta 0 ko'rsatmaymiz.
+         * Sonlar Firebase'dan keladi; manba hali yuklanmagan/o'chirilgan
+         * holatda soxta 0 o'rniga qatorni yashiramiz (`statsAvailable`).
          */
         private fun refreshStatsVisibility() {
             val r = reel ?: return

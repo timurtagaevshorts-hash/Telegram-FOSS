@@ -24,9 +24,10 @@ import java.io.File
  * Eski Firebase `reels` feed'ning o'rniga: barcha ko'rishga ruxsat berilgan
  * faol hikoyalar (do'stlar, kontaktlar, kanallar, guruhlar) + o'zimizning
  * arxiv va profilga saqlangan (pinned) hikoyalar bitta vertikal tasмага
- * aylantiriladi. Statistikalar (ko'rishlar/reaksiyalar/layk holati) to'g'ridan-
- * to'g'ri Telegram'dan olinadi; izohlar Firebase'da qoladi — ular uchun
- * [Reel.id] barqaror kalit: `story_{dialogId}_{storyId}`.
+ * aylantiriladi. Ko'rish/layk statistikasi Firebase'da yangidan sanaladi
+ * ([ReelsRepository.getStoryStats]) — Telegram'ning eski `views_count`/
+ * `reactions_count` qiymatlari ko'rsatilmaydi. Izohlar ham Firebase'da —
+ * barchasi uchun [Reel.id] barqaror kalit: `story_{dialogId}_{storyId}`.
  *
  * Video ijrosi: media3 pleyer `tg://` sxemasini tushunmaydi (Telegram'ning
  * o'za pleyeri vendored exoplayer2 + ExtendedDefaultDataSource bilan ishlaydi),
@@ -221,26 +222,25 @@ object YuzStoryFeed {
         val doc = try { media.getDocument() } catch (_: Exception) { null }
         val isVideo = doc != null && FileLoader.isVideoMimeType(doc.mime_type)
         val name = peerName(account, dialogId)
-        val liked = item.sent_reaction != null && item.sent_reaction !is TLRPC.TL_reactionEmpty
-        // Telegram ko'rishlar/reaksiyalar sonini faqat hikoya egasi va kanal
-        // obunachilariga beradi; boshqalarda `views` null — soxta 0 yozmaymiz.
-        val views = item.views
+        // Statistika endi Telegram'dan olinmaydi: ko'rish/layk sonlari Firebase
+        // hisoblagichlaridan (ReelsRepository.getStoryStats) keladi, shuning
+        // uchun bu yerda eski `views_count`/`reactions_count` yozilmaydi.
         return Reel(
             id = storyKey(dialogId, item.id),
             title = item.caption ?: "",
-            views = views?.views_count ?: 0,
-            likeCount = views?.reactions_count ?: 0,
+            views = 0,
+            likeCount = 0,
             createdAt = item.date.toLong() * 1000L,
             uploadedByUid = "tg_$dialogId",
             uploadedByName = name,
             isUserUpload = false,
-            isLikedByMe = liked,
+            isLikedByMe = false,
             isStory = true,
             storyDialogId = dialogId,
             storyId = item.id,
             storyIsVideo = isVideo,
             storyArchived = archived,
-            statsAvailable = views != null
+            statsAvailable = true
         )
     }
 
@@ -343,27 +343,11 @@ object YuzStoryFeed {
         return null
     }
 
-    /** Hikoyaning joriy Telegram statistikasi (in-memory [TL_stories.StoryItem]dan). */
-    data class StoryStats(
-        val views: Int,
-        val likes: Int,
-        val likedByMe: Boolean,
-        val available: Boolean
-    )
-
-    @JvmStatic
-    fun liveStats(account: Int, dialogId: Long, storyId: Int): StoryStats? {
-        val item = findStoryItem(account, dialogId, storyId) ?: return null
-        val views = item.views
-        return StoryStats(
-            views = views?.views_count ?: 0,
-            likes = views?.reactions_count ?: 0,
-            likedByMe = item.sent_reaction != null && item.sent_reaction !is TLRPC.TL_reactionEmpty,
-            available = views != null
-        )
-    }
-
-    /** Layk/unlike — Telegram reaksiyasi (`❤` emoji). Muvaffaqiyatda true. */
+    /**
+     * Layk/unlike — Telegram reaksiyasi (`❤` emoji), Telegram mijozlari bilan
+     * moslik uchun yuboriladi. YuzGram'dagi layk soni esa Firebase'da
+     * ([ReelsRepository.setStoryLiked]). Muvaffaqiyatda true.
+     */
     @JvmStatic
     fun likeStory(account: Int, dialogId: Long, storyId: Int, liked: Boolean): Boolean {
         val item = findStoryItem(account, dialogId, storyId) ?: return false

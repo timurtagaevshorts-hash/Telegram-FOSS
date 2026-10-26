@@ -5,6 +5,8 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.tasks.await
 import uz.kodlikino.top4.models.Reel
 import uz.kodlikino.top4.models.ReelComment
@@ -22,6 +24,14 @@ object ReelsRepository {
     private const val COMMENTS = "comments"
     private const val FEED_LIMIT = 100L
     private const val COMMENTS_LIMIT = 200L
+    /**
+     * Hikoya ko'rishlarini sanash yo'li: `stories/{storyKey}/reactions/{uid}` —
+     * bitta hujjat = bitta noyob ko'ruvchi. Qoidalarda bu subkolleksiya kirgan
+     * foydalanuvchiga yozishga va hammaga o'qishga ochiq; `reels` ostidagi
+     * `views` subkolleksiyasi esa faqat adminga ochiq.
+     */
+    private const val STORIES = "stories"
+    private const val STORY_VIEWS = "reactions"
 
     private val db = FirebaseFirestore.getInstance()
 
@@ -212,6 +222,104 @@ object ReelsRepository {
         }
     }
 
+    /** Hikoya reel'ining Firebase'dagi yangi statistikasi. */
+    data class StoryStats(
+        val views: Int,
+        val likeCount: Int,
+        val commentCount: Int,
+        val likedByMe: Boolean
+    )
+
+    /**
+     * Hikoya statistikasi — faqat Firebase hisoblagichlari:
+     *  - ko'rishlar: `stories/{key}/reactions` hujjatlari soni (noyob ko'ruvchilar);
+     *  - layklar: `reels/{key}/likes` hujjatlari soni;
+     *  - izohlar: `reels/{key}/comments` hujjatlari soni.
+     * Telegram'ning eski `views_count`/`reactions_count` qiymatlari ishlatilmaydi.
+     */
+    suspend fun getStoryStats(storyKey: String, uid: String): StoryStats? {
+        if (storyKey.isBlank() || YuzStoryFeed.parseKey(storyKey) == null) return null
+        val reelRef = db.collection(COLLECTION).document(storyKey)
+        val likesRef = reelRef.collection(LIKES)
+        return try {
+            // To'rtta o'qish parallel — sahifa almashganda kechikish sezilmasin.
+            coroutineScope {
+                val views = async {
+                    db.collection(STORIES).document(storyKey)
+                        .collection(STORY_VIEWS).count().get().await().count.toInt()
+                }
+                val likes = async { likesRef.count().get().await().count.toInt() }
+                val comments = async {
+                    reelRef.collection(COMMENTS).count().get().await().count.toInt()
+                }
+                val likedByMe = async {
+                    uid.isNotBlank() && likesRef.document(uid).get().await().exists()
+                }
+                StoryStats(views.await(), likes.await(), comments.await(), likedByMe.await())
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "getStoryStats $storyKey: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Hikoya ko'rildi — noyob ko'ruvchi belgisi (hujjat id = uid, takroriy
+     * ko'rishlar sonni oshirmaydi). Yozuv qoidasi faqat o'z uid'iga ruxsat beradi.
+     */
+    suspend fun registerStoryView(storyKey: String, uid: String) {
+        if (storyKey.isBlank() || uid.isBlank() || YuzStoryFeed.parseKey(storyKey) == null) return
+        try {
+            db.collection(STORIES).document(storyKey)
+                .collection(STORY_VIEWS).document(uid)
+                .set(hashMapOf("viewerUid" to uid, "viewedAt" to System.currentTimeMillis()))
+                .await()
+        } catch (e: Exception) {
+            Log.w(TAG, "registerStoryView $storyKey: ${e.message}")
+        }
+    }
+
+    /**
+     * Hikoya layki — `reels/{key}/likes/{uid}` hujjati (create/delete; update
+     * qoidasi yo'q, shuning uchun avval mavjudligini tekshiramiz). Yangi laykda
+     * hikoya egasiga (`tg_<dialogId>`) bildirishnoma yuboriladi.
+     */
+    suspend fun setStoryLiked(
+        storyKey: String,
+        uid: String,
+        liked: Boolean,
+        actorName: String = "",
+        actorPhoto: String = "",
+        ownerUid: String = "",
+        reelTitle: String = "",
+        reelThumbUrl: String = ""
+    ) {
+        if (storyKey.isBlank() || uid.isBlank() || YuzStoryFeed.parseKey(storyKey) == null) return
+        val ref = db.collection(COLLECTION).document(storyKey).collection(LIKES).document(uid)
+        val exists = ref.get().await().exists()
+        if (exists == liked) return
+        if (!liked) {
+            ref.delete().await()
+            return
+        }
+        ref.set(hashMapOf("userId" to uid, "createdAt" to System.currentTimeMillis())).await()
+        if (ownerUid.isNotBlank() && ownerUid != uid) {
+            try {
+                ReelNotificationManager.pushLike(
+                    ownerUid = ownerUid,
+                    actorUid = uid,
+                    actorName = actorName,
+                    actorPhoto = actorPhoto,
+                    reelId = storyKey,
+                    reelTitle = reelTitle,
+                    reelThumbUrl = reelThumbUrl
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "pushStoryLike $storyKey: ${e.message}")
+            }
+        }
+    }
+
     /** Ko'rishni hisobga olish (har sessiyada bir marta chaqiriladi). */
     suspend fun registerView(reelId: String) {
         if (reelId.isBlank()) return
@@ -301,7 +409,12 @@ object ReelsRepository {
      *
      * @return yozilgan izoh (id bilan)
      */
-    suspend fun addComment(reelId: String, comment: ReelComment): ReelComment {
+    suspend fun addComment(
+        reelId: String,
+        comment: ReelComment,
+        reelTitle: String = "",
+        reelThumbUrl: String = ""
+    ): ReelComment {
         if (reelId.isBlank() || comment.text.isBlank() || comment.userId.isBlank()) {
             throw IllegalArgumentException("Izoh matni bo'sh")
         }
@@ -340,7 +453,7 @@ object ReelsRepository {
             Log.e(TAG, "commentCount $reelId: ${e.message}", e)
         }
         try {
-            notifyCommentAdded(saved)
+            notifyCommentAdded(saved, reelTitle, reelThumbUrl)
         } catch (e: Exception) {
             Log.e(TAG, "notifyCommentAdded $reelId: ${e.message}", e)
         }
@@ -353,9 +466,22 @@ object ReelsRepository {
      *    reel egasi izohchidan va javob berilgan egadan boshqa bo'lsa TYPE_COMMENT;
      *  - oddiy izoh → reel egasiga TYPE_COMMENT (o'ziga yozsa — yo'q).
      */
-    private suspend fun notifyCommentAdded(comment: ReelComment) {
-        val reel = reelMeta(comment.reelId) ?: return
-        val ownerUid = reel.uploadedByUid
+    private suspend fun notifyCommentAdded(
+        comment: ReelComment,
+        reelTitle: String,
+        reelThumbUrl: String
+    ) {
+        // Hikoya kalitida `reels/{id}` hujjati yo'q — egasi Telegram peer'i:
+        // foydalanuvchi hikoyasida `tg_<dialogId>`; kanal/guruh hikoyasida esa
+        // Firebase egasi bo'lmaydi (faqat javob egasi bildirishnoma oladi).
+        val storyKey = YuzStoryFeed.parseKey(comment.reelId)
+        val reel = if (storyKey == null) reelMeta(comment.reelId) else null
+        val ownerUid = reel?.uploadedByUid.orEmpty().ifBlank {
+            val dialogId = storyKey?.first ?: 0L
+            if (dialogId > 0L) "tg_$dialogId" else ""
+        }
+        val title = reel?.title?.takeIf { it.isNotBlank() } ?: reelTitle
+        val thumb = reel?.thumbnailUrl?.takeIf { it.isNotBlank() } ?: reelThumbUrl
         if (comment.replyToCommentId.isNotBlank()) {
             val parent = getReelComment(comment.reelId, comment.replyToCommentId)
             val parentOwner = parent?.userId?.takeIf { it.isNotBlank() } ?: comment.replyToUserId
@@ -366,8 +492,8 @@ object ReelsRepository {
                     actorName = comment.authorName,
                     actorPhoto = comment.authorPhotoUrl,
                     reelId = comment.reelId,
-                    reelTitle = reel.title,
-                    reelThumbUrl = reel.thumbnailUrl,
+                    reelTitle = title,
+                    reelThumbUrl = thumb,
                     commentId = comment.replyToCommentId,
                     commentText = comment.text
                 )
@@ -379,8 +505,8 @@ object ReelsRepository {
                     actorName = comment.authorName,
                     actorPhoto = comment.authorPhotoUrl,
                     reelId = comment.reelId,
-                    reelTitle = reel.title,
-                    reelThumbUrl = reel.thumbnailUrl,
+                    reelTitle = title,
+                    reelThumbUrl = thumb,
                     commentId = comment.id,
                     commentText = comment.text
                 )
@@ -392,8 +518,8 @@ object ReelsRepository {
                 actorName = comment.authorName,
                 actorPhoto = comment.authorPhotoUrl,
                 reelId = comment.reelId,
-                reelTitle = reel.title,
-                reelThumbUrl = reel.thumbnailUrl,
+                reelTitle = title,
+                reelThumbUrl = thumb,
                 commentId = comment.id,
                 commentText = comment.text
             )

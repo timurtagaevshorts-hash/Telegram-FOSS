@@ -36,8 +36,9 @@ import uz.kodlikino.top4.utils.YuzReelNotify
  *
  *  - ro'yxat Firestore `user_notifications/{uid}/items` listener'idan;
  *  - ochilganda hammasi o'qilgan deb belgilanadi;
- *  - yangi item kelganda (ilk snapshot'dan keyin) heads-up bildirishnoma +
- *    ovoz ([YuzReelNotify]);
+ *  - yangi layk/izoh/javob heads-up'i butun ilova bo'ylab
+ *    [uz.kodlikino.top4.utils.YuzReelNotifyHub] tomonidan ko'rsatiladi —
+ *    bu ekran dublikat signal bermaydi;
  *  - yuqorida ovoz tugmasi (SwitchCompat) — yoqish/o'chirish;
  *  - bosilgan bildirma tegishli reel'ni (izoh/reply bo'lsa izohlar paneli bilan)
  *    ochadi; chapda o'chirish, tepada "barchasini tozalash".
@@ -53,8 +54,6 @@ class ReelNotificationsActivity : BaseFragment() {
 
     private var listener: ListenerRegistration? = null
     private var scope: CoroutineScope? = null
-    private val seenIds = HashSet<String>()
-    private var firstSnapshot = true
     private var uid = ""
 
     override fun createView(context: Context): View {
@@ -102,31 +101,12 @@ class ReelNotificationsActivity : BaseFragment() {
             progress?.visibility = View.GONE
             adapter?.submit(list)
             emptyView?.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
-            announceNew(list)
             hydrateMissingThumbs(list)
         }
         scope?.launch(Dispatchers.IO) {
             try { ReelNotificationManager.markAllRead(uid) } catch (_: Exception) {}
         }
         return root
-    }
-
-    /** Ikkinchi va keyingi snapshot'larda faqat YANGI itemlar uchun heads-up. */
-    private fun announceNew(list: List<ReelNotification>) {
-        val ctx = parentActivity ?: return
-        if (firstSnapshot) {
-            firstSnapshot = false
-            list.forEach { seenIds.add(it.id) }
-            return
-        }
-        var fresh = 0
-        for (item in list) {
-            if (seenIds.add(item.id)) {
-                YuzReelNotify.show(ctx, item)
-                fresh++
-            }
-        }
-        if (fresh > 0) YuzReelNotify.playInAppAlert(ctx)
     }
 
     /** Reel muqovasi bo'sh bildirmalar uchun thumbnail'larni reels'dan o'qiydi. */
