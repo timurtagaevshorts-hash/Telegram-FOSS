@@ -1436,19 +1436,44 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
         if (!isYuzProfileHost()) {
             return;
         }
-        if (tab == TAB_ARCHIVED_STORIES) {
-            if (yuzReelsOverlay == null) {
-                yuzReelsOverlay = new uz.kodlikino.top4.ui.YuzProfileReelsView(
-                        getContext(), profileActivity.getCurrentAccount(), profileActivity,
-                        "tg_" + dialog_id, isYuzSelfProfile());
-                addView(yuzReelsOverlay, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.LEFT | Gravity.TOP, 0, mediaPageTopMargin(), 0, 0));
-            } else {
-                yuzReelsOverlay.setVisibility(VISIBLE);
-                yuzReelsOverlay.bringToFront();
+        if (tab != TAB_ARCHIVED_STORIES) {
+            if (yuzReelsOverlay != null) {
+                yuzReelsOverlay.setVisibility(GONE);
             }
+            return;
+        }
+        MediaPage reelsPage = null;
+        for (int i = 0; i < mediaPages.length; i++) {
+            if (mediaPages[i] != null && mediaPages[i].selectedType == TAB_ARCHIVED_STORIES) {
+                reelsPage = mediaPages[i];
+                break;
+            }
+        }
+        if (reelsPage == null) {
+            return;
+        }
+        boolean wasVisible = false;
+        if (yuzReelsOverlay == null) {
+            yuzReelsOverlay = new uz.kodlikino.top4.ui.YuzProfileReelsView(
+                    getContext(), profileActivity.getCurrentAccount(), profileActivity,
+                    "tg_" + dialog_id, isYuzSelfProfile());
+        } else {
+            wasVisible = yuzReelsOverlay.getVisibility() == VISIBLE;
+            if (yuzReelsOverlay.getParent() instanceof ViewGroup && yuzReelsOverlay.getParent() != reelsPage) {
+                ((ViewGroup) yuzReelsOverlay.getParent()).removeView(yuzReelsOverlay);
+            }
+        }
+        // Qatlam media sahifasining ichida turadi: sahifa bilan birga o'lchanadi,
+        // kesiladi va tab almashganda u bilan birga siljiydi. Ilgari u
+        // SharedMediaLayout'ning bevosita bolasi edi va o'lchami sahifadan kichik
+        // chiqib, ostidagi native arxiv/stories grid'i pastda ko'rinib qolardi.
+        if (yuzReelsOverlay.getParent() != reelsPage) {
+            reelsPage.addView(yuzReelsOverlay, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        }
+        yuzReelsOverlay.setVisibility(VISIBLE);
+        yuzReelsOverlay.bringToFront();
+        if (!wasVisible) {
             yuzReelsOverlay.refresh();
-        } else if (yuzReelsOverlay != null) {
-            yuzReelsOverlay.setVisibility(GONE);
         }
     }
 
@@ -3812,7 +3837,11 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                 onSelectedTabChanged();
                 animateSearchToOptions(!isSearchItemVisible(id), true);
                 updateOptionsSearch(true);
-                updateYuzReelsOverlay(id);
+                if (id == TAB_ARCHIVED_STORIES) {
+                    // Reels sahifasi animatsiya bilan kirib kelayotganda Firebase
+                    // grid'i darhol ulanadi — ostidagi native arxiv grid'i ko'rinmaydi.
+                    updateYuzReelsOverlay(id);
+                }
             }
 
             @Override
@@ -3853,6 +3882,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                         searchItem.setVisibility(isStoriesView() ? View.GONE : View.INVISIBLE);
                     }
                     searchItemState = 0;
+                    updateYuzReelsOverlay(mediaPages[0].selectedType);
                     startStopVisibleGifs();
                 }
             }
@@ -4734,6 +4764,10 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
         mediaPages[1].setVisibility(View.VISIBLE);
         animatingForward = forward;
         switchToCurrentSelectedMode(true);
+        if (id == TAB_ARCHIVED_STORIES) {
+            // Swipe bilan Reels'ga o'tishda Firebase grid'i sahifa bilan birga suriladi.
+            updateYuzReelsOverlay(id);
+        }
         if (forward) {
             mediaPages[1].setTranslationX(mediaPages[0].getMeasuredWidth());
         } else {
