@@ -132,6 +132,8 @@ import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_chatlists;
 import org.telegram.tgnet.tl.TL_stories;
 import org.telegram.ui.ActionBar.ActionBarLayout;
+import org.telegram.ui.ActionBar.ActionBarMenuSubItem;
+import org.telegram.ui.ActionBar.ActionBarPopupWindow;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheetTabs;
@@ -490,6 +492,13 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         yuzGramBottomBar = new uz.kodlikino.top4.ui.YuzGramBottomBar(this);
         yuzGramBottomBar.setOnTabSelectedListener(tab -> {
             BaseFragment top = getLastFragment();
+            // Chat ro'yxati (asosiy root) ochiq bo'lganda ASOSIY slot "yangi chat"
+            // bo'lib ishlaydi: tab qayta tanlanmaydi, yaratish menyusi ochiladi.
+            if (tab == uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ASOSIY
+                    && top instanceof DialogsActivity && ((DialogsActivity) top).isYuzGramMainRoot()) {
+                showYuzGramComposeMenu(top);
+                return;
+            }
             uz.kodlikino.top4.ui.YuzGramNav.select(top, tab);
         });
         // Markaz "+" FAB olib tashlandi: e'lon/reel joylash tugmalari o'z bo'limlari
@@ -8039,15 +8048,19 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             eligible = false; // yon menyu ochiq — bar ko'rinmasin
         } else if (top instanceof uz.kodlikino.top4.ui.ReelsActivity) {
             yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_REELS, yuzGramBottomBar.isShownBar());
+            yuzGramBottomBar.setHomeCompose(false);
             eligible = true;
         } else if (top instanceof uz.kodlikino.top4.ui.FunksiyalarActivity) {
             yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ELONLAR, yuzGramBottomBar.isShownBar());
+            yuzGramBottomBar.setHomeCompose(false);
             eligible = true;
         } else if (top instanceof ProfileActivity && ((ProfileActivity) top).myProfile) {
             yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_PROFIL, yuzGramBottomBar.isShownBar());
+            yuzGramBottomBar.setHomeCompose(false);
             eligible = true;
         } else if (top instanceof DialogsActivity && ((DialogsActivity) top).isYuzGramMainRoot()) {
             yuzGramBottomBar.setActiveTab(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ASOSIY, yuzGramBottomBar.isShownBar());
+            yuzGramBottomBar.setHomeCompose(true);
             eligible = true;
         } else {
             eligible = false;
@@ -8070,6 +8083,83 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
 
     private void applyYuzGramBarVisibility() {
         yuzGramBottomBar.setVisible(yuzGramBarEligible && !yuzGramBarScrollHidden);
+    }
+
+    /**
+     * Pastki bardagi "yangi chat" slotining menyusi: yangi chat, guruh yoki kanal.
+     * Chat ro'yxati ochiq bo'lganda Asosiy slotga bosilganda ochiladi.
+     */
+    private void showYuzGramComposeMenu(BaseFragment fragment) {
+        if (fragment == null || yuzGramBottomBar == null || frameLayout == null) {
+            return;
+        }
+        ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout =
+                new ActionBarPopupWindow.ActionBarPopupWindowLayout(this);
+        popupLayout.setMinimumWidth(AndroidUtilities.dp(210));
+
+        ActionBarPopupWindow[] popupRef = new ActionBarPopupWindow[1];
+
+        ActionBarMenuSubItem newChat = new ActionBarMenuSubItem(this, true, true, null);
+        newChat.setMinimumWidth(AndroidUtilities.dp(210));
+        newChat.setTextAndIcon(LocaleController.getString("NewMessageTitle", R.string.NewMessageTitle), R.drawable.msg_edit);
+        newChat.setOnClickListener(v -> {
+            if (popupRef[0] != null) {
+                popupRef[0].dismiss();
+            }
+            Bundle args = new Bundle();
+            args.putBoolean("destroyAfterSelect", true);
+            fragment.presentFragment(new ContactsActivity(args));
+        });
+        popupLayout.addView(newChat);
+
+        ActionBarMenuSubItem newGroup = new ActionBarMenuSubItem(this, true, true, null);
+        newGroup.setMinimumWidth(AndroidUtilities.dp(210));
+        newGroup.setTextAndIcon(LocaleController.getString("NewGroup", R.string.NewGroup), R.drawable.msg_groups_create);
+        newGroup.setOnClickListener(v -> {
+            if (popupRef[0] != null) {
+                popupRef[0].dismiss();
+            }
+            fragment.presentFragment(new GroupCreateActivity(new Bundle()));
+        });
+        popupLayout.addView(newGroup);
+
+        ActionBarMenuSubItem newChannel = new ActionBarMenuSubItem(this, true, true, null);
+        newChannel.setMinimumWidth(AndroidUtilities.dp(210));
+        newChannel.setTextAndIcon(LocaleController.getString("NewChannel", R.string.NewChannel), R.drawable.msg_channel_create);
+        newChannel.setOnClickListener(v -> {
+            if (popupRef[0] != null) {
+                popupRef[0].dismiss();
+            }
+            Bundle args = new Bundle();
+            args.putInt("step", 0);
+            fragment.presentFragment(new ChannelCreateActivity(args));
+        });
+        popupLayout.addView(newChannel);
+
+        ActionBarPopupWindow popup = new ActionBarPopupWindow(popupLayout,
+                LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT);
+        popupRef[0] = popup;
+        popup.setPauseNotifications(true);
+        popup.setDismissAnimationDuration(220);
+        popup.setOutsideTouchable(true);
+        popup.setClippingEnabled(true);
+        popup.setAnimationStyle(R.style.PopupContextAnimation);
+        popup.setFocusable(true);
+        popupLayout.measure(
+                View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST),
+                View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST));
+        popup.setInputMethodMode(ActionBarPopupWindow.INPUT_METHOD_NOT_NEEDED);
+        popup.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_UNSPECIFIED);
+        popup.getContentView().setFocusableInTouchMode(true);
+
+        float x = yuzGramBottomBar.getX()
+                + yuzGramBottomBar.slotCenterX(uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ASOSIY)
+                - popupLayout.getMeasuredWidth() / 2f;
+        float maxX = frameLayout.getWidth() - popupLayout.getMeasuredWidth() - AndroidUtilities.dp(8);
+        x = Math.max(AndroidUtilities.dp(8), Math.min(maxX, x));
+        float y = yuzGramBottomBar.getY() - popupLayout.getMeasuredHeight() - AndroidUtilities.dp(6);
+        popup.showAtLocation(frameLayout, Gravity.LEFT | Gravity.TOP,
+                (int) x, Math.max(AndroidUtilities.dp(8), (int) y));
     }
 
     /**

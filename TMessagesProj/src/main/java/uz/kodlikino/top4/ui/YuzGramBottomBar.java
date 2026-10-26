@@ -87,6 +87,8 @@ public class YuzGramBottomBar extends View {
     private final Matrix shaderMatrix = new Matrix();
 
     private int activeTab = TAB_ASOSIY;
+    /** Chat ro'yxati ochiq: ASOSIY slot "yangi chat" ikonkasini ko'rsatadi. */
+    private boolean homeCompose;
     private float indicatorPos = 0f;   // tab-space 0..COUNT-1, animatsiyalanadi
     private float stretch = 0f;        // 0..1 — pill siljish paytidagi cho'zilishi
     private int popTab = -1;           // "pop" animatsiyasi ketayotgan tab
@@ -175,6 +177,32 @@ public class YuzGramBottomBar extends View {
 
     public void setOnTabSelectedListener(OnTabSelectedListener l) {
         this.listener = l;
+    }
+
+    /**
+     * ASOSIY slot ikonkasini almashtiradi: chat ro'yxati ochiq bo'lganda u
+     * "yangi chat" (ko'pik + plus) bo'lib ko'rinadi, boshqa tabda esa uy ikonkasi.
+     */
+    public void setHomeCompose(boolean compose) {
+        if (homeCompose != compose) {
+            homeCompose = compose;
+            invalidate();
+        }
+    }
+
+    public boolean isHomeCompose() {
+        return homeCompose;
+    }
+
+    /** Slot markazining View ichidagi x koordinatasi — menyuni shu yerga bog'laymiz. */
+    public float slotCenterX(int tab) {
+        if (tab < 0 || tab >= COUNT) {
+            return getWidth() / 2f;
+        }
+        if (panelRight > panelLeft) {
+            return slotCx[tab];
+        }
+        return getWidth() * (tab + 0.5f) / COUNT;
     }
 
     public int getActiveTab() {
@@ -458,7 +486,8 @@ public class YuzGramBottomBar extends View {
         float half = size / 2f;
         switch (tab) {
             case TAB_ASOSIY: {
-                // Suhbat ko'pigi + chap-pastdagi quloqcha
+                // Suhbat ko'pigi + chap-pastdagi quloqcha. Chat ro'yxati ochiq
+                // bo'lsa (homeCompose) ko'pik ichiga "+" qo'shiladi — yangi chat.
                 tmpRect.set(cx - half, cy - half + AndroidUtilities.dp(1f) * k,
                         cx + half, cy + half - AndroidUtilities.dp(6f) * k);
                 drawRoundRectStroke(canvas, tmpRect, AndroidUtilities.dp(5.5f) * k);
@@ -471,6 +500,12 @@ public class YuzGramBottomBar extends View {
                 iconPaint.setStyle(Paint.Style.FILL);
                 canvas.drawPath(path, iconPaint);
                 iconPaint.setStyle(Paint.Style.STROKE);
+                if (homeCompose) {
+                    float arm = AndroidUtilities.dp(3.9f) * k;
+                    float plusCy = tmpRect.centerY();
+                    canvas.drawLine(cx - arm, plusCy, cx + arm, plusCy, iconPaint);
+                    canvas.drawLine(cx, plusCy - arm, cx, plusCy + arm, iconPaint);
+                }
                 break;
             }
             case TAB_REELS: {
