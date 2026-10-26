@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tarif illyustratsiyasi uchun yumaloq ramka (clipToOutline bilan kesiladi). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/yuz_field" />
+    <stroke android:width="@dimen/yuz_stroke" android:color="@color/yuz_stroke" />
+    <corners android:radius="@dimen/yuz_space_4" />
+</shape>

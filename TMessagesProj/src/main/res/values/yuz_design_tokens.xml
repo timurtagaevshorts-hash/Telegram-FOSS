@@ -51,6 +51,9 @@
          premium sirtlarda (hero, tarif kartasi) ishlatiladi. -->
     <color name="yuz_gold_deep">#F0A93B</color>
     <color name="yuz_stroke_gold">#33FFD84D</color>
+    <!-- Tarif kartasidagi oltin nishon/emoji foni va kuchliroq hoshiya. -->
+    <color name="yuz_gold_soft">#1FFFD84D</color>
+    <color name="yuz_stroke_gold_strong">#66F0A93B</color>
     <color name="yuz_danger">#FF5C5C</color>
     <!-- Reels\'dagi faol layk — brend palitrasidagi yagona issiq holat rangi. -->
     <color name="yuz_like">#FF4D6D</color>
@@ -72,6 +75,7 @@
     <!-- ============ Tipografiya masshtabi ============ -->
     <dimen name="yuz_text_display">26sp</dimen>   <!-- faqat brend so'zi / qahramon sarlavha -->
     <dimen name="yuz_text_title">22sp</dimen>     <!-- ekran sarlavhasi -->
+    <dimen name="yuz_text_card_title">18sp</dimen> <!-- tarif/feature karta sarlavhasi -->
     <dimen name="yuz_text_section">16sp</dimen>   <!-- bo'lim sarlavhasi -->
     <dimen name="yuz_text_body">14sp</dimen>      <!-- asosiy matn -->
     <dimen name="yuz_text_secondary">13sp</dimen> <!-- ikkilamchi matn -->

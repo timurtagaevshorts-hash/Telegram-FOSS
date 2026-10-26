@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tarif kartasidagi to'ldirilgan teg ("TOP TANLOV"). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/yuz_gold" />
+    <corners android:radius="@dimen/yuz_radius_pill" />
+</shape>

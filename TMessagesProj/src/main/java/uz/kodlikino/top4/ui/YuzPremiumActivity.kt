@@ -11,9 +11,9 @@ import android.widget.TextView
 import android.widget.Toast
 import com.android.billingclient.api.Purchase
 import com.google.android.material.button.MaterialButton
-import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.BaseFragment
+import uz.kodlikino.top4.utils.PlanBenefit
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzPlayBilling
 import uz.kodlikino.top4.utils.YuzPremiumManager
@@ -105,46 +105,88 @@ class YuzPremiumActivity : BaseFragment() {
         ensureBilling()
     }
 
-    /** Ikkala tarif kartasi imtiyozlarini vektor belgili qatorlar qilib chiqaradi. */
-    private fun fillBenefits(container: android.widget.LinearLayout?, benefits: List<String>) {
+    /** Ikkala tarif kartasi imtiyozlarini emoji nishonli qatorlar qilib chiqaradi. */
+    private fun fillBenefits(
+        container: android.widget.LinearLayout?,
+        benefits: List<PlanBenefit>,
+        gold: Boolean
+    ) {
         val themed = themedContext ?: return
         container ?: return
         container.removeAllViews()
         val d = themed.resources.displayMetrics.density
-        benefits.forEach { label ->
-            val row = TextView(themed).apply {
+        val emojiBg = if (gold) R.drawable.bg_yuz_emoji_badge_gold else R.drawable.bg_yuz_emoji_badge
+        benefits.forEachIndexed { index, benefit ->
+            val row = android.widget.LinearLayout(themed).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
                 layoutParams = android.widget.LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = (4f * d).toInt() }
-                setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13f)
+                ).apply { topMargin = if (index == 0) 0 else (10f * d).toInt() }
+            }
+            val emoji = TextView(themed).apply {
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    (30f * d).toInt(), (30f * d).toInt()
+                )
+                gravity = android.view.Gravity.CENTER
+                setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14f)
+                includeFontPadding = false
+                text = benefit.emoji
+                setBackgroundResource(emojiBg)
+            }
+            val texts = android.widget.LinearLayout(themed).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+                ).apply { marginStart = (10f * d).toInt() }
+            }
+            val title = TextView(themed).apply {
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13.5f)
+                setTextColor(
+                    androidx.core.content.ContextCompat.getColor(themed, R.color.yuz_text_bright)
+                )
+                typeface = android.graphics.Typeface.create(
+                    android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD
+                )
+                includeFontPadding = false
+                text = benefit.title
+            }
+            val subtitle = TextView(themed).apply {
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = (2f * d).toInt() }
+                setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f)
                 setTextColor(
                     androidx.core.content.ContextCompat.getColor(themed, R.color.yuz_text_secondary)
                 )
-                text = label
+                includeFontPadding = false
+                text = benefit.subtitle
             }
-            row.setIconStart(
-                R.drawable.ic_yuz_check, sizeDp = 16, gapDp = 8,
-                tintColor = androidx.core.content.ContextCompat.getColor(themed, R.color.yuz_action)
-            )
+            texts.addView(title)
+            texts.addView(subtitle)
+            row.addView(emoji)
+            row.addView(texts)
             container.addView(row)
         }
     }
 
-    /** Ikkala tarif kartasini donor matnlari bilan to'ldiradi va tugmalarni ulaydi. */
+    /** Ikkala tarif kartasini to'ldiradi va tugmalarni ulaydi. */
     private fun fillPlanTexts() {
         // ContextThemeWrapper.findViewById ishonchli emas — fragment View daraxtini
         // ishlatamiz (createView'da chaqirilganda hali hierarxiyaga ulanmagan).
         val root = fragmentView ?: return
-        root.findViewById<TextView>(R.id.tvPremiumHero)?.setIconStart(
-            R.drawable.ic_yuz_diamond, sizeDp = 20, gapDp = 8,
-            tintColor = androidx.core.content.ContextCompat.getColor(
-                root.context, R.color.yuz_gold
-            )
-        )
         for (plan in listOf(YuzPremiumPlans.PREMIUM_KINO, YuzPremiumPlans.FULL_PREMIUM)) {
             val isKino = plan.id == YuzPremiumPlans.PREMIUM_KINO.id
             val tvTitle = root.findViewById<TextView>(
                 if (isKino) R.id.tvKinoTitle else R.id.tvFullTitle
+            )
+            val tvSubtitle = root.findViewById<TextView>(
+                if (isKino) R.id.tvKinoSubtitle else R.id.tvFullSubtitle
+            )
+            val tvTag = root.findViewById<TextView>(
+                if (isKino) R.id.tvKinoTag else R.id.tvFullTag
             )
             val tvPrice = root.findViewById<TextView>(
                 if (isKino) R.id.tvKinoPrice else R.id.tvFullPrice
@@ -153,15 +195,13 @@ class YuzPremiumActivity : BaseFragment() {
                 if (isKino) R.id.btnPayKino else R.id.btnPayFull
             )
             tvTitle?.text = plan.title
-            // Tarif belgisi — matnoldi emoji emas, vektor ikon (diamond/crown).
-            tvTitle?.setCompoundDrawablesRelativeWithIntrinsicBounds(
-                if (isKino) R.drawable.ic_yuz_diamond else R.drawable.ic_yuz_crown, 0, 0, 0
-            )
-            tvTitle?.setCompoundDrawablePadding(AndroidUtilities.dp(8f))
+            tvSubtitle?.text = plan.subtitle
+            tvTag?.text = plan.tag
             tvPrice?.text = plan.formattedPrice()
             fillBenefits(
                 root.findViewById(if (isKino) R.id.llKinoBenefits else R.id.llFullBenefits),
-                plan.benefits
+                plan.benefits,
+                gold = !isKino
             )
             btn?.text = plan.buttonText
             btn?.setOnClickListener { launchPurchase(plan) }

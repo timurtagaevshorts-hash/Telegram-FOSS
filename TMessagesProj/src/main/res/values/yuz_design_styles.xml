@@ -75,6 +75,58 @@
         <item name="android:letterSpacing">0.06</item>
     </style>
 
+    <!-- Premium hero ichidagi kalit imtiyoz chipi. -->
+    <style name="YuzPremiumHeroChip">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/bg_yuz_hero_chip</item>
+        <item name="android:paddingStart">@dimen/yuz_space_2</item>
+        <item name="android:paddingEnd">@dimen/yuz_space_2</item>
+        <item name="android:paddingTop">5dp</item>
+        <item name="android:paddingBottom">5dp</item>
+        <item name="android:textColor">@color/yuz_text_on_accent</item>
+        <item name="android:textSize">@dimen/yuz_text_caption</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <!-- Tarif kartasi sarlavhasidagi emoji nishoni (o'lcham XML'da). -->
+    <style name="YuzPremiumEmoji">
+        <item name="android:layout_width">38dp</item>
+        <item name="android:layout_height">38dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="YuzPremiumCardSubtitle">
+        <item name="android:textColor">@color/yuz_text_secondary</item>
+        <item name="android:textSize">@dimen/yuz_text_secondary</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:paddingTop">2dp</item>
+    </style>
+
+    <!-- Karta burchagidagi kichik teg: kontur yoki to'ldirilgan oltin. -->
+    <style name="YuzPremiumTagOutline">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/bg_yuz_tag_outline</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:paddingTop">3dp</item>
+        <item name="android:paddingBottom">3dp</item>
+        <item name="android:textColor">@color/yuz_gold</item>
+        <item name="android:textSize">@dimen/yuz_text_micro</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="YuzPremiumTagGold" parent="YuzPremiumTagOutline">
+        <item name="android:background">@drawable/bg_yuz_tag_gold</item>
+        <item name="android:textColor">@color/yuz_text_on_accent</item>
+    </style>
+
     <!-- ==================== Tugmalar (MaterialButton) ==================== -->
 
     <style name="YuzButton" parent="Widget.MaterialComponents.Button">

@@ -5,8 +5,8 @@
   (Theme.YuzGramAds ContextThemeWrapper ostida, BaseFragment ichida).
 
   Dizayn qoidalari (f1): narx — kartadagi eng yirik raqam; CTA — bitta
-  YuzButton balandligi/radiusi; imtiyozlar ro'yxati matnoldi "✓" belgisi
-  bilan emas, kodda qo'shiladigan vektor belgi bilan chiqadi.
+  YuzButton balandligi/radiusi; imtiyozlar ro'yxati emoji nishon + sarlavha +
+  izoh ko'rinishida kodda qo'shiladi (YuzPremiumActivity.fillBenefits).
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -53,6 +53,7 @@
                     android:text="@string/premium_screen_title" />
             </LinearLayout>
 
+            <!-- Hero: brend gradientida nishon, sarlavha va uchta kalit chip. -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -61,21 +62,72 @@
                 android:orientation="vertical"
                 android:padding="@dimen/yuz_space_5">
 
-                <TextView
-                    android:id="@+id/tvPremiumHero"
-                    style="@style/YuzScreenTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/yuz_text_on_accent"
-                    android:text="@string/premium_hero_title" />
-
-                <TextView
-                    style="@style/YuzBodySecondary"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/yuz_space_2"
-                    android:textColor="@color/yuz_text_on_accent_dim"
-                    android:text="@string/premium_hero_subtitle" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <FrameLayout
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:background="@drawable/bg_yuz_hero_chip">
+
+                        <ImageView
+                            android:layout_width="26dp"
+                            android:layout_height="26dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@string/premium_badge_desc"
+                            android:src="@drawable/ic_yuz_diamond"
+                            app:tint="@color/yuz_text_on_accent" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/yuz_space_3"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvPremiumHero"
+                            style="@style/YuzScreenTitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/yuz_text_on_accent"
+                            android:textSize="@dimen/yuz_text_display"
+                            android:text="@string/premium_hero_title" />
+
+                        <TextView
+                            style="@style/YuzBodySecondary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/yuz_space_1"
+                            android:textColor="@color/yuz_text_on_accent_dim"
+                            android:text="@string/premium_hero_subtitle" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/yuz_space_4"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/YuzPremiumHeroChip"
+                        android:text="@string/premium_hero_chip_kino" />
+
+                    <TextView
+                        style="@style/YuzPremiumHeroChip"
+                        android:layout_marginStart="@dimen/yuz_space_2"
+                        android:text="@string/premium_hero_chip_reels" />
+
+                    <TextView
+                        style="@style/YuzPremiumHeroChip"
+                        android:layout_marginStart="@dimen/yuz_space_2"
+                        android:text="@string/premium_hero_chip_ai" />
+                </LinearLayout>
             </LinearLayout>
 
             <TextView
@@ -86,28 +138,99 @@
                 android:layout_marginTop="@dimen/yuz_space_3"
                 android:visibility="gone" />
 
+            <TextView
+                style="@style/YuzLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_5"
+                android:text="@string/premium_choose_label" />
+
+            <!-- ==================== Premium Kino ==================== -->
             <LinearLayout
                 android:id="@+id/cardKino"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/yuz_space_4"
+                android:layout_marginTop="@dimen/yuz_space_2"
                 android:background="@drawable/bg_yuz_premium_card"
                 android:orientation="vertical"
                 android:padding="@dimen/yuz_space_4">
 
-                <TextView
-                    android:id="@+id/tvKinoTitle"
-                    style="@style/YuzSectionHeader"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <TextView
-                    android:id="@+id/tvKinoPrice"
-                    style="@style/YuzScreenTitle"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/yuz_space_1"
-                    android:textColor="@color/yuz_gold" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/YuzPremiumEmoji"
+                        android:background="@drawable/bg_yuz_emoji_badge"
+                        android:text="@string/premium_emoji_kino" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/yuz_space_3"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvKinoTitle"
+                            style="@style/YuzSectionHeader"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textSize="@dimen/yuz_text_card_title" />
+
+                        <TextView
+                            android:id="@+id/tvKinoSubtitle"
+                            style="@style/YuzPremiumCardSubtitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvKinoTag"
+                        style="@style/YuzPremiumTagOutline"
+                        android:layout_marginStart="@dimen/yuz_space_2" />
+                </LinearLayout>
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="104dp"
+                    android:layout_marginTop="@dimen/yuz_space_3"
+                    android:background="@drawable/bg_yuz_art_frame"
+                    android:clipToOutline="true">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@string/premium_kino_art_desc"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/yuz_premium_kino_art" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/yuz_space_3"
+                    android:gravity="bottom"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvKinoPrice"
+                        style="@style/YuzScreenTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/yuz_gold"
+                        android:textSize="@dimen/yuz_text_display" />
+
+                    <TextView
+                        style="@style/YuzCaption"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/yuz_space_2"
+                        android:layout_marginBottom="3dp"
+                        android:text="@string/premium_price_period" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/tvKinoPlayPrice"
@@ -131,28 +254,92 @@
                     android:enabled="false" />
             </LinearLayout>
 
+            <!-- ==================== To'liq Premium ==================== -->
             <LinearLayout
                 android:id="@+id/cardFull"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/yuz_space_4"
-                android:background="@drawable/bg_yuz_premium_card"
+                android:background="@drawable/bg_yuz_premium_card_full"
                 android:orientation="vertical"
                 android:padding="@dimen/yuz_space_4">
 
-                <TextView
-                    android:id="@+id/tvFullTitle"
-                    style="@style/YuzSectionHeader"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <TextView
-                    android:id="@+id/tvFullPrice"
-                    style="@style/YuzScreenTitle"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/yuz_space_1"
-                    android:textColor="@color/yuz_gold" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/YuzPremiumEmoji"
+                        android:background="@drawable/bg_yuz_emoji_badge_gold"
+                        android:text="@string/premium_emoji_full" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/yuz_space_3"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvFullTitle"
+                            style="@style/YuzSectionHeader"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textSize="@dimen/yuz_text_card_title" />
+
+                        <TextView
+                            android:id="@+id/tvFullSubtitle"
+                            style="@style/YuzPremiumCardSubtitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvFullTag"
+                        style="@style/YuzPremiumTagGold"
+                        android:layout_marginStart="@dimen/yuz_space_2" />
+                </LinearLayout>
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="112dp"
+                    android:layout_marginTop="@dimen/yuz_space_3"
+                    android:background="@drawable/bg_yuz_art_frame"
+                    android:clipToOutline="true">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@string/premium_full_art_desc"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/yuz_premium_full_art" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/yuz_space_3"
+                    android:gravity="bottom"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvFullPrice"
+                        style="@style/YuzScreenTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/yuz_gold"
+                        android:textSize="@dimen/yuz_text_display" />
+
+                    <TextView
+                        style="@style/YuzCaption"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/yuz_space_2"
+                        android:layout_marginBottom="3dp"
+                        android:text="@string/premium_price_period" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/tvFullPlayPrice"
@@ -173,7 +360,10 @@
                     android:id="@+id/btnPayFull"
                     style="@style/YuzButton"
                     android:layout_marginTop="@dimen/yuz_space_4"
-                    android:enabled="false" />
+                    android:enabled="false"
+                    android:textColor="@color/yuz_text_on_accent"
+                    app:backgroundTint="@color/yuz_gold"
+                    app:rippleColor="@color/yuz_stroke_strong" />
             </LinearLayout>
 
             <com.google.android.material.button.MaterialButton
@@ -202,13 +392,21 @@
         android:padding="@dimen/yuz_space_8"
         android:visibility="gone">
 
-        <ImageView
-            android:id="@+id/ivPremiumBadge"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:layout_marginBottom="@dimen/yuz_space_4"
-            android:contentDescription="@string/premium_badge_desc"
-            android:src="@drawable/ic_yuz_star" />
+        <FrameLayout
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_marginBottom="@dimen/yuz_space_5"
+            android:background="@drawable/bg_yuz_badge_ring">
+
+            <ImageView
+                android:id="@+id/ivPremiumBadge"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/premium_badge_desc"
+                android:src="@drawable/ic_yuz_star"
+                app:tint="@color/yuz_gold" />
+        </FrameLayout>
 
         <TextView
             android:id="@+id/tvApprovedTitle"
@@ -224,7 +422,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/yuz_space_3"
-            android:gravity="center" />
+            android:gravity="center"
+            android:lineSpacingExtra="3dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnApprovedClose"

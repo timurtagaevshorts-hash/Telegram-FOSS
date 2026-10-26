@@ -14,13 +14,20 @@ import java.util.Locale
  * faqat "best-effort" (jimgina rad etiladi), haqiqiy grant Play Purchase
  * tekshiruvida (Google imzosi).
  */
+data class PlanBenefit(
+    val emoji: String,
+    val title: String,
+    val subtitle: String
+)
+
 data class YuzPremiumPlan(
     val id: String,
     val title: String,
     val priceSom: Int,
     val playProductId: String,
-    val upgradeNote: String?,
-    val benefits: List<String>,
+    val tag: String,
+    val subtitle: String,
+    val benefits: List<PlanBenefit>,
     val buttonText: String
 ) {
     fun formattedPrice(): String =
@@ -29,7 +36,6 @@ data class YuzPremiumPlan(
 
 object YuzPremiumPlans {
     const val EXTRA_PLAN_ID = "premium_plan_id"
-    const val VALIDITY_NOTE = "Tarif 1 yil muddatga amal qiladi"
 
     const val ID_KINO = "premium_kino"
     const val ID_FULL = "full_premium"
@@ -39,10 +45,29 @@ object YuzPremiumPlans {
         title = "Premium Kino",
         priceSom = 12_000,
         playProductId = "premium_kino",
-        upgradeNote = VALIDITY_NOTE,
+        tag = "KINO",
+        subtitle = "Faqat premium kinolar uchun",
         benefits = listOf(
-            "Premium belgilangan kinolarni cheksiz tomosha",
-            "Reels limiti oddiy foydalanuvchidagidek qoladi"
+            PlanBenefit(
+                emoji = "🎬",
+                title = "Premium kinolar to'liq ochiladi",
+                subtitle = "Maxsus tanlangan filmlar kutubxonasi"
+            ),
+            PlanBenefit(
+                emoji = "🍿",
+                title = "Kinolar cheksiz",
+                subtitle = "Kunlik chegara yo'q — xohlagancha tomosha"
+            ),
+            PlanBenefit(
+                emoji = "📱",
+                title = "1 yil — bitta to'lov",
+                subtitle = "Obuna avtomatik uzaytirilmaydi"
+            ),
+            PlanBenefit(
+                emoji = "ℹ️",
+                title = "Reels va AI — To'liq Premium'da",
+                subtitle = "Bu tarif faqat kinolar uchun"
+            )
         ),
         buttonText = "Tarifga ulanish"
     )
@@ -52,11 +77,34 @@ object YuzPremiumPlans {
         title = "To'liq Premium",
         priceSom = 220_000,
         playProductId = "full_premium",
-        upgradeNote = "Premium Kino tarifidan o'tish narxi",
+        tag = "TOP TANLOV",
+        subtitle = "Hammasi bitta tarifda",
         benefits = listOf(
-            "Barcha premium kinolar ochiq",
-            "Reels uchun alohida, yuqoriroq kunlik limit",
-            "Kattaroq video hajmi limiti"
+            PlanBenefit(
+                emoji = "👑",
+                title = "Maxsus premium nishon",
+                subtitle = "Profilingizda oltin yulduz belgisi"
+            ),
+            PlanBenefit(
+                emoji = "🎬",
+                title = "Reels videolarni xohlagancha yuklash",
+                subtitle = "Premium uchun alohida, yuqori kunlik limit"
+            ),
+            PlanBenefit(
+                emoji = "⚡",
+                title = "Kuchaytirilgan xizmatlar",
+                subtitle = "Tezkor yuklash va kattaroq video hajmi"
+            ),
+            PlanBenefit(
+                emoji = "🤖",
+                title = "AI yordamchi to'liq quvvatda",
+                subtitle = "Ovozli buyruqlar va aqlli javoblar"
+            ),
+            PlanBenefit(
+                emoji = "🍿",
+                title = "Kinolar cheksiz",
+                subtitle = "Barcha premium filmlar ochiq"
+            )
         ),
         buttonText = "To'liq Premium olish"
     )
