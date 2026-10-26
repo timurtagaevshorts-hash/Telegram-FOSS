@@ -598,6 +598,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private uz.kodlikino.top4.ui.YuzGramBrandMark yuzBrandMark;
     // #100: APK himoyasi tugmasi — brend yonida, faqat asosiy chat ildizida.
     private uz.kodlikino.top4.ui.YuzGramApkToggle yuzApkToggle;
+    // #193: fon rasmi tugmasi — APK himoya pill'i yonida.
+    private uz.kodlikino.top4.ui.YuzGramWallpaperPill yuzWallpaperPill;
+    private final Runnable yuzWallpaperListener = this::onYuzWallpaperChanged;
     // YuzGram #85: gildirak OSTIDagi doimiy qidiruv satri ("Qidirish" pill'i +
     // filtr doirasi) va chat ro'yxati ORQASidagi nebula fon.
     private uz.kodlikino.top4.ui.YuzGramSearchBar yuzSearchBar;
@@ -1797,6 +1800,58 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     yuzApkToggle.setLayoutParams(lp);
                 }
             }
+        }
+        if (yuzWallpaperPill != null) {
+            boolean active = org.telegram.messenger.YuzWallpaper.isActive();
+            yuzWallpaperPill.setActive(active);
+            yuzWallpaperPill.setTranslationY(actionBar.getTranslationY());
+            yuzWallpaperPill.setAlpha(a);
+            yuzWallpaperPill.setClickable(a > 0.5f);
+            FrameLayout.LayoutParams wlp = (FrameLayout.LayoutParams) yuzWallpaperPill.getLayoutParams();
+            int parentWidth = yuzWallpaperPill.getParent() instanceof View
+                    ? ((View) yuzWallpaperPill.getParent()).getWidth() : 0;
+            if (parentWidth > 0 && yuzApkToggle != null) {
+                FrameLayout.LayoutParams apkLp = (FrameLayout.LayoutParams) yuzApkToggle.getLayoutParams();
+                int rightMargin = apkLp.rightMargin + yuzApkToggle.getMeasuredWidth() + dp(8);
+                if (wlp.rightMargin != rightMargin) {
+                    wlp.rightMargin = rightMargin;
+                    yuzWallpaperPill.setLayoutParams(wlp);
+                }
+            }
+        }
+    }
+
+    /**
+     * #193: fon rasmi yoqilganda asosiy ildizning o'z foni shaffof bo'ladi —
+     * LaunchActivity'dagi pastki qatlam rasm ro'yxat ortidan ko'rinadi.
+     */
+    private void updateYuzWallpaperBackdrop() {
+        if (!isYuzGramMainRoot() || fragmentView == null) {
+            return;
+        }
+        boolean active = org.telegram.messenger.YuzWallpaper.isActive();
+        fragmentView.setBackgroundColor(active ? android.graphics.Color.TRANSPARENT
+                : getThemedColor(Theme.key_windowBackgroundWhite));
+        if (viewPages[0] != null && viewPages[0].listView != null) {
+            if (active) {
+                viewPages[0].listView.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            } else {
+                viewPages[0].listView.setBackground(null);
+            }
+        }
+        // Nebula to'liq qoplovchi fon — rasm tanlanganda uni yashiramiz.
+        if (yuzNebula != null) {
+            yuzNebula.setVisibility(active ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    private void onYuzWallpaperChanged() {
+        updateYuzWallpaperBackdrop();
+        if (yuzWallpaperPill != null) {
+            yuzWallpaperPill.setActive(org.telegram.messenger.YuzWallpaper.isActive());
+        }
+        if (fragmentView != null) {
+            fragmentView.invalidate();
         }
     }
 
@@ -3369,6 +3424,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
+        org.telegram.messenger.YuzWallpaper.removeListener(yuzWallpaperListener);
         if (searchString == null) {
             getNotificationCenter().removeObserver(this, NotificationCenter.dialogsNeedReload);
             NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.emojiLoaded);
@@ -6063,6 +6119,18 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             tgLp.topMargin = AndroidUtilities.statusBarHeight + dp(14);
             tgLp.rightMargin = dp(80);
             contentView.addView(yuzApkToggle, tgLp);
+            // #193: fon rasmi tugmasi — APK himoya pill'i chap tomonida.
+            yuzWallpaperPill = new uz.kodlikino.top4.ui.YuzGramWallpaperPill(context);
+            yuzWallpaperPill.setContentDescription(getString(R.string.yuz_wallpaper_open));
+            yuzWallpaperPill.setOnClickListener(v ->
+                    uz.kodlikino.top4.ui.YuzGramWallpaperDialog.show(this));
+            FrameLayout.LayoutParams wpLp = new FrameLayout.LayoutParams(
+                    LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.RIGHT);
+            wpLp.topMargin = AndroidUtilities.statusBarHeight + dp(14);
+            wpLp.rightMargin = dp(160);
+            contentView.addView(yuzWallpaperPill, wpLp);
+            org.telegram.messenger.YuzWallpaper.addListener(yuzWallpaperListener);
+            updateYuzWallpaperBackdrop();
         }
         updateStoriesVisibility(false);
         return fragmentView;

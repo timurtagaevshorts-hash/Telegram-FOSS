@@ -261,6 +261,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     private RLottieDrawable themeSwitchSunDrawable;
     private ActionBarLayout actionBarLayout;
     private uz.kodlikino.top4.ui.YuzGramBottomBar yuzGramBottomBar;
+    // YuzGram #193: tanlangan fon rasmi — barcha oynalar ostidagi qatlam.
+    private ImageView yuzWallpaperUnderlay;
+    private final Runnable yuzWallpaperListener = this::refreshYuzWallpaper;
     // YuzGram: bar ko'rinishi = (root ekrandamiz) AND (skroll yashirmagan).
     private boolean yuzGramBarEligible;
     private boolean yuzGramBarScrollHidden;
@@ -470,6 +473,15 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         drawerLayoutContainer.setClipChildren(false);
         drawerLayoutContainer.setClipToPadding(false);
         drawerLayoutContainer.setBehindKeyboardColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+
+        // YuzGram #193: fon rasmi eng pastki qatlam — shaffof fonli root
+        // ekranlar (chat ro'yxati, Funksiyalar) orqali ko'rinadi.
+        yuzWallpaperUnderlay = new ImageView(this);
+        yuzWallpaperUnderlay.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        yuzWallpaperUnderlay.setVisibility(View.GONE);
+        frameLayout.addView(yuzWallpaperUnderlay, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        org.telegram.messenger.YuzWallpaper.addListener(yuzWallpaperListener);
+        refreshYuzWallpaper();
 
         frameLayout.addView(drawerLayoutContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
@@ -6042,6 +6054,11 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             }
             return;
         }
+        // YuzGram #193: fon rasmi tanlash natijasi — ochiq dialog o'zi qabul qiladi.
+        if (uz.kodlikino.top4.ui.YuzGramWallpaperDialog.handleActivityResult(requestCode, resultCode, data)) {
+            super.onActivityResult(requestCode, resultCode, data);
+            return;
+        }
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == SCREEN_CAPTURE_REQUEST_CODE) {
             if (resultCode == Activity.RESULT_OK) {
@@ -6180,8 +6197,29 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         }
     }
 
+    /** YuzGram #193: pastki qatlamni saqlangan rasm va shaffoflik bilan yangilaydi. */
+    private void refreshYuzWallpaper() {
+        if (yuzWallpaperUnderlay == null) {
+            return;
+        }
+        if (!org.telegram.messenger.YuzWallpaper.isActive()) {
+            yuzWallpaperUnderlay.setImageDrawable(null);
+            yuzWallpaperUnderlay.setVisibility(View.GONE);
+            return;
+        }
+        Bitmap bitmap = org.telegram.messenger.YuzWallpaper.getBitmap();
+        if (bitmap == null) {
+            yuzWallpaperUnderlay.setVisibility(View.GONE);
+            return;
+        }
+        yuzWallpaperUnderlay.setImageBitmap(bitmap);
+        yuzWallpaperUnderlay.setAlpha(org.telegram.messenger.YuzWallpaper.getOpacity() / 100f);
+        yuzWallpaperUnderlay.setVisibility(View.VISIBLE);
+    }
+
     @Override
     protected void onDestroy() {
+        org.telegram.messenger.YuzWallpaper.removeListener(yuzWallpaperListener);
         isActive = false;
         if (PhotoViewer.getPipInstance() != null) {
             PhotoViewer.getPipInstance().destroyPhotoViewer();
