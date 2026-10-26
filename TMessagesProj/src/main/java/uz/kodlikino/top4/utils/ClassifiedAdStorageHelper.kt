@@ -91,15 +91,25 @@ object ClassifiedAdStorageHelper {
                         for (attempt in 1..UPLOAD_ATTEMPTS) {
                             try {
                                 uploadSem.withPermit {
-                                    YuzUploadWatchdog.awaitWithStall(
-                                        ref.putFile(payload, metadata),
-                                        "Rasm ${index + 1}"
-                                    ) { snap ->
-                                        val bytes = snap.totalByteCount.coerceAtLeast(1L)
-                                        val fraction =
-                                            (snap.bytesTransferred.toFloat() / bytes)
-                                                .coerceIn(0f, 1f)
-                                        report(index, (fraction * 100).toInt())
+                                    val task = ref.putFile(payload, metadata)
+                                    try {
+                                        YuzUploadWatchdog.awaitWithStall(
+                                            task, "Rasm ${index + 1}"
+                                        ) { snap ->
+                                            val bytes = snap.totalByteCount.coerceAtLeast(1L)
+                                            val fraction =
+                                                (snap.bytesTransferred.toFloat() / bytes)
+                                                    .coerceIn(0f, 1f)
+                                            report(index, (fraction * 100).toInt())
+                                        }
+                                    } catch (e: CancellationException) {
+                                        // Foydalanuvchi bekor qildi — tarmoq oqimi ham
+                                        // to'xtasin, aks holda yuklash fonda davom etadi.
+                                        try {
+                                            task.cancel()
+                                        } catch (_: Exception) {
+                                        }
+                                        throw e
                                     }
                                 }
                                 results[index] = ref.downloadUrl.await().toString()

@@ -79,7 +79,7 @@ class ClassifiedAdUploadService : Service() {
         }
 
         fun cancelUpload(context: Context?, uploadId: String) {
-            if (uploadId.isBlank() || !isUploading()) return
+            if (uploadId.isBlank()) return
             val ctx = context ?: ApplicationLoader.applicationContext ?: return
             val intent = Intent(ctx, ClassifiedAdUploadService::class.java).apply {
                 action = ACTION_CANCEL
