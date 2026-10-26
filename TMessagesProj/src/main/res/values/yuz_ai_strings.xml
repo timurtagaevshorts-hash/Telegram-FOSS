@@ -20,13 +20,11 @@
     <string name="ai_utterance_prefix">Siz: %1$s</string>
     <!-- Tezkor tugmalar -->
     <string name="ai_chip_send">Xabar yuborish</string>
-    <string name="ai_chip_time">Soat</string>
-    <string name="ai_chip_weather">Ob-havo</string>
     <string name="ai_chip_reels">Reels</string>
     <string name="ai_hint_send">Kimnidir ayting — masalan: «Sardor qalesan bugun kelasanmi»</string>
     <!-- Funksiyalar hub kartasi -->
     <string name="func_ai_title">AI Yordamchi</string>
-    <string name="func_ai_desc">Ovoz orqali xabar yuborish, soat, ob-havo va buyruqlar</string>
+    <string name="func_ai_desc">Ovoz orqali xabar yuborish, qo‘ng‘iroq va buyruqlar</string>
     <string name="func_ai_cta">Ovoz bilan boshlash</string>
     <!-- Bo'lim nomlari (ovoz javoblarida) -->
     <string name="func_ai_elon_name">Elonlar</string>

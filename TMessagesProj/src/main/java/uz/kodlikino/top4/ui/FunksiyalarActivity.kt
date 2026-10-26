@@ -43,12 +43,6 @@ class FunksiyalarActivity : BaseFragment() {
             .inflate(R.layout.fragment_funksiyalar, null) as ViewGroup
         fragmentView = root
 
-        // #193: fon rasmi tanlangan bo'lsa hub ham shaffof — LaunchActivity'dagi
-        // pastki qatlam kartalar orasidan ko'rinadi.
-        if (org.telegram.messenger.YuzWallpaper.isActive()) {
-            root.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-        }
-
         actionBar?.visibility = View.GONE
         YuzTopInset.collapseActionBar(actionBar)
 

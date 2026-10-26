@@ -25,57 +25,24 @@ object YuzgramAiBrain {
     /** Tarmoqsiz, bir zumda javob beriladigan savollar (soat, sana, salomlashuv). */
     fun quickAnswer(question: String): String? = localAnswer(question.trim())
 
-    // ------------------------------------------------------------- #157 xotira
-    /**
-     * YuzGram #157: suhbat xotirasi. Ilgari har bir so'rov BIR TARMOQLI edi —
-     * "unga yana yoz", "batafsilroq ayt" kabi davom ettiruvchi gaplar umuman
-     * ishlamasdi. Endi oxirgi [MEMORY_TURNS] savol/javob jufti worker'ga "h"
-     * ro'yxatida yuboriladi; matnli va ovozli yo'l bitta xotirani bo'lishadi.
-     */
-    private const val MEMORY_TURNS = 3
-    private const val MEMORY_CHARS = 200
-    private val memory = ArrayDeque<Pair<String, String>>()
-
-    fun remember(question: String, answer: String) {
-        val q = question.trim().take(MEMORY_CHARS)
-        val a = answer.trim().take(MEMORY_CHARS)
-        if (q.isEmpty() || a.isEmpty()) return
-        synchronized(memory) {
-            memory.addLast(q to a)
-            while (memory.size > MEMORY_TURNS) memory.removeFirst()
-        }
-    }
-
-    fun clearMemory() {
-        synchronized(memory) { memory.clear() }
-    }
-
-    /** Worker'ga ketadigan oldingi suhbat; bo'sh bo'lsa null (ortiqcha bayt yo'q). */
-    fun historyJson(): JSONArray? {
-        val out = JSONArray()
-        synchronized(memory) {
-            for (pair in memory) {
-                out.put(JSONObject().put("r", "user").put("t", pair.first))
-                out.put(JSONObject().put("r", "model").put("t", pair.second))
-            }
-        }
-        return if (out.length() == 0) null else out
-    }
+    // #211: suhbat xotirasi OLIB TASHLANDI. Ilgari oldingi savol/javoblar
+    // worker'ga "h" bilan yuborilardi va yangi savol eski mavzu bilan
+    // aralashib ketardi. Endi har so'rov mustaqil — faqat shu savol.
 
     suspend fun answer(question: String): String = withContext(Dispatchers.IO) {
         val q = question.trim()
         if (q.isBlank()) return@withContext "Ha, eshitaman. Savolingizni ayting."
-        localAnswer(q)?.let { remember(q, it); return@withContext it }
+        localAnswer(q)?.let { return@withContext it }
         if (isWeather(q)) {
-            weatherAnswer()?.let { remember(q, it); return@withContext it }
+            weatherAnswer()?.let { return@withContext it }
         }
         if (AI_PROXY_URL.isNotBlank()) {
-            llmAnswer(q)?.let { remember(q, it); return@withContext it }
+            llmAnswer(q)?.let { return@withContext it }
         }
         // #157: worker limit (429) bergan bo'lsa SABABNI aytamiz — Wikipedia'ga
         // tushib "manba topa olmadim" deyish foydalanuvchini chalkashtiradi.
         rateLimitedMessage?.let { return@withContext it }
-        (wikipediaAnswer(q) ?: fallback(q)).also { remember(q, it) }
+        wikipediaAnswer(q) ?: fallback(q)
     }
 
     /**
@@ -85,7 +52,6 @@ object YuzgramAiBrain {
     private fun llmAnswer(question: String): String? {
         return try {
             val body = JSONObject().put("q", question)
-            historyJson()?.let { body.put("h", it) }
             val response = httpPostJson(AI_PROXY_URL, body.toString()) ?: return null
             val text = JSONObject(response).optString("a").trim()
             if (text.length < 2) null else text

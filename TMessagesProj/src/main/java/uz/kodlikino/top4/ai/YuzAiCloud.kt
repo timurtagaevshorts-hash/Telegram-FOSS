@@ -36,8 +36,8 @@ object YuzAiCloud {
                     .put("peers", JSONArray(peers.take(120)))
                     // Tezlik: /voice ichida TTS kutmaymiz — javob ovozi keyin /speak'dan olinadi.
                     .put("speak", false)
-                // #157: oldingi 3 savol/javob — davom ettiruvchi buyruqlar uchun.
-                uz.kodlikino.top4.utils.YuzgramAiBrain.historyJson()?.let { body.put("h", it) }
+                // #211: oldingi savollar YUBORILMAYDI — har buyruq mustaqil,
+                // eski mavzu yangi savolga aralashmaydi.
                 // #157: 30s o'qish vaqti orbni osib qo'yardi — 15s'da zaxira
                 // (tizim mikrofoni) ishga tushadi.
                 val resp = post("$BASE/voice", body.toString(), 8000, 20000) ?: return@withContext null
@@ -54,12 +54,7 @@ object YuzAiCloud {
                     goto = j.optString("g"),
                     answer = j.optString("a"),
                     audio = audio
-                ).also { r ->
-                    // #157: ovozli suhbat ham xotiraga yoziladi (matnli yo'l bilan birga).
-                    if (r.transcript.isNotBlank() && r.answer.isNotBlank()) {
-                        uz.kodlikino.top4.utils.YuzgramAiBrain.remember(r.transcript, r.answer)
-                    }
-                }
+                )
             } catch (_: Exception) {
                 null
             }

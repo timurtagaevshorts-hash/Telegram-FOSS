@@ -62,8 +62,18 @@ class YuzAiOverlayService : Service() {
     private var bubbleButton: FrameLayout? = null
     private var orb: YuzAiOrbView? = null
 
+    /**
+     * Aniq fazalar: "band" degan yagona bayroq ikkinchi bosishni yutib yuborardi
+     * (oyna javob kutayotganda bekor qilib bo'lmasdi). Endi har bosish fazaga
+     * qarab ishlaydi: IDLE -> tinglash, LISTENING -> yakunlash, THINKING -> bekor,
+     * SPEAKING -> ovozni to'xtatish.
+     */
+    private enum class Phase { IDLE, LISTENING, THINKING, SPEAKING }
+
+    @Volatile private var phase = Phase.IDLE
+    private var interactionSeq = 0
+    @Volatile private var peerNamesCache: List<String> = emptyList()
     private var voice: YuzAiVoice? = null
-    private var busy = false
     private var musicBusy = false
     private var pushToTalk = false
     private var pendingPeer: YuzAiEngine.Peer? = null
@@ -71,7 +81,7 @@ class YuzAiOverlayService : Service() {
 
     private val recorder = YuzAiRecorder { level ->
         mainHandler.post {
-            if (!destroyed && busy) orb?.level = level
+            if (!destroyed && phase == Phase.LISTENING) orb?.level = level
         }
     }
 
@@ -205,12 +215,17 @@ class YuzAiOverlayService : Service() {
                     startY = lp.y
                     dragged = false
                     downAt = SystemClock.elapsedRealtime()
-                    if (busy) {
-                        // Yozuv ketayotganda yana bosish — bekor qilish.
-                        recorder.cancel()
-                    } else {
-                        if (voice?.isSpeaking() == true) voice?.stopSpeaking()
-                        beginListening()
+                    when (phase) {
+                        Phase.IDLE -> beginListening()
+                        Phase.LISTENING ->
+                            // Ikkinchi bosish — yozuvni yakunlab, aytilganini yuboramiz.
+                            if (recorder.isRecording()) recorder.finish()
+                            else { recorder.cancel(); resetIdle() }
+                        Phase.THINKING -> cancelInteraction()
+                        Phase.SPEAKING -> {
+                            voice?.stopSpeaking()
+                            resetIdle()
+                        }
                     }
                     true
                 }
@@ -220,7 +235,11 @@ class YuzAiOverlayService : Service() {
                     if (!dragged && (abs(dx) > slop || abs(dy) > slop)) {
                         dragged = true
                         // Sudrab ko'chirish — tasodifiy yozuvni to'xtatadi.
-                        if (busy) recorder.cancel()
+                        when (phase) {
+                            Phase.LISTENING -> recorder.cancel()
+                            Phase.THINKING -> cancelInteraction()
+                            else -> Unit
+                        }
                     }
                     if (dragged) {
                         lp.x = (startX + dx).toInt()
@@ -233,7 +252,9 @@ class YuzAiOverlayService : Service() {
                 MotionEvent.ACTION_UP -> {
                     if (dragged) {
                         bubble?.let { snapToEdge(it, lp) }
-                    } else if (busy && SystemClock.elapsedRealtime() - downAt >= HOLD_MS) {
+                    } else if (phase == Phase.LISTENING &&
+                        SystemClock.elapsedRealtime() - downAt >= HOLD_MS
+                    ) {
                         // Ushlab turilgan — qo'yib yuborilishi bilan yakunlaymiz.
                         pushToTalk = true
                         recorder.finish()
@@ -241,7 +262,11 @@ class YuzAiOverlayService : Service() {
                     true
                 }
                 MotionEvent.ACTION_CANCEL -> {
-                    if (busy) recorder.cancel()
+                    when (phase) {
+                        Phase.LISTENING -> recorder.cancel()
+                        Phase.THINKING -> cancelInteraction()
+                        else -> Unit
+                    }
                     true
                 }
                 else -> false
@@ -280,12 +305,26 @@ class YuzAiOverlayService : Service() {
         override fun onListenError(message: String, retry: Boolean) = Unit
         override fun onListeningStopped() = Unit
         override fun onSpeakFinished() {
-            if (!busy) setOrb(YuzAiOrbView.Mode.IDLE)
+            if (phase == Phase.SPEAKING) resetIdle()
         }
     }
 
+    private fun isCurrent(token: Int): Boolean = !destroyed && token == interactionSeq
+
+    private fun resetIdle() {
+        phase = Phase.IDLE
+        setOrb(YuzAiOrbView.Mode.IDLE)
+    }
+
+    /** Javob kutish/xabar yuborishni bekor qiladi — kechikkan natija aytilmaydi. */
+    private fun cancelInteraction() {
+        interactionSeq++
+        voice?.stopSpeaking()
+        resetIdle()
+    }
+
     private fun beginListening() {
-        if (busy) return
+        if (phase != Phase.IDLE) return
         val v = voice ?: return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) !=
             PackageManager.PERMISSION_GRANTED
@@ -293,23 +332,27 @@ class YuzAiOverlayService : Service() {
             speak(getString(R.string.ai_mic_permission))
             return
         }
-        busy = true
+        val account = UserConfig.selectedAccount
+        val token = ++interactionSeq
+        phase = Phase.LISTENING
         pushToTalk = false
         recorder.prepare()
         setOrb(YuzAiOrbView.Mode.LISTENING)
         orb?.level = 0f
         v.playReadySignal()
-        val account = UserConfig.selectedAccount
         // Ism hovuzini yozuv davomida qurib qo'yamiz — transkript kelganda kutish yo'q.
-        scope.launch(Dispatchers.IO) { runCatching { YuzAiEngine.peers(account) } }
+        scope.launch(Dispatchers.IO) {
+            runCatching { YuzAiEngine.peers(account) }.getOrNull()?.let { peers ->
+                peerNamesCache = peers.map { it.name }.take(120)
+            }
+        }
         scope.launch {
             // Signal tugashi bilan yozishni boshlaymiz — beep mikrofonga
             // buyruq bo'lib tushmasin (80 ms signal + qisqa quyruq).
             delay(90L)
-            if (destroyed) return@launch
+            if (!isCurrent(token)) return@launch
             if (recorder.wasCancelled()) {
-                busy = false
-                setOrb(YuzAiOrbView.Mode.IDLE)
+                resetIdle()
                 return@launch
             }
             val wav = try {
@@ -318,46 +361,49 @@ class YuzAiOverlayService : Service() {
                 null
             }
             orb?.level = 0f
-            if (destroyed) return@launch
+            if (!isCurrent(token)) return@launch
             if (recorder.wasCancelled()) {
-                busy = false
-                setOrb(YuzAiOrbView.Mode.IDLE)
+                resetIdle()
                 return@launch
             }
             if (wav == null) {
-                busy = false
-                setOrb(YuzAiOrbView.Mode.IDLE)
+                resetIdle()
                 // Push-to-talk'da jim qo'yib yuborilgan bo'lsa — uzun uzr emas.
                 if (!pushToTalk) speak(getString(R.string.ai_heard_none))
                 return@launch
             }
+            phase = Phase.THINKING
             setOrb(YuzAiOrbView.Mode.THINKING)
-            val names = try {
-                withContext(Dispatchers.IO) {
-                    YuzAiEngine.peers(account).map { it.name }.take(120)
+            var names = peerNamesCache
+            if (names.isEmpty()) {
+                names = try {
+                    withContext(Dispatchers.IO) {
+                        YuzAiEngine.peers(account).map { it.name }.take(120)
+                    }
+                } catch (_: Exception) {
+                    emptyList()
                 }
-            } catch (_: Exception) {
-                emptyList()
             }
+            if (!isCurrent(token)) return@launch
             val res = try {
                 withContext(Dispatchers.IO) { YuzAiCloud.voice(wav, names) }
             } catch (_: Exception) {
                 null
             }
-            busy = false
-            if (destroyed) return@launch
+            if (!isCurrent(token)) return@launch
             if (res == null) {
-                setOrb(YuzAiOrbView.Mode.IDLE)
+                resetIdle()
                 // #157: limit (429) sababini aytamiz — "aloqa uzildi" emas.
                 val rate = YuzAiCloud.lastRateMessage
                 speak(if (!rate.isNullOrBlank()) rate else getString(R.string.ai_cloud_fallback))
                 return@launch
             }
             if (res.transcript.isBlank()) {
-                setOrb(YuzAiOrbView.Mode.IDLE)
+                resetIdle()
                 speak(getString(R.string.ai_voice_slow))
                 return@launch
             }
+            resetIdle()
             handleResult(res, account)
         }
     }
@@ -449,7 +495,7 @@ class YuzAiOverlayService : Service() {
      */
     private fun showPicker(choice: YuzAiEngine.Intent.NeedChoice, account: Int) {
         pendingPeer = null
-        setOrb(YuzAiOrbView.Mode.IDLE)
+        resetIdle()
         val peers = choice.options.map { it.peer }
         val message = if (choice.kind == YuzAiEngine.ChoiceKind.SEND) {
             choice.options.firstOrNull()?.text.orEmpty()
@@ -489,7 +535,6 @@ class YuzAiOverlayService : Service() {
             if (uname.isNullOrBlank()) p.name else "${p.name} (@$uname)"
         }
         speak(getString(R.string.ai_choose_peer, label) + " " + names)
-        setOrb(YuzAiOrbView.Mode.IDLE)
     }
 
     private fun sendTo(peer: YuzAiEngine.Peer, text: String, account: Int) {
@@ -523,6 +568,7 @@ class YuzAiOverlayService : Service() {
     private fun playMusic(rawQuery: String) {
         if (musicBusy) return
         musicBusy = true
+        val token = interactionSeq
         val query = YuzAiEngine.refineMusicQuery(rawQuery)
         val label = if (query.isBlank()) getString(R.string.ai_music_chart_label) else query
         speak(getString(R.string.ai_music_searching, label))
@@ -539,7 +585,7 @@ class YuzAiOverlayService : Service() {
                 emptyList()
             }
             musicBusy = false
-            if (destroyed) return@launch
+            if (!isCurrent(token)) return@launch
             if (list.isEmpty()) {
                 speak(getString(R.string.ai_music_empty))
                 return@launch
@@ -557,7 +603,10 @@ class YuzAiOverlayService : Service() {
 
     private fun answer(question: String, cloudAnswer: String?) {
         val q = question.trim()
-        if (q.isBlank()) return
+        if (q.isBlank()) {
+            resetIdle()
+            return
+        }
         YuzgramAiBrain.quickAnswer(q)?.let {
             speak(it)
             return
@@ -566,6 +615,8 @@ class YuzAiOverlayService : Service() {
             speak(cloudAnswer)
             return
         }
+        val token = interactionSeq
+        phase = Phase.THINKING
         setOrb(YuzAiOrbView.Mode.THINKING)
         scope.launch {
             val text = try {
@@ -573,15 +624,20 @@ class YuzAiOverlayService : Service() {
             } catch (_: Exception) {
                 getString(R.string.ai_no_network)
             }
-            if (!destroyed) speak(text)
+            if (isCurrent(token)) speak(text)
         }
     }
 
     private fun speak(text: String) {
         val spoken = YuzAiVoice.speakable(text)
-        if (spoken.isBlank()) return
+        val v = voice
+        if (spoken.isBlank() || v == null) {
+            resetIdle()
+            return
+        }
+        phase = Phase.SPEAKING
         setOrb(YuzAiOrbView.Mode.SPEAKING)
-        voice?.speak(spoken)
+        v.speak(spoken)
     }
 
     private fun openApp() {

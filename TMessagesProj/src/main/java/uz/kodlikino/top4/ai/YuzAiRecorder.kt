@@ -97,13 +97,15 @@ class YuzAiRecorder(
                     onLevel?.invoke((rms / 5000.0).toFloat().coerceIn(0f, 1f))
                 }
                 val totalMs = now - startedAt
-                if (rms > 500.0) {
+                // 500 -> 360: "salom" kabi qisqa va past ovozli so'zlar ham
+                // nutq sifatida qabul qilinadi (aks holda jim deb tashlanardi).
+                if (rms > 360.0) {
                     voiceSeen = true
                     lastVoiceAt = now
                 }
-                // 4000 -> 3200 ms: jim tugash tezroq aniqlanadi — foydalanuvchi
-                // "eshitilmadi" javobini kutib qolmaydi.
-                if (!voiceSeen && totalMs > 3200L) break
+                // 3200 -> 4500 ms: foydalanuvchi signaldan keyin 2-3 soniya
+                // o'ylanib gapirsa ham yozuv yopilib qolmaydi.
+                if (!voiceSeen && totalMs > 4500L) break
                 // 750 -> 550 ms: so'z orasidagi pauzalar saqlanadi, lekin
                 // buyruq tugagach javob ~0.2 s tezroq boshlanadi.
                 if (voiceSeen && now - lastVoiceAt > 550L) break

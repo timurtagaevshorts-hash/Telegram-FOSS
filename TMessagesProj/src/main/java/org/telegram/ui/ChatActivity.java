@@ -172,6 +172,7 @@ import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.VideoEditedInfo;
+import org.telegram.messenger.YuzChatWallpaper;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.messenger.support.LongSparseIntArray;
 import org.telegram.messenger.utils.PhotoUtilities;
@@ -361,6 +362,9 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     private QuickRepliesEmptyView quickRepliesEmptyView;
     private BusinessLinksEmptyView businessLinksEmptyView;
     public ChatActivityFragmentView contentView;
+    // YuzGram: shu chat uchun tanlangan fon rasmi (bg ustida, ro'yxat ostida).
+    private ImageView yuzChatWallpaperView;
+    private int yuzChatWallpaperLoadToken;
     private ChatBigEmptyView bigEmptyView;
     private ArrayList<View> actionModeViews = new ArrayList<>();
     private ChatAvatarContainer avatarContainer;
@@ -1440,6 +1444,8 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     private final static int translate = 62;
     private final static int scheduled = 63;
     private final static int edit_quick_reply = 64;
+
+    private final static int yuz_chat_wallpaper = 69;
 
     private final static int copy_business_link = 65;
     private final static int share_business_link = 66;
@@ -3553,6 +3559,8 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                     }
                 } else if (id == change_colors) {
                     showChatThemeBottomSheet();
+                } else if (id == yuz_chat_wallpaper) {
+                    showYuzChatWallpaperDialog();
                 } else if (id == topic_close) {
                     getMessagesController().getTopicsController().toggleCloseTopic(currentChat.id, forumTopic.id, forumTopic.closed = true);
                     updateTopicButtons();
@@ -3915,6 +3923,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             if (themeDelegate.isThemeChangeAvailable(true)) {
                 headerItem.lazilyAddSubItem(change_colors, R.drawable.msg_background, LocaleController.getString("SetWallpapers", R.string.SetWallpapers));
             }
+            headerItem.lazilyAddSubItem(yuz_chat_wallpaper, R.drawable.msg_background, LocaleController.getString(R.string.yuz_wallpaper_title));
             if (currentUser != null && currentUser.self) {
                 headerItem.lazilyAddSubItem(add_shortcut, R.drawable.msg_home, LocaleController.getString(R.string.AddShortcut));
             }
@@ -4013,8 +4022,12 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         if (inBubbleMode || isInsideContainer) {
             contentView.setOccupyStatusBar(false);
         }
+        // Yangi ierarxiya — eski fon qatlami havolasini tashlaymiz.
+        yuzChatWallpaperView = null;
+        yuzChatWallpaperLoadToken = 0;
 
         updateBackground();
+        updateYuzChatWallpaper();
 
         emptyViewContainer = null;
 
@@ -18585,6 +18598,9 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 
     @Override
     public void onActivityResultFragment(int requestCode, int resultCode, Intent data) {
+        if (uz.kodlikino.top4.ui.YuzChatWallpaperDialog.handleActivityResult(requestCode, resultCode, data)) {
+            return;
+        }
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == 0 || requestCode == 2) {
                 createChatAttachView();
@@ -38892,6 +38908,75 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         if (contentView.getBackgroundImage() == null) {
             contentView.setBackgroundImage(Theme.getCachedWallpaper(), Theme.isWallpaperMotion());
         }
+    }
+
+    /**
+     * YuzGram: shu chat uchun tanlangan fon rasmini yuklaydi. Qatlam standart
+     * fon (backgroundView, index 0) ustida va xabarlar ro'yxati ostida turadi.
+     */
+    private void updateYuzChatWallpaper() {
+        if (contentView == null) {
+            return;
+        }
+        final long targetId = dialog_id;
+        if (!YuzChatWallpaper.isActive(targetId)) {
+            yuzChatWallpaperLoadToken++;
+            if (yuzChatWallpaperView != null) {
+                yuzChatWallpaperView.setImageDrawable(null);
+                yuzChatWallpaperView.setVisibility(View.GONE);
+            }
+            return;
+        }
+        if (yuzChatWallpaperView == null) {
+            ImageView view = new ImageView(getContext());
+            view.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            view.setVisibility(View.GONE);
+            // Ro'yxat hali qo'shilmagan bo'lsa — eng ustki qatlam sifatida
+            // qo'shamiz (keyin ro'yxat shundan ham tepada paydo bo'ladi).
+            int index = chatListView != null
+                    ? Math.max(0, contentView.indexOfChild(chatListView))
+                    : contentView.getChildCount();
+            contentView.addView(view, index,
+                    LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+            yuzChatWallpaperView = view;
+        }
+        yuzChatWallpaperView.setAlpha(YuzChatWallpaper.getOpacity(targetId) / 100f);
+        final int token = ++yuzChatWallpaperLoadToken;
+        Utilities.globalQueue.postRunnable(() -> {
+            final Bitmap bitmap = YuzChatWallpaper.getBitmap(targetId);
+            AndroidUtilities.runOnUIThread(() -> {
+                if (token != yuzChatWallpaperLoadToken || yuzChatWallpaperView == null) {
+                    return;
+                }
+                if (bitmap == null) {
+                    yuzChatWallpaperView.setImageDrawable(null);
+                    yuzChatWallpaperView.setVisibility(View.GONE);
+                    return;
+                }
+                yuzChatWallpaperView.setImageBitmap(bitmap);
+                yuzChatWallpaperView.setVisibility(View.VISIBLE);
+            });
+        });
+    }
+
+    private void showYuzChatWallpaperDialog() {
+        uz.kodlikino.top4.ui.YuzChatWallpaperDialog.show(this, dialog_id,
+                new uz.kodlikino.top4.ui.YuzChatWallpaperDialog.Host() {
+                    @Override
+                    public void onOpacityPreview(long targetDialogId, int opacity) {
+                        if (targetDialogId == dialog_id && yuzChatWallpaperView != null
+                                && yuzChatWallpaperView.getVisibility() == View.VISIBLE) {
+                            yuzChatWallpaperView.setAlpha(opacity / 100f);
+                        }
+                    }
+
+                    @Override
+                    public void onChanged(long targetDialogId) {
+                        if (targetDialogId == dialog_id) {
+                            updateYuzChatWallpaper();
+                        }
+                    }
+                });
     }
 
     private void updateBotHelpCellClick(BotHelpCell cell) {

@@ -203,10 +203,25 @@ class YuzAiActivity : BaseFragment() {
             return
         }
         if (cloudBusy) {
-            // Yozib olinayotganda (yoki signal oldidan) tugma — bekor qilish.
-            if (recorder.isRecording() || listeningPending) {
-                recorder.cancel()
-                statusView.text = ctx.getString(R.string.ai_cancelled)
+            when {
+                // Yozuv ketmoqda — yakunlab, aytilganini yuboramiz (2-bosish = to'xta).
+                recorder.isRecording() -> recorder.finish()
+                // Hali signal/kechikish bosqichi — yozuvni bekor qilamiz.
+                listeningPending -> {
+                    recorder.cancel()
+                    interactionSeq++
+                    listeningPending = false
+                    cloudBusy = false
+                    setOrb(YuzAiOrbView.Mode.IDLE)
+                    statusView.text = ctx.getString(R.string.ai_cancelled)
+                }
+                // Javob kutilmoqda — bekor qilamiz; kechikkan javob aytilmaydi.
+                else -> {
+                    interactionSeq++
+                    cloudBusy = false
+                    setOrb(YuzAiOrbView.Mode.IDLE)
+                    statusView.text = ctx.getString(R.string.ai_cancelled)
+                }
             }
             return
         }
@@ -324,6 +339,7 @@ class YuzAiActivity : BaseFragment() {
         scope.launch {
             // Beep (80 ms) tugashi uchun qisqa pauza — signal mikrofonga tushmasin.
             delay(90L)
+            if (seq != interactionSeq) return@launch
             if (!screenActive || parentActivity == null) {
                 listeningPending = false
                 cloudBusy = false
@@ -334,9 +350,11 @@ class YuzAiActivity : BaseFragment() {
             } catch (_: Exception) {
                 null
             } finally {
-                listeningPending = false
+                // Yangi muloqot boshlangan bo'lsa — uning holatini buzmaymiz.
+                if (seq == interactionSeq) listeningPending = false
             }
             if (::orb.isInitialized) orb.level = 0f
+            if (seq != interactionSeq) return@launch
             if (parentActivity == null) {
                 cloudBusy = false
                 return@launch
@@ -371,8 +389,10 @@ class YuzAiActivity : BaseFragment() {
             } catch (_: Exception) {
                 null
             }
+            // Bekor qilingan/yangi muloqot — bayroqlarni uning ustidan yozmaymiz.
+            if (seq != interactionSeq) return@launch
             cloudBusy = false
-            if (!screenActive || parentActivity == null || seq != interactionSeq) {
+            if (!screenActive || parentActivity == null) {
                 setOrb(YuzAiOrbView.Mode.IDLE)
                 return@launch
             }
@@ -879,8 +899,6 @@ class YuzAiActivity : BaseFragment() {
             statusView.text = ctx.getString(R.string.ai_hint_send)
             if (!cloudBusy) onMicTapped()
         }
-        addChip(R.string.ai_chip_time) { askQuestion("hozir soat nechchi", null) }
-        addChip(R.string.ai_chip_weather) { askQuestion("ob-havo qanday", null) }
         addChip(R.string.ai_chip_reels) { gotoSection(YuzAiEngine.Section.REELS) }
         addChip(R.string.ai_chip_musiqa) { playMusic("") }
     }
@@ -929,6 +947,10 @@ class YuzAiActivity : BaseFragment() {
         autoListenArmed = false
         clearChoices()
         interactionSeq++
+        // Bekor qilingan oqim endi bayroqlarni o'zi tiklamaydi (seq tekshiruvi) —
+        // shu yerda tozalaymiz, aks holda tugma "band" bo'lib qoladi.
+        cloudBusy = false
+        listeningPending = false
         try {
             recorder.cancel()
             voice?.stopListening()

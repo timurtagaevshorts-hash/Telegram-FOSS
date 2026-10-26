@@ -26,10 +26,13 @@
     <string name="yuz_chat_offline" translatable="false">Tarmoqqa ulanish…</string>
     <string name="yuz_chat_search_hint" translatable="false">Qidirish</string>
 
-    <!-- #193: ilova fon rasmi (rasm tanlash + shaffoflik) -->
+    <!-- Chat foni: rasm tanlash + shaffoflik (har bir chat uchun alohida) -->
     <string name="yuz_wallpaper_pill">Fon</string>
     <string name="yuz_wallpaper_title">Fon rasmi</string>
     <string name="yuz_wallpaper_desc">Rasm tanlang va shaffofligini belgilang — rasm butun ilova foniga o‘tadi.</string>
+    <string name="yuz_wallpaper_chat_desc">Bu chat uchun fon rasmi. Rasm tanlang va shaffofligini sudrab belgilang — namuna darhol ko‘rinadi.</string>
+    <string name="yuz_wallpaper_sample_in">Salom! Fon qanday ko‘rinyapti?</string>
+    <string name="yuz_wallpaper_sample_out">Zo‘r, rahmat 👍</string>
     <string name="yuz_wallpaper_pick">Rasm tanlash</string>
     <string name="yuz_wallpaper_loading">Yuklanmoqda…</string>
     <string name="yuz_wallpaper_none">Rasm tanlanmagan</string>

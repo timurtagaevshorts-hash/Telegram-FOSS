@@ -8,6 +8,7 @@ import android.graphics.Canvas;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
@@ -24,46 +25,32 @@ import org.telegram.messenger.R;
 import java.util.ArrayList;
 
 /**
- * YuzGram #193b: chat ro'yxati ustidagi filtr ustuni — PASTKI-O'NG burchakda
- * ixcham vertikal shisha "tayoqcha" (balandligi 184dp, kengligi 104dp).
+ * YuzGram #93b: chat ro'yxati ustida suzuvchi PASTKI-O'NG shisha gumbaz
+ * (maket bo'yicha) — filtr tugmalari doira yoyi bo'ylab teriladi, fokusdagi
+ * dona kattalashib gradient ko'k bo'ladi, nomi donaning O'NG TOMONIDAGI
+ * shisha pill ichida turadi. Barmoq vertikal suriladi; qo'yib yuborilganda
+ * inertsiya bilan eng yaqin tugmaga qonadi. Chatlar ro'yxati bilan cheklan-
+ * maydi — gumbaz shaffof, qatorlar ostidan erkin o'tadi.
  *
- * Oldingi dumaloq gumbaz fan bo'lib yoyilardi va har bir dona yonida nom
- * ko'tarib turardi — joy egallardi. Endi: donalar deyarli TIK ustun bo'ylab
- * (katta radiusli, 10dp'lik mayin egilish) teriladi, nom faqat fokusdagi
- * donaning CHAP tomoniga chiqadigan shisha qanotda ko'rinadi. Shu bilan
- * ustun ixchamlashdi va chat qatorlarining o'ng chekkasi ochildi.
- *
- * Barmoq vertikal suriladi; qo'yib yuborilganda inertsiya bilan eng yaqin
- * tugunga qonadi. Sensor maydoni endi faqat kapsula ustuni — undan chapdagi
- * chat qatorlari bosilishini to'smaydi.
- *
- * Kontrakt o'zgarmaydi: setFilters/setListener/setCounterProvider/
- * setActionListener/setOnAddFolder/setActions/setSelectedIndex. Joylash:
- * Gravity.RIGHT|BOTTOM, o'lchov statik width()/height().
+ * Kontrakt oldingidek: setFilters/setListener/setCounterProvider/
+ * setActionListener/setOnAddFolder — DialogsActivity tanlash mexanizmi
+ * o'zgarmaydi. Joylash: Gravity.RIGHT|BOTTOM, o'lchov statik width()/height().
  */
 public class YuzGramChatWheel extends View {
 
-    /** Ustun kengligi — ko'rinadigan kapsula 36dp, qolgani yorliq uchun. */
-    public static final int WIDTH_DP = 116;
-    /** Ustun balandligi. */
-    public static final int HEIGHT_DP = 184;
-
-    /** Kapsula o'qi — o'ng chekkadan shu masofada. */
-    private static final float SPINE_INSET_DP = 22f;
-    private static final float CAPSULE_W_DP = 36f;
-    /** Kapsulaning tepa/past chekinishi va bel qismidagi qo'shimcha kenglik. */
-    private static final float CAPSULE_TOP_DP = 4f;
-    private static final float CAPSULE_WAIST_DP = 3f;
-    private static final float NODE_R_DP = 12f;
-    private static final float FOCUS_R_DP = 15f;
-    /** Donalar orasidagi tik qadam. */
-    private static final float SPACING_DP = 30f;
-    /** Yoy radiusi katta — ustun tik bo'lib qoladi, chetlari sal egiladi. */
-    private static final float CURVE_R_DP = 178f;
-    private static final float CURVE_STEP = SPACING_DP / CURVE_R_DP;
-    private static final float CURVE_BOW_DP = 72f;
+    /** Gumbaz o'rnini bosuvchi ustun kengligi (doira chekkadan chiqadi). */
+    public static final int WIDTH_DP = 120;
+    /** Ustun balandligi — gumbaz diametri nafasi bilan. */
+    public static final int HEIGHT_DP = 232;
+    /** Shisha gumbaz radiusi; markazi o'ng chekkadan DOME_INSET_DP ichda. */
+    private static final float DOME_R_DP = 100f;
+    private static final float DOME_INSET_DP = 10f;
+    /** Donalar yuradigan aylana radiusi va qadam (rad/dona). */
+    private static final float ARC_R_DP = 66f;
+    private static final float ARC_STEP = 0.45f;
     /** Fokusdan necha dona uzoqda dona butunlay yo'qoladi. */
     private static final float CULL_SLOTS = 3.2f;
+    private static final float CIRCLE_DP = 30f;
 
     private static final int BORDER = 0x592AABEE;
     private static final int GLOW = 0x662AABEE;
@@ -73,19 +60,15 @@ public class YuzGramChatWheel extends View {
     private static final int INACTIVE_STROKE = 0x7338B6FF;
     private static final int ICON_ACTIVE = 0xFFFFFFFF;
     private static final int ICON_IDLE = 0xFFBFD0EA;
-    /** Fokus yorlig'i: shisha qanot ichidagi oq matn. */
-    private static final int WING_TEXT = 0xFFFFFFFF;
-    /** O'qilmaganlar: fokusda raqam, boshqalarda nuqta — ixcham ierarxiya. */
+    /** Nom — fokusda oq, boshqalarda xira ko'k-kul. */
+    private static final int LABEL_IDLE = 0xFFA9C0D8;
+    /** O'qilmaganlar soni pill'i — brend ko'ki (qizil emas: bu xato emas, son). */
     private static final int COUNT_BG = 0xFF2AABEE;
+    /** Son pill ustida QO'NG'IR oq emas: oq #2AABEE ustida 2.4:1, qorong'i 8:1. */
     private static final int COUNT_TEXT = 0xFF061424;
-
-    private static final int CAPSULE_TOP = 0x261F3E66;
-    private static final int CAPSULE_BOTTOM = 0x1A142E4A;
-    private static final int CAPSULE_EDGE = 0x3D8FC4F0;
-    private static final int CAPSULE_HALO = 0x1038B6FF;
-    private static final int WING_FILL = 0x33FFFFFF;
-    private static final int WING_EDGE = 0x4D8FC4F0;
-    private static final int WING_LINK = 0x668FC4F0;
+    /** Shisha panel: o'ngdan chapga suyuvchi to'lqin. */
+    private static final int PANEL_EDGE = 0x591B3A5C;
+    private static final int PANEL_ARC = 0x4038B6FF;
 
     public static final int ACTION_COMPOSE = 0;
     public static final int ACTION_CAMERA = 1;
@@ -113,7 +96,6 @@ public class YuzGramChatWheel extends View {
     private final Paint countPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
     private final Path path = new Path();
-    private final Path capsule = new Path();
 
     private ArrayList<MessagesController.DialogFilter> filters = new ArrayList<>();
     private Listener listener;
@@ -123,7 +105,7 @@ public class YuzGramChatWheel extends View {
     private boolean showCompose = true;
     private boolean addTile;
 
-    private float pos;           // ustun pozitsiyasi (dona birligida)
+    private float pos;           // reyka pozitsiyasi (dona birligida)
     private int selectedIndex = 0;
 
     private float downY, downPos;
@@ -137,7 +119,7 @@ public class YuzGramChatWheel extends View {
 
     private LinearGradient activeShader;
     private float shaderCx = Float.MIN_VALUE, shaderCy = Float.MIN_VALUE, shaderR = Float.MIN_VALUE;
-    /** Fokus yorlig'i asosiy o'lchami (sp). */
+    /** Fokus nomining asosiy o'lchami (sp) — sig'imganda shundan pastga tushadi. */
     private float labelBaseSize;
 
     public YuzGramChatWheel(Context context) {
@@ -146,13 +128,13 @@ public class YuzGramChatWheel extends View {
         setWillNotDraw(false);
         fillPaint.setStyle(Paint.Style.FILL);
         strokePaint.setStyle(Paint.Style.STROKE);
-        strokePaint.setStrokeWidth(dp(1.2f));
+        strokePaint.setStrokeWidth(dp(1.4f));
         iconPaint.setStyle(Paint.Style.STROKE);
         iconPaint.setStrokeWidth(dp(2f));
         iconPaint.setStrokeCap(Paint.Cap.ROUND);
         iconPaint.setStrokeJoin(Paint.Join.ROUND);
-        textPaint.setTextAlign(Paint.Align.RIGHT);
-        labelBaseSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 10f,
+        textPaint.setTextAlign(Paint.Align.LEFT);
+        labelBaseSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 9.5f,
                 getResources().getDisplayMetrics());
         textPaint.setTextSize(labelBaseSize);
         textPaint.setTypeface(Typeface.DEFAULT_BOLD);
@@ -254,25 +236,22 @@ public class YuzGramChatWheel extends View {
         return n;
     }
 
-    /**
-     * Dona markazi: o'q bo'ylab TIK siljiydi (y = R·sin), chetga qarab juda
-     * sekin o'ngga egiladi (x = R·(1−cos)) — shisha kapsula ichida chuqurlik
-     * hissi beradi, lekin ustun vertikalligini yo'qotmaydi.
-     */
+    /** Doira yoyi: d=0 fokus — gumbazning eng chap nuqtasi; |d| ortsa dona
+     *  yoy bo'ylab tepa/pastga o'ralib, ekran chekkasiga qaytadi. */
     private boolean itemCenter(int slot, float[] out) {
         float d = slot - pos;
         float ad = Math.abs(d);
         if (ad > CULL_SLOTS) {
             return false;
         }
-        float th = d * CURVE_STEP;
-        float cx = getWidth() - dp(SPINE_INSET_DP);
-        float cy = getHeight() / 2f;
-        out[0] = cx + dp(CURVE_BOW_DP) * (1f - (float) Math.cos(th));
-        out[1] = cy + dp(CURVE_R_DP) * (float) Math.sin(th);
         float f = ad / CULL_SLOTS;
-        out[2] = 1f - 0.22f * f;                 // masshtab
-        out[3] = 1f - 0.80f * f;                 // shaffoflik
+        float th = d * ARC_STEP;
+        float cx = getWidth() - dp(DOME_INSET_DP);
+        float cy = getHeight() / 2f;
+        out[0] = cx - dp(ARC_R_DP) * (float) Math.cos(th);
+        out[1] = cy + dp(ARC_R_DP) * (float) Math.sin(th);
+        out[2] = 1f - 0.30f * f;                 // masshtab
+        out[3] = 1f - 0.85f * f;                 // shaffoflik
         return true;
     }
 
@@ -293,7 +272,7 @@ public class YuzGramChatWheel extends View {
         if (getWidth() == 0 || getHeight() == 0) {
             return;
         }
-        drawCapsule(canvas);
+        drawPanel(canvas);
         int n = slotCount();
         float[] p = new float[4];
         // Chetdakilardan markazga: fokus eng ustida chizilsin.
@@ -311,47 +290,26 @@ public class YuzGramChatWheel extends View {
         }
     }
 
-    /**
-     * Pastki-o'ngdagi vertikal shisha kapsula: beli sal kengroq, uchlari
-     * yumaloq purosimon shakl (Path) — dumaloq gumbazdan farqli, tik va
-     * ixcham. Ichki gradient tepada sal yorug', pastda brend ko'kiga og'adi.
-     */
-    private void drawCapsule(Canvas canvas) {
-        float cx = getWidth() - dp(SPINE_INSET_DP);
-        float top = dp(CAPSULE_TOP_DP);
-        float bottom = getHeight() - dp(CAPSULE_TOP_DP);
-        float halfEnd = dp(CAPSULE_W_DP) / 2f;
-        float halfWaist = halfEnd + dp(CAPSULE_WAIST_DP);
-        float rEnd = halfEnd;
-        float midY = (top + bottom) / 2f;
-
-        capsule.reset();
-        capsule.moveTo(cx - halfEnd, top + rEnd);
-        capsule.quadTo(cx - halfEnd, top, cx - halfEnd + rEnd, top);
-        capsule.lineTo(cx + halfEnd - rEnd, top);
-        capsule.quadTo(cx + halfEnd, top, cx + halfEnd, top + rEnd);
-        capsule.quadTo(cx + halfWaist, midY, cx + halfEnd, bottom - rEnd);
-        capsule.quadTo(cx + halfEnd, bottom, cx + halfEnd - rEnd, bottom);
-        capsule.lineTo(cx - halfEnd + rEnd, bottom);
-        capsule.quadTo(cx - halfEnd, bottom, cx - halfEnd, bottom - rEnd);
-        capsule.quadTo(cx - halfWaist, midY, cx - halfEnd, top + rEnd);
-        capsule.close();
-
-        // Tashqi yumshoq nur avval — kapsula uning ustidan chiziladi.
-        strokePaint.setColor(CAPSULE_HALO);
-        strokePaint.setStrokeWidth(dp(7f));
-        canvas.drawPath(capsule, strokePaint);
-
-        fillPaint.setShader(new LinearGradient(cx, top, cx, bottom,
-                new int[]{CAPSULE_TOP, CAPSULE_BOTTOM, CAPSULE_TOP},
-                new float[]{0f, 0.55f, 1f}, Shader.TileMode.CLAMP));
-        canvas.drawPath(capsule, fillPaint);
+    /** Pastki-o'ngdagi shisha gumbaz — maketdagi suzuvchi kabina: ichi tiniq,
+     *  chekkasi halqa nur bilan yozilgan; qatorlar ustidan shaffof o'tadi. */
+    private void drawPanel(Canvas canvas) {
+        float cx = getWidth() - dp(DOME_INSET_DP);
+        float cy = getHeight() / 2f;
+        float R = dp(DOME_R_DP);
+        RadialGradient dome = new RadialGradient(cx - R * 0.2f, cy - R * 0.2f, R * 1.25f,
+                new int[]{0x1A2A4A72, PANEL_EDGE, 0x0D0C1E33},
+                new float[]{0f, 0.72f, 1f}, Shader.TileMode.CLAMP);
+        fillPaint.setShader(dome);
+        canvas.drawCircle(cx, cy, R, fillPaint);
         fillPaint.setShader(null);
-
-        strokePaint.setColor(CAPSULE_EDGE);
-        strokePaint.setStrokeWidth(dp(1.1f));
-        canvas.drawPath(capsule, strokePaint);
-        strokePaint.setStrokeWidth(dp(1.2f));
+        // Halqa: ingichka ko'k qirra + tashqarida yumshoq nur.
+        strokePaint.setColor(PANEL_ARC);
+        strokePaint.setStrokeWidth(dp(1.3f));
+        canvas.drawCircle(cx, cy, R, strokePaint);
+        strokePaint.setColor(0x1438B6FF);
+        strokePaint.setStrokeWidth(dp(5f));
+        canvas.drawCircle(cx, cy, R + dp(3.5f), strokePaint);
+        strokePaint.setStrokeWidth(dp(1.4f));
     }
 
     private void drawSlot(Canvas canvas, int slot, float x, float y, float scale,
@@ -360,16 +318,16 @@ public class YuzGramChatWheel extends View {
         if (type < 0) {
             return;
         }
-        if (y < -dp(30) || y > getHeight() + dp(30)) {
+        if (y < -dp(CIRCLE_DP) || y > getHeight() + dp(CIRCLE_DP)) {
             return;
         }
         MessagesController.DialogFilter filter =
                 type == ITEM_FILTER ? filters.get(slot) : null;
-        float r = (focus ? dp(FOCUS_R_DP) : dp(NODE_R_DP)) * scale;
-        r *= focus ? (1f + 0.06f * (1f - pulseT)) : 1f;
+        float r = dp(CIRCLE_DP) / 2f * scale * (focus ? 1.18f : 1f);
+        r *= focus ? (1f + 0.10f * (1f - pulseT)) : 1f;
 
         canvas.save();
-        rect.set(x - r - dp(22), y - r - dp(22), x + r + dp(22), y + r + dp(22));
+        rect.set(x - r - dp(20), y - r - dp(20), x + r + dp(20), y + r + dp(20));
         canvas.saveLayerAlpha(rect, (int) (255 * alpha));
 
         if (focus) {
@@ -389,14 +347,12 @@ public class YuzGramChatWheel extends View {
                 strokePaint.setColor(GLOW);
                 strokePaint.setAlpha((int) (200 * (1f - pulseT)));
                 strokePaint.setStrokeWidth(dp(2f));
-                canvas.drawCircle(x, y, r + dp(2f) + dp(9f) * pulseT, strokePaint);
+                canvas.drawCircle(x, y, r + dp(2f) + dp(10f) * pulseT, strokePaint);
                 strokePaint.setAlpha(255);
-                strokePaint.setStrokeWidth(dp(1.2f));
+                strokePaint.setStrokeWidth(dp(1.4f));
             }
             strokePaint.setColor(BORDER);
-            strokePaint.setStrokeWidth(dp(1.6f));
             canvas.drawCircle(x, y, r + dp(3f), strokePaint);
-            strokePaint.setStrokeWidth(dp(1.2f));
             iconPaint.setColor(ICON_ACTIVE);
         } else {
             fillPaint.setColor(INACTIVE_FILL);
@@ -406,7 +362,7 @@ public class YuzGramChatWheel extends View {
             iconPaint.setColor(ICON_IDLE);
         }
 
-        float glyph = r * 1.12f;
+        float glyph = r * 1.05f;
         if (type == ITEM_COMPOSE) {
             drawPencil(canvas, x, y, glyph);
         } else if (type == ITEM_ADD) {
@@ -423,23 +379,14 @@ public class YuzGramChatWheel extends View {
             fillPaint.setColor(0xFFFFC24B);
             canvas.drawCircle(x - r * 0.72f, y - r * 0.72f, dp(2.6f), fillPaint);
         }
-        // Son — donaning o'ng-ustida (yorliq chapda, to'sqinlik qilmaydi).
+        // Son — donaning CHAP-USTIDagi belgi: nom o'ngda, band qilmasin.
         if (counter > 0 && alpha >= 0.25f) {
-            if (focus) {
-                drawBadge(canvas, counter, x + r * 0.66f, y - r * 0.86f, alpha);
-            } else {
-                fillPaint.setColor(COUNT_BG);
-                fillPaint.setAlpha((int) (235 * alpha));
-                canvas.drawCircle(x + r * 0.72f, y - r * 0.72f, dp(2.4f), fillPaint);
-                fillPaint.setAlpha(255);
-            }
+            drawBadge(canvas, counter, x - r * 0.72f, y - r * 0.92f, alpha, focus);
         }
         canvas.restore();
         canvas.restore();
 
-        if (focus) {
-            drawWing(canvas, labelForSlot(type, filter), x, y, r, alpha);
-        }
+        drawCaption(canvas, labelForSlot(type, filter), x, y, r, alpha, focus);
     }
 
     private String labelForSlot(int type, MessagesController.DialogFilter filter) {
@@ -451,9 +398,10 @@ public class YuzGramChatWheel extends View {
                 : LocaleController.getString("Add", R.string.Add);
     }
 
-    private void drawBadge(Canvas canvas, int counter, float cx, float cy, float alpha) {
+    private void drawBadge(Canvas canvas, int counter, float cx, float cy,
+                           float alpha, boolean focus) {
         String count = counter > 99 ? "99+" : String.valueOf(counter);
-        countPaint.setTextSize(dp(9f));
+        countPaint.setTextSize(focus ? dp(9f) : dp(8f));
         float rr = Math.max(dp(8.5f), countPaint.measureText(count) / 2f + dp(3.5f));
         countPaint.setAlpha((int) (255 * alpha));
         fillPaint.setColor(COUNT_BG);
@@ -466,48 +414,41 @@ public class YuzGramChatWheel extends View {
     }
 
     /**
-     * Fokusdagi donaning CHAP tomoniga chiqadigan shisha yorliq-qanot:
-     * ingichka bog'lovchi chiziq + 24dp kapsula. Nom faqat shu yerda
-     * ko'rinadi — qolgan donalar faqat ikonkali, ustun ixcham qoladi.
+     * Donaning O'NG TOMONIDAGI nom — maketdagi kabi har bir dona o'z nomi bilan
+     * turadi; fokusdagi nom shisha pill ichida oq, qolganlari xira va kichikroq.
      */
-    private void drawWing(Canvas canvas, String label, float x, float y, float r,
-                          float alpha) {
-        if (label == null || label.isEmpty()) {
+    private void drawCaption(Canvas canvas, String label, float x, float y, float r,
+                             float alpha, boolean focus) {
+        if (label == null || label.isEmpty() || alpha < 0.25f) {
             return;
         }
-        float h = dp(24f);
-        float right = x - r - dp(8f);
-        float textRight = right - dp(8f);
-        float maxText = textRight - dp(4f) - dp(8f);
-        if (maxText < dp(24f)) {
-            return;
+        float size = focus ? labelBaseSize : labelBaseSize * 0.82f;
+        textPaint.setTextSize(size);
+        textPaint.setColor(focus ? 0xFFFFFFFF : LABEL_IDLE);
+        textPaint.setAlpha((int) (255 * alpha));
+        float left = x + r + dp(7f);
+        float maxText = getWidth() - dp(4f) - left;
+        float floor = size * 0.78f;
+        while (size > floor && textPaint.measureText(label) > maxText) {
+            size = Math.max(floor, size - dp(0.4f));
+            textPaint.setTextSize(size);
         }
-        textPaint.setTextSize(labelBaseSize);
         if (textPaint.measureText(label) > maxText) {
             label = fitTail(label, maxText);
         }
-        float tw = textPaint.measureText(label);
-        float left = Math.max(dp(4f), textRight - tw - dp(8f));
-        float rr = h / 2f;
-
-        strokePaint.setColor(WING_LINK);
-        strokePaint.setStrokeWidth(dp(1.2f));
-        canvas.drawLine(right, y, x - r - dp(1.5f), y, strokePaint);
-
-        rect.set(left, y - h / 2f, right, y + h / 2f);
-        fillPaint.setColor(WING_FILL);
-        fillPaint.setAlpha((int) (0x33 * alpha));
-        canvas.drawRoundRect(rect, rr, rr, fillPaint);
-        fillPaint.setAlpha(255);
-        strokePaint.setColor(WING_EDGE);
-        strokePaint.setAlpha((int) (0x4D * alpha));
-        canvas.drawRoundRect(rect, rr, rr, strokePaint);
-        strokePaint.setAlpha(255);
-
-        textPaint.setColor(WING_TEXT);
-        textPaint.setAlpha((int) (255 * alpha));
         Paint.FontMetrics fm = textPaint.getFontMetrics();
-        canvas.drawText(label, textRight, y - (fm.ascent + fm.descent) / 2f, textPaint);
+        float tw = textPaint.measureText(label);
+        if (focus) {
+            // Maketdagi yorqin shisha pill — faqat fokus nomining ostida.
+            float ph = -fm.ascent + fm.descent + dp(9f);
+            rect.set(left - dp(8f), y - ph / 2f, left + tw + dp(8f), y + ph / 2f);
+            fillPaint.setColor(0x2EFFFFFF);
+            canvas.drawRoundRect(rect, ph / 2f, ph / 2f, fillPaint);
+            strokePaint.setColor(0x598FC4F0);
+            canvas.drawRoundRect(rect, ph / 2f, ph / 2f, strokePaint);
+            strokePaint.setStrokeWidth(dp(1.4f));
+        }
+        canvas.drawText(label, left, y - (fm.ascent + fm.descent) / 2f, textPaint);
         textPaint.setAlpha(255);
         textPaint.setTextSize(labelBaseSize);
     }
@@ -758,7 +699,7 @@ public class YuzGramChatWheel extends View {
                 continue;
             }
             boolean focus = Math.abs(i - pos) < 0.5f;
-            float r = (focus ? dp(FOCUS_R_DP) : dp(NODE_R_DP)) * p[2] + dp(9f);
+            float r = dp(CIRCLE_DP) / 2f * p[2] * (focus ? 1.18f : 1f) + dp(10f);
             float dx = x - p[0], dy = y - p[1];
             if (dx * dx + dy * dy <= r * r) {
                 return i;
@@ -767,18 +708,9 @@ public class YuzGramChatWheel extends View {
         return -1;
     }
 
-    /** Bir dona tik oralig'i (px) — surish koeffitsienti. */
+    /** Bir dona vertikal oralig'i (px) — surish koeffitsienti (yoy bo'yi). */
     private float spacingPx() {
-        return dp(SPACING_DP);
-    }
-
-    /** Sensor maydoni — faqat kapsula ustuni (yonidagi chat qatorlari ochiq). */
-    private boolean insideCapsule(float x, float y) {
-        float cx = getWidth() - dp(SPINE_INSET_DP);
-        float halfW = dp(CAPSULE_W_DP) / 2f + dp(10f);
-        float top = dp(CAPSULE_TOP_DP) - dp(6f);
-        float bottom = getHeight() - dp(CAPSULE_TOP_DP) + dp(6f);
-        return x >= cx - halfW && x <= cx + halfW && y >= top && y <= bottom;
+        return dp(ARC_R_DP) * ARC_STEP;
     }
 
     @Override
@@ -788,7 +720,12 @@ public class YuzGramChatWheel extends View {
         }
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN: {
-                if (!insideCapsule(event.getX(), event.getY())) {
+                // Gumbaz doirasi TASHQARISIDagi urishlar o'tib ketadi: ostdagi
+                // chat qatorlari to'liq kenglikda bosiladigan bo'lib qoladi.
+                float rdx = event.getX() - (getWidth() - dp(DOME_INSET_DP));
+                float rdy = event.getY() - getHeight() / 2f;
+                float rr = dp(DOME_R_DP + 4f);
+                if (rdx * rdx + rdy * rdy > rr * rr) {
                     return false;
                 }
                 if (getParent() != null) {
