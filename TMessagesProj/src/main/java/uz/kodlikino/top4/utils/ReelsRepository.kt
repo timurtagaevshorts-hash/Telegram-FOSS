@@ -1,6 +1,7 @@
 package uz.kodlikino.top4.utils
 
 import android.util.Log
+import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -246,11 +247,15 @@ object ReelsRepository {
             coroutineScope {
                 val views = async {
                     db.collection(STORIES).document(storyKey)
-                        .collection(STORY_VIEWS).count().get().await().count.toInt()
+                        .collection(STORY_VIEWS).count()
+                        .get(AggregateSource.SERVER).await().count.toInt()
                 }
-                val likes = async { likesRef.count().get().await().count.toInt() }
+                val likes = async {
+                    likesRef.count().get(AggregateSource.SERVER).await().count.toInt()
+                }
                 val comments = async {
-                    reelRef.collection(COMMENTS).count().get().await().count.toInt()
+                    reelRef.collection(COMMENTS).count()
+                        .get(AggregateSource.SERVER).await().count.toInt()
                 }
                 val likedByMe = async {
                     uid.isNotBlank() && likesRef.document(uid).get().await().exists()
