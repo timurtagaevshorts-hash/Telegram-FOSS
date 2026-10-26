@@ -636,9 +636,12 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             chatListRow = rowCount++;
             chatListInfoRow = rowCount++;
 
-            appIconHeaderRow = rowCount++;
-            appIconSelectorRow = rowCount++;
-            appIconShadowRow = rowCount++;
+            // YuzGram: "Ilova ikonkasi" bo'limi olib tashlandi — u yerda Telegram'ning
+            // tayyor ikonkalari ko'rinardi. Launcher ikonkasi bitta (brend) qat'iy qoladi,
+            // shuning uchun appIcon* qatorlari yaratilmaydi (-1 holatida qoladi).
+            // appIconHeaderRow = rowCount++;
+            // appIconSelectorRow = rowCount++;
+            // appIconShadowRow = rowCount++;
 
             swipeGestureHeaderRow = rowCount++;
             swipeGestureRow = rowCount++;
