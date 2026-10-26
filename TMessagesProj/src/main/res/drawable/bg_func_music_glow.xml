@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Music player" kartasi orqasidagi yumshoq ko'k yorug'lik. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="@dimen/yuz_radius_card" />
+    <gradient
+        android:angle="225"
+        android:startColor="#262AABEE"
+        android:endColor="#00121925" />
+</shape>

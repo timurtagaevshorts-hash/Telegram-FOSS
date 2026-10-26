@@ -39,9 +39,13 @@
 
     <style name="FuncsionHeroTitle">
         <item name="android:textColor">@color/yuz_text_bright</item>
-        <item name="android:textSize">18sp</item>
+        <item name="android:textSize">@dimen/yuz_text_title</item>
         <item name="android:textStyle">bold</item>
         <item name="android:includeFontPadding">false</item>
+        <item name="android:shadowColor">#99000000</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">2</item>
+        <item name="android:shadowRadius">8</item>
     </style>
 
     <style name="FuncsionHeroDesc">
@@ -49,6 +53,10 @@
         <item name="android:textColor">@color/yuz_text_secondary</item>
         <item name="android:textSize">@dimen/yuz_text_secondary</item>
         <item name="android:lineSpacingExtra">2sp</item>
+        <item name="android:shadowColor">#CC000000</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">6</item>
     </style>
 
     <style name="FuncsionHeroCta">
@@ -81,6 +89,8 @@
         <item name="android:textStyle">bold</item>
         <item name="android:letterSpacing">-0.005</item>
         <item name="android:includeFontPadding">false</item>
+        <item name="android:drawableStart">@drawable/bg_func_section_bar</item>
+        <item name="android:drawablePadding">10dp</item>
     </style>
 
     <style name="FuncsionRow">
@@ -106,23 +116,6 @@
         <item name="cardElevation">0dp</item>
         <item name="strokeColor">@color/yuz_stroke</item>
         <item name="strokeWidth">@dimen/yuz_stroke</item>
-    </style>
-
-    <style name="FuncsionTileBody">
-        <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">wrap_content</item>
-        <item name="android:orientation">vertical</item>
-        <item name="android:padding">@dimen/yuz_space_4</item>
-    </style>
-
-    <!-- Funksiyalar kartasi ikonka plitasi: gradient kvadrat + oq vektor ikon. -->
-    <style name="FuncsionTileIcon">
-        <item name="android:layout_width">@dimen/yuz_icon_tile</item>
-        <item name="android:layout_height">@dimen/yuz_icon_tile</item>
-        <item name="android:padding">11dp</item>
-        <item name="android:scaleType">fitCenter</item>
-        <item name="android:tint">#FFFFFF</item>
-        <item name="android:contentDescription">@null</item>
     </style>
 
     <style name="FuncsionTileTitle">
@@ -183,7 +176,38 @@
         <item name="strokeWidth">@dimen/yuz_stroke</item>
     </style>
 
-    <style name="FuncsionWideRow">
+    <!-- Rasmli karta: media qismi (rasm + pastki fade + ikon nishoni). -->
+    <style name="FuncsionTileMedia">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">104dp</item>
+    </style>
+
+    <style name="FuncsionImageBadge">
+        <item name="android:layout_width">34dp</item>
+        <item name="android:layout_height">34dp</item>
+        <item name="android:padding">8dp</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:tint">#FFFFFF</item>
+        <item name="android:contentDescription">@null</item>
+    </style>
+
+    <style name="FuncsionTileText">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:paddingStart">@dimen/yuz_space_4</item>
+        <item name="android:paddingTop">@dimen/yuz_space_3</item>
+        <item name="android:paddingEnd">@dimen/yuz_space_4</item>
+        <item name="android:paddingBottom">14dp</item>
+    </style>
+
+    <!-- "Music player" — to'liq kenglikdagi jonli holat kartasi. -->
+    <style name="FuncsionMusic" parent="FuncsionWide">
+        <item name="cardBackgroundColor">@color/yuz_surface_raised</item>
+        <item name="strokeColor">@color/yuz_stroke_action</item>
+    </style>
+
+    <style name="FuncsionMusicRow">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:orientation">horizontal</item>
@@ -191,11 +215,34 @@
         <item name="android:padding">@dimen/yuz_space_4</item>
     </style>
 
-    <style name="FuncsionWideText">
-        <item name="android:layout_width">0dp</item>
+    <style name="FuncsionMusicCover">
+        <item name="android:layout_width">88dp</item>
+        <item name="android:layout_height">88dp</item>
+        <item name="android:scaleType">centerCrop</item>
+        <item name="android:background">@drawable/bg_func_round</item>
+        <item name="android:clipToOutline">true</item>
+        <item name="android:contentDescription">@null</item>
+    </style>
+
+    <style name="FuncsionMusicTitle">
+        <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_weight">1</item>
-        <item name="android:layout_marginStart">14dp</item>
-        <item name="android:orientation">vertical</item>
+        <item name="android:textColor">@color/yuz_text_bright</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="FuncsionMusicBadge">
+        <item name="android:layout_width">30dp</item>
+        <item name="android:layout_height">30dp</item>
+        <item name="android:padding">8dp</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:background">@drawable/bg_yuz_play</item>
+        <item name="android:src">@drawable/ic_yuz_play</item>
+        <item name="android:tint">@color/yuz_on_action</item>
+        <item name="android:contentDescription">@null</item>
     </style>
 </resources>
