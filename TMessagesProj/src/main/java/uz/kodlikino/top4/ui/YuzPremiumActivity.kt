@@ -45,6 +45,7 @@ class YuzPremiumActivity : BaseFragment() {
     private var btnPayFull: MaterialButton? = null
     private var tvKinoPlayPrice: TextView? = null
     private var tvFullPlayPrice: TextView? = null
+    private var tvPremiumStatus: TextView? = null
 
     /** Play tasdiqlagan faol tarif — tarif kartalari shunga mos ko'rinadi. */
     private var currentPlanId: String? = null
@@ -71,6 +72,7 @@ class YuzPremiumActivity : BaseFragment() {
         tvApprovedSubtitle = root.findViewById(R.id.tvApprovedSubtitle)
         tvKinoPlayPrice = root.findViewById(R.id.tvKinoPlayPrice)
         tvFullPlayPrice = root.findViewById(R.id.tvFullPlayPrice)
+        tvPremiumStatus = root.findViewById(R.id.tvPremiumStatus)
         btnPayKino = root.findViewById(R.id.btnPayKino)
         btnPayFull = root.findViewById(R.id.btnPayFull)
 
@@ -97,11 +99,13 @@ class YuzPremiumActivity : BaseFragment() {
 
         fillPlanTexts()
 
-        // Allab: faol tarifi bor foydalanuvchi darhol holatini ko'radi.
+        // Ekran ochilishida har doim tariflar ko'rinadi; faol tarif yuqoridagi
+        // bannerda aytiladi — "a'zo bo'lish" ekrani yopilib qolmasin.
         val plan = YuzPremiumManager.from(themed).planType(currentAccount)
         if (YuzPremiumPlans.isPremiumPlan(plan)) {
-            showActivePlan(plan)
+            currentPlanId = plan
         }
+        showPlanChooser()
         return root
     }
 
@@ -290,11 +294,10 @@ class YuzPremiumActivity : BaseFragment() {
             )
             mainHandler.post {
                 if (fragmentView == null) return@post
-                // Tiklangan xarid — "faollashtirildi" emas, mavjud holat ko'rsatiladi.
-                // Foydalanuvchi tariflarni ko'rayotgan bo'lsa, ekranni almashtirmaymiz.
-                val browsingPlans = scroll?.visibility == View.VISIBLE
-                showActivePlan(planId)
-                if (browsingPlans) showPlanChooser()
+                // Tiklangan xarid — "faollashtirildi" deb aytmaymiz, faqat mavjud
+                // holat ko'rsatiladi; tariflar ekrani ochiq qoladi.
+                currentPlanId = planId
+                refreshPriceLabels()
             }
         }
 
@@ -326,6 +329,7 @@ class YuzPremiumActivity : BaseFragment() {
     private fun refreshPriceLabels() {
         // Tarif holati (faol / ichida) billing holatidan mustaqil ko'rinadi.
         applyActivePlanLabels()
+        updateStatusBanner()
         val b = billing ?: return
         val root = fragmentView ?: return
         for (plan in listOf(YuzPremiumPlans.PREMIUM_KINO, YuzPremiumPlans.FULL_PREMIUM)) {
@@ -419,17 +423,22 @@ class YuzPremiumActivity : BaseFragment() {
         scroll?.visibility = View.GONE
     }
 
-    private fun showActivePlan(plan: String) {
-        currentPlanId = plan
-        val isFull = YuzPremiumPlans.isFullPremiumPlan(plan)
-        tvApprovedTitle?.text = getString(
-            if (isFull) R.string.premium_active_full else R.string.premium_active_kino
+    /** Faol tarif tariflar ekranining tepasida qisqa banner bo'lib turadi. */
+    private fun updateStatusBanner() {
+        val status = tvPremiumStatus ?: return
+        val planId = currentPlanId
+        if (planId == null) {
+            status.visibility = View.GONE
+            return
+        }
+        status.visibility = View.VISIBLE
+        status.text = getString(
+            if (YuzPremiumPlans.isFullPremiumPlan(planId)) {
+                R.string.premium_active_full
+            } else {
+                R.string.premium_active_kino
+            }
         )
-        tvApprovedSubtitle?.text = getString(
-            if (isFull) R.string.premium_active_full_sub else R.string.premium_active_kino_sub
-        )
-        overlay?.visibility = View.VISIBLE
-        scroll?.visibility = View.GONE
     }
 
     override fun onFragmentDestroy() {
@@ -445,6 +454,7 @@ class YuzPremiumActivity : BaseFragment() {
         btnPayFull = null
         tvKinoPlayPrice = null
         tvFullPlayPrice = null
+        tvPremiumStatus = null
         super.onFragmentDestroy()
     }
 
