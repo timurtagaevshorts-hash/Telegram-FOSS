@@ -100,6 +100,9 @@ dependencies {
     // 8.0.0 (5.2.1 bilan release "Error" bo'lib bloklanadi). 8.0.0 AAR'da
     // compileSdk cheklovi yo'q — AGP 7.0.3 / compileSdk 33 bilan yig'iladi.
     implementation 'com.android.billingclient:billing:8.0.0'
+    // Play In-App Updates — Play Market'da yangi versiya chiqqanda yangilashni
+    // so'raydigan oyna (YuzAppUpdate). 2.1.0 AAR'da compileSdk cheklovi yo'q.
+    implementation 'com.google.android.play:app-update:2.1.0'
     // OkHttp — Instagram resolver va taksi HTTP uchun. 4.12.0 compileSdk 33 / AGP 7.0.3 mos.
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     // Kotlin stdlib pinned to match the 1.8.22 compiler (also satisfies the jdk7/jdk8 constraints above).

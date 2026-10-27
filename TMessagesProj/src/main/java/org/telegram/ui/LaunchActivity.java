@@ -6337,6 +6337,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             showUpdateActivity(UserConfig.selectedAccount, SharedConfig.pendingAppUpdate, true);
         }
         checkAppUpdate(false, null);
+        // YuzGram: Play Market'da yangi versiya chiqqan bo'lsa yangilashni so'raymiz.
+        uz.kodlikino.top4.utils.YuzAppUpdate.check(this);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             ApplicationLoader.canDrawOverlays = Settings.canDrawOverlays(this);
