@@ -2,7 +2,6 @@ package uz.kodlikino.top4.utils
 
 import android.content.Context
 import android.media.MediaMetadataRetriever
-import android.net.Uri
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,6 +24,12 @@ import kotlin.math.roundToInt
  * Siqish faqat [SKIP_BELOW_BYTES] dan katta fayllarda bajariladi. Har qanday
  * xato (noto'g'ri codec, metadata yo'q, bekor qilish) — `null`: chaqiruvchi
  * asl faylni yuklaydi, ya'ni publish hech qachon siqish tufayli buzilmaydi.
+ *
+ * 2026-10-27: kirish endi tayyor lokal fayl ([source]) — nusxani chaqiruvchi
+ * ([uz.kodlikino.top4.services.ReelUploadService]) yaratadi va saqlab turadi.
+ * Avval nusxa shu yerda olinib, oxirida o'chirilardi: yuklash xato bilan
+ * tugasa manba yo'qolib, foydalanuvchi videoni qaytadan tanlashi kerak edi.
+ * Bundan tashqari faylni chaqiruvchi o'chirmaguncha (retry uchun) tegilmaydi.
  */
 object YuzReelCompressor {
 
@@ -38,8 +43,9 @@ object YuzReelCompressor {
     private const val DEFAULT_FPS = 30
 
     /**
-     * @param sizeBytes tanlangan video hajmi (<=0 bo'lsa siqishga urinamiz).
-     * @param targetBytes maqsad hajm — bitrate shundan hisoblanadi (12/24 MB).
+     * @param source lokal video fayli — chaqiruvchi yaratadi va o'zi o'chiradi
+     *   (xato bo'lsa retry uchun saqlanadi).
+     * @param targetBytes maqsad hajm — bitrate shundan hisoblanadi (9/16 MB).
      * @param onProgress 0..100, konvertor thread'idan chaqiriladi — UI'ga
      *   o'tkazish chaqiruvchi zimmasida.
      * @param isCanceled ekran yopilganda true — konvertor xavfsiz to'xtaydi.
@@ -47,17 +53,14 @@ object YuzReelCompressor {
      */
     suspend fun compress(
         context: Context,
-        uri: Uri,
-        sizeBytes: Long,
+        source: File,
         targetBytes: Long,
         onProgress: (Int) -> Unit,
         isCanceled: () -> Boolean
     ): File? = withContext(Dispatchers.IO) {
-        if (sizeBytes in 1 until SKIP_BELOW_BYTES) return@withContext null
-        var source: File? = null
+        if (source.length() in 1 until SKIP_BELOW_BYTES) return@withContext null
         var dest: File? = null
         try {
-            source = copyToCache(context, uri)
             val meta = readMetadata(source) ?: return@withContext null
             if (meta.width <= 0 || meta.height <= 0 || meta.durationMs <= 0) {
                 return@withContext null
@@ -107,9 +110,9 @@ object YuzReelCompressor {
                 listener, info
             )
             val failed = MediaCodecVideoConvertor().convertVideo(params)
-            if (failed || isCanceled() || dest == null || !dest.isFile || dest.length() <= 0L) {
+            if (failed || isCanceled() || !dest.isFile || dest.length() <= 0L) {
                 try {
-                    dest?.delete()
+                    dest.delete()
                 } catch (_: Exception) {
                 }
                 return@withContext null
@@ -123,11 +126,6 @@ object YuzReelCompressor {
             } catch (_: Exception) {
             }
             null
-        } finally {
-            try {
-                source?.delete()
-            } catch (_: Exception) {
-            }
         }
     }
 
@@ -203,23 +201,5 @@ object YuzReelCompressor {
         val targetBps = (targetBytes * 8.0 / durationSec).toInt()
             .coerceIn(500_000, 2_500_000)
         return if (meta.bitrate > 0) min(targetBps, meta.bitrate.coerceAtLeast(600_000)) else targetBps
-    }
-
-    private fun copyToCache(context: Context, uri: Uri): File {
-        val ext = try {
-            context.contentResolver.getType(uri)?.substringAfterLast('/', "")
-                ?.takeIf { it.length in 2..4 && it.all { c -> c.isLetterOrDigit() } } ?: "mp4"
-        } catch (_: Exception) {
-            "mp4"
-        }
-        val file = File(context.cacheDir, "reel_src_${System.currentTimeMillis()}.$ext")
-        val input = context.contentResolver.openInputStream(uri)
-            ?: throw IllegalStateException("Video ochilmadi")
-        input.use { ins ->
-            file.outputStream().use { out ->
-                ins.copyTo(out, 256 * 1024)
-            }
-        }
-        return file
     }
 }

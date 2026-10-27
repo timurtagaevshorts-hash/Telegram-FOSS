@@ -67,10 +67,19 @@ class ReelUploadService : Service() {
         const val EXTRA_HASHTAGS = "hashtags"
         const val EXTRA_THUMB_PATH = "thumb_path"
         const val EXTRA_ACCOUNT = "account"
+        const val EXTRA_SOURCE_PATH = "source_path"
 
         private const val NOTIFICATION_ID = 20261022
         private const val CHANNEL_ID = "reel_upload"
         private const val CHANNEL_NAME = "Reel yuklash"
+
+        /**
+         * Tanlangan videoning lokal nusxasi shu papkada turadi. Nusxa birinchi
+         * qadamda olinadi: content-URI ruxsati jarayon o'lsa yo'qoladi, kesh
+         * fayli esa qoladi — yuklash xato bilan tugasa [YuzReelUploads.retry]
+         * videoni qaytadan tanlashsiz davom ettiradi.
+         */
+        private const val QUEUE_DIR = "reel_queue"
 
         /** Siqish nishonlari — kichikroq fayl, tezroq yuklash. */
         private const val TARGET_BYTES_REGULAR = 9L * 1024L * 1024L
@@ -96,7 +105,8 @@ class ReelUploadService : Service() {
             caption: String,
             hashtags: String,
             thumbPath: String,
-            account: Int
+            account: Int,
+            sourcePath: String = ""
         ) {
             val intent = Intent(context, ReelUploadService::class.java).apply {
                 action = ACTION_UPLOAD
@@ -108,6 +118,7 @@ class ReelUploadService : Service() {
                 putExtra(EXTRA_HASHTAGS, hashtags)
                 putExtra(EXTRA_THUMB_PATH, thumbPath)
                 putExtra(EXTRA_ACCOUNT, account)
+                putExtra(EXTRA_SOURCE_PATH, sourcePath)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
@@ -144,7 +155,9 @@ class ReelUploadService : Service() {
         val caption: String,
         val hashtags: String,
         val thumbPath: String,
-        val account: Int
+        val account: Int,
+        /** Oldindan tayyorlangan lokal nusxa (retry yo'li) — bo'sh bo'lsa servis o'zi yaratadi. */
+        val sourcePath: String = ""
     )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -214,7 +227,8 @@ class ReelUploadService : Service() {
             caption = intent.getStringExtra(EXTRA_CAPTION) ?: "",
             hashtags = intent.getStringExtra(EXTRA_HASHTAGS) ?: "",
             thumbPath = intent.getStringExtra(EXTRA_THUMB_PATH) ?: "",
-            account = intent.getIntExtra(EXTRA_ACCOUNT, UserConfig.selectedAccount)
+            account = intent.getIntExtra(EXTRA_ACCOUNT, UserConfig.selectedAccount),
+            sourcePath = intent.getStringExtra(EXTRA_SOURCE_PATH) ?: ""
         )
     }
 
@@ -275,14 +289,21 @@ class ReelUploadService : Service() {
             slotReserved = reservation.getOrDefault(false)
             ensureNotCancelled()
 
+            // Manba nusxa: content-URI ruxsati jarayon o'lsa yo'qoladi, kesh
+            // fayli esa qoladi — xato bo'lsa retry videoni qaytadan tanlashsiz
+            // davom etadi.
+            report(req, 3, YuzReelUploads.Phase.PREPARE,
+                getString(R.string.reels_preparing_video), force = true)
+            val sourceFile = withContext(Dispatchers.IO) { ensureLocalSource(req) }
+            ensureNotCancelled()
+
             // Siqish: umumiy progress 5–45%.
             report(req, 5, YuzReelUploads.Phase.COMPRESS,
                 getString(R.string.reels_upload_phase_compress, 0), force = true)
             compressedFile = try {
                 YuzReelCompressor.compress(
                     context = applicationContext,
-                    uri = req.uri,
-                    sizeBytes = req.size,
+                    source = sourceFile,
                     targetBytes = if (boosted) TARGET_BYTES_PREMIUM else TARGET_BYTES_REGULAR,
                     onProgress = { pct ->
                         report(
@@ -304,7 +325,8 @@ class ReelUploadService : Service() {
             ensureNotCancelled()
 
             // Yuklash: 45–95%.
-            val fileName = compressedFile?.let { "${req.id}.mp4" } ?: "${req.id}.${extensionOf(req.name)}"
+            val fileName = compressedFile?.let { "${req.id}.mp4" }
+                ?: "${req.id}.${extensionOf(sourceFile.name)}"
             report(req, 45, YuzReelUploads.Phase.UPLOAD,
                 getString(R.string.reels_upload_phase_upload, 0), force = true)
             val uploadProgress: (Int, Long, Long) -> Unit = { pct, transferred, total ->
@@ -323,7 +345,7 @@ class ReelUploadService : Service() {
             val url = if (compressedFile != null) {
                 ReelStorageHelper.uploadVideo(uid, fileName, compressedFile, uploadProgress)
             } else {
-                ReelStorageHelper.uploadVideo(uid, fileName, req.uri, uploadProgress)
+                ReelStorageHelper.uploadVideo(uid, fileName, sourceFile, uploadProgress)
             }
             ensureNotCancelled()
 
@@ -398,6 +420,45 @@ class ReelUploadService : Service() {
             } catch (_: Exception) {
             }
         }
+    }
+
+    /**
+     * Yuklanadigan videoning lokal nusxasini qaytaradi (kesh papkasida).
+     * Retry'da tayyor nusxa ishlatiladi; aks holda content-URI keshga
+     * ko'chiriladi — keyingi urinishlar tarmoq/ruxsat uzilishidan qat'i nazar
+     * aynan shu fayldan ketadi. Nusxa [YuzReelUploads] tugagach o'chiriladi.
+     */
+    private fun ensureLocalSource(req: Request): File {
+        val prepared = req.sourcePath.takeIf { it.isNotBlank() }?.let { File(it) }
+        if (prepared != null && prepared.isFile && prepared.length() > 0L) return prepared
+        val dir = File(cacheDir, QUEUE_DIR)
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw UploadFailure(getString(R.string.reels_publish_failed))
+        }
+        val dest = File(dir, "${req.id}.${extensionOf(req.name)}")
+        try {
+            val input = contentResolver.openInputStream(req.uri)
+                ?: throw IllegalStateException("Video oqimi ochilmadi: ${req.uri}")
+            input.use { ins ->
+                dest.outputStream().use { out -> ins.copyTo(out, 512 * 1024) }
+            }
+        } catch (e: Exception) {
+            FileLog.e(e)
+            try {
+                dest.delete()
+            } catch (_: Exception) {
+            }
+            throw UploadFailure(getString(R.string.reels_video_not_readable))
+        }
+        if (!dest.isFile || dest.length() <= 0L) {
+            try {
+                dest.delete()
+            } catch (_: Exception) {
+            }
+            throw UploadFailure(getString(R.string.reels_video_not_readable))
+        }
+        YuzReelUploads.setSourcePath(req.id, dest.absolutePath)
+        return dest
     }
 
     /**

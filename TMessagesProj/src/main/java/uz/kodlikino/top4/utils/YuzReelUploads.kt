@@ -39,6 +39,12 @@ object YuzReelUploads {
         val thumbPath: String,
         val account: Int,
         val startedAt: Long,
+        /**
+         * Yuklanadigan videoning lokal nusxasi (ilova keshida). Servis uni
+         * birinchi qadamda tayyorlaydi va muvaffaqiyatgacha saqlaydi: xato
+         * bo'lsa foydalanuvchi videoni qaytadan tanlamasdan [retry] qila oladi.
+         */
+        val sourcePath: String = "",
         val updatedAt: Long = startedAt,
         val progress: Int = 0,
         val phase: Phase = Phase.PREPARE,
@@ -119,17 +125,73 @@ object YuzReelUploads {
         }
     }
 
-    /** Yuklash muvaffaqiyatli — yozuv va lokal kadr o'chadi. */
+    /** Yuklash muvaffaqiyatli — yozuv, lokal kadr va manba nusxa o'chadi. */
     fun complete(id: String) {
         val items = ensureLoaded()
-        val thumb = synchronized(items) {
+        val removed = synchronized(items) {
             val found = items.firstOrNull { it.id == id }
             items.removeAll { it.id == id }
-            found?.thumbPath
+            found
         }
-        deleteQuietly(thumb)
+        deleteQuietly(removed?.thumbPath)
+        deleteQuietly(removed?.sourcePath)
         persist()
         notifyChanged()
+    }
+
+    /**
+     * Servis manba nusxani tayyorlagach yozuvga yozadi. Nusxa trekerdagi
+     * `Complete`gacha turadi — xato bo'lsa [retry] shundan foydalanadi.
+     */
+    fun setSourcePath(id: String, path: String) {
+        if (id.isBlank() || path.isBlank()) return
+        mutate { items ->
+            val idx = items.indexOfFirst { it.id == id }
+            if (idx >= 0) items[idx] = items[idx].copy(sourcePath = path)
+        }
+    }
+
+    /** Xato yozuvni lokal nusxadan qayta boshlash mumkinmi. */
+    fun canRetry(upload: Upload): Boolean =
+        upload.sourcePath.isNotBlank() && File(upload.sourcePath).let { it.isFile && it.length() > 0L }
+
+    /**
+     * Xato bilan tugagan yuklashni qayta boshlaydi — video qaytadan tanlanmaydi.
+     * @return `true` bo'lsa servisga topshirildi va yozuv PREPARE holatiga qaytdi.
+     */
+    fun retry(context: Context?, upload: Upload): Boolean {
+        if (!canRetry(upload)) return false
+        val ctx = context ?: ApplicationLoader.applicationContext ?: return false
+        val source = File(upload.sourcePath)
+        try {
+            uz.kodlikino.top4.services.ReelUploadService.startUpload(
+                context = ctx,
+                uploadId = upload.id,
+                videoUri = android.net.Uri.fromFile(source),
+                videoName = upload.fileName,
+                videoSize = source.length(),
+                caption = upload.title,
+                hashtags = upload.hashtags,
+                thumbPath = upload.thumbPath,
+                account = upload.account,
+                sourcePath = source.absolutePath
+            )
+        } catch (e: Exception) {
+            FileLog.e(e)
+            return false
+        }
+        mutate { items ->
+            val idx = items.indexOfFirst { it.id == upload.id }
+            if (idx >= 0) {
+                items[idx] = items[idx].copy(
+                    progress = 0,
+                    phase = Phase.PREPARE,
+                    error = "",
+                    updatedAt = System.currentTimeMillis()
+                )
+            }
+        }
+        return true
     }
 
     /** Foydalanuvchi ✕ bosdi — yozuv olib tashlanadi (servis ham to'xtatiladi). */
@@ -189,6 +251,7 @@ object YuzReelUploads {
                 thumbPath = obj.optString("thumbPath"),
                 account = obj.optInt("account", 0),
                 startedAt = obj.optLong("startedAt", 0L),
+                sourcePath = obj.optString("sourcePath"),
                 updatedAt = obj.optLong("updatedAt", 0L),
                 progress = obj.optInt("progress", 0),
                 phase = runCatching { Phase.valueOf(obj.optString("phase")) }
@@ -211,6 +274,7 @@ object YuzReelUploads {
         put("thumbPath", item.thumbPath)
         put("account", item.account)
         put("startedAt", item.startedAt)
+        put("sourcePath", item.sourcePath)
         put("updatedAt", item.updatedAt)
         put("progress", item.progress)
         put("phase", item.phase.name)
@@ -238,6 +302,7 @@ object YuzReelUploads {
                     item.phase == Phase.FAILED && now - item.updatedAt > FAILED_KEEP_MS -> {
                         iterator.remove()
                         deleteQuietly(item.thumbPath)
+                        deleteQuietly(item.sourcePath)
                         changed = true
                     }
                     !item.finished && !running && now - item.updatedAt > STALL_MS -> {

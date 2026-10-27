@@ -57,6 +57,12 @@
     <string name="reels_pending_cancel">Yuklashni bekor qilish</string>
     <string name="reels_pending_cancel_confirm">«%1$s» yuklanishi bekor qilinsinmi?</string>
     <string name="reels_pending_tap">Reel yuklanmoqda — biroz kuting</string>
+    <!-- Grid katagidagi bosqich yorliqlari (siqish / yuklash / saqlash) -->
+    <string name="reels_pending_prepare">Tayyorlanmoqda</string>
+    <string name="reels_pending_compress">Siqilmoqda</string>
+    <string name="reels_pending_save">Saqlanmoqda</string>
+    <string name="reels_pending_failed_retry">Yuklanmadi · qayta urinish</string>
+    <string name="reels_pending_retry_unavailable">Videoni qayta tanlash kerak — lokal nusxa topilmadi</string>
 
     <!-- Ovoz tugmasi: ikon holatni, yozuv tugilish harakatini bildiradi. -->
     <string name="reels_sound_on">Ovozni o\'chirish</string>

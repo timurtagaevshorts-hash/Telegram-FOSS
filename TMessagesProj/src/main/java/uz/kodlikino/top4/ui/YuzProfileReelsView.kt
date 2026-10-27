@@ -87,7 +87,7 @@ class YuzProfileReelsView(
         adapter = ProfileReelsAdapter(context,
             onClick = { index -> openFeed(index) },
             onDelete = { reel -> confirmDelete(reel) },
-            onPendingTap = { toast(context.getString(R.string.reels_pending_tap)) },
+            onPendingTap = { upload -> onPendingClicked(upload) },
             onPendingCancel = { upload -> confirmCancel(upload) })
         // O'chirish faqat o'z profilida; begona profilida grid view-only.
         adapter.manageMode = isSelf
@@ -215,6 +215,23 @@ class YuzProfileReelsView(
                 .show()
         } catch (_: Exception) {
             toast(context.getString(R.string.reels_delete_failed))
+        }
+    }
+
+    /**
+     * Katak bosilganda: faol yuklash — faqat eslatma; xato yuklash — lokal
+     * nusxadan qayta boshlanadi (video qaytadan tanlanmaydi).
+     */
+    private fun onPendingClicked(upload: YuzReelUploads.Upload) {
+        if (!upload.failed) {
+            toast(context.getString(R.string.reels_pending_tap))
+            return
+        }
+        if (YuzReelUploads.retry(context, upload)) {
+            toast(context.getString(R.string.reels_uploading_in_background))
+            refreshPending()
+        } else {
+            toast(context.getString(R.string.reels_pending_retry_unavailable))
         }
     }
 

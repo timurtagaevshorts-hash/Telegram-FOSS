@@ -213,13 +213,22 @@ class ProfileReelsAdapter(
             val danger = ContextCompat.getColor(appContext, R.color.yuz_danger)
             val normal = ContextCompat.getColor(appContext, R.color.yuz_text)
             label.setTextColor(if (failed) danger else normal)
+            // Bosqich yoziladi: siqish bosqichida "Yuklanmoqda 20%" degan yozuv
+            // yuklash qotib qolgandek taassurot berardi.
             label.text = if (failed) {
-                appContext.getString(R.string.reels_pending_failed)
+                appContext.getString(R.string.reels_pending_failed_retry)
             } else {
-                appContext.getString(R.string.reels_pending_title) + " · " + upload.progress + "%"
+                appContext.getString(phaseLabel(upload.phase)) + " · " + upload.progress + "%"
             }
             progress.visibility = if (failed) View.INVISIBLE else View.VISIBLE
             progress.progress = upload.progress
+        }
+
+        private fun phaseLabel(phase: YuzReelUploads.Phase): Int = when (phase) {
+            YuzReelUploads.Phase.COMPRESS -> R.string.reels_pending_compress
+            YuzReelUploads.Phase.SAVE -> R.string.reels_pending_save
+            YuzReelUploads.Phase.UPLOAD -> R.string.reels_pending_title
+            else -> R.string.reels_pending_prepare
         }
     }
 
