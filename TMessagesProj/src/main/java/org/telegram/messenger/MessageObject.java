@@ -178,6 +178,8 @@ public class MessageObject {
     public String monthKey;
     public boolean deleted;
     public boolean deletedByThanos;
+    public boolean yuzGhost;
+    public String yuzQuoteText;
     public float audioProgress;
     public float forceSeekTo = -1;
     public int audioProgressMs;

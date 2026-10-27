@@ -172,6 +172,7 @@ import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.VideoEditedInfo;
+import org.telegram.messenger.YuzMessageArchive;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.messenger.support.LongSparseIntArray;
 import org.telegram.messenger.utils.PhotoUtilities;
@@ -329,6 +330,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     private RadialProgressView progressBar;
     private ActionBarMenuItem.Item addContactItem;
     private ActionBarMenuItem.Item clearHistoryItem;
+    private ActionBarMenuItem.Item yuzOriginalsItem;
     private ActionBarMenuItem.Item viewAsTopics;
     private ActionBarMenuItem.Item closeTopicItem;
     private ActionBarMenuItem.Item openForumItem;
@@ -734,6 +736,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     private HashMap<String, ArrayList<MessageObject>> messagesByDays = new HashMap<>();
     private SparseArray<ArrayList<MessageObject>> messagesByDaysSorted = new SparseArray<>();
     public ArrayList<MessageObject> messages = new ArrayList<>();
+    private final HashSet<Integer> yuzInjectedGhosts = new HashSet<>();
     private SparseArray<MessageObject> waitingForReplies = new SparseArray<>();
     private LongSparseArray<ArrayList<MessageObject>> polls = new LongSparseArray<>();
     private LongSparseArray<MessageObject.GroupedMessages> groupedMessagesMap = new LongSparseArray<>();
@@ -1447,6 +1450,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     private final static int delete_business_link = 68;
     
     private final static int share = 69;
+    private final static int yuz_original_messages = 70;
 
     private final static int id_chat_compose_panel = 1000;
 
@@ -3377,6 +3381,20 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                         return;
                     }
                     showDialog(AlertsCreator.createTTLAlert(getParentActivity(), currentEncryptedChat, themeDelegate).create());
+                } else if (id == yuz_original_messages) {
+                    boolean enabled = !YuzMessageArchive.isEnabled();
+                    YuzMessageArchive.setEnabled(enabled);
+                    if (yuzOriginalsItem != null) {
+                        yuzOriginalsItem.setChecked(enabled);
+                    }
+                    YuzMessageArchive.getInstance(currentAccount).ensureLoaded(() -> {
+                        if (chatAdapter == null) {
+                            return;
+                        }
+                        clearChatData(true);
+                        firstMessagesLoaded = false;
+                        firstLoadMessages();
+                    });
                 } else if (id == clear_history || id == delete_chat || id == auto_delete_timer) {
                     if (getParentActivity() == null) {
                         return;
@@ -3920,6 +3938,8 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             }
             if (!isTopic) {
                 clearHistoryItem = headerItem.lazilyAddSubItem(clear_history, R.drawable.msg_clear, LocaleController.getString("ClearHistory", R.string.ClearHistory));
+                yuzOriginalsItem = headerItem.lazilyAddSubItem(yuz_original_messages, R.drawable.msg_archive, null, LocaleController.getString("YuzShowOriginals", R.string.YuzShowOriginals), true, true);
+                yuzOriginalsItem.setChecked(YuzMessageArchive.isEnabled());
             }
             boolean addedSettings = false;
             if (!isTopic) {
@@ -11851,6 +11871,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 updatePinnedMessageView(true);
             }
             getMessagesController().deleteDialog(dialog_id, 1, revoke);
+            YuzMessageArchive.getInstance(currentAccount).clearDialog(dialog_id);
             clearingHistory = false;
             clearHistory(false, null);
             chatAdapter.notifyDataSetChanged();
@@ -14268,6 +14289,67 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         return () -> getMessagesController().doDeleteShowOnceTask(taskId, dialog_id, messageObject.getId());
     }
 
+    private ArrayList<MessageObject> yuzApplyOriginals(ArrayList<MessageObject> messArr, int loadType) {
+        if (messArr == null || messArr.isEmpty() || !YuzMessageArchive.isEnabled()) {
+            return messArr;
+        }
+        YuzMessageArchive archive = YuzMessageArchive.getInstance(currentAccount);
+        if (!archive.isLoaded()) {
+            return messArr;
+        }
+        for (int a = 0, N = messArr.size(); a < N; a++) {
+            MessageObject obj = messArr.get(a);
+            if (obj.yuzGhost) {
+                continue;
+            }
+            String original = archive.getEditQuote(dialog_id, obj.getId());
+            if (original != null) {
+                obj.yuzQuoteText = original;
+            }
+        }
+        if (chatMode != MODE_DEFAULT || isTopic || chatAdapter != null && chatAdapter.isFiltered) {
+            return messArr;
+        }
+        ArrayList<YuzMessageArchive.Ghost> ghosts = archive.getGhosts(dialog_id);
+        if (ghosts == null) {
+            return messArr;
+        }
+        int newestDate = messArr.get(0).messageOwner.date;
+        int oldestDate = messArr.get(messArr.size() - 1).messageOwner.date;
+        boolean allowNewer = loadType == 0;
+        ArrayList<MessageObject> add = null;
+        for (int a = 0, N = ghosts.size(); a < N; a++) {
+            YuzMessageArchive.Ghost ghost = ghosts.get(a);
+            if (yuzInjectedGhosts.contains(ghost.id) || ghost.date < oldestDate || !allowNewer && ghost.date > newestDate) {
+                continue;
+            }
+            MessageObject ghostObject = archive.restoreGhost(dialog_id, ghost);
+            if (ghostObject == null) {
+                continue;
+            }
+            ghostObject.messageOwner.grouped_id = 0;
+            ghostObject.localSentGroupId = 0;
+            if (add == null) {
+                add = new ArrayList<>();
+            }
+            add.add(ghostObject);
+            yuzInjectedGhosts.add(ghost.id);
+        }
+        if (add == null) {
+            return messArr;
+        }
+        ArrayList<MessageObject> merged = new ArrayList<>(messArr.size() + add.size());
+        int i = 0, j = 0;
+        while (i < messArr.size() || j < add.size()) {
+            if (j >= add.size() || (i < messArr.size() && messArr.get(i).messageOwner.date >= add.get(j).messageOwner.date)) {
+                merged.add(messArr.get(i++));
+            } else {
+                merged.add(add.get(j++));
+            }
+        }
+        return merged;
+    }
+
     private void clearChatData(boolean full) {
         messages.clear();
         messagesByDays.clear();
@@ -14275,6 +14357,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         waitingForLoad.clear();
         groupedMessagesMap.clear();
         threadMessageAdded = false;
+        yuzInjectedGhosts.clear();
 
         if (chatAdapter != null) {
             showProgressView(chatAdapter.botInfoRow < 0);
@@ -19147,6 +19230,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 count += 2;
                 threadMessageAdded = true;
             }
+            messArr = yuzApplyOriginals(messArr, load_type);
             if (load_type == 1) {
                 Collections.reverse(messArr);
             }
@@ -23715,6 +23799,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         LongSparseArray<MessageObject.GroupedMessages> newGroups = null;
         LongSparseArray<Integer> newGroupsSizes = null;
         int size = markAsDeletedMessages.size();
+        boolean yuzKeepAsGhost = size <= 15 && chatMode == MODE_DEFAULT && !isTopic && YuzMessageArchive.isEnabled() && (chatAdapter == null || !chatAdapter.isFiltered);
         boolean updatedSelected = false;
         boolean updatedSelectedLast = false;
         boolean updateScheduled = false;
@@ -23775,6 +23860,16 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                             replyObject.viewsReloaded = false;
                         }
                     }
+                }
+                if (yuzKeepAsGhost && !obj.yuzGhost && obj.messageOwner.action == null && !obj.scheduled && !obj.isDateObject && obj.type >= 0 && obj.getGroupId() == 0) {
+                    YuzMessageArchive.getInstance(currentAccount).rememberDelete(dialog_id, obj);
+                    obj.deleted = false;
+                    obj.yuzGhost = true;
+                    updated = true;
+                    continue;
+                }
+                if (obj.yuzGhost) {
+                    YuzMessageArchive.getInstance(currentAccount).forgetGhost(dialog_id, obj.getId());
                 }
                 obj.deleted = true;
                 if (obj.scheduled && sent) {
@@ -24014,6 +24109,9 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 pinnedMessageObjects.put(messageObject.getId(), messageObject);
             }
             MessageObject old = messagesDict[loadIndex].get(messageObject.getId());
+            if (old != null && old.yuzQuoteText != null) {
+                messageObject.yuzQuoteText = old.yuzQuoteText;
+            }
             if (pinnedMessageObjects.containsKey(messageObject.getId())) {
                 pinnedMessageObjects.put(messageObject.getId(), messageObject);
                 if (messageObject.getId() == currentPinnedMessageId) {
@@ -27785,6 +27883,9 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             message = null;
         }
         if (message == null) {
+            return false;
+        }
+        if (message.yuzGhost) {
             return false;
         }
         if (!single && (message.messageOwner.action instanceof TLRPC.TL_messageActionGiftPremium || message.messageOwner.action instanceof TLRPC.TL_messageActionGiftCode)) {

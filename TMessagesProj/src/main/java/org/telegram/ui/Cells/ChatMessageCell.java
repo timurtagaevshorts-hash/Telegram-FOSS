@@ -1475,6 +1475,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     public int namesOffset;
 
+    private int yuzQuoteHeight;
+    private Paint yuzQuotePaint;
+
     private int lastSendState;
     private int lastDeleteDate;
     private int lastViewsCount;
@@ -15762,6 +15765,17 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     }
 
     private void measureTime(MessageObject messageObject) {
+        if (messageObject.yuzGhost) {
+            edited = false;
+            currentViewsString = null;
+            currentRepliesString = null;
+            viewsTextWidth = 0;
+            repliesTextWidth = 0;
+            currentTimeString = getString("YuzDeletedMessage", R.string.YuzDeletedMessage);
+            timeTextWidth = timeWidth = (int) Math.ceil(Theme.chat_timePaint.measureText(currentTimeString, 0, currentTimeString.length()));
+            timeLayout = new StaticLayout(currentTimeString, Theme.chat_timePaint, timeTextWidth + AndroidUtilities.dp(100), Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
+            return;
+        }
         CharSequence signString;
         MessageObject primaryMessageObject = getPrimaryMessageObject();
         long fromId = messageObject.getFromChatId();
@@ -16812,6 +16826,15 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             }
         }
 
+        if (messageObject.yuzQuoteText != null && currentPosition == null && !messageObject.shouldDrawWithoutBackground() && messageObject.type != MessageObject.TYPE_ROUND_VIDEO && messageObject.type != MessageObject.TYPE_PHONE_CALL && messageObject.type != MessageObject.TYPE_EMOJIS) {
+            Paint.FontMetrics labelMetrics = Theme.chat_replyNamePaint.getFontMetrics();
+            Paint.FontMetrics quoteMetrics = Theme.chat_quoteTextPaint.getFontMetrics();
+            yuzQuoteHeight = (int) Math.ceil(AndroidUtilities.dp(11) + (labelMetrics.descent - labelMetrics.ascent) + AndroidUtilities.dp(1) + (quoteMetrics.descent - quoteMetrics.ascent));
+            namesOffset += yuzQuoteHeight;
+        } else {
+            yuzQuoteHeight = 0;
+        }
+
         requestLayout();
     }
 
@@ -17089,6 +17112,47 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     public boolean doNotDraw;
 
+    private void drawYuzOriginalQuote(Canvas canvas) {
+        if (currentMessageObject == null || yuzQuoteHeight <= 0 || currentMessageObject.yuzQuoteText == null) {
+            return;
+        }
+        float left = getCurrentBackgroundLeft() + AndroidUtilities.dp(8);
+        float right = getCurrentBackgroundRight() - AndroidUtilities.dp(8);
+        if (right - left < AndroidUtilities.dp(70)) {
+            return;
+        }
+        if (yuzQuotePaint == null) {
+            yuzQuotePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        }
+        float top = namesOffset - yuzQuoteHeight + AndroidUtilities.dp(2);
+        float bottom = namesOffset - AndroidUtilities.dp(2);
+        float radius = AndroidUtilities.dp(7);
+        int accent = getThemedColor(currentMessageObject.isOutOwner() ? Theme.key_chat_outReplyLine : Theme.key_chat_inReplyLine);
+
+        yuzQuotePaint.setColor(accent);
+        yuzQuotePaint.setAlpha(26);
+        rect.set(left, top, right, bottom);
+        canvas.drawRoundRect(rect, radius, radius, yuzQuotePaint);
+
+        yuzQuotePaint.setAlpha(255);
+        rect.set(left + AndroidUtilities.dp(5), top + AndroidUtilities.dp(5), left + AndroidUtilities.dp(7.5f), bottom - AndroidUtilities.dp(5));
+        canvas.drawRoundRect(rect, AndroidUtilities.dp(1.25f), AndroidUtilities.dp(1.25f), yuzQuotePaint);
+
+        float textX = left + AndroidUtilities.dp(13);
+        Theme.chat_replyNamePaint.setColor(getThemedColor(currentMessageObject.isOutOwner() ? Theme.key_chat_outReplyNameText : Theme.key_chat_inReplyNameText));
+        Paint.FontMetrics labelMetrics = Theme.chat_replyNamePaint.getFontMetrics();
+        float labelY = top + AndroidUtilities.dp(3) - labelMetrics.ascent;
+        canvas.drawText(getString("YuzEditedFrom", R.string.YuzEditedFrom), textX, labelY, Theme.chat_replyNamePaint);
+
+        Theme.chat_quoteTextPaint.setColor(getThemedColor(currentMessageObject.isOutOwner() ? Theme.key_chat_messageTextOut : Theme.key_chat_messageTextIn));
+        Theme.chat_quoteTextPaint.setAlpha(190);
+        Paint.FontMetrics quoteMetrics = Theme.chat_quoteTextPaint.getFontMetrics();
+        CharSequence quote = TextUtils.ellipsize(currentMessageObject.yuzQuoteText.replace('\n', ' '), Theme.chat_quoteTextPaint, right - textX - AndroidUtilities.dp(6), TextUtils.TruncateAt.END);
+        float quoteY = labelY + labelMetrics.descent + AndroidUtilities.dp(1) - quoteMetrics.ascent;
+        canvas.drawText(quote, 0, quote.length(), textX, quoteY, Theme.chat_quoteTextPaint);
+        Theme.chat_quoteTextPaint.setAlpha(255);
+    }
+
     @SuppressLint("WrongCall")
     @Override
     protected void onDraw(Canvas canvas) {
@@ -17165,6 +17229,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             canvas.translate(-getBoundsLeft(), 0);
         }
 
+        int yuzGhostLayer = Integer.MIN_VALUE;
+        if (currentMessageObject.yuzGhost) {
+            rect.set(0, 0, getMeasuredWidth(), getMeasuredHeight());
+            yuzGhostLayer = canvas.saveLayerAlpha(rect, 140, Canvas.ALL_SAVE_FLAG);
+        }
         drawBackgroundInternal(canvas, false);
         drawYuzApkGuard(canvas);
         if (isHighlightedAnimated) {
@@ -17296,7 +17365,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if ((!autoPlayingMedia || !MediaController.getInstance().isPlayingMessageAndReadyToDraw(currentMessageObject) || isRoundVideo) && !transitionParams.animateBackgroundBoundsInner && !(currentMessageObject != null && currentMessageObject.preview)) {
             drawOverlays(canvas);
         }
-        if ((drawTime || !mediaBackground) && !forceNotDrawTime && !transitionParams.animateBackgroundBoundsInner && !(enterTransitionInProgress && !currentMessageObject.isVoice()) && (!currentMessageObject.isQuickReply() || currentMessageObject.isSendError())) {
+        drawYuzOriginalQuote(canvas);
+        if (yuzGhostLayer != Integer.MIN_VALUE) {
+            canvas.restoreToCount(yuzGhostLayer);
+        }
+        if ((drawTime || !mediaBackground || currentMessageObject.yuzGhost) && !forceNotDrawTime && !transitionParams.animateBackgroundBoundsInner && !(enterTransitionInProgress && !currentMessageObject.isVoice()) && (!currentMessageObject.isQuickReply() || currentMessageObject.isSendError())) {
             drawTime(canvas, 1f, false);
         }
 
@@ -20165,7 +20238,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if ((!drawTime || groupPhotoInvisible) && shouldDrawTimeOnMedia() || timeLayout == null || (currentMessageObject.deleted && currentPosition != null) || currentMessageObject.type == MessageObject.TYPE_PHONE_CALL) {
             return;
         }
-        if (currentMessageObject.type == MessageObject.TYPE_ROUND_VIDEO) {
+        if (currentMessageObject.yuzGhost) {
+            Theme.chat_timePaint.setColor(getThemedColor(Theme.key_text_RedRegular));
+        } else if (currentMessageObject.type == MessageObject.TYPE_ROUND_VIDEO) {
             Theme.chat_timePaint.setColor(
                 ColorUtils.blendARGB(
                     getThemedColor(Theme.key_chat_serviceText),
@@ -20190,6 +20265,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     Theme.chat_timePaint.setColor(getThemedColor(drawSelectionBackground ? Theme.key_chat_inTimeSelectedText : Theme.key_chat_inTimeText));
                 }
             }
+        }
+        if (currentMessageObject.yuzGhost) {
+            timeAlpha = 1f;
         }
         if (getTransitionParams().animateDrawingTimeAlpha) {
             alpha *= getTransitionParams().animateChangeProgress;
@@ -20470,7 +20548,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             canvas.restore();
         }
 
-        if (currentMessageObject.isOutOwner()) {
+        if (currentMessageObject.isOutOwner() && !currentMessageObject.yuzGhost) {
             int currentStatus = transitionParams.createStatusDrawableParams();
             if (transitionParams.lastStatusDrawableParams >= 0 && transitionParams.lastStatusDrawableParams != currentStatus && !statusDrawableAnimationInProgress) {
                 createStatusDrawableAnimator(transitionParams.lastStatusDrawableParams, currentStatus, fromParent);

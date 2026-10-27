@@ -2333,6 +2333,7 @@ public class ActionBarMenuItem extends FrameLayout {
         private View view;
         private View.OnClickListener overrideClickListener;
         private int visibility = VISIBLE, rightIconVisibility = VISIBLE;
+        private boolean checked;
 
         private Integer textColor, iconColor;
 
@@ -2369,6 +2370,7 @@ public class ActionBarMenuItem extends FrameLayout {
             } else if (viewType == VIEW_TYPE_SUBITEM) {
                 ActionBarMenuSubItem cell = new ActionBarMenuSubItem(parent.getContext(), needCheck, false, false, parent.resourcesProvider);
                 cell.setTextAndIcon(text, icon, iconDrawable);
+                cell.setChecked(checked);
                 cell.setMinimumWidth(AndroidUtilities.dp(196));
                 cell.setTag(id);
                 parent.popupLayout.addView(cell);
@@ -2494,6 +2496,13 @@ public class ActionBarMenuItem extends FrameLayout {
                 if (view instanceof ActionBarMenuSubItem) {
                     ((ActionBarMenuSubItem) view).setColors(textColor, iconColor);
                 }
+            }
+        }
+
+        public void setChecked(boolean checked) {
+            this.checked = checked;
+            if (view instanceof ActionBarMenuSubItem) {
+                ((ActionBarMenuSubItem) view).setChecked(checked);
             }
         }
     }

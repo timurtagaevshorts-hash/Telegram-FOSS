@@ -1363,6 +1363,7 @@ public class MessagesController extends BaseController implements NotificationCe
             getNotificationCenter().addObserver(messagesController, NotificationCenter.updateMessageMedia);
         });
         addSupportUser();
+        YuzMessageArchive.getInstance(currentAccount).ensureLoaded(null);
         if (currentAccount == 0) {
             notificationsPreferences = ApplicationLoader.applicationContext.getSharedPreferences("Notifications", Activity.MODE_PRIVATE);
             mainPreferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
@@ -18547,6 +18548,7 @@ public class MessagesController extends BaseController implements NotificationCe
                             for (int a = 0, size2 = arrayList.size(); a < size2; a++) {
                                 MessageObject newMessage = arrayList.get(a);
                                 if (oldObject.getId() == newMessage.getId()) {
+                                    YuzMessageArchive.getInstance(currentAccount).rememberEdit(dialogId, oldObject, newMessage);
                                     oldObjects.set(i, newMessage);
                                     if (newMessage.messageOwner.peer_id != null && newMessage.messageOwner.peer_id.channel_id == 0) {
                                         dialogMessagesByIds.put(newMessage.getId(), newMessage);

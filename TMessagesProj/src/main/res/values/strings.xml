@@ -185,6 +185,9 @@
     <string name="EncryptedChatStartedOutgoing">%s joined your secret chat.</string>
     <string name="EncryptedChatStartedIncoming">You joined the secret chat.</string>
     <string name="ClearHistory">Clear history</string>
+    <string name="YuzDeletedMessage">O\'chirilgan xabar</string>
+    <string name="YuzShowOriginals">Asl nusxalarni ko\'rsatish</string>
+    <string name="YuzEditedFrom">Avvalgi tahrir</string>
     <string name="ClearRecentHistory">Clear history</string>
     <string name="AlertClearHistory">Clear History</string>
     <string name="EnableAutoDelete">Enable Auto-Delete</string>
