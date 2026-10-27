@@ -847,15 +847,39 @@ object YuzMusicEngine {
 
     // ---------------------------------------------------------------- radio
 
+    private val TITLE_BRACKETS = Regex("\\([^)]*\\)|\\[[^]]*]")
+    private val TITLE_NOISE = Regex(
+        "\\b(official|video|audio|lyrics?|lyric|music|clip|premyera|premiere|hd|hq|4k|remix|cover|live|slowed|reverb)\\b"
+    )
+    private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")
+
+    /** Qo'shiq nomi kaliti — (Official Video), [lyrics], remix kabi qo'shimchalarsiz. */
+    private fun titleKey(title: String): String =
+        TITLE_NOISE.replace(TITLE_BRACKETS.replace(title.lowercase(), " "), " ")
+            .replace(NON_WORD, " ")
+            .trim()
+
+    /** Ijrochi kaliti — "Artist - Topic" kanal nomi ham bir xil kalitga tushsin. */
+    private fun artistKey(artist: String): String =
+        NON_WORD.replace(artist.lowercase().replace("- topic", " "), " ")
+            .trim()
+
     /**
      * YuzGram #98: navbatni uzluksiz to'ldirish. Zanjir (#117):
      *  1) ijrochining boshqa qo'shiqlari (o'xshash),
-     *  2) ijrochi + qo'shiq nomi (mospot),
-     *  3) aylanadigan hit hovizi — o'zbekcha eng ko'p eshitilgan va
+     *  2) ijrochi + qo'shiq nomi (qidiruvga eng yaqin natijalar),
+     *  3) aylanadigan hit hovuzi — o'zbekcha eng ko'p eshitilgan va
      *     rus xitlari almashinib,
      *  4) tinglov tarixi — foydalanuvchi eng ko'p eshitgan ijrochi va
      *     qo'shiqlar seed'lari.
-     * Har seeddan en ko'pi bilan 5 qator olinadi — navbat aralash bo'ladi.
+     *
+     * #223 — TAKROR BO'LMASIN: barcha seed natijalari bitta hovuzga yig'iladi,
+     * keyin tanlov qatlami qo'llanadi:
+     *  - 1-davra: oxirgi 40 qatorda uchramagan ijrochi, 1 ijrochidan 1 qo'shiq;
+     *  - 2-davra: tanish ijrochiga ham ruxsat, lekin baribir 1 qatordan;
+     *  - 3-davra (hovuz tanqis bo'lsa): 1 ijrochidan 2 tagacha.
+     * Bir xil qo'shiq nomi (turli video/remix/cover bo'lsa ham) hech qachon
+     * qaytmaydi; 1 daqiqadan qisqa treklar umuman olinmaydi.
      * Hech biri natija bermasa 3 s dan keyin bir marta qayta uriniladi
      * (sust tarmoqda cheksiz urinish bo'lmasligi uchun 4 marta bilan cheklangan).
      */
@@ -869,12 +893,16 @@ object YuzMusicEngine {
         extendAttempts++
         val anchor = currentTrack() ?: queueTracks.lastOrNull()
         val artist = anchor?.artist?.trim().orEmpty()
-        val anchorLc = artist.lowercase()
+        val anchorArtist = artistKey(artist)
+        val anchorTitle = titleKey(anchor?.title.orEmpty())
         val baseSeeds = ArrayList<String>()
         if (artist.isNotEmpty()) baseSeeds.add(artist)
         if (artist.isNotEmpty() && anchor != null) baseSeeds.add((artist + " " + anchor.title).trim())
         // #115: seedRotate'ni modlusida aylantiramiz — cheksiz o'sib Int
         // chegarasidan o'tsa manfiy qoldiq (negative index) crash berar edi.
+        // #223: bitta extension'da IKKI xil hit havzasi — xilma-xillik uchun.
+        baseSeeds.add(hitSeeds[seedRotate])
+        seedRotate = (seedRotate + 1) % hitSeeds.size
         baseSeeds.add(hitSeeds[seedRotate])
         seedRotate = (seedRotate + 1) % hitSeeds.size
         val appended = ArrayList<YuzTrack>()
@@ -885,34 +913,81 @@ object YuzMusicEngine {
             // (iyova qotib qolmasligi uchun).
             val seeds = ArrayList(baseSeeds)
             runCatching {
-                for (a in YuzListenStats.topArtists(appCtx, 2, setOf(anchorLc))) {
+                // ikkala ko'rinish: xom (lowercase) va normallashtirilgan kalit
+                for (a in YuzListenStats.topArtists(appCtx, 2, setOf(artist.lowercase(), anchorArtist))) {
                     val s = a + " qoshiklari"
                     if (s !in seeds) seeds.add(s)
                 }
-                YuzListenStats.topTracks(appCtx, 1).firstOrNull { !it.lowercase().startsWith(anchorLc) }
+                YuzListenStats.topTracks(appCtx, 1).firstOrNull { titleKey(it) != anchorTitle }
                     ?.let { if (it !in seeds) seeds.add(it) }
             }
             Log.i(TAG, "extendQueue seeds=$seeds attempt=$extendAttempts")
+
+            // Oxirgi 40 qator: takrorlanmaslik mezoni shu ro'yxatga qarab.
+            val recent = queueTracks.takeLast(40)
+            val usedTitles = HashSet<String>()
+            val knownArtists = HashSet<String>()
+            for (t in recent) {
+                titleKey(t.title).takeIf { it.isNotEmpty() }?.let { usedTitles.add(it) }
+                artistKey(t.artist).takeIf { it.isNotEmpty() }?.let { knownArtists.add(it) }
+            }
+            if (anchorTitle.isNotEmpty()) usedTitles.add(anchorTitle)
+
+            // 1) Hovuz: barcha seed natijalari (filtr keyin qo'llanadi).
+            val pool = ArrayList<YuzTrack>()
             var i = 0
-            while (appended.size < 10 && i < seeds.size) {
+            while (pool.size < 100 && i < seeds.size) {
                 val q = seeds[i++]
                 // #115: gateway izlanuvlisi istisno otsa butun ip crash
                 // bo'lardi — har urinish alohida qalq ostida.
                 val more = runCatching { YuzMusicGateway.search(q, 20) }
                     .getOrDefault(emptyList())
                     .ifEmpty { runCatching { YuzYouTubeApi.search(q, 20) }.getOrDefault(emptyList()) }
-                // #117: bitta seeddan ko'pi bilan 5 qator — shunda har
-                // kengaytirishda o'xshash + o'zbek xit + rus xiti aralash
-                // keladi, bir manba navbatni butun egallab qoymaydi.
-                var taken = 0
                 for (t in more) {
-                    if (taken >= 5 || appended.size >= 10) break
-                    if (t.videoId.isNotBlank() && seenIds.add(t.id)) {
-                        appended.add(t)
-                        taken++
-                    }
+                    if (t.videoId.isBlank() && t.previewUrl.isBlank()) continue
+                    if (!YuzMusicRepository.longEnough(t)) continue
+                    pool.add(t)
                 }
             }
+            pool.shuffle()
+
+            // 2) Tanlov qatlami — nom takrori taqiqlangan, ijrochi cheklangan.
+            val batchArtists = HashMap<String, Int>()
+            fun accept(t: YuzTrack, maxPerArtist: Int, onlyNewArtist: Boolean): Boolean {
+                if (appended.size >= 10) return false
+                val k = artistKey(t.artist)
+                val tk = titleKey(t.title)
+                if (tk.isNotEmpty() && usedTitles.contains(tk)) return false
+                if (onlyNewArtist && k.isNotEmpty() && knownArtists.contains(k)) return false
+                val n = if (k.isEmpty()) 0 else (batchArtists[k] ?: 0)
+                if (n >= maxPerArtist) return false
+                if (!seenIds.add(t.id)) return false
+                if (tk.isNotEmpty()) usedTitles.add(tk)
+                if (k.isNotEmpty()) batchArtists[k] = n + 1
+                appended.add(t)
+                return true
+            }
+            for (t in pool) {
+                if (appended.size >= 10) break
+                accept(t, maxPerArtist = 1, onlyNewArtist = true)
+            }
+            if (appended.size < 10) {
+                for (t in pool) {
+                    if (appended.size >= 10) break
+                    accept(t, maxPerArtist = 1, onlyNewArtist = false)
+                }
+            }
+            if (appended.size < 6) {
+                for (t in pool) {
+                    if (appended.size >= 10) break
+                    accept(t, maxPerArtist = 2, onlyNewArtist = false)
+                }
+            }
+            Log.i(
+                TAG,
+                "extendQueue picked=" + appended.size + " pool=" + pool.size +
+                    " artists=" + appended.map { artistKey(it.artist) }.distinct().size
+            )
             ui.post {
                 // #115: post tanasidagi istisno bevosita process crash bo'ladi —
                 // butun holatlashuv qalq ostida.

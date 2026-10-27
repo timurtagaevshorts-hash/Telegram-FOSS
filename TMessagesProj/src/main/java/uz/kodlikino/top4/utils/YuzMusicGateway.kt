@@ -58,7 +58,8 @@ object YuzMusicGateway {
                         )
                     )
                 }
-                out
+                // #223: 1 daqiqadan qisqa (shorts/preview) qatorlar kerak emas.
+                out.filter(YuzMusicRepository::longEnough)
             }
         } catch (_: Exception) {
             emptyList()

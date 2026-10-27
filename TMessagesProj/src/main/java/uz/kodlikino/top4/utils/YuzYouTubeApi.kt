@@ -113,7 +113,8 @@ object YuzYouTubeApi {
         val resp = post(SEARCH_URL, body, c) ?: return emptyList()
         val out = ArrayList<YuzTrack>()
         collect(resp, out, HashSet(), limit)
-        return out
+        // #223: 1 daqiqadan qisqa videolar (shorts) musiqa qatoriga chiqmaydi.
+        return out.filter(YuzMusicRepository::longEnough)
     }
 
     /** videoId bo'yicha ijroga MOS eng sifatli sof audio oqimini topadi. */

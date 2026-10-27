@@ -27,6 +27,17 @@ data class YuzTrack(
 
 object YuzMusicRepository {
 
+    /**
+     * #223: 1 daqiqadan qisqa treklar — shorts/reels va 30s preview'lar —
+     * qidiruvda ham, radio navbatida ham ko'rinmaydi. Davomiylik noma'lum
+     * (0) bo'lsa qator SAQLANADI: aks holda ba'zi manbalarda barcha
+     * natijalar yo'qolib qolardi.
+     */
+    const val MIN_TRACK_SECONDS = 60
+
+    fun longEnough(t: YuzTrack): Boolean =
+        t.durationSec <= 0 || t.durationSec >= MIN_TRACK_SECONDS
+
     private const val BASE = "https://api.deezer.com"
 
     /** Qo'shiq nomi/ijrochi bo'yicha qidirish — avval to'liq audio manbasi. */
@@ -147,6 +158,8 @@ object YuzMusicRepository {
                 val t = data.optJSONObject(i) ?: continue
                 val title = t.optString("title").ifBlank { t.optString("title_short") }
                 if (title.isBlank()) continue
+                val duration = t.optInt("duration")
+                if (duration in 1 until MIN_TRACK_SECONDS) continue
                 val artist = t.optJSONObject("artist")?.optString("name").orEmpty()
                 val albumObj = t.optJSONObject("album")
                 out.add(
@@ -155,7 +168,7 @@ object YuzMusicRepository {
                         title = title,
                         artist = artist,
                         album = albumObj?.optString("title").orEmpty(),
-                        durationSec = t.optInt("duration"),
+                        durationSec = duration,
                         coverUrl = albumObj?.optString("cover_medium").orEmpty(),
                         previewUrl = t.optString("preview"),
                         link = t.optString("link")
