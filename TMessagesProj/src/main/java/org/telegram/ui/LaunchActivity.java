@@ -7858,6 +7858,15 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 }
             }
             drawerLayoutContainer.setAllowOpenDrawer(allow, false);
+            // YuzGram: tab ildizini (Profil/Reels/Funksiyalar) chat bilan almashtirmaymiz.
+            // Aks holda stack'da yolg'iz ChatActivity qolib, orqaga bosilganda ilova
+            // butunlay yopilib ketardi. Ildiz ostida qoladi, chat ustiga chiqadi.
+            if (removeLast && layout.getFragmentStack().size() <= 1
+                    && (fragment instanceof ChatActivity || fragment instanceof TopicsFragment)) {
+                params.setRemoveLast(false).setCheckPresentFromDelegate(false);
+                layout.presentFragment(params);
+                return false;
+            }
         }
         return true;
     }
@@ -7963,6 +7972,22 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             }
         } else {
             if (layout.getFragmentStack().size() <= 1) {
+                BaseFragment onlyFragment = layout.getFragmentStack().isEmpty() ? null : layout.getFragmentStack().get(0);
+                // YuzGram: chat hech qachon ilovani yopsin emas — stack'da yolg'iz
+                // ChatActivity qolgan bo'lsa, orqaga bosilganda chat ro'yxatiga qaytamiz.
+                if (onlyFragment instanceof ChatActivity || onlyFragment instanceof TopicsFragment) {
+                    DialogsActivity dialogsActivity = new DialogsActivity(null);
+                    dialogsActivity.setSideMenu(sideMenu);
+                    layout.removeAllFragments();
+                    boolean added = layout.addFragmentToStack(dialogsActivity);
+                    if (!added) {
+                        onFinish();
+                        finish();
+                    } else {
+                        updateYuzGramBottomBar();
+                    }
+                    return false;
+                }
                 onFinish();
                 finish();
                 return false;
