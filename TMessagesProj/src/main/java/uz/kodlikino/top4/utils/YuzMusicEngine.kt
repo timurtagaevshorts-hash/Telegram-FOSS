@@ -519,7 +519,7 @@ object YuzMusicEngine {
 
     /** URI: local kesh > "yuz://" marker (loader ipida resolve) > Deezer preview. */
     private fun buildItem(t: YuzTrack): MediaItem {
-        val local = if (::appCtx.isInitialized) YuzMusicCache.localFile(appCtx, t.id) else null
+        val local = if (::appCtx.isInitialized) YuzMusicCache.streamFile(appCtx, t.id) else null
         val uri = when {
             // #133: File.toURI() "file:/..." (bir slash) beradi — media3
             // DataSource buni avval HTTP manba deb ochib, ijro etolmasdi.
@@ -581,7 +581,9 @@ object YuzMusicEngine {
         if (!::appCtx.isInitialized || dlInFlight) return
         val t = queueTracks.getOrNull(from + 1) ?: return
         if (t.videoId.isBlank()) return
-        if (YuzMusicCache.isDownloaded(appCtx, t.id)) return
+        // #224: radio/prebuffer faqat VAQTINCHALIK nusxa oladi — foydalanuvchi
+        // yuklab olish tugmasini bosmagan qo'shiq kutubxonaga saqlanmaydi.
+        if (YuzMusicCache.streamFile(appCtx, t.id) != null) return
         val now = android.os.SystemClock.elapsedRealtime()
         if (prebufferId == t.id && now - prebufferTryAt < 30_000L) return
         prebufferId = t.id
@@ -590,7 +592,7 @@ object YuzMusicEngine {
         val index = from + 1
         Thread {
             val ok = runCatching {
-                YuzMusicCache.downloadBlockingExclusive(appCtx, t, ::backgroundGate)
+                YuzMusicCache.downloadBlockingExclusive(appCtx, t, ::backgroundGate, streamOnly = true)
             }.getOrDefault(false)
             Log.i(
                 TAG, "prebuffer vid=${t.videoId} ok=$ok " +
@@ -613,7 +615,7 @@ object YuzMusicEngine {
         // ishga tushmaydi, shuning uchun navbat bir lahza "tushib" qoladi.
         if (index <= p.currentMediaItemIndex || index >= p.mediaItemCount) return
         if (queueTracks.getOrNull(index)?.id != t.id) return
-        if (YuzMusicCache.localFile(appCtx, t.id) == null) return
+        if (YuzMusicCache.streamFile(appCtx, t.id) == null) return
         runCatching {
             p.removeMediaItem(index)
             p.addMediaItem(index, buildItem(t))
@@ -747,7 +749,7 @@ object YuzMusicEngine {
         // keshdan olib tashlab, SHU index'da oqim manbasini quramiz.
         if (mediaItem.localConfiguration?.uri?.scheme == "file" &&
             (t.videoId.isNotBlank() || t.previewUrl.isNotBlank()) &&
-            YuzMusicCache.localFile(appCtx, t.id) != null
+            YuzMusicCache.streamFile(appCtx, t.id) != null
         ) {
             Log.i(TAG, "local corrupt -> re-stream id=${t.id} vid=${t.videoId}")
             YuzMusicCache.remove(appCtx, t.id)
@@ -831,13 +833,14 @@ object YuzMusicEngine {
     /** Oxirgi chora emas — qo'shiqni fonida yuklab, keyingi urinishda local ochilsin. */
     private fun silentDownload(t: YuzTrack) {
         if (dlInFlight) return
-        if (YuzMusicCache.isDownloaded(appCtx, t.id)) return
+        // #224: bu ham faqat VAQTINCHALIK nusxa — kutubxonaga saqlanmaydi.
+        if (YuzMusicCache.streamFile(appCtx, t.id) != null) return
         dlInFlight = true
         Thread {
             // #86: shu yuklash KEYINGI qo'shiqni ijrosi bilan raqobatlashadi
             // — eshik ijroga birinchi navbat beradi.
             val ok = runCatching {
-                YuzMusicCache.downloadBlockingExclusive(appCtx, t, ::backgroundGate)
+                YuzMusicCache.downloadBlockingExclusive(appCtx, t, ::backgroundGate, streamOnly = true)
             }.getOrDefault(false)
             Log.i(TAG, "silentDownload vid=${t.videoId} ok=$ok")
             dlInFlight = false

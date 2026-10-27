@@ -45,6 +45,16 @@ object YuzMusicCache {
      */
     private const val MAX_BYTES = 220L * 1024 * 1024
 
+    /**
+     * #224: radio/prebuffer uchun VAQTINCHALIK nusxa. Foydalanuvchi yuklab
+     * olish tugmasini bosmagan qo'shiqlar kutubxonaga (indeks + filesDir)
+     * tushmaydi — faqat cacheDir'da qisqa umr ko'radi va o'zi tozalanadi.
+     */
+    private const val STREAM_DIR = "yuzmusic_stream"
+    private const val STREAM_MAX_BYTES = 120L * 1024 * 1024
+    private const val STREAM_KEEP = 12
+    private const val STREAM_TTL = 12 * 60 * 60 * 1000L
+
     private val http = OkHttpClient.Builder()
         .dns(uz.kodlikino.top4.utils.YuzNet.DNS_V4_FIRST)
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -53,6 +63,12 @@ object YuzMusicCache {
 
     private fun dir(context: Context): File {
         val d = File(context.filesDir, DIR)
+        if (!d.exists()) d.mkdirs()
+        return d
+    }
+
+    private fun streamDir(context: Context): File {
+        val d = File(context.cacheDir, STREAM_DIR)
         if (!d.exists()) d.mkdirs()
         return d
     }
@@ -118,6 +134,22 @@ object YuzMusicCache {
 
     fun isDownloaded(context: Context, id: Long): Boolean = localFile(context, id) != null
 
+    /**
+     * #224: ijro uchun eng yaqin nusxa — avval foydalanuvchi SAQLAGAN fayl,
+     * keyin vaqtinchalik oqim nusxasi. Kutubxona ro'yxati ([downloadedTracks])
+     * va "yuklangan" belgisi faqat [localFile]'ga qaraydi: radio treklari
+     * hech qachon saqlangan hisoblanmaydi.
+     */
+    fun streamFile(context: Context, id: Long): File? {
+        localFile(context, id)?.let { return it }
+        val d = streamDir(context)
+        for (e in EXT) {
+            val f = File(d, "$id.$e")
+            if (f.isFile && f.length() > 0L) return f
+        }
+        return null
+    }
+
     enum class DownloadResult { DONE, FAILED, CANCELED }
 
     private val indexLock = Any()
@@ -144,6 +176,8 @@ object YuzMusicCache {
         //     CANCELED qila olmaydi;
         // (2) FAILED bo'lsa progress saqlangan holda auto-retry yuradi.
         @Volatile var userJoined = false
+        // #224: fon yuklashi faqat vaqtinchalik oqim nusxasini oladi.
+        @Volatile var streamOnly = false
         private var lastGot = 0L
         private var lastAt = 0L
 
@@ -176,9 +210,16 @@ object YuzMusicCache {
     }
     private val inflight = java.util.concurrent.ConcurrentHashMap<Long, Inflight>()
 
-    fun isInflight(id: Long): Boolean = inflight.containsKey(id)
-    fun isCanceling(id: Long): Boolean = inflight[id]?.cancellation?.canceled == true
-    fun inflightIds(): Set<Long> = inflight.keys.toSet()
+    /**
+     * #224: UI uchun "yuklanmoqda" faqat FOYDALANUVCHI boshlagan yuklashga
+     * tegishli. Radio fon yuklashi ko'rinsa, "yuklab olish" tugmasi uni
+     * bekor qilishga urinardi va qo'shiq hech qachon saqlanmasdi.
+     */
+    fun isInflight(id: Long): Boolean = inflight[id]?.streamOnly == false
+    fun isCanceling(id: Long): Boolean =
+        inflight[id]?.let { !it.streamOnly && it.cancellation.canceled } == true
+    fun inflightIds(): Set<Long> =
+        inflight.values.filter { !it.streamOnly }.map { it.track.id }.toSet()
     fun inflightPct(id: Long): Int = inflight[id]?.pct ?: 0
 
     fun rateLabel(id: Long): String {
@@ -208,6 +249,24 @@ object YuzMusicCache {
         // #155: fon prebuffer'iga attach bo'lgan taqdirda ham yuklash
         // "foydalanuvchiniki"ga aylanadi — bekor qilinmaydi, retry oladi.
         operation.userJoined = true
+        val app = context.applicationContext
+        // #224: attach bo'lgan operatsiya faqat VAQTINCHALIK nusxa olayotgan
+        // bo'lsa, natijani saqlanadigan keshga ko'chirib beramiz — aks holda
+        // UI "yuklandi" derdi, kutubxonada esa hech narsa qolmasdi.
+        if (existing != null && existing.streamOnly) {
+            val done = existing.result
+            if (done == null) {
+                synchronized(existing) {
+                    if (existing.result == null) {
+                        existing.completions.add { r -> finishAttached(app, track, r, onDone) }
+                        if (onProgress != null) existing.progressListeners.add(onProgress)
+                        return
+                    }
+                }
+            }
+            finishAttached(app, track, existing.result ?: DownloadResult.FAILED, onDone)
+            return
+        }
         synchronized(operation) {
             val result = operation.result
             if (result != null) {
@@ -219,17 +278,47 @@ object YuzMusicCache {
             Unit
         }
         if (existing != null) return
-        val app = context.applicationContext
         Thread { runDownload(app, operation, null) }.start()
     }
 
-    fun downloadBlockingExclusive(context: Context, track: YuzTrack, gate: (() -> Long)? = null): Boolean {
-        val operation = Inflight(track)
-        if (inflight.putIfAbsent(track.id, operation) != null) return false
-        return runDownload(context.applicationContext, operation, gate) == DownloadResult.DONE
+    /**
+     * #224: fon oqim yuklashiga ulangan foydalanuvchi so'rovi — tugagach
+     * vaqtinchalik faylni doimiy keshga ko'chiradi va natijani xabar qiladi.
+     */
+    private fun finishAttached(
+        app: Context,
+        track: YuzTrack,
+        result: DownloadResult,
+        onDone: (DownloadResult) -> Unit
+    ) {
+        if (result != DownloadResult.DONE) {
+            main.post { runCatching { onDone(result) } }
+            return
+        }
+        Thread {
+            val ok = adoptStream(app, track)
+            if (ok) doneSeq.incrementAndGet()
+            main.post { runCatching { onDone(if (ok) DownloadResult.DONE else DownloadResult.FAILED) } }
+        }.start()
     }
 
-    private fun runDownload(context: Context, operation: Inflight, backgroundGate: (() -> Long)?): DownloadResult {
+    fun downloadBlockingExclusive(
+        context: Context,
+        track: YuzTrack,
+        gate: (() -> Long)? = null,
+        streamOnly: Boolean = false
+    ): Boolean {
+        val operation = Inflight(track).also { it.streamOnly = streamOnly }
+        if (inflight.putIfAbsent(track.id, operation) != null) return false
+        return runDownload(context.applicationContext, operation, gate, streamOnly) == DownloadResult.DONE
+    }
+
+    private fun runDownload(
+        context: Context,
+        operation: Inflight,
+        backgroundGate: (() -> Long)?,
+        streamOnly: Boolean = false
+    ): DownloadResult {
         val cancellation = operation.cancellation
         val gate = {
             cancellation.check()
@@ -252,12 +341,12 @@ object YuzMusicCache {
         // (tmp qoladi, keyingi urinish davom etadi) va 12 sekunddan keyin
         // yana sinab ko'riladi: zaif/o'zgaruvchan tarmoqda bitta raund
         // kamlik qiladi, "to'xtab qoldi" ko'rinar edi. Jami 3 raund.
-        var ok = false
+        var ok: Boolean
         var round = 0
         while (true) {
             ok = runCatching {
                 cancellation.scoped {
-                    downloadBlocking(context, operation.track, gate, operation::update, cancellation)
+                    downloadBlocking(context, operation.track, gate, operation::update, cancellation, streamOnly)
                 }
             }.getOrDefault(false)
             round++
@@ -314,10 +403,15 @@ object YuzMusicCache {
         track: YuzTrack,
         gate: (() -> Long)? = null,
         progress: ((Long, Long) -> Unit)? = null,
-        cancellation: YuzDownloadCancellation = YuzDownloadCancellation()
+        cancellation: YuzDownloadCancellation = YuzDownloadCancellation(),
+        streamOnly: Boolean = false
     ): Boolean {
         cancellation.check()
         if (isDownloaded(context, track.id)) return true
+        // #224: vaqtinchalik nusxa bor bo'lsa — qaytadan yuklamaymiz, uni
+        // doimiy keshga ko'chiramiz (foydalanuvchi "yuklab olish"ni bosdi).
+        if (!streamOnly && adoptStream(context, track)) return true
+        if (streamOnly && streamFile(context, track.id) != null) return true
         awaitGate(gate, cancellation)
         cleanupStaleTmp(context)
         val streams = try {
@@ -335,13 +429,13 @@ object YuzMusicCache {
         for (s in attempts) {
             awaitGate(gate, cancellation)
             if (s.url.contains("googlevideo")) {
-                val r = fetchRanges(context, track, s, s.sourceVideoId, gate, progress, cancellation)
+                val r = fetchRanges(context, track, s, s.sourceVideoId, gate, progress, cancellation, streamOnly)
                 if (r == CANCELED) {
                     Log.i(TAG, "download canceled ${track.videoId} (ijro yo'l so'radi)")
                     return false
                 }
                 if (r == OK) return true
-            } else if (fetchPlain(context, track, s, gate, progress, cancellation)) {
+            } else if (fetchPlain(context, track, s, gate, progress, cancellation, streamOnly)) {
                 return true
             }
             cancellation.check()
@@ -350,12 +444,40 @@ object YuzMusicCache {
     }
 
     /** #104/#155: tugallanmagan .tmp qoldiqlari — 72 soatdan eski bo'lsa
-     * (resume imkonini saqlab, uzoq muddatli axlatni yig'ib boramiz). */
+     * (resume imkonini saqlab, uzoq muddatli axlatni yig'ib boramiz).
+     * #224: vaqtinchalik oqim papkasi ham tozalanadi (u umuman saqlanmaydi). */
     private fun cleanupStaleTmp(context: Context) {
         runCatching {
             val cutoff = System.currentTimeMillis() - 3 * 86_400_000L
             dir(context).listFiles()?.forEach { f ->
                 if (f.name.endsWith(".tmp") && f.lastModified() < cutoff) f.delete()
+            }
+            pruneStream(context)
+        }
+    }
+
+    /**
+     * #224: oqim nusxalari cheksiz o'smasin — eng yangi [STREAM_KEEP] fayl,
+     * [STREAM_MAX_BYTES] hajm va [STREAM_TTL] umr ichida saqlanadi.
+     * Media3 ochiq faylni o'chirsa ham davom etadi, lekin joriy trek doim
+     * eng yangilar qatorida bo'ladi.
+     */
+    private fun pruneStream(context: Context) {
+        runCatching {
+            val d = streamDir(context)
+            val now = System.currentTimeMillis()
+            val files = d.listFiles()?.filter { it.isFile && !it.name.endsWith(".tmp") }.orEmpty()
+            var total = 0L
+            files.sortedByDescending { it.lastModified() }.forEachIndexed { i, f ->
+                val stale = now - f.lastModified() > STREAM_TTL
+                if (stale || i >= STREAM_KEEP || total + f.length() > STREAM_MAX_BYTES) {
+                    runCatching { f.delete() }
+                } else {
+                    total += f.length()
+                }
+            }
+            d.listFiles()?.forEach { f ->
+                if (f.name.endsWith(".tmp") && now - f.lastModified() > STREAM_TTL) f.delete()
             }
         }
     }
@@ -384,7 +506,8 @@ object YuzMusicCache {
         videoId: String,
         gate: (() -> Long)?,
         progress: ((Long, Long) -> Unit)?,
-        cancellation: YuzDownloadCancellation
+        cancellation: YuzDownloadCancellation,
+        streamOnly: Boolean
     ): Int {
         val id = track.id
         // #155: tmp nomi endi FORMATGA BOG'LIQ VA BARQAROR: "$id-<itag>.tmp".
@@ -395,7 +518,7 @@ object YuzMusicCache {
         //     nanoTime nom yaratilar va tortilgan baytlar yo'qolar edi.
         //     Turli nomzod (itag) = turli fayl: formatlar aralashmaydi.
         val fp = YuzYouTubeApi.itagOf(stream.url) ?: stream.ext.ifBlank { "raw" }
-        val tmp = File(dir(context), "$id-$fp.tmp")
+        val tmp = File(if (streamOnly) streamDir(context) else dir(context), "$id-$fp.tmp")
         // refresh FAQAT shu videoId uchun: muqobil videoning baytlari
         // yarim faylga aralashib ketmasligi kerak.
         val refresh: ((Long, String) -> YuzAudioStream?)? =
@@ -411,13 +534,15 @@ object YuzMusicCache {
             if (tmp.isFile && tmp.length() > 0L) resumeAt = tmp.length()
         }
         if (resumeAt <= 0L && stream.approxBytes > PAR_MIN) {
-            val split = fetchRangesSplit(context, tmp, track, stream, refresh, gate, progress, cancellation)
+            val split = fetchRangesSplit(
+                context, tmp, track, stream, refresh, gate, progress, cancellation, streamOnly
+            )
             if (split.code != FAIL) return split.code
             resumeAt = split.lowerEnd
             if (resumeAt <= 0L) runCatching { tmp.delete() }
         }
         return fetchRangesSequential(
-            context, tmp, track, stream, refresh, gate, progress, cancellation, resumeAt
+            context, tmp, track, stream, refresh, gate, progress, cancellation, resumeAt, streamOnly
         )
     }
 
@@ -440,7 +565,8 @@ object YuzMusicCache {
         gate: (() -> Long)?,
         progress: ((Long, Long) -> Unit)?,
         cancellation: YuzDownloadCancellation,
-        startAt: Long
+        startAt: Long,
+        streamOnly: Boolean
     ): Int {
         var got = startAt.coerceAtLeast(0L)
         // #163: clen= boshlang'ich qiymat EMAS — faqat server tasdiqlagan
@@ -533,7 +659,7 @@ object YuzMusicCache {
             // bo'lsa eski kod yarim faylni saqlab qo'yardi. Tasdiq
             // bo'lmasa — keyingi urinish (tmp saqlanadi, resume bo'ladi).
             val complete = got > 0L && total > 0L && got >= total
-            if (complete && publish(context, tmp, track, stream.ext, cancellation)) return OK
+            if (complete && publish(context, tmp, track, stream.ext, cancellation, streamOnly)) return OK
         }
         // #155: FAIL'da fayl o'chirilmaydi — auto-retry/keyingi bosish shu
         // prefiksdan davom etadi. Eski qoldiqlarni cleanupStaleTmp yig'adi.
@@ -558,7 +684,8 @@ object YuzMusicCache {
         refresh: ((Long, String) -> YuzAudioStream?)?,
         gate: (() -> Long)?,
         progress: ((Long, Long) -> Unit)?,
-        cancellation: YuzDownloadCancellation
+        cancellation: YuzDownloadCancellation,
+        streamOnly: Boolean
     ): SplitOutcome {
         val total = stream.approxBytes
         val mid = total / 2
@@ -639,7 +766,7 @@ object YuzMusicCache {
             }
             return SplitOutcome(CANCELED, le, total)
         }
-        if (complete && publish(context, tmp, track, stream.ext, cancellation)) {
+        if (complete && publish(context, tmp, track, stream.ext, cancellation, streamOnly)) {
             return SplitOutcome(OK, total, total)
         }
         // #133/#155: tmp O'CHIRILMAYDI — uzluksiz prefiksgacha KESILADI.
@@ -708,9 +835,13 @@ object YuzMusicCache {
         stream: YuzAudioStream,
         gate: (() -> Long)?,
         progress: ((Long, Long) -> Unit)?,
-        cancellation: YuzDownloadCancellation
+        cancellation: YuzDownloadCancellation,
+        streamOnly: Boolean
     ): Boolean {
-        val tmp = File(dir(context), "${track.id}-${System.nanoTime()}.tmp")
+        val tmp = File(
+            if (streamOnly) streamDir(context) else dir(context),
+            "${track.id}-${System.nanoTime()}.tmp"
+        )
         val call = http.newCall(Request.Builder().url(stream.url)
             .header("User-Agent", stream.ua)
             .header("Accept-Encoding", "identity").build())
@@ -744,7 +875,7 @@ object YuzMusicCache {
                     }
                 }
                 if (got <= 0L || (expect >= 0L && got != expect)) return false
-                return publish(context, tmp, track, stream.ext, cancellation)
+                return publish(context, tmp, track, stream.ext, cancellation, streamOnly)
             }
         } catch (e: Exception) {
             Log.i(TAG, "download plain ERR ${e.javaClass.simpleName}")
@@ -757,14 +888,20 @@ object YuzMusicCache {
     }
 
     private fun publish(context: Context, tmp: File, track: YuzTrack, ext: String,
-                        cancellation: YuzDownloadCancellation): Boolean {
+                        cancellation: YuzDownloadCancellation,
+                        streamOnly: Boolean = false): Boolean {
         return try {
             cancellation.commit {
-                // Indeks fayldan OLDIN yoziladi: jarayon rename va indeks
-                // orasida o'lsa, fayl indekssiz qolib "yuklangan, lekin
-                // ro'yxatda yo'q" holatiga tushmasin.
-                addToIndex(context, track)
-                if (!promote(context, tmp, track.id, ext)) return@commit false
+                // #224: oqim nusxasi kutubxona indeksiga YOZILMAYDI — faqat
+                // foydalanuvchi bosgan yuklash "saqlangan" bo'lib qoladi.
+                if (!streamOnly) {
+                    // Indeks fayldan OLDIN yoziladi: jarayon rename va indeks
+                    // orasida o'lsa, fayl indekssiz qolib "yuklangan, lekin
+                    // ro'yxatda yo'q" holatiga tushmasin.
+                    addToIndex(context, track)
+                }
+                if (!promote(context, tmp, track.id, ext, streamOnly)) return@commit false
+                if (streamOnly) pruneStream(context)
                 true
             }
         } catch (_: IOException) {
@@ -790,15 +927,45 @@ object YuzMusicCache {
         }
     }
 
-    private fun promote(context: Context, tmp: File, id: Long, ext: String): Boolean {
+    private fun promote(context: Context, tmp: File, id: Long, ext: String,
+                        streamOnly: Boolean = false): Boolean {
         if (tmp.length() <= 0L) return false
-        val dst = File(dir(context), "$id.${normalizeExt(ext)}")
+        val dstDir = if (streamOnly) streamDir(context) else dir(context)
+        if (streamOnly) {
+            // Avvalgi nusxa boshqa kengaytmada bo'lishi mumkin — ikki nusxa qolmasin.
+            dstDir.listFiles()?.forEach { f ->
+                if (f.name.startsWith("$id.")) runCatching { f.delete() }
+            }
+        }
+        val dst = File(dstDir, "$id.${normalizeExt(ext)}")
         // Both paths share a directory; only an atomic rename exposes saved audio.
         if (dst.exists()) runCatching { dst.delete() }
         if (!tmp.renameTo(dst)) return false
-        scanMap = null
-        Log.i(TAG, "download OK ${dst.length()}B -> ${dst.name}")
+        if (!streamOnly) scanMap = null
+        Log.i(TAG, "download OK ${dst.length()}B -> ${if (streamOnly) "stream/" else ""}${dst.name}")
         return true
+    }
+
+    /**
+     * #224: foydalanuvchi saqlashni so'radi, lekin qo'shiq allaqachon
+     * vaqtinchalik oqim nusxasi sifatida diskda — tarmoqdan qayta tortmaymiz,
+     * faylni doimiy keshga ko'chiramiz va indeksga yozamiz.
+     */
+    private fun adoptStream(context: Context, track: YuzTrack): Boolean {
+        val src = streamFile(context, track.id) ?: return false
+        val permanentDir = dir(context)
+        if (src.parentFile?.path == permanentDir.path) return true
+        return try {
+            addToIndex(context, track)
+            if (promote(context, src, track.id, src.extension, streamOnly = false)) return true
+            val dst = File(permanentDir, "${track.id}.${normalizeExt(src.extension)}")
+            src.copyTo(dst, overwrite = true)
+            runCatching { src.delete() }
+            scanMap = null
+            dst.isFile && dst.length() > 0L
+        } catch (_: Exception) {
+            false
+        }
     }
 
     fun remove(context: Context, id: Long) {
@@ -808,6 +975,13 @@ object YuzMusicCache {
         // yuklash toza boshlanadi.
         runCatching {
             dir(context).listFiles()?.forEach { f ->
+                if (f.name.startsWith("$id-") && f.name.endsWith(".tmp")) f.delete()
+            }
+        }
+        // #224: buzilgan oqim nusxasi ham tashlanadi.
+        runCatching {
+            removeFiles(streamDir(context), id)
+            streamDir(context).listFiles()?.forEach { f ->
                 if (f.name.startsWith("$id-") && f.name.endsWith(".tmp")) f.delete()
             }
         }
@@ -838,7 +1012,10 @@ object YuzMusicCache {
                 )
             )
         }
-        val live = inflight.values.sortedByDescending { it.order }.map { it.track }
+        // #224: faqat foydalanuvchi boshlagan yuklashlar "yuklanmoqda" qatorida
+        // ko'rinadi — radio fon yuklashlari ro'yxatga umuman kirmaydi.
+        val live = inflight.values.filter { !it.streamOnly }
+            .sortedByDescending { it.order }.map { it.track }
         return (live + out.asReversed()).distinctBy { it.id }
     }
 
@@ -857,7 +1034,7 @@ object YuzMusicCache {
 
     /** Local file URI yoki network preview URI. */
     fun playUri(context: Context, track: YuzTrack): String {
-        val f = localFile(context, track.id)
+        val f = streamFile(context, track.id)
         return if (f != null) Uri.fromFile(f).toString() else track.previewUrl
     }
 
