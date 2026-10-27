@@ -950,6 +950,15 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             if (fragment instanceof DialogsActivity) {
                 ((DialogsActivity) fragment).setSideMenu(sideMenu);
             }
+            // YuzGram: statik stack aktivetlar orasida saqlanadi. Agar ichida chat
+            // ildizsiz qolgan bo'lsa (bildirishnomadan ochib, "orqaga" bilan ilova
+            // yopilgan holat), har ochilishda chat ekrani qaytib, "orqaga" yana
+            // ilovani yopardi. Ostiga chat ro'yxatini qo'yib, zanjirni tiklaymiz.
+            if (!AndroidUtilities.isTablet() && (fragment instanceof ChatActivity || fragment instanceof TopicsFragment)) {
+                DialogsActivity dialogsActivity = new DialogsActivity(null);
+                dialogsActivity.setSideMenu(sideMenu);
+                actionBarLayout.addFragmentToStack(dialogsActivity, 0);
+            }
             boolean allowOpen = true;
             if (AndroidUtilities.isTablet()) {
                 allowOpen = actionBarLayout.getFragmentStack().size() <= 1 && layersActionBarLayout.getFragmentStack().isEmpty();
@@ -3346,6 +3355,15 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         }
         if (!showGroupVoip && (intent == null || !Intent.ACTION_MAIN.equals(intent.getAction())) && GroupCallActivity.groupCallInstance != null) {
             GroupCallActivity.groupCallInstance.dismiss();
+        }
+        // YuzGram: intent stack'ni bo'shatib qo'ysa (masalan qidiruv bilan ochilish),
+        // ekran bo'sh qolib "orqaga" umuman ishlamay qolardi. Chat ro'yxatini tiklaymiz.
+        if (!AndroidUtilities.isTablet() && !pushOpened && actionBarLayout.getFragmentStack().isEmpty()
+                && UserConfig.getInstance(currentAccount).isClientActivated()) {
+            DialogsActivity dialogsActivity = new DialogsActivity(null);
+            dialogsActivity.setSideMenu(sideMenu);
+            actionBarLayout.addFragmentToStack(dialogsActivity);
+            drawerLayoutContainer.setAllowOpenDrawer(true, false);
         }
 
         intent.setAction(null);
