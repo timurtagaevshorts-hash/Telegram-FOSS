@@ -389,7 +389,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private com.google.firebase.firestore.ListenerRegistration yuzNotifListener;
     private ActionBarMenuItem otherItem;
     private ActionBarMenuItem searchItem;
-    private ActionBarMenuSubItem editColorItem;
     private ActionBarMenuSubItem linkItem;
     private ActionBarMenuSubItem setUsernameItem;
     private ImageView ttlIconView;
@@ -518,13 +517,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private final static int qr_button = 37;
     private final static int gift_premium = 38;
     private final static int channel_stories = 39;
-    private final static int edit_color = 40;
     private final static int edit_profile = 41;
     private final static int copy_link_profile = 42;
     private final static int set_username = 43;
     private final static int open_settings = 44;
     private final static int open_reel_notifications = 45;
     private final static int open_accounts = 46;
+    private final static int yuz_premium = 47;
 
     private Rect rect = new Rect();
 
@@ -2489,12 +2488,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     }
                 } else if (id == edit_info) {
                     presentFragment(new UserInfoActivity());
-                } else if (id == edit_color) {
-                    if (!getUserConfig().isPremium()) {
-                        showDialog(new PremiumFeatureBottomSheet(ProfileActivity.this, PremiumPreviewFragment.PREMIUM_FEATURE_NAME_COLOR, true));
-                        return;
-                    }
-                    presentFragment(new PeerColorActivity(0).startOnProfile().setOnApplied(ProfileActivity.this));
+                } else if (id == yuz_premium) {
+                    // YuzGram: profil rangini o'zgartirish o'rniga — Premium obuna ekrani.
+                    presentFragment(new uz.kodlikino.top4.ui.YuzPremiumActivity(), false);
                 } else if (id == copy_link_profile) {
                     TLRPC.User user = getMessagesController().getUser(userId);
                     AndroidUtilities.addToClipboard(getMessagesController().linkPrefix + "/" + UserObject.getPublicUsername(user));
@@ -7736,9 +7732,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (otherItem != null) {
                 otherItem.setSubItemShown(start_secret_chat, !getMessagesController().isUserPremiumBlocked(userId));
             }
-            updateEditColorIcon();
         } else if (id == NotificationCenter.currentUserPremiumStatusChanged) {
-            updateEditColorIcon();
+            updateListAnimated(false);
         } else if (id == NotificationCenter.starBalanceUpdated) {
             updateListAnimated(false);
         }
@@ -9761,8 +9756,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 if (imageUpdater != null) {
                     otherItem.addSubItem(add_photo, R.drawable.msg_addphoto, LocaleController.getString("AddPhoto", R.string.AddPhoto));
                 }
-                editColorItem = otherItem.addSubItem(edit_color, R.drawable.menu_profile_colors, LocaleController.getString(R.string.ProfileColorEdit));
-                updateEditColorIcon();
+                otherItem.addSubItem(yuz_premium, R.drawable.msg_settings_premium, LocaleController.getString(R.string.YuzGramPremium));
                 if (myProfile) {
                     setUsernameItem = otherItem.addSubItem(set_username, R.drawable.menu_username_change, getString(R.string.ProfileUsernameEdit));
                     linkItem = otherItem.addSubItem(copy_link_profile, R.drawable.msg_link2, getString(R.string.ProfileCopyLink));
@@ -13628,23 +13622,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         setUsernameItem.setIcon(hasUsername ? R.drawable.menu_username_change : R.drawable.menu_username_set);
         setUsernameItem.setText(hasUsername ? getString(R.string.ProfileUsernameEdit) : getString(R.string.ProfileUsernameSet));
         linkItem.setVisibility(UserObject.getPublicUsername(user) != null ? View.VISIBLE : View.GONE);
-    }
-
-    private void updateEditColorIcon() {
-        if (getContext() == null || editColorItem == null) return;
-        if (getUserConfig().isPremium()) {
-            editColorItem.setIcon(R.drawable.menu_profile_colors);
-        } else {
-            Drawable icon = ContextCompat.getDrawable(getContext(), R.drawable.menu_profile_colors_locked);
-            icon.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_actionBarDefaultSubmenuItemIcon), PorterDuff.Mode.SRC_IN));
-            Drawable lockIcon = ContextCompat.getDrawable(getContext(), R.drawable.msg_gallery_locked2);
-            lockIcon.setColorFilter(new PorterDuffColorFilter(ColorUtils.blendARGB(Color.WHITE, Color.BLACK, 0.5f), PorterDuff.Mode.MULTIPLY));
-            CombinedDrawable combinedDrawable = new CombinedDrawable(icon, lockIcon, dp(1), -dp(1)) {
-                @Override
-                public void setColorFilter(ColorFilter colorFilter) {}
-            };
-            editColorItem.setIcon(combinedDrawable);
-        }
     }
 
     /**
