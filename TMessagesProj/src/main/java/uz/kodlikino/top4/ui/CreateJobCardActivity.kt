@@ -11,7 +11,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.ImageView
-import android.widget.ProgressBar
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
@@ -26,20 +25,19 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.telegram.messenger.AndroidUtilities
+import org.telegram.messenger.ApplicationLoader
 import org.telegram.messenger.R
-import org.telegram.messenger.UserConfig
 import org.telegram.ui.ActionBar.BaseFragment
-import uz.kodlikino.top4.models.ClassifiedAdCardThemes
-import uz.kodlikino.top4.models.JobCard
+import uz.kodlikino.top4.models.JobCardCategories
 import uz.kodlikino.top4.models.JobCardListingTypes
 import uz.kodlikino.top4.models.JobCardSalaryTypes
+import uz.kodlikino.top4.services.ClassifiedAdUploadService
 import uz.kodlikino.top4.utils.ClassifiedLocationHelper
 import uz.kodlikino.top4.utils.JobCardRepository
-import uz.kodlikino.top4.utils.JobCardStorageHelper
 import uz.kodlikino.top4.utils.YuzAdModeration
+import uz.kodlikino.top4.utils.YuzAdUploads
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzPriceInput
-import uz.kodlikino.top4.utils.YuzUploadUi
 
 /**
  * "Ish kartasi qo'shish" — [BaseFragment] ko'rinishida.
@@ -76,7 +74,6 @@ class CreateJobCardActivity(
     private var etPhone: TextInputEditText? = null
     private var btnPickRegion: MaterialButton? = null
     private var selectedRegion = ""
-    private var uploadProgress: ProgressBar? = null
     private var btnPublish: MaterialButton? = null
 
     private var pickedUri: Uri? = null
@@ -113,7 +110,6 @@ class CreateJobCardActivity(
         spinnerSalaryType = root.findViewById(R.id.spinnerSalaryType)
         etPhone = root.findViewById(R.id.etPhone)
         btnPickRegion = root.findViewById(R.id.btnJobPickRegion)
-        uploadProgress = root.findViewById(R.id.uploadProgress)
         btnPublish = root.findViewById(R.id.btnPublish)
 
         toolbar?.apply {
@@ -295,79 +291,52 @@ class CreateJobCardActivity(
             JobCardSalaryTypes.NEGOTIABLE
         }
 
-        val user = UserConfig.getInstance(currentAccount).currentUser
-        val ownerName = listOfNotNull(
-            user?.first_name?.takeIf { it.isNotBlank() },
-            user?.last_name?.takeIf { it.isNotBlank() }
-        ).joinToString(" ").orEmpty()
-
         val cardId = editCardId.ifBlank { System.currentTimeMillis().toString() }
-        val account = currentAccount
+        val now = System.currentTimeMillis()
         publishing = true
-        btnPublish?.isEnabled = false
-        uploadProgress?.visibility = View.VISIBLE
-        keepScreenOn(true)
-
-        val s = scope ?: return
-        s.launch {
-            try {
-                val uid = YuzGramAdsAuth.ensureSignedIn(account)
-                var imageUrl = existingImageUrl
-                pickedUri?.let { uri ->
-                    imageUrl = JobCardStorageHelper.uploadImage(uid, cardId, uri)
-                    if (imageUrl.isBlank()) imageUrl = existingImageUrl
-                }
-                if (imageUrl.isBlank()) {
-                    imageUrl = JobCardRepository.findLatestImageUrlForOwner(uid, excludeId = cardId)
-                }
-                val card = JobCard(
-                    id = cardId,
-                    listingType = listingType,
-                    title = title,
-                    description = description,
-                    location = selectedRegion,
-                    phone = phone,
-                    salaryAmount = salaryAmount,
-                    salaryType = salaryType,
-                    imageUrl = imageUrl,
-                    cardTheme = ClassifiedAdCardThemes.BLACK,
-                    ownerUid = uid,
-                    ownerName = ownerName,
-                    ownerPhotoUrl = "",
-                    createdAt = existingCreatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
-                    region = selectedRegion
-                )
-                JobCardRepository.saveCard(card)
-                keepScreenOn(false)
-                toast(
-                    if (YuzAdModeration.cachedEnabled()) {
-                        R.string.classified_submitted_for_review
-                    } else {
-                        R.string.job_board_published
-                    }
-                )
-                removeSelfFromStack()
-            } catch (e: Exception) {
-                publishing = false
-                btnPublish?.isEnabled = true
-                uploadProgress?.visibility = View.GONE
-                keepScreenOn(false)
-                val reason = e.message ?: getString(R.string.classified_publish_failed)
-                YuzUploadUi.showError(themedContext ?: context, reason) { publish() }
+        // Yuklash ekranni bloklamaydi: yozuv trekerga qo'yiladi va servis
+        // rasmni Storage'ga, so'ng hujjatni Firestore'ga yozadi. Ekran yopiladi.
+        val upload = YuzAdUploads.Upload(
+            id = cardId,
+            adId = cardId,
+            kind = YuzAdUploads.Kind.JOB,
+            account = currentAccount,
+            title = title,
+            model = "",
+            description = description,
+            price = 0L,
+            category = JobCardCategories.fromListingType(listingType),
+            phone = phone,
+            region = selectedRegion,
+            address = "",
+            createdAt = existingCreatedAt.takeIf { it > 0L } ?: now,
+            localUris = listOfNotNull(pickedUri?.toString()),
+            existingUrls = existingImageUrl.trim().takeIf { it.isNotBlank() }
+                ?.let { listOf(it) } ?: emptyList(),
+            removedUrls = emptyList(),
+            listingType = listingType,
+            salaryType = salaryType,
+            salaryAmount = salaryAmount,
+            startedAt = now
+        )
+        val ctx = parentActivity ?: context ?: ApplicationLoader.applicationContext ?: return
+        try {
+            YuzAdUploads.begin(upload)
+            ClassifiedAdUploadService.startUpload(ctx, cardId)
+        } catch (e: Exception) {
+            YuzAdUploads.complete(cardId)
+            publishing = false
+            toast(e.message ?: getString(R.string.classified_publish_failed))
+            return
+        }
+        toast(
+            if (YuzAdModeration.cachedEnabled()) {
+                R.string.classified_submitted_for_review
+            } else {
+                R.string.job_board_upload_started
             }
-        }
-    }
-
-    private fun keepScreenOn(on: Boolean) {
-        YuzUploadUi.keepScreenOn(parentActivity, on)
-    }
-
-    override fun onBackPressed(): Boolean {
-        if (publishing) {
-            toast(R.string.classified_saving)
-            return false
-        }
-        return super.onBackPressed()
+        )
+        removeSelfFromStack()
     }
 
     override fun onResume() {
@@ -378,7 +347,6 @@ class CreateJobCardActivity(
     override fun onFragmentDestroy() {
         scope?.cancel()
         scope = null
-        keepScreenOn(false)
         super.onFragmentDestroy()
     }
 

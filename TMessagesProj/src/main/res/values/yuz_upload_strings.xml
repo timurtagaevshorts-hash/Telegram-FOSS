@@ -32,6 +32,14 @@
     <string name="classified_pending_cancel">Bekor qilish</string>
     <string name="classified_pending_retry">Qayta urinish</string>
 
+    <!-- Ish kartasi fon yuklashi: bir xil servis/treker, faqat matnlari boshqa. -->
+    <string name="job_board_upload_started">Ish e\'loni fonda yuklanmoqda — ilovadan foydalanishingiz mumkin</string>
+    <string name="job_board_saving">Ish e\'loni saqlanmoqda…</string>
+    <string name="job_board_upload_done">Ish e\'loni joylandi</string>
+    <string name="job_board_upload_failed_title">Ish e\'loni joylanmadi</string>
+    <string name="job_board_pending_title">Ish e\'loni yuklanmoqda</string>
+    <string name="job_board_pending_progress">Ish e\'loni yuklanmoqda… %1$d%%</string>
+
     <string name="reels_cancel_upload">Yuklashni bekor qilish</string>
     <string name="reels_upload_canceled">Yuklash bekor qilindi</string>
 </resources>

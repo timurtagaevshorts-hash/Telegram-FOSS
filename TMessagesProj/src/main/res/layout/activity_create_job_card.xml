@@ -205,16 +205,6 @@
                 app:icon="@drawable/ic_location_pin"
                 app:iconGravity="start" />
 
-            <ProgressBar
-                android:id="@+id/uploadProgress"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/yuz_space_4"
-                android:indeterminate="true"
-                android:indeterminateTint="@color/yuz_action"
-                android:visibility="gone" />
-
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPublish"
                 style="@style/YuzButton"

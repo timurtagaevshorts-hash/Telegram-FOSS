@@ -28,8 +28,12 @@ import org.telegram.messenger.R
 import org.telegram.messenger.UserConfig
 import uz.kodlikino.top4.models.ClassifiedAd
 import uz.kodlikino.top4.models.ClassifiedAdCardThemes
+import uz.kodlikino.top4.models.JobCard
+import uz.kodlikino.top4.models.JobCardListingTypes
+import uz.kodlikino.top4.models.JobCardSalaryTypes
 import uz.kodlikino.top4.utils.ClassifiedAdRepository
 import uz.kodlikino.top4.utils.ClassifiedAdStorageHelper
+import uz.kodlikino.top4.utils.JobCardRepository
 import uz.kodlikino.top4.utils.YuzAdUploads
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 
@@ -108,8 +112,10 @@ class ClassifiedAdUploadService : Service() {
 
     private var doneCount = 0
     private var lastDoneTitle = ""
+    private var lastDoneKind = YuzAdUploads.Kind.AD
     private var lastError = ""
     private var lastFailedId = ""
+    private var lastFailedKind = YuzAdUploads.Kind.AD
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -223,7 +229,6 @@ class ClassifiedAdUploadService : Service() {
             val allUrls = (req.existingUrls + uploaded)
                 .filter { it.isNotBlank() }
                 .distinct()
-                .take(5)
 
             val user = UserConfig.getInstance(req.account).currentUser
             val ownerName = listOfNotNull(
@@ -233,34 +238,20 @@ class ClassifiedAdUploadService : Service() {
 
             report(
                 req, 96, YuzAdUploads.Phase.SAVE,
-                getString(R.string.classified_saving), force = true
+                getString(
+                    if (req.kind == YuzAdUploads.Kind.JOB)
+                        R.string.job_board_saving else R.string.classified_saving
+                ),
+                force = true
             )
-            val ad = ClassifiedAd(
-                id = req.adId,
-                title = req.title,
-                model = req.model,
-                description = req.description,
-                price = req.price,
-                category = req.category,
-                imageUrls = allUrls,
-                address = req.address,
-                phone = req.phone,
-                ownerUid = uid,
-                ownerName = ownerName,
-                ownerPhotoUrl = "",
-                createdAt = req.createdAt,
-                isActive = true,
-                cardTheme = ClassifiedAdCardThemes.BLACK,
-                region = req.region
-            )
-            ClassifiedAdRepository.saveAd(ad)
-
-            if (req.removedUrls.isNotEmpty()) {
-                ClassifiedAdStorageHelper.deleteImages(req.removedUrls)
+            when (req.kind) {
+                YuzAdUploads.Kind.JOB -> saveJobCard(req, uid, ownerName, uploaded)
+                YuzAdUploads.Kind.AD -> saveAd(req, uid, ownerName, allUrls)
             }
 
             doneCount++
             lastDoneTitle = req.displayTitle
+            lastDoneKind = req.kind
             YuzAdUploads.complete(req.id)
         } catch (e: CancellationException) {
             // Bekor qilish — xato ko'rsatilmaydi, yozuv dismiss orqali o'chirilgan.
@@ -275,9 +266,74 @@ class ClassifiedAdUploadService : Service() {
                     ?: getString(R.string.classified_upload_failed)
                 lastError = message
                 lastFailedId = req.id
+                lastFailedKind = req.kind
                 YuzAdUploads.fail(req.id, message)
             }
         }
+    }
+
+    /** E'lon yozuvi — rasmlar (ko'pi bilan 5) + Firestore hujjati. */
+    private suspend fun saveAd(
+        req: YuzAdUploads.Upload,
+        uid: String,
+        ownerName: String,
+        urls: List<String>
+    ) {
+        val ad = ClassifiedAd(
+            id = req.adId,
+            title = req.title,
+            model = req.model,
+            description = req.description,
+            price = req.price,
+            category = req.category,
+            imageUrls = urls.take(5),
+            address = req.address,
+            phone = req.phone,
+            ownerUid = uid,
+            ownerName = ownerName,
+            ownerPhotoUrl = "",
+            createdAt = req.createdAt,
+            isActive = true,
+            cardTheme = ClassifiedAdCardThemes.BLACK,
+            region = req.region
+        )
+        ClassifiedAdRepository.saveAd(ad)
+
+        if (req.removedUrls.isNotEmpty()) {
+            ClassifiedAdStorageHelper.deleteImages(req.removedUrls)
+        }
+    }
+
+    /** Ish kartasi — bitta rasm (yangi yuklangan yoki eskisi) + Firestore hujjati. */
+    private suspend fun saveJobCard(
+        req: YuzAdUploads.Upload,
+        uid: String,
+        ownerName: String,
+        uploaded: List<String>
+    ) {
+        // Yangi rasm eskisini almashtiradi; yangi tanlanmasa — eskisi qoladi.
+        val imageUrl = uploaded.firstOrNull()?.takeIf { it.isNotBlank() }
+            ?: req.existingUrls.firstOrNull()?.takeIf { it.isNotBlank() }
+            ?: JobCardRepository.findLatestImageUrlForOwner(uid, excludeId = req.adId)
+        JobCardRepository.saveCard(
+            JobCard(
+                id = req.adId,
+                listingType = req.listingType.ifBlank { JobCardListingTypes.HIRING },
+                title = req.title,
+                description = req.description,
+                location = req.region,
+                phone = req.phone,
+                salaryAmount = req.salaryAmount,
+                salaryType = req.salaryType.ifBlank { JobCardSalaryTypes.NEGOTIABLE },
+                imageUrl = imageUrl,
+                cardTheme = ClassifiedAdCardThemes.BLACK,
+                ownerUid = uid,
+                ownerName = ownerName,
+                ownerPhotoUrl = "",
+                createdAt = req.createdAt,
+                region = req.region
+            )
+        )
     }
 
     /** Treker + bildirishnomani chegaralangan tezlikda yangilaydi. */
@@ -335,8 +391,10 @@ class ClassifiedAdUploadService : Service() {
         runningCount = 0
         releaseWakeLock()
         val doneTitle = lastDoneTitle
+        val doneKind = lastDoneKind
         val error = lastError
         val failedId = lastFailedId
+        val failedKind = lastFailedKind
         val done = doneCount
         doneCount = 0
         lastDoneTitle = ""
@@ -345,12 +403,20 @@ class ClassifiedAdUploadService : Service() {
         stopForegroundCompat()
         when {
             error.isNotBlank() -> showResultNotification(
-                getString(R.string.classified_upload_failed_title),
+                getString(
+                    if (failedKind == YuzAdUploads.Kind.JOB)
+                        R.string.job_board_upload_failed_title
+                    else R.string.classified_upload_failed_title
+                ),
                 error,
                 retryUploadId = failedId
             )
             done > 0 -> showResultNotification(
-                getString(R.string.classified_upload_done),
+                getString(
+                    if (doneKind == YuzAdUploads.Kind.JOB)
+                        R.string.job_board_upload_done
+                    else R.string.classified_upload_done
+                ),
                 doneTitle,
                 retryUploadId = null
             )

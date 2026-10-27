@@ -33,6 +33,7 @@ import uz.kodlikino.top4.models.JobCard
 import uz.kodlikino.top4.models.JobCardListingTypes
 import uz.kodlikino.top4.utils.ClassifiedLocationHelper
 import uz.kodlikino.top4.utils.JobCardRepository
+import uz.kodlikino.top4.utils.YuzAdUploads
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzPriceInput
 
@@ -61,6 +62,13 @@ class JobCardsActivity : BaseFragment() {
     private var btnRegionPicker: MaterialButton? = null
     private var chipGroupDate: ChipGroup? = null
     private var chipGroupSort: ChipGroup? = null
+
+    private var jobUploadBanner: View? = null
+    private var jobUploadBannerTitle: TextView? = null
+    private var jobUploadBannerSubtitle: TextView? = null
+    private var jobUploadBannerProgress: ProgressBar? = null
+    private var jobUploadBannerAction: ImageButton? = null
+    private val jobUploadListener = Runnable { refreshJobUploadBanner() }
 
     private var themedContext: Context? = null
     private val adapter = JobCardsAdapter(
@@ -109,6 +117,17 @@ class JobCardsActivity : BaseFragment() {
         btnRegionPicker = root.findViewById(R.id.btnJobRegionPicker)
         chipGroupDate = root.findViewById(R.id.chipGroupJobDate)
         chipGroupSort = root.findViewById(R.id.chipGroupJobSort)
+        jobUploadBanner = root.findViewById(R.id.jobUploadBanner)
+        jobUploadBannerTitle = root.findViewById(R.id.jobUploadBannerTitle)
+        jobUploadBannerSubtitle = root.findViewById(R.id.jobUploadBannerSubtitle)
+        jobUploadBannerProgress = root.findViewById(R.id.jobUploadBannerProgress)
+        jobUploadBannerAction = root.findViewById(R.id.jobUploadBannerAction)
+        jobUploadBannerAction?.setOnClickListener {
+            val item = YuzAdUploads.bannerFor(currentAccount, YuzAdUploads.Kind.JOB)
+                ?: return@setOnClickListener
+            val ctx = themedContext ?: context
+            if (item.failed) YuzAdUploads.retry(ctx, item.id) else YuzAdUploads.dismiss(ctx, item.id)
+        }
 
         rvJobCards?.apply {
             layoutManager = LinearLayoutManager(themed)
@@ -342,19 +361,62 @@ class JobCardsActivity : BaseFragment() {
         }
     }
 
+    /**
+     * Bo'lim tepasidagi yuklash tasmasi: "Joylash"dan keyin ekran yopiladi,
+     * yuklash esa fonda davom etadi — foiz va xato shu yerda ko'rinadi.
+     */
+    private fun refreshJobUploadBanner() {
+        val banner = jobUploadBanner ?: return
+        val ctx = themedContext ?: context
+        val item = YuzAdUploads.bannerFor(currentAccount, YuzAdUploads.Kind.JOB)
+        if (item == null) {
+            banner.visibility = View.GONE
+            return
+        }
+        banner.visibility = View.VISIBLE
+        val name = item.displayTitle.takeIf { it.isNotBlank() }
+            ?: ctx.getString(R.string.job_board_pending_title)
+        if (item.failed) {
+            jobUploadBannerTitle?.text = ctx.getString(R.string.classified_pending_failed)
+            jobUploadBannerSubtitle?.text = ctx.getString(
+                R.string.classified_pending_failed_hint,
+                name,
+                item.error.ifBlank { ctx.getString(R.string.job_board_upload_failed_title) }
+            )
+            jobUploadBannerProgress?.visibility = View.GONE
+            jobUploadBannerAction?.setImageResource(R.drawable.ic_yuz_loop)
+            jobUploadBannerAction?.contentDescription =
+                ctx.getString(R.string.classified_pending_retry)
+        } else {
+            jobUploadBannerTitle?.text =
+                ctx.getString(R.string.job_board_pending_progress, item.progress)
+            jobUploadBannerSubtitle?.text =
+                ctx.getString(R.string.classified_pending_subtitle, name)
+            jobUploadBannerProgress?.visibility = View.VISIBLE
+            jobUploadBannerProgress?.progress = item.progress
+            jobUploadBannerAction?.setImageResource(R.drawable.ic_yuz_close)
+            jobUploadBannerAction?.contentDescription =
+                ctx.getString(R.string.classified_pending_cancel)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         actionBar?.visibility = View.GONE
         if (fragmentView != null) attachListener()
+        YuzAdUploads.addListener(jobUploadListener)
+        refreshJobUploadBanner()
     }
 
     override fun onPause() {
+        YuzAdUploads.removeListener(jobUploadListener)
         cardsListener?.remove()
         cardsListener = null
         super.onPause()
     }
 
     override fun onFragmentDestroy() {
+        YuzAdUploads.removeListener(jobUploadListener)
         cardsListener?.remove()
         cardsListener = null
         scope?.cancel()

@@ -27,9 +27,13 @@ object YuzAdUploads {
 
     enum class Phase { PREPARE, UPLOAD, SAVE, DONE, FAILED }
 
+    /** Bir xil treker/servis ikki turdagi yozuvni tashiydi: e'lon va ish kartasi. */
+    enum class Kind { AD, JOB }
+
     data class Upload(
         val id: String,
         val adId: String,
+        val kind: Kind = Kind.AD,
         val account: Int,
         val title: String,
         val model: String,
@@ -43,6 +47,10 @@ object YuzAdUploads {
         val localUris: List<String>,
         val existingUrls: List<String>,
         val removedUrls: List<String>,
+        /** Ish kartasi maydonlari ([Kind.JOB]); e'lonlarda bo'sh qoladi. */
+        val listingType: String = "",
+        val salaryType: String = "",
+        val salaryAmount: Long = 0L,
         val startedAt: Long,
         val updatedAt: Long = startedAt,
         val progress: Int = 0,
@@ -52,7 +60,9 @@ object YuzAdUploads {
         val failed: Boolean get() = phase == Phase.FAILED
         /** Yuklash tugagan (muvaffaqiyatli yoki xato) — banner faqat xato holatida qoladi. */
         val finished: Boolean get() = phase == Phase.DONE || phase == Phase.FAILED
-        val imageCount: Int get() = (existingUrls.size + localUris.size).coerceAtMost(5)
+        val imageCount: Int
+            get() = (existingUrls.size + localUris.size)
+                .coerceAtMost(if (kind == Kind.JOB) 1 else 5)
         val displayTitle: String get() = title.ifBlank { model }
     }
 
@@ -86,8 +96,8 @@ object YuzAdUploads {
     fun find(id: String): Upload? = list().firstOrNull { it.id == id }
 
     /** Feed banneri uchun: shu akkauntdagi eng dolzarb yozuv (faol ustun). */
-    fun bannerFor(account: Int): Upload? {
-        val mine = list().filter { it.account == account }
+    fun bannerFor(account: Int, kind: Kind = Kind.AD): Upload? {
+        val mine = list().filter { it.account == account && it.kind == kind }
         return mine.firstOrNull { !it.finished } ?: mine.firstOrNull { it.failed }
     }
 
@@ -187,6 +197,8 @@ object YuzAdUploads {
             Upload(
                 id = id,
                 adId = obj.optString("adId"),
+                kind = runCatching { Kind.valueOf(obj.optString("kind")) }
+                    .getOrDefault(Kind.AD),
                 account = obj.optInt("account", 0),
                 title = obj.optString("title"),
                 model = obj.optString("model"),
@@ -200,6 +212,9 @@ object YuzAdUploads {
                 localUris = readStringList(obj, "localUris"),
                 existingUrls = readStringList(obj, "existingUrls"),
                 removedUrls = readStringList(obj, "removedUrls"),
+                listingType = obj.optString("listingType"),
+                salaryType = obj.optString("salaryType"),
+                salaryAmount = obj.optLong("salaryAmount", 0L),
                 startedAt = obj.optLong("startedAt", 0L),
                 updatedAt = obj.optLong("updatedAt", 0L),
                 progress = obj.optInt("progress", 0),
@@ -226,6 +241,7 @@ object YuzAdUploads {
     private fun serialize(item: Upload): JSONObject = JSONObject().apply {
         put("id", item.id)
         put("adId", item.adId)
+        put("kind", item.kind.name)
         put("account", item.account)
         put("title", item.title)
         put("model", item.model)
@@ -239,6 +255,9 @@ object YuzAdUploads {
         put("localUris", JSONArray(item.localUris))
         put("existingUrls", JSONArray(item.existingUrls))
         put("removedUrls", JSONArray(item.removedUrls))
+        put("listingType", item.listingType)
+        put("salaryType", item.salaryType)
+        put("salaryAmount", item.salaryAmount)
         put("startedAt", item.startedAt)
         put("updatedAt", item.updatedAt)
         put("progress", item.progress)
