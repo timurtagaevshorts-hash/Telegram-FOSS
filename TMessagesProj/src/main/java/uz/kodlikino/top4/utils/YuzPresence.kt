@@ -25,6 +25,9 @@ object YuzPresence {
     private const val PREFS = "yuz_presence"
     private const val KEY_LAST = "last_write_ms"
     private const val MIN_INTERVAL_MS = 20L * 60L * 1000L
+    // Firestore yozuvi server tasdig'isiz tugamaydi — tarmoq jim bo'lsa
+    // cheksiz kutish o'rniga tashlab yuboramiz (keyingi safar qayta yoziladi).
+    private const val WRITE_TIMEOUT_MS = 12_000L
 
     private val db = FirebaseFirestore.getInstance()
 
@@ -41,17 +44,19 @@ object YuzPresence {
         val ref = db.collection("comment_profiles").document(uid)
         try {
             withContext(Dispatchers.IO) {
-                try {
-                    ref.update(
-                        mapOf("online" to true, "lastActiveAt" to now)
-                    ).await()
-                } catch (e: Exception) {
-                    if (e is FirebaseFirestoreException &&
-                        e.code == FirebaseFirestoreException.Code.NOT_FOUND
-                    ) {
-                        ref.set(createSafe(uid, firstName, lastName, now)).await()
-                    } else {
-                        throw e
+                YuzTaskTimeouts.awaitBound("Faollik yozuvi", WRITE_TIMEOUT_MS) {
+                    try {
+                        ref.update(
+                            mapOf("online" to true, "lastActiveAt" to now)
+                        ).await()
+                    } catch (e: Exception) {
+                        if (e is FirebaseFirestoreException &&
+                            e.code == FirebaseFirestoreException.Code.NOT_FOUND
+                        ) {
+                            ref.set(createSafe(uid, firstName, lastName, now)).await()
+                        } else {
+                            throw e
+                        }
                     }
                 }
             }

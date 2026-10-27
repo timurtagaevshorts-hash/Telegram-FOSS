@@ -90,6 +90,13 @@ class ReelUploadService : Service() {
         private const val TRACKER_TICK_MS = 700L
         private const val NOTIFICATION_TICK_MS = 500L
 
+        /**
+         * Siqish uzun videoda daqiqalab davom etadi, lekin undan ham uzoq
+         * jim qolish — qotib qolish. Tarmoq qadamlari o'z muddatlariga ega.
+         */
+        private const val STALL_MS = 240_000L
+        private const val STALL_TICK_MS = 5_000L
+
         @Volatile
         private var runningCount = 0
 
@@ -172,6 +179,14 @@ class ReelUploadService : Service() {
     private var lastTrackerAt = 0L
     private var lastNotificationAt = 0L
     private var lastPhase: YuzReelUploads.Phase? = null
+
+    /** Oxirgi tirik belgisi (progress) vaqti — [watchStall] shuni kuzatadi. */
+    @Volatile
+    private var lastActivityAt = 0L
+
+    /** To'xtab qolish aniqlanganda sabab — bekor qilishdan farqlash uchun. */
+    @Volatile
+    private var stallMessage = ""
     /** Oxirgi start so'rovi — navbat bo'shaganda faqat shu id bilan to'xtaymiz. */
     private var lastStartId = 0
 
@@ -248,11 +263,16 @@ class ReelUploadService : Service() {
         lastPhase = null
         lastTrackerAt = 0L
         lastNotificationAt = 0L
+        lastActivityAt = SystemClock.elapsedRealtime()
+        stallMessage = ""
         runningCount = 1
         acquireWakeLock()
         currentJob = scope.launch {
             try {
-                performUpload(next)
+                val work = launch { performUpload(next) }
+                val guard = launch { watchStall(next.id, work) }
+                work.join()
+                guard.cancel()
             } finally {
                 currentJob = null
                 current = null
@@ -260,6 +280,26 @@ class ReelUploadService : Service() {
                 queue.removeAll { it.id == next.id }
                 pump()
             }
+        }
+    }
+
+    /**
+     * [STALL_MS] davomida progress bo'lmasa ishni to'xtatib, yozuvni xato
+     * holatiga o'tkazadi. `fail` shu yerda yoziladi: siqish kabi bloklovchi
+     * qadam bekor qilishni eshitmasa ham banner "yuklanmoqda"da qolmaydi.
+     */
+    private suspend fun watchStall(uploadId: String, work: Job) {
+        while (true) {
+            delay(STALL_TICK_MS)
+            if (SystemClock.elapsedRealtime() - lastActivityAt <= STALL_MS) continue
+            val message = "Video yuklash javob bermayapti — internetni tekshirib, qayta urinib ko'ring"
+            stallMessage = message
+            try {
+                YuzReelUploads.fail(uploadId, message)
+            } catch (_: Exception) {
+            }
+            work.cancel()
+            return
         }
     }
 
@@ -394,8 +434,14 @@ class ReelUploadService : Service() {
             YuzReelUploads.complete(req.id)
         } catch (e: CancellationException) {
             // Bekor qilish — xato ko'rsatilmaydi, kvota finally'da qaytadi.
+            // To'xtab qolish ham shu yerga keladi: u holda xato yoziladi.
+            val stalled = stallMessage
             try {
-                YuzReelUploads.complete(req.id)
+                if (stalled.isNotBlank() && !currentCancelled) {
+                    YuzReelUploads.fail(req.id, stalled)
+                } else {
+                    YuzReelUploads.complete(req.id)
+                }
             } catch (_: Exception) {
             }
         } catch (e: Exception) {
@@ -501,6 +547,7 @@ class ReelUploadService : Service() {
         force: Boolean = false
     ) {
         val now = SystemClock.elapsedRealtime()
+        lastActivityAt = now
         if (force || phase != lastPhase || now - lastTrackerAt >= TRACKER_TICK_MS) {
             lastPhase = phase
             lastTrackerAt = now

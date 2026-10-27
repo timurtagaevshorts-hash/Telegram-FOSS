@@ -2,7 +2,10 @@ package uz.kodlikino.top4.utils
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctions
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
@@ -29,6 +32,9 @@ object YuzGramAdsAuth {
     // (masalan, Reels va e'lonlar) signIn qilsa, biri ikkinchisining sessiyasini
     // o'chirib yuborardi. Barcha kirishlar shu mutex orqali ketma-ket ketadi.
     private val sessionLock = Mutex()
+
+    // Presence yozuvi shu oqimda, alohida: u `sessionLock`ni ushlab turmaydi.
+    private val presenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun currentTelegramId(account: Int): Long =
         UserConfig.getInstance(account).clientUserId
@@ -63,19 +69,31 @@ object YuzGramAdsAuth {
 
         // Avval token olinadi, keyingina eski sessiya yopiladi: mint xato
         // bersa foydalanuvchi avvalgi sessiyasini yo'qotmaydi.
+        // Muddat qat'iy: sovuq startda ham cheksiz kutilmaydi — aks holda
+        // e'lon/ish kartasi/reel yuklash abadiy "tayyorlanmoqda"da qolardi.
         val callResult = withContext(Dispatchers.IO) {
-            FirebaseFunctions.getInstance()
-                .getHttpsCallable("mintTelegramCustomToken")
-                .call(params)
-                .await()
+            YuzTaskTimeouts.awaitBound(
+                "Firebase token",
+                YuzTaskTimeouts.AUTH_MINT_MS
+            ) {
+                FirebaseFunctions.getInstance()
+                    .getHttpsCallable("mintTelegramCustomToken")
+                    .call(params)
+                    .await()
+            }
         }
         val token = extractToken(callResult?.data)
             ?: throw IllegalStateException("Firebase token olinmadi. Internetni tekshirib, qayta urinib ko'ring.")
 
         withContext(Dispatchers.IO) {
-            if (auth.currentUser?.uid != uid) {
-                auth.signOut()
-                auth.signInWithCustomToken(token).await()
+            YuzTaskTimeouts.awaitBound(
+                "Firebase sessiyasi",
+                YuzTaskTimeouts.AUTH_SIGN_IN_MS
+            ) {
+                if (auth.currentUser?.uid != uid) {
+                    auth.signOut()
+                    auth.signInWithCustomToken(token).await()
+                }
             }
         }
         val signedUid = auth.currentUser?.uid
@@ -89,12 +107,22 @@ object YuzGramAdsAuth {
     /**
      * Faollik izi — admin dashboard statistikasi shu yozuvlardan sanaladi.
      * Throttle [YuzPresence] ichida; any xato suhbatni to'xtatmasligi kerak.
+     *
+     * KUTILMAYDI (2026-10-27): ilgari bu yozuv `sessionLock` ichida `await()`
+     * qilinardi. Firestore yozuvi tarmoq javobini olmasa cheksiz osilib qoladi
+     * va global mutex abadiy band bo'lib, undan keyingi BARCHA yuklashlar
+     * (e'lon, ish kartasi, reel) "yuklanmoqda"da qotib qolardi. Endi presence
+     * alohida IO oqimda, muddat bilan — auth yo'liga ta'sir qilmaydi.
      */
-    private suspend fun touchPresence(uid: String, user: org.telegram.tgnet.TLRPC.User?) {
+    private fun touchPresence(uid: String, user: org.telegram.tgnet.TLRPC.User?) {
         val ctx = org.telegram.messenger.ApplicationLoader.applicationContext ?: return
-        try {
-            YuzPresence.touch(ctx, uid, user?.first_name ?: "", user?.last_name ?: "")
-        } catch (_: Exception) {
+        val firstName = user?.first_name ?: ""
+        val lastName = user?.last_name ?: ""
+        presenceScope.launch {
+            try {
+                YuzPresence.touch(ctx, uid, firstName, lastName)
+            } catch (_: Exception) {
+            }
         }
     }
 

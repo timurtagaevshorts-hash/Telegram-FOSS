@@ -200,7 +200,10 @@ object ReelsRepository {
             "isUserUpload" to reel.isUserUpload
         )
         try {
-            db.collection(COLLECTION).document(id).set(data).await()
+            YuzTaskTimeouts.awaitBound(
+                "Reelni saqlash",
+                YuzTaskTimeouts.FIRESTORE_MS
+            ) { db.collection(COLLECTION).document(id).set(data).await() }
             // Kesheski holat qolmasligi uchun: yangi reel keyingi ochilishda
             // darhol ko'rinishi kerak (network fetch yangi list keshlaydi).
             cachedFeed = null

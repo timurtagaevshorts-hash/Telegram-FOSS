@@ -42,7 +42,12 @@ object YuzAdModeration {
             memoryEnabled?.let { return it }
         }
         return try {
-            val snapshot = db.collection(SETTINGS_COLLECTION).document(SETTINGS_DOC).get().await()
+            // Server o'qishi javobsiz qolsa keshdagi qiymat ishlatiladi —
+            // aks holda har bir e'lon saqlash shu qadamda osilib qolardi.
+            val snapshot = YuzTaskTimeouts.awaitBound(
+                "Moderatsiya sozlamasi",
+                YuzTaskTimeouts.SETTINGS_MS
+            ) { db.collection(SETTINGS_COLLECTION).document(SETTINGS_DOC).get().await() }
             val enabled = if (!snapshot.exists()) {
                 true
             } else {

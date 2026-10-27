@@ -64,6 +64,14 @@ class ClassifiedAdUploadService : Service() {
         private const val TRACKER_TICK_MS = 700L
         private const val NOTIFICATION_TICK_MS = 500L
 
+        /**
+         * Progress bo'lmasa yuklash "abadiy yuklanmoqda"da qolmasin. Tarmoq
+         * `await`lari o'z muddatlariga ega; bu to'r siqish/fayl kabi lokal
+         * qadamlar uchun — ular ham qotib qolishi mumkin.
+         */
+        private const val STALL_MS = 180_000L
+        private const val STALL_TICK_MS = 5_000L
+
         @Volatile
         private var runningCount = 0
 
@@ -109,6 +117,14 @@ class ClassifiedAdUploadService : Service() {
     private var lastTrackerAt = 0L
     private var lastNotificationAt = 0L
     private var lastPhase: YuzAdUploads.Phase? = null
+
+    /** Oxirgi tirik belgisi (progress) vaqti — [watchStall] shuni kuzatadi. */
+    @Volatile
+    private var lastActivityAt = 0L
+
+    /** To'xtab qolish aniqlanganda sabab — bekor qilishdan farqlash uchun. */
+    @Volatile
+    private var stallMessage = ""
 
     private var doneCount = 0
     private var lastDoneTitle = ""
@@ -173,11 +189,16 @@ class ClassifiedAdUploadService : Service() {
         lastPhase = null
         lastTrackerAt = 0L
         lastNotificationAt = 0L
+        lastActivityAt = SystemClock.elapsedRealtime()
+        stallMessage = ""
         runningCount = 1
         acquireWakeLock()
         currentJob = scope.launch {
             try {
-                performUpload(upload)
+                val work = launch { performUpload(upload) }
+                val guard = launch { watchStall(upload.id, work) }
+                work.join()
+                guard.cancel()
             } finally {
                 currentJob = null
                 current = null
@@ -185,6 +206,26 @@ class ClassifiedAdUploadService : Service() {
                 queue.removeAll { it == nextId }
                 pump()
             }
+        }
+    }
+
+    /**
+     * [STALL_MS] davomida progress bo'lmasa ishni to'xtatib, yozuvni xato
+     * holatiga o'tkazadi. `fail` shu yerda yoziladi: siqish kabi bloklovchi
+     * qadam bekor qilishni eshitmasa ham banner "yuklanmoqda"da qolmaydi.
+     */
+    private suspend fun watchStall(uploadId: String, work: Job) {
+        while (true) {
+            delay(STALL_TICK_MS)
+            if (SystemClock.elapsedRealtime() - lastActivityAt <= STALL_MS) continue
+            val message = "Yuklash javob bermayapti — internetni tekshirib, qayta urinib ko'ring"
+            stallMessage = message
+            try {
+                YuzAdUploads.fail(uploadId, message)
+            } catch (_: Exception) {
+            }
+            work.cancel()
+            return
         }
     }
 
@@ -255,8 +296,14 @@ class ClassifiedAdUploadService : Service() {
             YuzAdUploads.complete(req.id)
         } catch (e: CancellationException) {
             // Bekor qilish — xato ko'rsatilmaydi, yozuv dismiss orqali o'chirilgan.
+            // To'xtab qolish ham shu yerga keladi: u holda xato yoziladi.
+            val stalled = stallMessage
             try {
-                YuzAdUploads.complete(req.id)
+                if (stalled.isNotBlank() && !currentCancelled) {
+                    YuzAdUploads.fail(req.id, stalled)
+                } else {
+                    YuzAdUploads.complete(req.id)
+                }
             } catch (_: Exception) {
             }
         } catch (e: Exception) {
@@ -346,6 +393,7 @@ class ClassifiedAdUploadService : Service() {
         force: Boolean = false
     ) {
         val now = SystemClock.elapsedRealtime()
+        lastActivityAt = now
         if (force || phase != lastPhase || now - lastTrackerAt >= TRACKER_TICK_MS) {
             lastPhase = phase
             lastTrackerAt = now

@@ -137,7 +137,11 @@ object YuzReelQuota {
         val cached = memoryLimits ?: cachedLimits()
         if (!force && now - lastFetchAt < CACHE_TTL_MS) return cached
         return try {
-            val snapshot = db.collection(SETTINGS_COLLECTION).document(SETTINGS_DOC).get().await()
+            // Javobsiz o'qish yuklashni to'xtatib qo'ymasin — keshdagi limit.
+            val snapshot = YuzTaskTimeouts.awaitBound(
+                "Yuklash limitlari",
+                YuzTaskTimeouts.SETTINGS_MS
+            ) { db.collection(SETTINGS_COLLECTION).document(SETTINGS_DOC).get().await() }
             val limits = parse(snapshot.data)
             memoryLimits = limits
             lastFetchAt = now
@@ -314,28 +318,33 @@ object YuzReelQuota {
         if (limit == 0) return Result.success(false)
         return try {
             val ref = db.collection(COLLECTION).document(uid)
-            db.runTransaction { transaction ->
-                val snapshot = transaction.get(ref)
-                val data = snapshot.data
-                val current = if ((data?.get("dayKey") as? String) == dayKey()) {
-                    (data?.get("dayCount") as? Number)?.toInt() ?: 0
-                } else {
-                    0
-                }
-                if (current >= limit) {
-                    throw IllegalStateException(limitExceededMessage(isPremium))
-                }
-                transaction.set(
-                    ref,
-                    mapOf(
-                        "dayKey" to dayKey(),
-                        "dayCount" to current + 1,
-                        "updatedAt" to FieldValue.serverTimestamp()
-                    ),
-                    SetOptions.merge()
-                )
-                null
-            }.await()
+            YuzTaskTimeouts.awaitBound(
+                "Kunlik limit",
+                YuzTaskTimeouts.FIRESTORE_MS
+            ) {
+                db.runTransaction { transaction ->
+                    val snapshot = transaction.get(ref)
+                    val data = snapshot.data
+                    val current = if ((data?.get("dayKey") as? String) == dayKey()) {
+                        (data?.get("dayCount") as? Number)?.toInt() ?: 0
+                    } else {
+                        0
+                    }
+                    if (current >= limit) {
+                        throw IllegalStateException(limitExceededMessage(isPremium))
+                    }
+                    transaction.set(
+                        ref,
+                        mapOf(
+                            "dayKey" to dayKey(),
+                            "dayCount" to current + 1,
+                            "updatedAt" to FieldValue.serverTimestamp()
+                        ),
+                        SetOptions.merge()
+                    )
+                    null
+                }.await()
+            }
             Result.success(true)
         } catch (e: IllegalStateException) {
             Result.failure(e)
@@ -351,14 +360,21 @@ object YuzReelQuota {
         if (uid.isBlank() || !reserved) return
         val ref = db.collection(COLLECTION).document(uid)
         try {
-            db.runTransaction { transaction ->
-                val snapshot = transaction.get(ref)
-                val data = snapshot.data ?: return@runTransaction null
-                if (data["dayKey"] != dayKey()) return@runTransaction null
-                val current = (data["dayCount"] as? Number)?.toInt() ?: 0
-                if (current > 0) transaction.update(ref, "dayCount", current - 1)
-                null
-            }.await()
+            // Bu qadam `NonCancellable` ichida chaqiriladi — chegarasiz qolsa
+            // servis navbati abadiy osilib qolardi.
+            YuzTaskTimeouts.awaitBound(
+                "Limitni qaytarish",
+                YuzTaskTimeouts.FIRESTORE_MS
+            ) {
+                db.runTransaction { transaction ->
+                    val snapshot = transaction.get(ref)
+                    val data = snapshot.data ?: return@runTransaction null
+                    if (data["dayKey"] != dayKey()) return@runTransaction null
+                    val current = (data["dayCount"] as? Number)?.toInt() ?: 0
+                    if (current > 0) transaction.update(ref, "dayCount", current - 1)
+                    null
+                }.await()
+            }
         } catch (_: Exception) {
         }
     }

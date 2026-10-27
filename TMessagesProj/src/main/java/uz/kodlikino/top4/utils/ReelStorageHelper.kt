@@ -98,7 +98,10 @@ object ReelStorageHelper {
                         total
                     )
                 }
-                return ref.downloadUrl.await().toString()
+                return YuzTaskTimeouts.awaitBound(
+                    "Video havolasi",
+                    YuzTaskTimeouts.DOWNLOAD_URL_MS
+                ) { ref.downloadUrl.await() }.toString()
             } catch (e: Exception) {
                 lastError = e
                 val message = e.message.orEmpty()

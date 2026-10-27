@@ -112,7 +112,10 @@ object ClassifiedAdStorageHelper {
                                         throw e
                                     }
                                 }
-                                results[index] = ref.downloadUrl.await().toString()
+                                results[index] = YuzTaskTimeouts.awaitBound(
+                                    "Rasm havolasi",
+                                    YuzTaskTimeouts.DOWNLOAD_URL_MS
+                                ) { ref.downloadUrl.await() }.toString()
                                 uploaded = true
                                 break
                             } catch (e: CancellationException) {
@@ -157,8 +160,14 @@ object ClassifiedAdStorageHelper {
             val trimmed = url.trim()
             if (trimmed.isBlank()) continue
             try {
-                storage.getReferenceFromUrl(trimmed).delete().await()
-            } catch (_: Exception) {
+                // O'chirish ixtiyoriy qadam: bitta so'rov osilib qolsa
+                // e'lon saqlash bosqichi ham osilib qolmasin.
+                YuzTaskTimeouts.awaitBound(
+                    "Rasmni o'chirish",
+                    YuzTaskTimeouts.DOWNLOAD_URL_MS
+                ) { storage.getReferenceFromUrl(trimmed).delete().await() }
+            } catch (e: Exception) {
+                Log.w(TAG, "delete $trimmed: ${e.message}")
             }
         }
     }

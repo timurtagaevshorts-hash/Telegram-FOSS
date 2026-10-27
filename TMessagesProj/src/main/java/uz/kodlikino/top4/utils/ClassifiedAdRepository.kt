@@ -192,7 +192,10 @@ object ClassifiedAdRepository {
     suspend fun getAdById(id: String): ClassifiedAd? {
         if (id.isBlank()) return null
         return try {
-            val doc = db.collection(COLLECTION).document(id).get().await()
+            val doc = YuzTaskTimeouts.awaitBound(
+                "E'lonni o'qish",
+                YuzTaskTimeouts.FIRESTORE_MS
+            ) { db.collection(COLLECTION).document(id).get().await() }
             if (!doc.exists()) return null
             parseAd(doc)
         } catch (e: Exception) {
@@ -307,7 +310,12 @@ object ClassifiedAdRepository {
             "moderatedAt" to payload.moderatedAt
         )
         try {
-            db.collection(COLLECTION).document(id).set(data).await()
+            // Yozish server tasdig'ini kutadi: javob kelmasa yuklash bosqichi
+            // abadiy "Saqlanmoqda"da qolmasin.
+            YuzTaskTimeouts.awaitBound(
+                "E'lonni saqlash",
+                YuzTaskTimeouts.FIRESTORE_MS
+            ) { db.collection(COLLECTION).document(id).set(data).await() }
         } catch (e: Exception) {
             val message = e.message.orEmpty()
             if (message.contains("PERMISSION_DENIED", ignoreCase = true) ||
