@@ -62,6 +62,9 @@ class YuzPlayBilling(
     private var destroyed = false
     private var restoreRequested = false
 
+    /** To'lov oynasi yopilgandan keyingi so'rov — xarid shu sessiyada tugagan. */
+    private var purchaseFlowActive = false
+
     private val expectedUid: String
         get() = YuzGramAdsAuth.expectedUid(account)
 
@@ -159,6 +162,8 @@ class YuzPlayBilling(
     /** Ekranga qaytganda inventarni jimgina yangilash. */
     fun refreshPurchases() {
         restoreRequested = false
+        // purchaseFlowActive'ni bu yerda tozalamaymiz: to'lov oynasi yopilishi
+        // bilan onResume poyga qilishi mumkin — bayroqni birinchi so'rov o'zi yeydi.
         queryExistingPurchases()
     }
 
@@ -168,6 +173,7 @@ class YuzPlayBilling(
                 // Bu ro'yxat to'liq inventar emas — qayta so'raymiz, shunda
                 // upgrade qilgan foydalanuvchi pastroq tarifga tushmaydi.
                 // So'rov yiqilsa, callback ro'yxati zaxira bo'lib qoladi.
+                purchaseFlowActive = true
                 queryExistingPurchases(purchases)
             }
             BillingClient.BillingResponseCode.USER_CANCELED -> {
@@ -219,12 +225,13 @@ class YuzPlayBilling(
             .build()
         client.queryPurchasesAsync(params) { result, purchases ->
             if (result.responseCode != BillingClient.BillingResponseCode.OK) {
+                purchaseFlowActive = false
                 // Play xaridni tasdiqladi, lekin to'liq inventar so'rovi yiqildi —
                 // pul to'lagan foydalanuvchi premium'siz qolmasin.
                 if (!fallback.isNullOrEmpty()) {
                     val restoredOnly = restoreRequested
                     restoreRequested = false
-                    processQuery(fallback, restoredOnly, allowEmptyClear = false)
+                    processQuery(fallback, restoredOnly, allowEmptyClear = false, fresh = false)
                     return@queryPurchasesAsync
                 }
                 if (restoreRequested) {
@@ -234,15 +241,18 @@ class YuzPlayBilling(
                 return@queryPurchasesAsync
             }
             val restoredOnly = restoreRequested
+            val fresh = purchaseFlowActive
             restoreRequested = false
-            processQuery(purchases, restoredOnly, allowEmptyClear = true)
+            purchaseFlowActive = false
+            processQuery(purchases, restoredOnly, allowEmptyClear = true, fresh = fresh)
         }
     }
 
     private fun processQuery(
         purchases: List<Purchase>,
         restoredOnly: Boolean,
-        allowEmptyClear: Boolean
+        allowEmptyClear: Boolean,
+        fresh: Boolean
     ) {
         val valid = ArrayList<YuzPurchaseCheck.Valid>()
         var pending = false
@@ -273,14 +283,18 @@ class YuzPlayBilling(
             if (allowEmptyClear) listener.onSyncFinished(null)
             return
         }
-        processValid(valid, restoredOnly)
+        processValid(valid, restoredOnly, fresh)
     }
 
-    private fun processValid(valid: List<YuzPurchaseCheck.Valid>, restoredOnly: Boolean) {
+    private fun processValid(
+        valid: List<YuzPurchaseCheck.Valid>,
+        restoredOnly: Boolean,
+        fresh: Boolean
+    ) {
         // To'lov Google tomonidan tasdiqlangan (PURCHASED + imzo tekshirildi) —
         // grant darhol beriladi. Acknowledge buxgalteriya qadami: u yiqilsa ham
         // xaridor premium'ni yo'qotmaydi, keyingi urinishlar davom etadi.
-        finishSync(valid, restoredOnly)
+        finishSync(valid, restoredOnly, fresh)
         valid.filter { !it.purchase.isAcknowledged }.forEach { item ->
             acknowledge(item.purchase, attempt = 0) { ok ->
                 if (!ok) FileLog.d("YuzPlayBilling: acknowledge bajarilmadi")
@@ -308,13 +322,19 @@ class YuzPlayBilling(
         }
     }
 
-    private fun finishSync(valid: List<YuzPurchaseCheck.Valid>, restoredOnly: Boolean) {
+    private fun finishSync(
+        valid: List<YuzPurchaseCheck.Valid>,
+        restoredOnly: Boolean,
+        fresh: Boolean
+    ) {
         val bestPlan = YuzPurchaseValidator.bestPlan(valid.map { it.planId }) ?: return
         val best = valid.first { it.planId == bestPlan }
-        if (restoredOnly) {
-            listener.onExistingPurchaseRestored(bestPlan, best.purchase)
-        } else {
+        // "Faollashtirildi" faqat shu sessiyada Play oynasi orqali tugagan
+        // xaridga tegishli; inventar tekshiruvi esa mavjud holatni ko'rsatadi.
+        if (fresh && !restoredOnly) {
             listener.onPurchaseCompleted(bestPlan, best.purchase)
+        } else {
+            listener.onExistingPurchaseRestored(bestPlan, best.purchase)
         }
         listener.onSyncFinished(bestPlan)
     }

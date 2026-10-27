@@ -430,5 +430,12 @@
             style="@style/YuzButton"
             android:layout_marginTop="@dimen/yuz_space_6"
             android:text="@string/premium_done_close" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnApprovedPlans"
+            style="@style/YuzButtonSecondary"
+            android:layout_width="wrap_content"
+            android:layout_marginTop="@dimen/yuz_space_3"
+            android:text="@string/premium_view_plans" />
     </LinearLayout>
 </FrameLayout>

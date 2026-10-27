@@ -46,6 +46,9 @@ class YuzPremiumActivity : BaseFragment() {
     private var tvKinoPlayPrice: TextView? = null
     private var tvFullPlayPrice: TextView? = null
 
+    /** Play tasdiqlagan faol tarif — tarif kartalari shunga mos ko'rinadi. */
+    private var currentPlanId: String? = null
+
     private var billing: YuzPlayBilling? = null
     private var billingReady = false
     private var restoreRequested = false
@@ -75,6 +78,11 @@ class YuzPremiumActivity : BaseFragment() {
         YuzTopInset.applyPadding(root.findViewById<View>(R.id.premiumTopBar))
         root.findViewById<View>(R.id.btnPremiumBack)?.setOnClickListener { removeSelfFromStack() }
         root.findViewById<View>(R.id.btnApprovedClose)?.setOnClickListener { removeSelfFromStack() }
+        // Faol tarif ekranidan ham tarif kartalariga qaytish yo'li bo'lsin:
+        // aks holda "a'zo bo'lish" ekrani umuman ochilmagandek tuyuladi.
+        root.findViewById<View>(R.id.btnApprovedPlans)?.setOnClickListener {
+            showPlanChooser()
+        }
         root.findViewById<View>(R.id.btnRestorePurchases)?.setOnClickListener {
             restoreRequested = true
             val existing = billing
@@ -282,7 +290,11 @@ class YuzPremiumActivity : BaseFragment() {
             )
             mainHandler.post {
                 if (fragmentView == null) return@post
-                showApproved(planId)
+                // Tiklangan xarid — "faollashtirildi" emas, mavjud holat ko'rsatiladi.
+                // Foydalanuvchi tariflarni ko'rayotgan bo'lsa, ekranni almashtirmaymiz.
+                val browsingPlans = scroll?.visibility == View.VISIBLE
+                showActivePlan(planId)
+                if (browsingPlans) showPlanChooser()
             }
         }
 
@@ -297,10 +309,13 @@ class YuzPremiumActivity : BaseFragment() {
                     if (manager.isPremium(currentAccount)) {
                         manager.clearPlan(currentAccount)
                     }
+                    currentPlanId = null
                     showPlanChooser()
                     if (restoreRequested) {
                         toast(getString(R.string.premium_restore_not_found))
                     }
+                } else {
+                    currentPlanId = activePlanId
                 }
                 restoreRequested = false
                 refreshPriceLabels()
@@ -309,6 +324,8 @@ class YuzPremiumActivity : BaseFragment() {
     }
 
     private fun refreshPriceLabels() {
+        // Tarif holati (faol / ichida) billing holatidan mustaqil ko'rinadi.
+        applyActivePlanLabels()
         val b = billing ?: return
         val root = fragmentView ?: return
         for (plan in listOf(YuzPremiumPlans.PREMIUM_KINO, YuzPremiumPlans.FULL_PREMIUM)) {
@@ -329,7 +346,28 @@ class YuzPremiumActivity : BaseFragment() {
             } else {
                 getString(R.string.premium_play_price, price)
             }
-            btn?.isEnabled = billingReady && !price.isNullOrBlank()
+            btn?.isEnabled = isPlanPurchasable(plan.id) && billingReady && !price.isNullOrBlank()
+        }
+    }
+
+    /** Faol tarif mavjud bo'lsa, o'sha tarifni (yoki unga kirgan tarifni) sotmaymiz. */
+    private fun isPlanPurchasable(planId: String): Boolean = when (currentPlanId) {
+        YuzPremiumPlans.ID_FULL -> false
+        YuzPremiumPlans.ID_KINO -> planId == YuzPremiumPlans.ID_FULL
+        else -> true
+    }
+
+    private fun applyActivePlanLabels() {
+        val fullActive = currentPlanId == YuzPremiumPlans.ID_FULL
+        btnPayKino?.text = when {
+            currentPlanId == YuzPremiumPlans.ID_KINO -> getString(R.string.premium_plan_current)
+            fullActive -> getString(R.string.premium_plan_included)
+            else -> YuzPremiumPlans.PREMIUM_KINO.buttonText
+        }
+        btnPayFull?.text = if (fullActive) {
+            getString(R.string.premium_plan_current)
+        } else {
+            YuzPremiumPlans.FULL_PREMIUM.buttonText
         }
     }
 
@@ -361,13 +399,15 @@ class YuzPremiumActivity : BaseFragment() {
         }, 1500L)
     }
 
-    /** Tarif tanlash ekraniga qaytish (xarid topilmadi / refund). */
+    /** Tarif tanlash ekraniga qaytish (faol tarif / xarid topilmadi / refund). */
     private fun showPlanChooser() {
         overlay?.visibility = View.GONE
         scroll?.visibility = View.VISIBLE
+        refreshPriceLabels()
     }
 
     private fun showApproved(planId: String) {
+        currentPlanId = planId
         val isKinoOnly = planId == YuzPremiumPlans.PREMIUM_KINO.id
         tvApprovedTitle?.text = getString(
             if (isKinoOnly) R.string.premium_approved_kino else R.string.premium_approved_full
@@ -380,6 +420,7 @@ class YuzPremiumActivity : BaseFragment() {
     }
 
     private fun showActivePlan(plan: String) {
+        currentPlanId = plan
         val isFull = YuzPremiumPlans.isFullPremiumPlan(plan)
         tvApprovedTitle?.text = getString(
             if (isFull) R.string.premium_active_full else R.string.premium_active_kino
