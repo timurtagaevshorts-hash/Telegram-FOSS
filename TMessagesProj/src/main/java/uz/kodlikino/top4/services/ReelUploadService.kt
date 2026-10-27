@@ -172,6 +172,8 @@ class ReelUploadService : Service() {
     private var lastTrackerAt = 0L
     private var lastNotificationAt = 0L
     private var lastPhase: YuzReelUploads.Phase? = null
+    /** Oxirgi start so'rovi — navbat bo'shaganda faqat shu id bilan to'xtaymiz. */
+    private var lastStartId = 0
 
     private var doneCount = 0
     private var lastDoneName = ""
@@ -192,6 +194,7 @@ class ReelUploadService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        lastStartId = startId
         when (intent?.action) {
             ACTION_UPLOAD -> {
                 // startForegroundService → 5 soniya ichida startForeground shart.
@@ -564,7 +567,10 @@ class ReelUploadService : Service() {
                 doneName
             )
         }
-        stopSelf()
+        // stopSelf(startId): shu lahzada yangi yuklash so'rovi kelib qolsa servis
+        // o'chmaydi. `stopSelf()` yangi startId'ni e'tiborsiz qoldirib, navbatga
+        // qo'yilgan so'rovni jarayon bilan birga o'ldirardi.
+        stopSelf(lastStartId)
     }
 
     private fun createNotificationChannel() {

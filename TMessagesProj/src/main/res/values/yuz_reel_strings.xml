@@ -43,6 +43,9 @@
 
     <!-- Yuklash oynasi: sarlavha, maydon yorliqlari va fon holati -->
     <string name="reels_upload_heading">Yangi reel</string>
+    <string name="reels_upload_subtitle">Videoni tanlang, nom bering va joylang</string>
+    <string name="reels_media_empty_title">Video tanlanmagan</string>
+    <string name="reels_media_empty_hint">Vertikal video · MP4 · 200 MB gacha</string>
     <string name="reels_name_hint">Video nomi</string>
     <string name="reels_name_required">Video nomini kiriting</string>
     <string name="reels_description_hint">Tavsif (ixtiyoriy)</string>

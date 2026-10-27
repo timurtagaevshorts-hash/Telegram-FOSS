@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Maydon hoshiyasi: tinch holatda neytral, fokusda brend aksenti. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/yuz_action" android:state_focused="true" />
+    <item android:color="@color/yuz_stroke" />
+</selector>

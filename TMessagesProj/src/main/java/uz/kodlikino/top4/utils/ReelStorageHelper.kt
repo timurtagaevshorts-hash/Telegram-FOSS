@@ -8,6 +8,7 @@ import com.google.firebase.storage.StorageMetadata
 import com.google.firebase.storage.UploadTask
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 /**
@@ -31,6 +32,8 @@ object ReelStorageHelper {
 
     private const val TAG = "ReelStorageHelper"
     private const val UPLOAD_ATTEMPTS = 3
+    /** Poster urinishi uchun chegara — ixtiyoriy qadam reel'ni ushlab turmasin. */
+    private const val THUMB_TIMEOUT_MS = 20_000L
     // Reel fayllari hech qachon qayta yozilmaydi (har yuklash — yangi nom) —
     // shuning uchun uzoq muddatli keshlash xavfsiz va CDN/telefon keshini
     // to'liq ishlatadi.
@@ -144,13 +147,27 @@ object ReelStorageHelper {
         if (user.uid != uid) return ""
         val ref = storage.reference.child("user_reel_thumbs/$uid/$fileName")
         repeat(2) { attempt ->
-            try {
-                ref.putFile(Uri.fromFile(file), mediaMetadata("image/jpeg")).await()
-                return ref.downloadUrl.await().toString()
+            // Poster ixtiyoriy — u tutab qolsa butun reel 95% da osilib qolmasin.
+            val task = ref.putFile(Uri.fromFile(file), mediaMetadata("image/jpeg"))
+            val uploaded = try {
+                withTimeoutOrNull(THUMB_TIMEOUT_MS) {
+                    task.await()
+                    true
+                } == true
             } catch (e: Exception) {
                 Log.w(TAG, "thumbnail $fileName urinish ${attempt + 1}: ${e.message}")
-                if (attempt == 0) delay(800L)
+                false
             }
+            if (uploaded) {
+                return withTimeoutOrNull(THUMB_TIMEOUT_MS) {
+                    ref.downloadUrl.await()
+                }?.toString().orEmpty()
+            }
+            try {
+                task.cancel()
+            } catch (_: Exception) {
+            }
+            if (attempt == 0) delay(800L)
         }
         return ""
     }

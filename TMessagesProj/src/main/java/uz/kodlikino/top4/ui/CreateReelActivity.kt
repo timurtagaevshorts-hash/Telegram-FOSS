@@ -80,6 +80,7 @@ class CreateReelActivity : BaseFragment() {
     private var tvVideoMeta: TextView? = null
     private var progressAnalyze: ProgressBar? = null
     private var tvPickVideoLabel: TextView? = null
+    private var tvMediaPlaceholder: TextView? = null
     private var tvVideoName: TextView? = null
     private var quotaCard: View? = null
     private var tvQuota: TextView? = null
@@ -94,6 +95,10 @@ class CreateReelActivity : BaseFragment() {
 
     private var scope: CoroutineScope? = null
     private var publishing = false
+    /** Video tekshiruvi (hajm/davomiylik/kadr) tugamaguncha joylash bloklanadi. */
+    private var analyzing = false
+    /** Har tanlovda oshadi — eski tekshiruv natijasi yangisini bosib ketmaydi. */
+    private var analyzeToken = 0
 
     override fun createView(context: Context): View {
         val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
@@ -115,6 +120,7 @@ class CreateReelActivity : BaseFragment() {
         tvVideoMeta = root.findViewById(R.id.tvVideoMeta)
         progressAnalyze = root.findViewById(R.id.progressAnalyze)
         tvPickVideoLabel = root.findViewById(R.id.tvPickVideoLabel)
+        tvMediaPlaceholder = root.findViewById(R.id.tvMediaPlaceholder)
         tvVideoName = root.findViewById(R.id.tvVideoName)
         quotaCard = root.findViewById(R.id.quotaCard)
         tvQuota = root.findViewById(R.id.tvQuotaInfo)
@@ -194,9 +200,10 @@ class CreateReelActivity : BaseFragment() {
         val uri = data.data ?: return
         videoUri = uri
         videoDisplayName = queryDisplayName(uri)
+        tvMediaPlaceholder?.visibility = View.GONE
         tvVideoName?.text = videoDisplayName
         tvVideoName?.visibility = View.VISIBLE
-        refreshPublishState()
+        tvVideoMeta?.visibility = View.GONE
         analyzeVideo(uri)
     }
 
@@ -208,7 +215,12 @@ class CreateReelActivity : BaseFragment() {
     private fun analyzeVideo(uri: Uri) {
         val ctx = context ?: return
         val s = scope ?: return
+        val token = ++analyzeToken
+        analyzing = true
+        videoSizeBytes = -1L
+        previewFrame = null
         progressAnalyze?.visibility = View.VISIBLE
+        refreshPublishState()
         s.launch {
             val info = withContext(Dispatchers.IO) {
                 // ContentResolver'dan aniq hajm: OpenableColumns.SIZE + fd.statSize.
@@ -249,6 +261,8 @@ class CreateReelActivity : BaseFragment() {
                 }
                 Triple(size, durationMs, frame)
             }
+            // Foydalanuvchi shu orada boshqa video tanlagan bo'lsa — eski natija tashlanadi.
+            if (token != analyzeToken) return@launch
             progressAnalyze?.visibility = View.GONE
             val size = info.first
             // Storage qoidasi 200 MB, tier limiti 50/100 MB — tanlashda tekshiriladi.
@@ -256,20 +270,18 @@ class CreateReelActivity : BaseFragment() {
                 rejectVideo(getString(R.string.reels_video_too_large))
                 return@launch
             }
-            // Kunlik/hajm limitlari — admin panel sozlamasidan (settings/app).
-            // Majburiy o'qish: admin o'zgartirgan qiymat keyingi yuklashda darhol amal qiladi.
-            YuzReelQuota.loadLimits(force = true)
-            val maxBytes = YuzReelQuota.maxFileBytes(premiumBoost())
-            if (size > maxBytes) {
-                rejectVideo(YuzReelQuota.sizeLimitMessage(premiumBoost(), size))
-                return@launch
-            }
+            // Kadr va meta avval ko'rsatiladi: limitlar Firestore'dan kelishini
+            // kutish sekin tarmoqda ekranni bo'sh qoldirardi.
             videoSizeBytes = size
             val frame = info.third
             previewFrame = frame
             if (frame != null) {
-                ivVideoPreview?.setImageBitmap(frame)
-                ivVideoPreview?.visibility = View.VISIBLE
+                ivVideoPreview?.apply {
+                    setImageBitmap(frame)
+                    alpha = 0f
+                    visibility = View.VISIBLE
+                    animate().alpha(1f).setDuration(180L).start()
+                }
                 previewScrim?.visibility = View.VISIBLE
                 btnPickOverlay?.visibility = View.VISIBLE
                 llPickPrompt?.visibility = View.GONE
@@ -280,29 +292,47 @@ class CreateReelActivity : BaseFragment() {
                 tvVideoDuration?.visibility = View.VISIBLE
             }
             val ext = videoDisplayName.substringAfterLast('.', "").uppercase()
-            tvVideoMeta?.text = listOfNotNull(
+            val metaText = listOfNotNull(
                 if (durMs > 0L) humanDuration(durMs) else null,
                 if (size > 0L) YuzUploadUi.humanBytes(size) else null,
                 ext.takeIf { it.length in 2..4 && it.all { c -> c.isLetterOrDigit() } }
             ).joinToString(" · ")
+            tvVideoMeta?.text = metaText.ifBlank { getString(R.string.reels_media_empty_hint) }
             tvVideoMeta?.visibility = View.VISIBLE
+
+            // Kunlik/hajm limitlari — admin panel sozlamasidan (settings/app).
+            // Kesh iliq bo'lsa darhol; sovuq bo'lsa tarmoq javobi kutiladi.
+            YuzReelQuota.loadLimits()
+            if (token != analyzeToken) return@launch
+            val maxBytes = YuzReelQuota.maxFileBytes(premiumBoost())
+            if (size > 0L && size > maxBytes) {
+                rejectVideo(YuzReelQuota.sizeLimitMessage(premiumBoost(), size))
+                return@launch
+            }
+            analyzing = false
+            refreshPublishState()
         }
     }
 
     /** Video rad etilganda maydonni bo'sh holatga qaytaradi. */
     private fun rejectVideo(message: String) {
+        analyzing = false
         videoUri = null
         videoSizeBytes = -1L
         previewFrame = null
+        ivVideoPreview?.animate()?.cancel()
+        ivVideoPreview?.alpha = 1f
         ivVideoPreview?.setImageDrawable(null)
         ivVideoPreview?.visibility = View.GONE
         previewScrim?.visibility = View.GONE
         btnPickOverlay?.visibility = View.GONE
         tvVideoDuration?.visibility = View.GONE
-        tvVideoMeta?.visibility = View.GONE
+        tvMediaPlaceholder?.visibility = View.VISIBLE
+        tvVideoName?.visibility = View.GONE
+        tvVideoMeta?.text = getString(R.string.reels_media_empty_hint)
+        tvVideoMeta?.visibility = View.VISIBLE
         llPickPrompt?.visibility = View.VISIBLE
         tvPickVideoLabel?.text = getString(R.string.reels_pick_video)
-        tvVideoName?.visibility = View.GONE
         refreshPublishState()
         toast(message)
     }
@@ -331,13 +361,13 @@ class CreateReelActivity : BaseFragment() {
     }
 
     private fun refreshPublishState() {
-        val ready = videoUri != null && !etReelName?.text.isNullOrBlank()
+        val ready = videoUri != null && !analyzing && !etReelName?.text.isNullOrBlank()
         btnPublish?.isEnabled = ready && !publishing
         btnPublish?.alpha = if (ready && !publishing) 1f else 0.45f
     }
 
     private fun publishReel() {
-        if (publishing) return
+        if (publishing || analyzing) return
         val uri = videoUri
         if (uri == null) {
             toast(getString(R.string.reels_video_required))

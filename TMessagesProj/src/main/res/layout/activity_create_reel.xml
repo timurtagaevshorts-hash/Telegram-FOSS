@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  "Reel joylash" ekrani — ixcham ikki ustunli forma.
+  "Yangi reel" kompozitori: ixcham kvadrat media tanlagich + nom/tavsif formasi.
 
-  Chapda 9:16 media karta (video tanlash / birinchi kadr + davomiylik,
-  hajm, format), o'ngda nom va tavsif maydonlari. Hashtag alohida maydoni
-  yo'q — kerak bo'lsa tavsif ichida yoziladi.
-
-  Media kartaning preview'i `clipToOutline` bilan kartaning radiusiga
-  kesiladi. Poster rasm Firebase'ga yuklanmaydi (Storage qoidasi `user_reels/`
-  ostida faqat video contentType'ga ruxsat beradi) — kadr faqat shu ekranda va
-  profildagi "yuklanmoqda" katagida ko'rsatiladi.
+  Tanlagich 144dp kvadrat — 9:16 ramka emas, shuning uchun ekranning katta
+  qismi matn maydonlariga qoladi. Kadr `clipToOutline` bilan kartaning radiusiga
+  kesiladi. Poster Firebase'ga yuklanmaydi (Storage qoidasi `user_reels/` ostida
+  faqat video contentType'ga ruxsat beradi) — kadr shu ekranda va profildagi
+  "yuklanmoqda" katagida ko'rsatiladi.
 -->
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -36,27 +33,40 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:includeFontPadding="false"
+            android:letterSpacing="-0.02"
             android:paddingStart="@dimen/yuz_gutter"
             android:paddingEnd="@dimen/yuz_gutter"
-            android:paddingBottom="@dimen/yuz_space_3"
+            android:paddingTop="@dimen/yuz_space_1"
             android:text="@string/reels_upload_heading"
             android:textColor="@color/yuz_text_bright"
             android:textSize="@dimen/yuz_text_display"
             android:textStyle="bold" />
 
-        <!-- Chap: 9:16 preview · O'ng: nom + tavsif -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:paddingStart="@dimen/yuz_gutter"
+            android:paddingTop="@dimen/yuz_space_1"
+            android:paddingEnd="@dimen/yuz_gutter"
+            android:text="@string/reels_upload_subtitle"
+            android:textColor="@color/yuz_text_secondary"
+            android:textSize="@dimen/yuz_text_secondary" />
+
+        <!-- Kvadrat tanlagich · o'ngda tanlangan video holati -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="top"
             android:orientation="horizontal"
             android:paddingStart="@dimen/yuz_gutter"
+            android:paddingTop="@dimen/yuz_space_4"
             android:paddingEnd="@dimen/yuz_gutter">
 
             <FrameLayout
                 android:id="@+id/btnPickVideo"
-                android:layout_width="132dp"
-                android:layout_height="234dp"
+                android:layout_width="144dp"
+                android:layout_height="144dp"
                 android:background="@drawable/bg_yuz_upload_hero"
                 android:clickable="true"
                 android:clipToOutline="true"
@@ -73,13 +83,13 @@
                     android:padding="@dimen/yuz_space_3">
 
                     <FrameLayout
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
                         android:background="@drawable/bg_yuz_upload_orb">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
                             android:layout_gravity="center"
                             android:contentDescription="@null"
                             android:src="@drawable/ic_yuz_gallery"
@@ -97,15 +107,6 @@
                         android:textColor="@color/yuz_text"
                         android:textSize="@dimen/yuz_text_secondary"
                         android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/yuz_space_1"
-                        android:gravity="center"
-                        android:text="@string/reels_pick_video_short"
-                        android:textColor="@color/yuz_text_muted"
-                        android:textSize="@dimen/yuz_text_caption" />
                 </LinearLayout>
 
                 <ImageView
@@ -121,7 +122,7 @@
                 <View
                     android:id="@+id/previewScrim"
                     android:layout_width="match_parent"
-                    android:layout_height="88dp"
+                    android:layout_height="64dp"
                     android:layout_gravity="bottom"
                     android:background="@drawable/bg_yuz_media_scrim_bottom"
                     android:visibility="gone" />
@@ -166,8 +167,8 @@
 
                 <ProgressBar
                     android:id="@+id/progressAnalyze"
-                    android:layout_width="30dp"
-                    android:layout_height="30dp"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
                     android:layout_gravity="center"
                     android:indeterminateTint="@color/yuz_action"
                     android:visibility="gone" />
@@ -175,76 +176,114 @@
 
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/yuz_space_3"
+                android:layout_height="144dp"
+                android:layout_marginStart="@dimen/yuz_space_4"
                 android:layout_weight="1"
+                android:gravity="center_vertical"
                 android:orientation="vertical">
 
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                <TextView
+                    android:id="@+id/tvMediaPlaceholder"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/reels_name_hint"
-                    app:boxBackgroundColor="@color/classified_field_bg"
-                    app:boxStrokeColor="@color/yuz_action"
-                    app:hintTextColor="@color/yuz_text_muted">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etReelName"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="textCapSentences"
-                        android:maxLength="100"
-                        android:maxLines="1"
-                        android:textColor="@color/yuz_text"
-                        android:textSize="@dimen/yuz_text_button" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="130dp"
-                    android:layout_marginTop="@dimen/yuz_space_2"
-                    android:hint="@string/reels_description_hint"
-                    app:boxBackgroundColor="@color/classified_field_bg"
-                    app:boxStrokeColor="@color/yuz_action"
-                    app:hintTextColor="@color/yuz_text_muted">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etCaption"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:gravity="top|start"
-                        android:inputType="textCapSentences|textMultiLine"
-                        android:maxLength="800"
-                        android:scrollbars="vertical"
-                        android:textColor="@color/yuz_text"
-                        android:textSize="@dimen/yuz_text_button" />
-                </com.google.android.material.textfield.TextInputLayout>
+                    android:includeFontPadding="false"
+                    android:text="@string/reels_media_empty_title"
+                    android:textColor="@color/yuz_text_bright"
+                    android:textSize="@dimen/yuz_text_button"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/tvVideoName"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/yuz_space_2"
                     android:ellipsize="middle"
+                    android:includeFontPadding="false"
                     android:singleLine="true"
-                    android:textColor="@color/yuz_text_secondary"
-                    android:textSize="@dimen/yuz_text_caption"
+                    android:textColor="@color/yuz_text"
+                    android:textSize="@dimen/yuz_text_body"
+                    android:textStyle="bold"
                     android:visibility="gone" />
 
                 <TextView
                     android:id="@+id/tvVideoMeta"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:ellipsize="end"
-                    android:singleLine="true"
-                    android:textColor="@color/yuz_text_muted"
-                    android:textSize="@dimen/yuz_text_caption"
-                    android:visibility="gone" />
+                    android:layout_marginTop="@dimen/yuz_space_1"
+                    android:lineSpacingExtra="3sp"
+                    android:maxLines="3"
+                    android:text="@string/reels_media_empty_hint"
+                    android:textColor="@color/yuz_text_secondary"
+                    android:textSize="@dimen/yuz_text_caption" />
             </LinearLayout>
         </LinearLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/yuz_gutter"
+            android:layout_marginTop="@dimen/yuz_space_5"
+            android:layout_marginEnd="@dimen/yuz_gutter"
+            android:hint="@string/reels_name_hint"
+            app:boxBackgroundColor="@color/yuz_field"
+            app:boxCornerRadiusBottomEnd="@dimen/yuz_radius_field"
+            app:boxCornerRadiusBottomStart="@dimen/yuz_radius_field"
+            app:boxCornerRadiusTopEnd="@dimen/yuz_radius_field"
+            app:boxCornerRadiusTopStart="@dimen/yuz_radius_field"
+            app:boxStrokeColor="@color/yuz_field_stroke"
+            app:boxStrokeErrorColor="@color/yuz_danger"
+            app:boxStrokeWidth="@dimen/yuz_stroke"
+            app:boxStrokeWidthFocused="2dp"
+            app:counterEnabled="true"
+            app:counterMaxLength="100"
+            app:counterTextColor="@color/yuz_text_muted"
+            app:errorTextColor="@color/yuz_danger"
+            app:hintTextColor="@color/yuz_text_muted">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etReelName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionNext"
+                android:inputType="textCapSentences"
+                android:maxLength="100"
+                android:maxLines="1"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_button" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="132dp"
+            android:layout_marginStart="@dimen/yuz_gutter"
+            android:layout_marginTop="@dimen/yuz_space_3"
+            android:layout_marginEnd="@dimen/yuz_gutter"
+            android:hint="@string/reels_description_hint"
+            app:boxBackgroundColor="@color/yuz_field"
+            app:boxCornerRadiusBottomEnd="@dimen/yuz_radius_field"
+            app:boxCornerRadiusBottomStart="@dimen/yuz_radius_field"
+            app:boxCornerRadiusTopEnd="@dimen/yuz_radius_field"
+            app:boxCornerRadiusTopStart="@dimen/yuz_radius_field"
+            app:boxStrokeColor="@color/yuz_field_stroke"
+            app:boxStrokeWidth="@dimen/yuz_stroke"
+            app:boxStrokeWidthFocused="2dp"
+            app:counterEnabled="true"
+            app:counterMaxLength="800"
+            app:counterTextColor="@color/yuz_text_muted"
+            app:hintTextColor="@color/yuz_text_muted">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etCaption"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="top|start"
+                android:inputType="textCapSentences|textMultiLine"
+                android:maxLength="800"
+                android:scrollbars="vertical"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_button" />
+        </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Kunlik limit / hajm chegarasi (YuzReelQuota) -->
         <LinearLayout
@@ -286,7 +325,7 @@
             android:layout_width="match_parent"
             android:layout_height="@dimen/yuz_button"
             android:layout_marginStart="@dimen/yuz_gutter"
-            android:layout_marginTop="@dimen/yuz_space_4"
+            android:layout_marginTop="@dimen/yuz_space_5"
             android:layout_marginEnd="@dimen/yuz_gutter"
             android:text="@string/reels_publish" />
 
