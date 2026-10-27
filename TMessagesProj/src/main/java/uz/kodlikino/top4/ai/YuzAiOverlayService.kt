@@ -117,6 +117,10 @@ class YuzAiOverlayService : Service() {
         addBubble()
         // DNS+TLS oldindan isitiladi — birinchi buyruq handshake'ni kutmaydi.
         scope.launch(Dispatchers.IO) { runCatching { YuzAiCloud.warmup() } }
+        // Ism hovuzi ham tayyor turisin: birinchi buyruqda qurish kutilmaydi.
+        scope.launch(Dispatchers.IO) {
+            runCatching { YuzAiEngine.peers(UserConfig.selectedAccount) }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -428,7 +432,7 @@ class YuzAiOverlayService : Service() {
                 ) return@postDelayed
                 listenStartedAt = SystemClock.elapsedRealtime()
                 v.startListening(announce = false)
-            }, 90L)
+            }, 60L)
         } else {
             cloudListen(token, account)
         }
@@ -451,7 +455,7 @@ class YuzAiOverlayService : Service() {
         scope.launch {
             // Signal tugashi bilan yozishni boshlaymiz — beep mikrofonga
             // buyruq bo'lib tushmasin (80 ms signal + qisqa quyruq).
-            delay(90L)
+            delay(70L)
             if (!isCurrent(token) || phase != Phase.LISTENING ||
                 listenMode != ListenMode.CLOUD
             ) return@launch
@@ -523,6 +527,11 @@ class YuzAiOverlayService : Service() {
             sendTo(pending, text, account)
             return
         }
+        // Juda qisqa yoki tushunarsiz — taxmin qilmaymiz, qayta gapirishni so'raymiz.
+        if (YuzAiEngine.isUnclear(text)) {
+            speak(getString(R.string.ai_unclear))
+            return
+        }
         val intent = try {
             YuzAiEngine.parse(text, account)
         } catch (_: Exception) {
@@ -551,6 +560,10 @@ class YuzAiOverlayService : Service() {
         if (pending != null) {
             pendingPeer = null
             sendTo(pending, text, account)
+            return
+        }
+        if (YuzAiEngine.isUnclear(text)) {
+            speak(getString(R.string.ai_unclear))
             return
         }
         val intent = try {
@@ -640,22 +653,25 @@ class YuzAiOverlayService : Service() {
             ""
         }
         val started = runCatching {
-            YuzAiChatPickerActivity.listener = { index ->
+            YuzAiChatPickerActivity.listener = listener@{ index, edited ->
                 YuzAiChatPickerActivity.listener = null
-                val option = choice.options.getOrNull(index)
-                if (option != null) {
-                    when (choice.kind) {
-                        YuzAiEngine.ChoiceKind.SEND ->
-                            if (option.text.isBlank()) askBody(option.peer)
-                            else sendTo(option.peer, option.text, account)
-                        YuzAiEngine.ChoiceKind.OPEN,
-                        YuzAiEngine.ChoiceKind.CALL -> openApp()
+                val option = choice.options.getOrNull(index) ?: return@listener
+                when (choice.kind) {
+                    YuzAiEngine.ChoiceKind.SEND -> {
+                        // Karta matnni ham tasdiqlab qaytardi.
+                        val body = edited.ifBlank { option.text }
+                        if (body.isBlank()) askBody(option.peer)
+                        else sendNow(option.peer, body, account)
                     }
+                    YuzAiEngine.ChoiceKind.OPEN,
+                    YuzAiEngine.ChoiceKind.CALL -> openApp()
                 }
             }
             startActivity(
-                YuzAiChatPickerActivity.intent(this, message, peers, account, overlay = true)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                YuzAiChatPickerActivity.intent(
+                    this, message, peers, account, overlay = true,
+                    send = choice.kind == YuzAiEngine.ChoiceKind.SEND
+                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
         }.isSuccess
         if (!started) {
@@ -674,7 +690,35 @@ class YuzAiOverlayService : Service() {
         speak(getString(R.string.ai_choose_peer, label) + " " + names)
     }
 
+    /**
+     * Yuborishdan oldin tasdiq kartasi: kimga va qanday matn ketadi (matn
+     * qalam bilan tahrirlanadi). Karta ochilmasa — to'g'ridan-to'g'ri yuboramiz.
+     */
     private fun sendTo(peer: YuzAiEngine.Peer, text: String, account: Int) {
+        val body = text.trim()
+        if (body.isBlank()) {
+            askBody(peer)
+            return
+        }
+        resetIdle()
+        val started = runCatching {
+            YuzAiChatPickerActivity.listener = listener@{ index, edited ->
+                YuzAiChatPickerActivity.listener = null
+                if (index == 0) sendNow(peer, edited.ifBlank { body }, account)
+            }
+            startActivity(
+                YuzAiChatPickerActivity.intent(
+                    this, body, listOf(peer), account, overlay = true, send = true
+                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }.isSuccess
+        if (!started) {
+            YuzAiChatPickerActivity.listener = null
+            sendNow(peer, body, account)
+        }
+    }
+
+    private fun sendNow(peer: YuzAiEngine.Peer, text: String, account: Int) {
         val body = text.trim()
         if (body.isBlank()) {
             askBody(peer)

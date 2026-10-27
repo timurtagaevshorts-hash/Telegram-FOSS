@@ -66,6 +66,8 @@ class YuzAiActivity : BaseFragment() {
     private var voice: YuzAiVoice? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var pendingPeer: YuzAiEngine.Peer? = null
+    // Tasdiq kartasi ochiq: kimga va qanday matn yuborilishi kutilmoqda.
+    private var pendingSend: Pair<YuzAiEngine.Peer, String>? = null
     private val recorder = YuzAiRecorder { level ->
         if (::orb.isInitialized) orb.post { orb.level = level }
     }
@@ -173,7 +175,7 @@ class YuzAiActivity : BaseFragment() {
                 setOrb(YuzAiOrbView.Mode.IDLE)
                 val armed = autoListenArmed
                 autoListenArmed = false
-                if (armed) scheduleListen(260L)
+                if (armed) scheduleListen(150L)
             }
         })
 
@@ -182,6 +184,8 @@ class YuzAiActivity : BaseFragment() {
         runCatching { MessagesController.getInstance(currentAccount).loadDialogs(0, 0, 200, false) }
         // #127 tezlik: ochilishda DNS+TLS+edge "isitamiz".
         scope.launch { runCatching { YuzAiCloud.warmup() } }
+        // Ism hovuzini ham oldindan qurib qo'yamiz — birinchi buyruq kutmaydi.
+        scope.launch(Dispatchers.IO) { runCatching { YuzAiEngine.peers(currentAccount) } }
         return root
     }
 
@@ -199,7 +203,7 @@ class YuzAiActivity : BaseFragment() {
             // Ekranga kirganda: ovozli salom YO'Q — faqat signal va tinglash.
             fragmentView?.postDelayed({
                 if (screenActive && !cloudBusy && parentActivity != null) beginListening()
-            }, 220L)
+            }, 120L)
         }
     }
 
@@ -489,6 +493,12 @@ class YuzAiActivity : BaseFragment() {
             sendTo(pending, text)
             return
         }
+        // Juda qisqa / tushunarsiz transkript: taxmin qilib noto'g'ri amal
+        // bajarmaymiz — qayta gapirishni so'raymiz.
+        if (YuzAiEngine.isUnclear(text)) {
+            fastSay(ctx.getString(R.string.ai_unclear))
+            return
+        }
         // #134: lokal qoida birinchi — ism/nik gapning istalgan joyida bo'lsa
         // ham topiladi va buyruq darhol bajariladi (worker niyatini kutmaydi).
         val intent = try {
@@ -602,6 +612,10 @@ class YuzAiActivity : BaseFragment() {
             sendTo(pending, raw)
             return
         }
+        if (YuzAiEngine.isUnclear(raw)) {
+            fastSay(ctx.getString(R.string.ai_unclear))
+            return
+        }
         val intent = try {
             YuzAiEngine.parse(raw, currentAccount)
         } catch (_: Exception) {
@@ -633,7 +647,35 @@ class YuzAiActivity : BaseFragment() {
         }
     }
 
+    /**
+     * Yuborishdan OLDIN tasdiq kartasi: kimga va qanday matn ketadi, matnni
+     * qalam bilan tahrirlash mumkin. Kartani ochib bo'lmasa — to'g'ridan-to'g'ri.
+     */
     private fun sendTo(peer: YuzAiEngine.Peer, text: String) {
+        val body = text.trim()
+        if (body.isBlank()) {
+            askBody(peer)
+            return
+        }
+        clearChoices()
+        autoListenArmed = false
+        setOrb(YuzAiOrbView.Mode.IDLE)
+        pendingSend = peer to body
+        val started = parentActivity != null && runCatching {
+            startActivityForResult(
+                YuzAiChatPickerActivity.intent(
+                    ctx, body, listOf(peer), currentAccount, send = true
+                ),
+                REQ_CONFIRM
+            )
+        }.isSuccess
+        if (!started) {
+            pendingSend = null
+            sendNow(peer, body)
+        }
+    }
+
+    private fun sendNow(peer: YuzAiEngine.Peer, text: String) {
         val body = text.trim()
         if (body.isBlank()) {
             askBody(peer)
@@ -770,7 +812,7 @@ class YuzAiActivity : BaseFragment() {
         val seq = interactionSeq
         scope.launch {
             val b = try {
-                withTimeoutOrNull(550L) { YuzAiCloud.speakText(text) }
+                withTimeoutOrNull(400L) { YuzAiCloud.speakText(text) }
             } catch (_: Exception) {
                 null
             }
@@ -821,7 +863,8 @@ class YuzAiActivity : BaseFragment() {
         val started = parentActivity != null && runCatching {
             startActivityForResult(
                 YuzAiChatPickerActivity.intent(
-                    ctx, message, intent.options.map { it.peer }, currentAccount
+                    ctx, message, intent.options.map { it.peer }, currentAccount,
+                    send = intent.kind == YuzAiEngine.ChoiceKind.SEND
                 ),
                 REQ_PICK
             )
@@ -1042,12 +1085,35 @@ class YuzAiActivity : BaseFragment() {
     }
 
     override fun onActivityResultFragment(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQ_CONFIRM) {
+            val pending = pendingSend
+            pendingSend = null
+            if (resultCode == Activity.RESULT_OK && pending != null) {
+                val text = data?.getStringExtra(YuzAiChatPickerActivity.EXTRA_TEXT)
+                    .orEmpty().ifBlank { pending.second }
+                sendNow(pending.first, text)
+            } else {
+                // Bekor qilindi — mikrofon qayta ochilsin, qaytadan aytish mumkin.
+                scheduleListen(200L)
+            }
+            return
+        }
         if (requestCode == REQ_PICK) {
             val choice = pendingChoice
             pendingChoice = null
             if (resultCode == Activity.RESULT_OK && choice != null) {
                 val index = data?.getIntExtra(YuzAiChatPickerActivity.EXTRA_INDEX, -1) ?: -1
-                choice.options.getOrNull(index)?.let { executeChoice(choice, it) }
+                val option = choice.options.getOrNull(index)
+                if (option != null) {
+                    if (choice.kind == YuzAiEngine.ChoiceKind.SEND) {
+                        // Karta chatni va matnni tasdiqlab qaytardi — qayta so'ramaymiz.
+                        val body = data?.getStringExtra(YuzAiChatPickerActivity.EXTRA_TEXT)
+                            .orEmpty().ifBlank { option.text }
+                        sendNow(option.peer, body)
+                    } else {
+                        executeChoice(choice, option)
+                    }
+                }
             }
             return
         }
@@ -1077,5 +1143,6 @@ class YuzAiActivity : BaseFragment() {
         private const val REQ_OVERLAY = 502
         private const val REQ_MIC_QUICK = 503
         private const val REQ_PICK = 504
+        private const val REQ_CONFIRM = 505
     }
 }

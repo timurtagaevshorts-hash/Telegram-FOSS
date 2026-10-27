@@ -55,7 +55,9 @@ object YuzAiEngine {
         ) : Intent()
     }
 
-    private val SEND_WORDS_RAW = listOf("yubor", "yubordim", "jo'nat", "jonat", "yoz", "olibsana", "xabar", "xabarlang")
+    private val SEND_WORDS_RAW = listOf(
+        "yubor", "yubordim", "jo'nat", "jonat", "yoz", "olibsana", "xabar", "habar", "xabarlang"
+    )
     private val CALL_WORDS_RAW = listOf("qo'ng'iroq", "qong'iroq", "qo'ngiroq", "qongiroq", "qoingiroq", "telefon", "zvonit", "qo'ng'iroqni")
     private val NAV_WORDS_RAW = listOf(
         "reels" to Section.REELS,
@@ -220,6 +222,20 @@ object YuzAiEngine {
         MessagesController.getInstance(account).dialogs_dict?.get(peer.dialogId)?.last_message_date ?: 0
     } catch (_: Exception) {
         0
+    }
+
+    /**
+     * Juda qisqa yoki mazmunsiz transkript ("a", "mm", "shu") — buyruq deb
+     * talqin qilish xavfli. Bunday holatda yordamchi taxmin qilmaydi, qayta
+     * gapirishni so'raydi. Sof suhbat so'zlari ("ha", "ok", "salom") clear.
+     */
+    fun isUnclear(raw: String): Boolean {
+        val text = raw.trim()
+        if (text.isEmpty()) return true
+        if (isSmallTalk(text)) return false
+        if (text.count { it.isLetterOrDigit() } < 3) return true
+        val tokens = text.split(Regex("\\s+")).filter { it.isNotBlank() }
+        return tokens.size == 1 && norm(tokens[0]).length <= 2
     }
 
     /** "Salom", "rahmat", "qalaysan" — buyruq emas, oddiy suhbat. */
@@ -640,13 +656,18 @@ object YuzAiEngine {
 
     private fun isQuestion(normed: List<String>): Boolean = normed.any { it in QUESTION_SET }
 
+    /**
+     * Buyruq so'zlaridan tashqari qolgan matn. Bo'sh bo'lsa "" qaytaradi —
+     * "xabar yubor" kabi ismsiz buyruq "«xabar yubor» ismli chat topilmadi"
+     * deb xato aytmasin, balki "Kimga?" deb so'ralsin.
+     */
     private fun residual(tokens: List<String>, normed: List<String>): String {
         val parts = ArrayList<String>()
         for (i in tokens.indices) {
             val t = normed.getOrElse(i) { "" }
             if (t.length >= 3 && !isStopToken(t)) parts.add(tokens[i])
         }
-        return if (parts.isEmpty()) TextUtils.join(" ", tokens).trim() else TextUtils.join(" ", parts).trim()
+        return TextUtils.join(" ", parts).trim()
     }
 
     private fun findNav(normed: List<String>): Section? {

@@ -63,4 +63,13 @@
     <string name="ai_picker_title">Chatni tanlang</string>
     <string name="ai_picker_sending">Yuboriladi: «%1$s»</string>
     <string name="ai_picker_cancel">Bekor qilish</string>
+
+    <!-- Xabar yuborishdan oldingi tasdiq kartasi -->
+    <string name="ai_confirm_title">Xabar yuborish</string>
+    <string name="ai_confirm_to">Kimga yuboriladi</string>
+    <string name="ai_confirm_send">Yuborish</string>
+    <string name="ai_confirm_edit">Matnni tahrirlash</string>
+    <string name="ai_confirm_hint">Xabar matni</string>
+    <string name="ai_confirm_done">Tayyor</string>
+    <string name="ai_unclear">Tushunmadim. Iltimos, qaytadan, ravonroq ayting.</string>
 </resources>
