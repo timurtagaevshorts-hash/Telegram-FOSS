@@ -16,6 +16,7 @@ import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.OvershootInterpolator;
+import android.view.animation.DecelerateInterpolator;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
@@ -40,17 +41,19 @@ public class YuzGramChatWheel extends View {
 
     /** Gumbaz o'rnini bosuvchi ustun kengligi (doira chekkadan chiqadi). */
     public static final int WIDTH_DP = 120;
-    /** Ustun balandligi — gumbaz diametri nafasi bilan. */
-    public static final int HEIGHT_DP = 232;
+    /** Ustun balandligi — gumbaz diametri nafasi bilan (ixchamlashtirildi). */
+    public static final int HEIGHT_DP = 184;
     /** Shisha gumbaz radiusi; markazi o'ng chekkadan DOME_INSET_DP ichda. */
-    private static final float DOME_R_DP = 100f;
+    private static final float DOME_R_DP = 78f;
     private static final float DOME_INSET_DP = 10f;
     /** Donalar yuradigan aylana radiusi va qadam (rad/dona). */
-    private static final float ARC_R_DP = 66f;
-    private static final float ARC_STEP = 0.45f;
+    private static final float ARC_R_DP = 52f;
+    private static final float ARC_STEP = 0.5f;
     /** Fokusdan necha dona uzoqda dona butunlay yo'qoladi. */
     private static final float CULL_SLOTS = 3.2f;
-    private static final float CIRCLE_DP = 30f;
+    private static final float CIRCLE_DP = 24f;
+    /** Surish paytida menyu shu nisbatda kattalashadi (dam olish = 1.0). */
+    private static final float SCALE_DRAG = 1.16f;
 
     private static final int BORDER = 0x592AABEE;
     private static final int GLOW = 0x662AABEE;
@@ -107,6 +110,9 @@ public class YuzGramChatWheel extends View {
 
     private float pos;           // reyka pozitsiyasi (dona birligida)
     private int selectedIndex = 0;
+    /** Gumbazning umumiy masshtabi: surishda kattalashadi, tanlovdan so'ng qaytadi. */
+    private float menuScale = 1f;
+    private ValueAnimator scaleAnim;
 
     private float downY, downPos;
     private float lastY, lastT;
@@ -272,6 +278,10 @@ public class YuzGramChatWheel extends View {
         if (getWidth() == 0 || getHeight() == 0) {
             return;
         }
+        canvas.save();
+        if (menuScale != 1f) {
+            canvas.scale(menuScale, menuScale, getWidth(), getHeight() / 2f);
+        }
         drawPanel(canvas);
         int n = slotCount();
         float[] p = new float[4];
@@ -288,6 +298,7 @@ public class YuzGramChatWheel extends View {
                 drawSlot(canvas, i, p[0], p[1], p[2], p[3], focus);
             }
         }
+        canvas.restore();
     }
 
     /** Pastki-o'ngdagi shisha gumbaz — maketdagi suzuvchi kabina: ichi tiniq,
@@ -679,6 +690,54 @@ public class YuzGramChatWheel extends View {
         pulse.start();
     }
 
+    /**
+     * Gumbazning umumiy masshtabi: barmoq tegsa sal kattalashadi, surishda
+     * yanada o'sadi, qo'yib yuborilganda (tanlovdan so'ng) yumshoq kichrayadi.
+     */
+    private void animateScale(float target, int duration, boolean springy) {
+        if (scaleAnim != null) {
+            scaleAnim.cancel();
+            scaleAnim = null;
+        }
+        if (Math.abs(menuScale - target) < 0.001f) {
+            menuScale = target;
+            invalidate();
+            return;
+        }
+        scaleAnim = ValueAnimator.ofFloat(menuScale, target);
+        scaleAnim.setDuration(duration);
+        scaleAnim.setInterpolator(springy
+                ? new OvershootInterpolator(1.5f)
+                : new DecelerateInterpolator(1.6f));
+        scaleAnim.addUpdateListener(a -> {
+            menuScale = (float) a.getAnimatedValue();
+            invalidate();
+        });
+        scaleAnim.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                scaleAnim = null;
+            }
+        });
+        scaleAnim.start();
+    }
+
+    /** Ekran koordinatasini masshtabdan tashqari (chizma) koordinataga aylantiradi. */
+    private float unscaledX(float x) {
+        if (menuScale == 1f) {
+            return x;
+        }
+        return getWidth() + (x - getWidth()) / menuScale;
+    }
+
+    private float unscaledY(float y) {
+        if (menuScale == 1f) {
+            return y;
+        }
+        float cy = getHeight() / 2f;
+        return cy + (y - cy) / menuScale;
+    }
+
     private void shake() {
         animate().cancel();
         setTranslationX(0);
@@ -718,12 +777,14 @@ public class YuzGramChatWheel extends View {
         if (slotCount() == 0) {
             return false;
         }
+        final float ex = unscaledX(event.getX());
+        final float ey = unscaledY(event.getY());
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN: {
                 // Gumbaz doirasi TASHQARISIDagi urishlar o'tib ketadi: ostdagi
                 // chat qatorlari to'liq kenglikda bosiladigan bo'lib qoladi.
-                float rdx = event.getX() - (getWidth() - dp(DOME_INSET_DP));
-                float rdy = event.getY() - getHeight() / 2f;
+                float rdx = ex - (getWidth() - dp(DOME_INSET_DP));
+                float rdy = ey - getHeight() / 2f;
                 float rr = dp(DOME_R_DP + 4f);
                 if (rdx * rdx + rdy * rdy > rr * rr) {
                     return false;
@@ -735,17 +796,19 @@ public class YuzGramChatWheel extends View {
                     animator.cancel();
                     animator = null;
                 }
-                downY = event.getY();
-                lastY = event.getY();
+                downY = ey;
+                lastY = ey;
                 lastT = event.getEventTime();
                 downPos = pos;
                 velocity = 0f;
                 dragging = false;
-                pressItem = slotAt(event.getX(), event.getY());
+                pressItem = slotAt(ex, ey);
+                // Barmoq tegdikda gumbaz tirik javob beradi.
+                animateScale(1.06f, 130, false);
                 return true;
             }
             case MotionEvent.ACTION_MOVE: {
-                float y = event.getY();
+                float y = ey;
                 float t = event.getEventTime();
                 float dt = Math.max(1f, t - lastT);
                 float v = (y - lastY) / dt * 1000f;
@@ -755,6 +818,8 @@ public class YuzGramChatWheel extends View {
                 float dy = y - downY;
                 if (!dragging && Math.abs(dy) > dp(8f) && slotCount() > 1) {
                     dragging = true;
+                    // Surish boshlandi — menyu kattalashadi.
+                    animateScale(SCALE_DRAG, 180, false);
                 }
                 if (dragging) {
                     float want = downPos - dy / spacingPx();
@@ -774,6 +839,8 @@ public class YuzGramChatWheel extends View {
                 boolean wasDragging = dragging;
                 boolean tap = !dragging && event.getActionMasked() == MotionEvent.ACTION_UP;
                 dragging = false;
+                // Tanlovdan/keyingi holatdan so'ng gumbaz yana ixchamlashadi.
+                animateScale(1f, 260, true);
                 if (tap && pressItem >= 0) {
                     int tapped = pressItem;
                     pressItem = -1;
@@ -828,6 +895,10 @@ public class YuzGramChatWheel extends View {
         }
         if (pulse != null) {
             pulse.cancel();
+        }
+        if (scaleAnim != null) {
+            scaleAnim.cancel();
+            scaleAnim = null;
         }
         super.onDetachedFromWindow();
     }

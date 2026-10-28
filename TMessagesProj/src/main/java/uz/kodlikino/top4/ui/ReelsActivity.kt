@@ -616,6 +616,12 @@ class ReelsActivity @JvmOverloads constructor(
     private fun openCreate() {
         // "Reel joylash" — Firebase'ga video yuklash ekrani (kuniga 5 ta,
         // premium uchun cheksiz). Hikoya joylash esa tepadagi doiralardan.
+        // Reels joylash endi faqat premium obunachilar uchun.
+        val ctx = parentActivity ?: context ?: return
+        if (!YuzPremiumGate.canPostReels(currentAccount, ctx)) {
+            YuzPremiumGate.showReelsRequired(this)
+            return
+        }
         try {
             presentFragment(CreateReelActivity(), false)
         } catch (_: Exception) {

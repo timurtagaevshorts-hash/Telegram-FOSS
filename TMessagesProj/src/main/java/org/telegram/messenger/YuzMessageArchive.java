@@ -172,7 +172,10 @@ public class YuzMessageArchive {
         if (!isEnabled() || dialogId == 0 || oldObject == null || newObject == null) {
             return;
         }
-        if (oldObject.yuzGhost || oldObject.messageOwner == null || newObject.messageOwner == null) {
+        if (oldObject.yuzGhost || oldObject.isOutOwner() || oldObject.messageOwner == null || newObject.messageOwner == null) {
+            return;
+        }
+        if (newObject.isOutOwner()) {
             return;
         }
         int messageId = oldObject.getId();
@@ -204,7 +207,7 @@ public class YuzMessageArchive {
         if (!isEnabled() || dialogId == 0 || messageObject == null || messageObject.messageOwner == null) {
             return;
         }
-        if (messageObject.yuzGhost || messageObject.getId() <= 0) {
+        if (messageObject.yuzGhost || messageObject.getId() <= 0 || messageObject.isOutOwner()) {
             return;
         }
         if (messageObject.messageOwner.action != null || messageObject.isDateObject || messageObject.type == MessageObject.TYPE_LOADING) {
@@ -433,7 +436,7 @@ public class YuzMessageArchive {
 
     public MessageObject restoreGhost(long dialogId, Ghost ghost) {
         TLRPC.Message message = deserialize(ghost.data);
-        if (message == null) {
+        if (message == null || message.out) {
             return null;
         }
         message.dialog_id = dialogId;

@@ -9230,7 +9230,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             hasPinAction[0] = !(newPinnedSecretCount + pinnedSecretCount > maxPinnedCount || newPinnedCount + pinnedCount - alreadyAdded > maxPinnedCount);
         }
 
-        if (hasPinAction[0]) {
+        // YuzGram: pin bandi endi doim ko'rinadi — limitga yetilganda tugma
+        // yashiringanidan foydalanuvchi "pin ishlamayapti" deb qabul qilardi.
+        if (dialog != null) {
             ActionBarMenuSubItem unpinItem = new ActionBarMenuSubItem(getParentActivity(), false, false);
             if (isDialogPinned(dialog)) {
                 unpinItem.setTextAndIcon(LocaleController.getString("UnpinMessage", R.string.UnpinMessage), R.drawable.msg_unpin);
@@ -9252,13 +9254,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     if (DialogObject.isEncryptedDialog(dialogId)) {
                         encryptedChat = getMessagesController().getEncryptedChat(DialogObject.getEncryptedChatId(dialogId));
                     }
-                    UndoView undoView = getUndoView();
-                    if (undoView == null) {
+                    boolean pin = !isDialogPinned(dialog);
+                    if (pin && !hasPinAction[0]) {
+                        LimitReachedBottomSheet limitReachedBottomSheet = new LimitReachedBottomSheet(this, getParentActivity(), LimitReachedBottomSheet.TYPE_PIN_DIALOGS, currentAccount, null);
+                        showDialog(limitReachedBottomSheet);
                         return;
                     }
-                    if (!isDialogPinned(dialog)) {
+                    // YuzGram: UndoView mavjud bo'lmasa ham pin bajariladi.
+                    if (pin) {
                         pinDialog(dialogId, true, filter, minPinnedNum, true);
-                        undoView.showWithAction(0, UndoView.ACTION_PIN_DIALOGS, 1, 1600, null, null);
                         if (filter != null) {
                             if (encryptedChat != null) {
                                 if (!filter.alwaysShow.contains(encryptedChat.user_id)) {
@@ -9272,7 +9276,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         }
                     } else {
                         pinDialog(dialogId, false, filter, minPinnedNum, true);
-                        undoView.showWithAction(0, UndoView.ACTION_UNPIN_DIALOGS, 1, 1600, null, null);
                     }
                     if (filter != null) {
                         FilterCreateActivity.saveFilterToServer(filter, filter.flags, filter.name, filter.color, filter.alwaysShow, filter.neverShow, filter.pinnedDialogs, false, false, true, true, false, DialogsActivity.this, null);
@@ -9285,6 +9288,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         }
                     }
                     updateVisibleRows(MessagesController.UPDATE_MASK_REORDER | MessagesController.UPDATE_MASK_CHECK);
+                    UndoView undoView = getUndoView();
+                    if (undoView != null) {
+                        undoView.showWithAction(0, pin ? UndoView.ACTION_PIN_DIALOGS : UndoView.ACTION_UNPIN_DIALOGS, 1, 1600, null, null);
+                    }
 
                 }, 100);
             });
@@ -10699,7 +10706,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         Context context = getContext();
-        if (context == null) {
+        if (context == null || !(fragmentView instanceof ContentView)) {
             return;
         }
 
@@ -10776,9 +10783,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             undoView[0] = undoView[1];
             undoView[1] = old;
             old.hide(true, 2);
-            ContentView contentView = (ContentView) fragmentView;
-            contentView.removeView(undoView[0]);
-            contentView.addView(undoView[0]);
+            if (fragmentView instanceof ContentView) {
+                ContentView contentView = (ContentView) fragmentView;
+                contentView.removeView(undoView[0]);
+                contentView.addView(undoView[0]);
+            }
         }
         return undoView[0];
     }

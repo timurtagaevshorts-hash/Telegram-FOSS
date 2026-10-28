@@ -30,6 +30,7 @@ import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
+import android.graphics.DashPathEffect;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
@@ -1477,6 +1478,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     private int yuzQuoteHeight;
     private Paint yuzQuotePaint;
+    private Paint yuzGhostPaint;
+    private Path yuzGhostPath;
 
     private int lastSendState;
     private int lastDeleteDate;
@@ -16826,7 +16829,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             }
         }
 
-        if (messageObject.yuzQuoteText != null && currentPosition == null && !messageObject.shouldDrawWithoutBackground() && messageObject.type != MessageObject.TYPE_ROUND_VIDEO && messageObject.type != MessageObject.TYPE_PHONE_CALL && messageObject.type != MessageObject.TYPE_EMOJIS) {
+        if (messageObject.yuzQuoteText != null && !messageObject.isOutOwner() && currentPosition == null && !messageObject.shouldDrawWithoutBackground() && messageObject.type != MessageObject.TYPE_ROUND_VIDEO && messageObject.type != MessageObject.TYPE_PHONE_CALL && messageObject.type != MessageObject.TYPE_EMOJIS) {
             Paint.FontMetrics labelMetrics = Theme.chat_replyNamePaint.getFontMetrics();
             Paint.FontMetrics quoteMetrics = Theme.chat_quoteTextPaint.getFontMetrics();
             yuzQuoteHeight = (int) Math.ceil(AndroidUtilities.dp(11) + (labelMetrics.descent - labelMetrics.ascent) + AndroidUtilities.dp(1) + (quoteMetrics.descent - quoteMetrics.ascent));
@@ -17153,6 +17156,38 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         Theme.chat_quoteTextPaint.setAlpha(255);
     }
 
+    /**
+     * #227: o'chirilgan (ghost) xabar ramkasi — xira pufak atrofiga ingichka
+     * qizil shtrixli chegara. Xira qatlamdan TASHQARIDA chiziladi, shuning uchun
+     * "o'chirilgan" holati aniq o'qiladi.
+     */
+    private void drawYuzGhostFrame(Canvas canvas) {
+        if (currentMessageObject == null || !currentMessageObject.yuzGhost || currentBackgroundDrawable == null) {
+            return;
+        }
+        Rect bounds = currentBackgroundDrawable.getBounds();
+        if (bounds == null || bounds.width() <= 0 || bounds.height() <= 0) {
+            return;
+        }
+        if (yuzGhostPaint == null) {
+            yuzGhostPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            yuzGhostPaint.setStyle(Paint.Style.STROKE);
+            yuzGhostPaint.setStrokeWidth(AndroidUtilities.dp(1.2f));
+            float dash = AndroidUtilities.dp(4f);
+            yuzGhostPaint.setPathEffect(new DashPathEffect(new float[]{dash, dash}, 0));
+        }
+        if (yuzGhostPath == null) {
+            yuzGhostPath = new Path();
+        }
+        yuzGhostPaint.setColor(getThemedColor(Theme.key_text_RedRegular));
+        yuzGhostPaint.setAlpha(150);
+        yuzGhostPath.reset();
+        rect.set(bounds);
+        rect.inset(AndroidUtilities.dp(0.6f), AndroidUtilities.dp(0.6f));
+        yuzGhostPath.addRoundRect(rect, AndroidUtilities.dp(10), AndroidUtilities.dp(10), Path.Direction.CW);
+        canvas.drawPath(yuzGhostPath, yuzGhostPaint);
+    }
+
     @SuppressLint("WrongCall")
     @Override
     protected void onDraw(Canvas canvas) {
@@ -17369,6 +17404,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (yuzGhostLayer != Integer.MIN_VALUE) {
             canvas.restoreToCount(yuzGhostLayer);
         }
+        drawYuzGhostFrame(canvas);
         if ((drawTime || !mediaBackground || currentMessageObject.yuzGhost) && !forceNotDrawTime && !transitionParams.animateBackgroundBoundsInner && !(enterTransitionInProgress && !currentMessageObject.isVoice()) && (!currentMessageObject.isQuickReply() || currentMessageObject.isSendError())) {
             drawTime(canvas, 1f, false);
         }

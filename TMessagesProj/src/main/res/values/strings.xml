@@ -188,6 +188,15 @@
     <string name="YuzDeletedMessage">O\'chirilgan xabar</string>
     <string name="YuzShowOriginals">Asl nusxalarni ko\'rsatish</string>
     <string name="YuzEditedFrom">Avvalgi tahrir</string>
+    <string name="YuzGhostDeleteConfirm">Bu xabarning saqlangan nusxasi butunlay o\'chiriladi va chatda boshqa ko\'rinmaydi.</string>
+    <string name="YuzGhostDelete">O\'chirish</string>
+    <string name="YuzPremiumReelTitle">Reels joylash — Premium</string>
+    <string name="YuzPremiumReelBody">Rels joylash faqat YuzGram Premium obunachilari uchun. Obuna bilan cheklovsiz rels joylaysiz.</string>
+    <string name="YuzPremiumReelPerkUnlimited">Cheklovsiz rels joylash</string>
+    <string name="YuzPremiumReelPerkMovies">Premium kinolar kutubxonasi</string>
+    <string name="YuzPremiumReelPerkBadge">Profilda oltin premium belgisi</string>
+    <string name="YuzPremiumReelCta">Premium olish</string>
+    <string name="YuzPremiumNotNow">Keyinroq</string>
     <string name="ClearRecentHistory">Clear history</string>
     <string name="AlertClearHistory">Clear History</string>
     <string name="EnableAutoDelete">Enable Auto-Delete</string>

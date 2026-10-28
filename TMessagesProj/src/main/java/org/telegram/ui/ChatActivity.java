@@ -1634,6 +1634,10 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             }
             if (view instanceof ChatMessageCell) {
                 MessageObject msg = ((ChatMessageCell) view).getMessageObject();
+                if (msg != null && msg.yuzGhost) {
+                    showYuzGhostDeleteDialog(msg);
+                    return;
+                }
                 if (msg != null && msg.type == MessageObject.TYPE_JOINED_CHANNEL) {
                     msg.toggleChannelRecommendations();
                     msg.forceUpdate = true;
@@ -14299,7 +14303,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         }
         for (int a = 0, N = messArr.size(); a < N; a++) {
             MessageObject obj = messArr.get(a);
-            if (obj.yuzGhost) {
+            if (obj.yuzGhost || obj.isOutOwner()) {
                 continue;
             }
             String original = archive.getEditQuote(dialog_id, obj.getId());
@@ -14348,6 +14352,44 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             }
         }
         return merged;
+    }
+
+    private void showYuzGhostDeleteDialog(MessageObject ghostObject) {
+        if (ghostObject == null || getParentActivity() == null) {
+            return;
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), themeDelegate);
+        builder.setTitle(LocaleController.getString("YuzDeletedMessage", R.string.YuzDeletedMessage));
+        builder.setMessage(LocaleController.getString("YuzGhostDeleteConfirm", R.string.YuzGhostDeleteConfirm));
+        builder.setPositiveButton(LocaleController.getString("YuzGhostDelete", R.string.YuzGhostDelete), (dialogInterface, i) -> removeYuzGhost(ghostObject));
+        builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);
+        showDialog(builder.create());
+    }
+
+    private void removeYuzGhost(MessageObject ghostObject) {
+        if (ghostObject == null) {
+            return;
+        }
+        final int ghostId = ghostObject.getId();
+        YuzMessageArchive.getInstance(currentAccount).forgetGhost(dialog_id, ghostId);
+        yuzInjectedGhosts.remove(ghostId);
+        messagesDict[0].remove(ghostId);
+        ArrayList<MessageObject> dayArr = messagesByDays.get(ghostObject.dateKey);
+        if (dayArr != null) {
+            dayArr.remove(ghostObject);
+        }
+        int index = messages.indexOf(ghostObject);
+        if (index >= 0) {
+            messages.remove(index);
+            if (chatAdapter != null) {
+                chatAdapter.notifyItemRemoved(chatAdapter.messagesStartRow + index);
+                chatAdapter.notifyItemRangeChanged(chatAdapter.messagesStartRow + index, Math.max(0, messages.size() - index));
+            }
+        }
+        if (messagesByDaysSorted != null && dayArr != null && dayArr.isEmpty()) {
+            messagesByDays.remove(ghostObject.dateKey);
+            messagesByDaysSorted.remove(ghostObject.dateKeyInt);
+        }
     }
 
     private void clearChatData(boolean full) {
