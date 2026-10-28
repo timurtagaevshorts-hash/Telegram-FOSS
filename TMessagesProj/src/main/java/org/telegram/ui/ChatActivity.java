@@ -14303,7 +14303,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         }
         for (int a = 0, N = messArr.size(); a < N; a++) {
             MessageObject obj = messArr.get(a);
-            if (obj.yuzGhost || obj.isOutOwner()) {
+            if (obj.yuzGhost || obj.getId() <= 0) {
                 continue;
             }
             String original = archive.getEditQuote(dialog_id, obj.getId());
@@ -24153,6 +24153,12 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             MessageObject old = messagesDict[loadIndex].get(messageObject.getId());
             if (old != null && old.yuzQuoteText != null) {
                 messageObject.yuzQuoteText = old.yuzQuoteText;
+            }
+            // r53: chat ochiq turgan paytda kelgan tahrir ham asl matnni darhol ko'rsatadi
+            if (messageObject.yuzQuoteText == null && !messageObject.yuzGhost && YuzMessageArchive.isEnabled()
+                    && old != null && old.messageOwner != null && messageObject.messageOwner != null
+                    && !TextUtils.equals(old.messageOwner.message, messageObject.messageOwner.message)) {
+                messageObject.yuzQuoteText = YuzMessageArchive.getInstance(currentAccount).getEditQuote(dialog_id, messageObject.getId());
             }
             if (pinnedMessageObjects.containsKey(messageObject.getId())) {
                 pinnedMessageObjects.put(messageObject.getId(), messageObject);

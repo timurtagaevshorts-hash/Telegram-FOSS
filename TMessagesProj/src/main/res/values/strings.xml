@@ -187,7 +187,7 @@
     <string name="ClearHistory">Clear history</string>
     <string name="YuzDeletedMessage">O\'chirilgan xabar</string>
     <string name="YuzShowOriginals">Asl nusxalarni ko\'rsatish</string>
-    <string name="YuzEditedFrom">Avvalgi tahrir</string>
+    <string name="YuzEditedFrom">Tahrirdan oldin</string>
     <string name="YuzGhostDeleteConfirm">Bu xabarning saqlangan nusxasi butunlay o\'chiriladi va chatda boshqa ko\'rinmaydi.</string>
     <string name="YuzGhostDelete">O\'chirish</string>
     <string name="YuzPremiumReelTitle">Reels joylash — Premium</string>

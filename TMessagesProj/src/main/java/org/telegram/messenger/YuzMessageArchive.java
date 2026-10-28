@@ -172,10 +172,11 @@ public class YuzMessageArchive {
         if (!isEnabled() || dialogId == 0 || oldObject == null || newObject == null) {
             return;
         }
-        if (oldObject.yuzGhost || oldObject.isOutOwner() || oldObject.messageOwner == null || newObject.messageOwner == null) {
+        if (oldObject.yuzGhost || oldObject.messageOwner == null || newObject.messageOwner == null) {
             return;
         }
-        if (newObject.isOutOwner()) {
+        // Secret chat matni shifrlangan — asl nusxa o'rniga kodsiz matn chiqmasin.
+        if (DialogObject.isEncryptedDialog(dialogId)) {
             return;
         }
         int messageId = oldObject.getId();

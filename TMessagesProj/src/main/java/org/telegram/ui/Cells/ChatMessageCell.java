@@ -1478,6 +1478,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     private int yuzQuoteHeight;
     private Paint yuzQuotePaint;
+    private TextPaint yuzQuoteLabelPaint;
+    private TextPaint yuzQuoteBodyPaint;
     private Paint yuzGhostPaint;
     private Path yuzGhostPath;
 
@@ -16829,10 +16831,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             }
         }
 
-        if (messageObject.yuzQuoteText != null && !messageObject.isOutOwner() && currentPosition == null && !messageObject.shouldDrawWithoutBackground() && messageObject.type != MessageObject.TYPE_ROUND_VIDEO && messageObject.type != MessageObject.TYPE_PHONE_CALL && messageObject.type != MessageObject.TYPE_EMOJIS) {
-            Paint.FontMetrics labelMetrics = Theme.chat_replyNamePaint.getFontMetrics();
-            Paint.FontMetrics quoteMetrics = Theme.chat_quoteTextPaint.getFontMetrics();
-            yuzQuoteHeight = (int) Math.ceil(AndroidUtilities.dp(11) + (labelMetrics.descent - labelMetrics.ascent) + AndroidUtilities.dp(1) + (quoteMetrics.descent - quoteMetrics.ascent));
+        if (messageObject.yuzQuoteText != null && currentPosition == null && !messageObject.shouldDrawWithoutBackground() && messageObject.type != MessageObject.TYPE_ROUND_VIDEO && messageObject.type != MessageObject.TYPE_PHONE_CALL && messageObject.type != MessageObject.TYPE_EMOJIS) {
+            ensureYuzQuotePaints();
+            Paint.FontMetrics labelMetrics = yuzQuoteLabelPaint.getFontMetrics();
+            Paint.FontMetrics quoteMetrics = yuzQuoteBodyPaint.getFontMetrics();
+            yuzQuoteHeight = (int) Math.ceil(AndroidUtilities.dp(10) + (labelMetrics.descent - labelMetrics.ascent) + AndroidUtilities.dp(2) + (quoteMetrics.descent - quoteMetrics.ascent));
             namesOffset += yuzQuoteHeight;
         } else {
             yuzQuoteHeight = 0;
@@ -17115,45 +17118,57 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     public boolean doNotDraw;
 
+    private void ensureYuzQuotePaints() {
+        float base = Theme.chat_quoteTextPaint.getTextSize();
+        if (yuzQuoteLabelPaint == null) {
+            yuzQuoteLabelPaint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
+            yuzQuoteLabelPaint.setTypeface(AndroidUtilities.bold());
+            yuzQuoteBodyPaint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
+        }
+        yuzQuoteLabelPaint.setTextSize(base * 0.78f);
+        yuzQuoteBodyPaint.setTextSize(base * 0.92f);
+    }
+
     private void drawYuzOriginalQuote(Canvas canvas) {
         if (currentMessageObject == null || yuzQuoteHeight <= 0 || currentMessageObject.yuzQuoteText == null) {
             return;
         }
-        float left = getCurrentBackgroundLeft() + AndroidUtilities.dp(8);
-        float right = getCurrentBackgroundRight() - AndroidUtilities.dp(8);
+        float left = getCurrentBackgroundLeft() + AndroidUtilities.dp(6);
+        float right = getCurrentBackgroundRight() - AndroidUtilities.dp(6);
         if (right - left < AndroidUtilities.dp(70)) {
             return;
         }
+        ensureYuzQuotePaints();
         if (yuzQuotePaint == null) {
             yuzQuotePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         }
-        float top = namesOffset - yuzQuoteHeight + AndroidUtilities.dp(2);
-        float bottom = namesOffset - AndroidUtilities.dp(2);
-        float radius = AndroidUtilities.dp(7);
-        int accent = getThemedColor(currentMessageObject.isOutOwner() ? Theme.key_chat_outReplyLine : Theme.key_chat_inReplyLine);
+        boolean out = currentMessageObject.isOutOwner();
+        int accent = getThemedColor(out ? Theme.key_chat_outReplyLine : Theme.key_chat_inReplyLine);
+        float top = namesOffset - yuzQuoteHeight + AndroidUtilities.dp(1);
+        float bottom = namesOffset - AndroidUtilities.dp(3);
 
         yuzQuotePaint.setColor(accent);
-        yuzQuotePaint.setAlpha(26);
+        yuzQuotePaint.setAlpha(20);
         rect.set(left, top, right, bottom);
-        canvas.drawRoundRect(rect, radius, radius, yuzQuotePaint);
+        canvas.drawRoundRect(rect, AndroidUtilities.dp(6), AndroidUtilities.dp(6), yuzQuotePaint);
 
         yuzQuotePaint.setAlpha(255);
-        rect.set(left + AndroidUtilities.dp(5), top + AndroidUtilities.dp(5), left + AndroidUtilities.dp(7.5f), bottom - AndroidUtilities.dp(5));
-        canvas.drawRoundRect(rect, AndroidUtilities.dp(1.25f), AndroidUtilities.dp(1.25f), yuzQuotePaint);
+        rect.set(left + AndroidUtilities.dp(5), top + AndroidUtilities.dp(4), left + AndroidUtilities.dp(7), bottom - AndroidUtilities.dp(4));
+        canvas.drawRoundRect(rect, AndroidUtilities.dp(1), AndroidUtilities.dp(1), yuzQuotePaint);
 
-        float textX = left + AndroidUtilities.dp(13);
-        Theme.chat_replyNamePaint.setColor(getThemedColor(currentMessageObject.isOutOwner() ? Theme.key_chat_outReplyNameText : Theme.key_chat_inReplyNameText));
-        Paint.FontMetrics labelMetrics = Theme.chat_replyNamePaint.getFontMetrics();
-        float labelY = top + AndroidUtilities.dp(3) - labelMetrics.ascent;
-        canvas.drawText(getString("YuzEditedFrom", R.string.YuzEditedFrom), textX, labelY, Theme.chat_replyNamePaint);
+        float textX = left + AndroidUtilities.dp(11);
+        Paint.FontMetrics labelMetrics = yuzQuoteLabelPaint.getFontMetrics();
+        yuzQuoteLabelPaint.setColor(accent);
+        float labelY = top + AndroidUtilities.dp(4) - labelMetrics.ascent;
+        canvas.drawText(getString("YuzEditedFrom", R.string.YuzEditedFrom), textX, labelY, yuzQuoteLabelPaint);
 
-        Theme.chat_quoteTextPaint.setColor(getThemedColor(currentMessageObject.isOutOwner() ? Theme.key_chat_messageTextOut : Theme.key_chat_messageTextIn));
-        Theme.chat_quoteTextPaint.setAlpha(190);
-        Paint.FontMetrics quoteMetrics = Theme.chat_quoteTextPaint.getFontMetrics();
-        CharSequence quote = TextUtils.ellipsize(currentMessageObject.yuzQuoteText.replace('\n', ' '), Theme.chat_quoteTextPaint, right - textX - AndroidUtilities.dp(6), TextUtils.TruncateAt.END);
-        float quoteY = labelY + labelMetrics.descent + AndroidUtilities.dp(1) - quoteMetrics.ascent;
-        canvas.drawText(quote, 0, quote.length(), textX, quoteY, Theme.chat_quoteTextPaint);
-        Theme.chat_quoteTextPaint.setAlpha(255);
+        yuzQuoteBodyPaint.setColor(getThemedColor(out ? Theme.key_chat_messageTextOut : Theme.key_chat_messageTextIn));
+        yuzQuoteBodyPaint.setAlpha(190);
+        Paint.FontMetrics quoteMetrics = yuzQuoteBodyPaint.getFontMetrics();
+        CharSequence quote = TextUtils.ellipsize(currentMessageObject.yuzQuoteText.replace('\n', ' '), yuzQuoteBodyPaint, right - textX - AndroidUtilities.dp(6), TextUtils.TruncateAt.END);
+        float quoteY = labelY + labelMetrics.descent + AndroidUtilities.dp(2) - quoteMetrics.ascent;
+        canvas.drawText(quote, 0, quote.length(), textX, quoteY, yuzQuoteBodyPaint);
+        yuzQuoteBodyPaint.setAlpha(255);
     }
 
     /**
