@@ -320,6 +320,8 @@ object YuzMusicEngine {
                 uz.kodlikino.top4.ui.YuzMiniPlayer
             )
         }
+        // Fon rejimida ekran tepasidagi shaffof boshqaruv (overlay).
+        uz.kodlikino.top4.ui.YuzMusicOverlay.install(appCtx)
         val okHttp = OkHttpClient.Builder()
             .dns(uz.kodlikino.top4.utils.YuzNet.DNS_V4_FIRST)
             .connectTimeout(10, TimeUnit.SECONDS)

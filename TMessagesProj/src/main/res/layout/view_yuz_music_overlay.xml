@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fon ijrosi: boshqa ilovalar ustidagi ixcham shaffof boshqaruv. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:id="@+id/yuzMusicOverlayRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@android:color/transparent"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp">
+
+    <LinearLayout
+        android:id="@+id/overlayCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_yuz_overlay"
+        android:elevation="16dp"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="10dp"
+            android:paddingEnd="4dp">
+
+            <ImageView
+                android:id="@+id/ivOverlayCover"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_yuz_cover"
+                android:clipToOutline="true"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvOverlayTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:textColor="@color/yuz_text"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvOverlayArtist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:textColor="@color/yuz_text_secondary"
+                    android:textSize="@dimen/yuz_text_caption" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btnOverlayPrev"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/yuz_a11y_prev"
+                android:padding="5dp"
+                android:src="@drawable/ic_yuz_prev"
+                android:tint="@color/yuz_text" />
+
+            <ImageButton
+                android:id="@+id/btnOverlayPlay"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/yuz_a11y_play"
+                android:padding="6dp"
+                android:src="@drawable/ic_yuz_play"
+                android:tint="@color/yuz_action" />
+
+            <ImageButton
+                android:id="@+id/btnOverlayNext"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/yuz_a11y_next"
+                android:padding="5dp"
+                android:src="@drawable/ic_yuz_next"
+                android:tint="@color/yuz_text" />
+
+            <ImageButton
+                android:id="@+id/btnOverlayClose"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/yuz_a11y_close"
+                android:padding="6dp"
+                android:src="@drawable/ic_yuz_close"
+                android:tint="@color/yuz_text_secondary" />
+        </LinearLayout>
+
+        <View
+            android:id="@+id/overlayProgress"
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:background="@color/yuz_action"
+            android:scaleX="0" />
+    </LinearLayout>
+</FrameLayout>

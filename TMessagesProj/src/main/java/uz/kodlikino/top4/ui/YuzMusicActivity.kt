@@ -2,9 +2,11 @@ package uz.kodlikino.top4.ui
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
@@ -134,6 +136,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
                 )
             }
             syncPlayingMark()
+            if (playing) maybeAskOverlayPermission()
         }
 
         override fun onPreparingChanged(preparing: Boolean) {
@@ -397,6 +400,32 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             else -> R.string.yuz_a11y_download
         })
         b.alpha = if (busy || has) 1.0f else 0.6f
+    }
+
+    /** Bir marta: fon boshqaruvi uchun "ustidan chizish" ruxsatini so'raymiz. */
+    private fun maybeAskOverlayPermission() {
+        val act = parentActivity ?: return
+        if (Settings.canDrawOverlays(act)) return
+        val prefs = ctx.getSharedPreferences("yuz_music_overlay", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("asked", false)) return
+        prefs.edit().putBoolean("asked", true).apply()
+        showDialog(
+            AlertDialog.Builder(act)
+                .setTitle(act.getString(R.string.musiqa_overlay_perm_title))
+                .setMessage(act.getString(R.string.musiqa_overlay_perm_message))
+                .setPositiveButton(act.getString(R.string.musiqa_overlay_perm_allow)) { _, _ ->
+                    runCatching {
+                        act.startActivity(
+                            Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:" + act.packageName)
+                            )
+                        )
+                    }
+                }
+                .setNegativeButton(act.getString(R.string.musiqa_overlay_perm_later), null)
+                .create()
+        )
     }
 
     private fun updateBarTrack(track: YuzTrack) {

@@ -100,4 +100,8 @@
     <string name="musiqa_dl_summary">%1$d trek \u2022 %2$s</string>
     <string name="musiqa_dl_folder_empty">Hali yuklangan trek yo\'q</string>
     <string name="musiqa_dl_folder_hint">Pleyerdagi tugma bilan qo\'shiqni keshga saqlang — ular shu papkada offline ijro etiladi.</string>
+    <string name="musiqa_overlay_perm_title">Boshqa ilovalar ustida boshqaruv</string>
+    <string name="musiqa_overlay_perm_message">Musiqa fonda ijro etilganda orqaga / ijro-pauza / oldinga tugmalari ekran tepasida ko\'rinishi uchun \"Ustidan chizish\" ruxsatini bering.</string>
+    <string name="musiqa_overlay_perm_allow">Ruxsat berish</string>
+    <string name="musiqa_overlay_perm_later">Keyinroq</string>
 </resources>

@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
@@ -12,6 +14,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -23,6 +26,7 @@ import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.AlertDialog
 import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.utils.YuzAdFeed
+import uz.kodlikino.top4.utils.YuzAnim
 import uz.kodlikino.top4.utils.YuzMusicEngine
 
 /**
@@ -36,6 +40,17 @@ class FunksiyalarActivity : BaseFragment() {
     private var musicObserver: YuzMusicEngine.Observer? = null
     private var adSlot: FrameLayout? = null
     private var adSignature: String? = null
+    private var tileControls: View? = null
+    private var tileProgress: View? = null
+    private var tilePlay: ImageButton? = null
+    private var tileTicking = false
+    private val ui = Handler(Looper.getMainLooper())
+    private val tileTick = object : Runnable {
+        override fun run() {
+            updateTileProgress()
+            if (tileTicking) ui.postDelayed(this, 500L)
+        }
+    }
 
     override fun createView(context: Context): View {
         val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
@@ -66,6 +81,18 @@ class FunksiyalarActivity : BaseFragment() {
         }
         root.findViewById<View>(R.id.cardMusiqa)?.setOnClickListener {
             presentFragment(YuzMusicActivity(), false)
+        }
+        tileControls = root.findViewById(R.id.musicTileControls)
+        tileProgress = root.findViewById(R.id.musicTileProgress)
+        tilePlay = root.findViewById(R.id.btnMusicTilePlay)
+        root.findViewById<View>(R.id.btnMusicTilePrev)?.setOnClickListener {
+            YuzMusicEngine.playerOrNull()?.seekToPrevious()
+        }
+        root.findViewById<View>(R.id.btnMusicTilePlay)?.setOnClickListener {
+            context?.let { YuzMusicEngine.togglePlay(it) }
+        }
+        root.findViewById<View>(R.id.btnMusicTileNext)?.setOnClickListener {
+            YuzMusicEngine.playerOrNull()?.seekToNextMediaItem()
         }
         root.findViewById<View>(R.id.cardInstagram)?.setOnClickListener {
             presentFragment(InstagramSaveActivity(), false)
@@ -153,6 +180,10 @@ class FunksiyalarActivity : BaseFragment() {
                 override fun onPlayingChanged(playing: Boolean) {
                     AndroidUtilities.runOnUIThread { updateMusicState() }
                 }
+
+                override fun onPreparingChanged(preparing: Boolean) {
+                    AndroidUtilities.runOnUIThread { updateMusicState() }
+                }
             }.also { YuzMusicEngine.addObserver(it) }
         }
         updateMusicState()
@@ -162,7 +193,15 @@ class FunksiyalarActivity : BaseFragment() {
     override fun onPause() {
         musicObserver?.let { YuzMusicEngine.removeObserver(it) }
         musicObserver = null
+        tileTicking = false
+        ui.removeCallbacks(tileTick)
         super.onPause()
+    }
+
+    override fun onFragmentDestroy() {
+        tileTicking = false
+        ui.removeCallbacks(tileTick)
+        super.onFragmentDestroy()
     }
 
     /** Musiqa plitkasida jonli holat: ijro / buffer / pauza. */
@@ -172,14 +211,27 @@ class FunksiyalarActivity : BaseFragment() {
         val eq = root.findViewById<ImageView>(R.id.musicTileEq) ?: return
         val track = YuzMusicEngine.currentTrack()
         val player = YuzMusicEngine.playerOrNull()
-        if (track == null || player?.currentMediaItem == null ||
-            player.playbackState == Player.STATE_IDLE || player.playbackState == Player.STATE_ENDED
-        ) {
+        val active = track != null && player != null && player.currentMediaItem != null &&
+            player.playbackState != Player.STATE_IDLE &&
+            player.playbackState != Player.STATE_ENDED
+        tileControls?.visibility = if (active) View.VISIBLE else View.GONE
+        tileProgress?.visibility = if (active) View.VISIBLE else View.GONE
+        if (!active || track == null || player == null) {
+            tileTicking = false
+            ui.removeCallbacks(tileTick)
             desc.text = root.context.getString(R.string.func_musiqa_desc)
             eq.visibility = View.GONE
             return
         }
         val playing = player.isPlaying
+        if (YuzMusicEngine.isPreparing()) {
+            YuzAnim.setPlayLoading(tilePlay, true)
+        } else {
+            YuzAnim.setPlayLoading(tilePlay, false)
+            tilePlay?.setImageResource(
+                if (playing) R.drawable.ic_yuz_pause else R.drawable.ic_yuz_play
+            )
+        }
         val textRes = when {
             playing -> R.string.func_musiqa_playing_desc
             player.playbackState == Player.STATE_BUFFERING -> R.string.func_musiqa_buffering_desc
@@ -187,6 +239,21 @@ class FunksiyalarActivity : BaseFragment() {
         }
         desc.text = root.context.getString(textRes, track.title)
         eq.visibility = if (playing) View.VISIBLE else View.GONE
+        updateTileProgress()
+        if (!tileTicking) {
+            tileTicking = true
+            ui.post(tileTick)
+        }
+    }
+
+    private fun updateTileProgress() {
+        val p = YuzMusicEngine.playerOrNull() ?: run {
+            tileProgress?.scaleX = 0f
+            return
+        }
+        val d = p.duration
+        tileProgress?.scaleX =
+            if (d > 0) (p.currentPosition.toFloat() / d).coerceIn(0f, 1f) else 0f
     }
 
     /** Bitta sahifa kirish momenti: ketma-ket, qisqa fade+rise. */

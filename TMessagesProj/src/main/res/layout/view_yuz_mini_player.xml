@@ -16,7 +16,7 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="52dp"
+        android:layout_height="62dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="@dimen/yuz_space_2"
@@ -24,9 +24,10 @@
 
         <ImageView
             android:id="@+id/ivMiniCover"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
             android:background="@drawable/bg_yuz_cover"
+            android:clipToOutline="true"
             android:contentDescription="@null"
             android:padding="@dimen/yuz_space_2"
             android:scaleType="centerCrop"
@@ -63,19 +64,39 @@
         </LinearLayout>
 
         <ImageButton
+            android:id="@+id/btnMiniPrev"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/yuz_a11y_prev"
+            android:padding="5dp"
+            android:src="@drawable/ic_yuz_prev"
+            app:tint="@color/yuz_text" />
+
+        <ImageButton
             android:id="@+id/btnMiniPlay"
-            android:layout_width="@dimen/yuz_icon_button"
-            android:layout_height="@dimen/yuz_icon_button"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/yuz_a11y_play"
-            android:padding="@dimen/yuz_space_3"
+            android:padding="@dimen/yuz_space_2"
             android:src="@drawable/ic_yuz_play"
+            app:tint="@color/yuz_action" />
+
+        <ImageButton
+            android:id="@+id/btnMiniNext"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/yuz_a11y_next"
+            android:padding="5dp"
+            android:src="@drawable/ic_yuz_next"
             app:tint="@color/yuz_text" />
 
         <ImageButton
             android:id="@+id/btnMiniClose"
-            android:layout_width="@dimen/yuz_button_sm"
-            android:layout_height="@dimen/yuz_button_sm"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/yuz_a11y_close"
             android:padding="@dimen/yuz_space_2"

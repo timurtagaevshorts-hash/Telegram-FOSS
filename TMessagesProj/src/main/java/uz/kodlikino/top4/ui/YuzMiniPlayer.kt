@@ -87,6 +87,12 @@ object YuzMiniPlayer : Application.ActivityLifecycleCallbacks, YuzMusicEngine.Ob
         progress?.pivotX = 0f
         btnPlay = v.findViewById(R.id.btnMiniPlay)
         v.findViewById<View>(R.id.btnMiniPlay).setOnClickListener { toggle() }
+        v.findViewById<View>(R.id.btnMiniPrev).setOnClickListener {
+            YuzMusicEngine.playerOrNull()?.seekToPrevious()
+        }
+        v.findViewById<View>(R.id.btnMiniNext).setOnClickListener {
+            YuzMusicEngine.playerOrNull()?.seekToNextMediaItem()
+        }
         v.findViewById<View>(R.id.btnMiniClose).setOnClickListener {
             manualHide = true
             update()
