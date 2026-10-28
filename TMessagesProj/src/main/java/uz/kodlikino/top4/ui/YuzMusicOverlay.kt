@@ -27,9 +27,9 @@ import uz.kodlikino.top4.utils.YuzMusicEngine
 
 /**
  * Ilova fonda bo'lganda musiqa boshqaruvi — ekranning yuqori qismida shaffof
- * ixcham parda (orqaga / ijro-pauza / oldinga). Faqat musiqa yuklangan va
- * "ustidan chizish" ruxsati berilgan bo'lsa ko'rinadi; ilovaga qaytilganda
- * yashiriladi (u yerda global mini-pleyer bor).
+ * ixcham parda (orqaga / ijro-pauza / oldinga). Faqat musiqa HAQIQATAN ijro
+ * etilayotganda (playWhenReady) va "ustidan chizish" ruxsati berilgan bo'lsa
+ * ko'rinadi; pauza qilinsa yoki ilovaga qaytilganda yashiriladi.
  */
 object YuzMusicOverlay : Application.ActivityLifecycleCallbacks, YuzMusicEngine.Observer {
 
@@ -44,6 +44,7 @@ object YuzMusicOverlay : Application.ActivityLifecycleCallbacks, YuzMusicEngine.
     private var started = 0
     private var visible = false
     private var dismissed = false
+    private var listenedPlayer: Player? = null
 
     private val tick = object : Runnable {
         override fun run() {
@@ -96,7 +97,7 @@ object YuzMusicOverlay : Application.ActivityLifecycleCallbacks, YuzMusicEngine.
     }
 
     override fun onPreparingChanged(preparing: Boolean) {
-        ui.post { if (visible) update() }
+        ui.post { reconcile() }
     }
 
     override fun onStatus(text: String?) {
@@ -111,13 +112,33 @@ object YuzMusicOverlay : Application.ActivityLifecycleCallbacks, YuzMusicEngine.
         if (!Settings.canDrawOverlays(a)) return false
         val p = YuzMusicEngine.playerOrNull() ?: return false
         if (p.currentMediaItem == null) return false
+        // Faqat HAQIQIY ijro paytida: pauza (yoki tayyor emas) holatda
+        // boshqa ilovalar ustida boshqaruv paneli qolmasin.
+        if (!p.playWhenReady) return false
         if (p.playbackState == Player.STATE_IDLE ||
             p.playbackState == Player.STATE_ENDED
         ) return false
         return YuzMusicEngine.currentTrack() != null
     }
 
+    /** Pleyer holati o'zgarishlarini (pauza/pley) to'g'ridan-to'g'ri tinglaymiz:
+     *  buferlash paytida pauza qilinsa ham parda darhol yashiriladi. */
+    private fun listen(p: Player) {
+        if (listenedPlayer === p) return
+        listenedPlayer = p
+        p.addListener(object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                ui.post { reconcile() }
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                ui.post { reconcile() }
+            }
+        })
+    }
+
     private fun reconcile() {
+        YuzMusicEngine.playerOrNull()?.let { listen(it) }
         if (canShow()) {
             show()
             update()
