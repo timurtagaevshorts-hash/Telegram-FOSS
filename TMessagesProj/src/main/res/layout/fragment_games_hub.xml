@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/yuz_bg"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/hubTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/yuz_space_1"
+        android:paddingTop="@dimen/yuz_space_2"
+        android:paddingEnd="@dimen/yuz_gutter"
+        android:paddingBottom="@dimen/yuz_space_2">
+
+        <ImageButton
+            android:id="@+id/btnGamesBack"
+            style="@style/YuzIconButton"
+            android:contentDescription="@string/games_back"
+            android:src="@drawable/ic_back" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/yuz_space_1"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/YuzScreenTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/games_title" />
+
+            <TextView
+                android:id="@+id/tvHubChat"
+                style="@style/YuzScreenSubtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/yuz_gutter"
+            android:paddingTop="@dimen/yuz_space_2"
+            android:paddingEnd="@dimen/yuz_gutter"
+            android:paddingBottom="@dimen/yuz_space_8">
+
+            <!-- ============================ Shashka ============================ -->
+            <LinearLayout
+                android:id="@+id/cardCheckers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_yuz_games_tile_checkers"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="@dimen/yuz_space_4">
+
+                <FrameLayout
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
+                    android:background="@drawable/bg_yuz_games_badge_checkers">
+
+                    <ImageView
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_yuz_checkers"
+                        android:tint="@color/yuz_on_action" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/yuz_space_4"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/games_checkers"
+                        android:textColor="@color/yuz_text_bright"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        style="@style/YuzBodySecondary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/games_checkers_desc" />
+
+                    <TextView
+                        style="@style/YuzCaption"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/yuz_space_2"
+                        android:text="@string/games_checkers_meta"
+                        android:textColor="@color/yuz_action" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="@dimen/yuz_space_2"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_yuz_chevron_right"
+                    android:tint="@color/yuz_text_muted" />
+            </LinearLayout>
+
+            <!-- ============================= Mafiya ============================ -->
+            <LinearLayout
+                android:id="@+id/cardMafia"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_3"
+                android:background="@drawable/bg_yuz_games_tile_mafia"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="@dimen/yuz_space_4">
+
+                <FrameLayout
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
+                    android:background="@drawable/bg_yuz_games_badge_mafia">
+
+                    <ImageView
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_yuz_mafia"
+                        android:tint="#FFFFFF" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/yuz_space_4"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/games_mafia"
+                        android:textColor="@color/yuz_text_bright"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        style="@style/YuzBodySecondary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/games_mafia_desc" />
+
+                    <TextView
+                        style="@style/YuzCaption"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/yuz_space_2"
+                        android:text="@string/games_mafia_meta"
+                        android:textColor="@color/yuz_games_mafia" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="@dimen/yuz_space_2"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_yuz_chevron_right"
+                    android:tint="@color/yuz_text_muted" />
+            </LinearLayout>
+
+            <!-- ========================= Faol o'yinlar ========================= -->
+            <TextView
+                style="@style/YuzSectionHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_6"
+                android:text="@string/games_active" />
+
+            <LinearLayout
+                android:id="@+id/hubActiveList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <TextView
+                android:id="@+id/tvHubEmpty"
+                style="@style/YuzBodySecondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_3"
+                android:text="@string/games_empty_active" />
+
+            <!-- ============================ Takliflar ========================== -->
+            <TextView
+                android:id="@+id/tvInvitesHeader"
+                style="@style/YuzSectionHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_6"
+                android:text="@string/games_invites"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/hubInviteList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <!-- ============================= Qoidalar ========================== -->
+            <TextView
+                style="@style/YuzSectionHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_6"
+                android:text="@string/games_rules_title" />
+
+            <TextView
+                style="@style/YuzBodySecondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_2"
+                android:text="@string/chk_rules" />
+
+            <TextView
+                style="@style/YuzBodySecondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_2"
+                android:text="@string/maf_rules" />
+
+            <ProgressBar
+                android:id="@+id/hubProgress"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="@dimen/yuz_space_5"
+                android:indeterminateTint="@color/yuz_action"
+                android:visibility="gone" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

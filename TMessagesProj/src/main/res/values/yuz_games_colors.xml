@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mafiya o'yini aksenti — FAQAT shu o'yin ichida (brend `yuz_action`
+         o'zgarmaydi). Qorong'i fonda 4.5:1 dan yuqori o'qiladi. -->
+    <color name="yuz_games_mafia">#E85D75</color>
+    <color name="yuz_games_mafia_deep">#7A3BD8</color>
+    <color name="yuz_games_stroke_mafia">#40E85D75</color>
+    <color name="yuz_games_stroke_mafia_strong">#80E85D75</color>
+
+    <!-- Shashka taxtasi -->
+    <color name="yuz_games_board_dark">#0E1622</color>
+    <color name="yuz_games_board_light">#23314A</color>
+    <color name="yuz_games_piece_white">#F3EEDC</color>
+    <color name="yuz_games_piece_white_edge">#B7AC8C</color>
+    <color name="yuz_games_piece_black">#232B38</color>
+    <color name="yuz_games_piece_black_edge">#0A0E15</color>
+    <color name="yuz_games_king">#FFD84D</color>
+</resources>

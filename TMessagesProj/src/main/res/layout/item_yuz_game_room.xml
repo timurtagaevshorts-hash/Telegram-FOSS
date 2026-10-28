@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="@dimen/yuz_space_2"
+    android:background="@drawable/bg_yuz_games_panel"
+    android:foreground="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingLeft="@dimen/yuz_space_4"
+    android:paddingTop="@dimen/yuz_space_3"
+    android:paddingRight="@dimen/yuz_space_3"
+    android:paddingBottom="@dimen/yuz_space_3">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvRoomTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/yuz_text"
+            android:textSize="@dimen/yuz_text_body"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvRoomSubtitle"
+            style="@style/YuzCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/btnRoomAction"
+        style="@style/YuzPill"
+        android:layout_marginStart="@dimen/yuz_space_3"
+        android:background="@drawable/bg_yuz_games_chip_active"
+        android:textColor="@color/yuz_action"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/btnRoomAction2"
+        style="@style/YuzPill"
+        android:layout_marginStart="@dimen/yuz_space_2"
+        android:background="@drawable/bg_yuz_games_chip"
+        android:textColor="@color/yuz_text_secondary"
+        android:textStyle="bold"
+        android:visibility="gone" />
+</LinearLayout>

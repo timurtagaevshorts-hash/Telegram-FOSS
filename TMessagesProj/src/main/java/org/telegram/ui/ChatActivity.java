@@ -1451,6 +1451,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     
     private final static int share = 69;
     private final static int yuz_original_messages = 70;
+    private final static int yuz_games = 71;
 
     private final static int id_chat_compose_panel = 1000;
 
@@ -3399,6 +3400,20 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                         firstMessagesLoaded = false;
                         firstLoadMessages();
                     });
+                } else if (id == yuz_games) {
+                    if (getParentActivity() == null) {
+                        return;
+                    }
+                    String gamesTitle = currentChat != null ? currentChat.title :
+                        (currentUser != null ? UserObject.getUserName(currentUser) : "");
+                    boolean gamesGroup = currentChat != null;
+                    String gamesPeerUid = "";
+                    String gamesPeerName = "";
+                    if (!gamesGroup && currentUser != null && !UserObject.isUserSelf(currentUser) && currentUser.id > 0) {
+                        gamesPeerUid = "tg_" + currentUser.id;
+                        gamesPeerName = UserObject.getUserName(currentUser);
+                    }
+                    presentFragment(new uz.kodlikino.top4.ui.GamesHubFragment(dialog_id, gamesTitle, gamesPeerUid, gamesPeerName, gamesGroup), false);
                 } else if (id == clear_history || id == delete_chat || id == auto_delete_timer) {
                     if (getParentActivity() == null) {
                         return;
@@ -3941,6 +3956,9 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 headerItem.lazilyAddSubItem(add_shortcut, R.drawable.msg_home, LocaleController.getString(R.string.AddShortcut));
             }
             if (!isTopic) {
+                if (currentEncryptedChat == null) {
+                    headerItem.lazilyAddSubItem(yuz_games, R.drawable.ic_yuz_games, LocaleController.getString("YuzGames", R.string.YuzGames));
+                }
                 clearHistoryItem = headerItem.lazilyAddSubItem(clear_history, R.drawable.msg_clear, LocaleController.getString("ClearHistory", R.string.ClearHistory));
                 yuzOriginalsItem = headerItem.lazilyAddSubItem(yuz_original_messages, R.drawable.msg_archive, null, LocaleController.getString("YuzShowOriginals", R.string.YuzShowOriginals), true, true);
                 yuzOriginalsItem.setChecked(YuzMessageArchive.isEnabled());
