@@ -37,6 +37,7 @@ import org.telegram.messenger.NotificationCenter
 import org.telegram.messenger.R
 import org.telegram.messenger.UserConfig
 import org.telegram.ui.ActionBar.BaseFragment
+import org.telegram.ui.Components.ShareAlert
 import org.telegram.ui.LaunchActivity
 import org.telegram.ui.Stories.StoriesController
 import uz.kodlikino.top4.models.Reel
@@ -197,6 +198,7 @@ class ReelsActivity @JvmOverloads constructor(
             myUid = currentUid(),
             onDelete = { reel -> confirmDelete(reel) },
             onOpenProfile = { reel -> openUploaderProfile(reel) },
+            onShareReel = { reel -> shareReelToFriends(reel) },
             onExpandTap = { enterReelFullscreen() }
         )
         adapter = reelsAdapter
@@ -697,6 +699,73 @@ class ReelsActivity @JvmOverloads constructor(
         val uid = reel.uploadedByUid
         if (uid.isBlank()) return
         openNativeProfile(uid)
+    }
+
+    /**
+     * "Do'stlarga yuborish": Telegram'ning Instagram uslubidagi chat
+     * tanlagichi ([ShareAlert]) ochiladi, tanlangan chatlarga xabar ketadi.
+     *  - Telegram hikoyasi — hikoya xabari sifatida: qabul qiluvchi bosganda
+     *    StoryViewer'da ochiladi (Telegram'ning o'z hikoya oynasi);
+     *  - Firebase reel'da hikoya yo'q — xabar yuklagan odam profiliga olib
+     *    boradi (@username yoki ilova havolasi orqali).
+     */
+    private fun shareReelToFriends(reel: Reel) {
+        val ctx = themedContext ?: parentActivity ?: return
+        if (reel.isStory && reel.storyId > 0) {
+            val storyItem = YuzStoryFeed.findStoryItem(currentAccount, reel.storyDialogId, reel.storyId)
+            if (storyItem != null) {
+                storyItem.dialogId = reel.storyDialogId
+                val link = YuzStoryFeed.storyShareLink(currentAccount, reel)
+                val copy = link.ifBlank { null }
+                val alert = ShareAlert(
+                    ctx, null, null, copy, null, false, copy, null, false, false, false, null
+                )
+                alert.setStoryToShare(storyItem)
+                showDialog(alert)
+                return
+            }
+        }
+        val body = buildString {
+            append("\uD83C\uDFAC ").append(reel.title.ifBlank { getString(R.string.reels_title) })
+            val by = reel.uploadedByName.takeIf { it.isNotBlank() }
+            if (by != null) {
+                append("\n\uD83D\uDC64 ").append(by)
+            }
+            val mention = uploaderMention(reel.uploadedByUid)
+            if (mention != null) {
+                append("\n").append(mention)
+            } else {
+                val link = uploaderProfileLink(reel.uploadedByUid)
+                if (link.isNotBlank()) {
+                    append("\n").append(link)
+                } else if (reel.videoUrl.isNotBlank()) {
+                    append("\n").append(reel.videoUrl)
+                }
+            }
+        }
+        showDialog(ShareAlert(ctx, null, null, body, null, false, null, null, false, false, false, null))
+    }
+
+    /** Ochiq @username — bosilganda Telegram o'zi profilni ochadi. */
+    private fun uploaderMention(uid: String): String? {
+        val peerId = uid.removePrefix("tg_").toLongOrNull() ?: return null
+        if (peerId <= 0) return null
+        val username = try {
+            MessagesController.getInstance(currentAccount).getUser(peerId)?.username
+        } catch (_: Exception) {
+            null
+        }
+        return username?.takeIf { it.isNotBlank() }?.let { "@$it" }
+    }
+
+    /**
+     * Username yo'q bo'lsa — ilova havolasi; ChatActivity uni ushlab native
+     * profilni ochadi (boshqa Telegram mijozlarida brauzer ochiladi).
+     */
+    private fun uploaderProfileLink(uid: String): String {
+        val id = uid.removePrefix("tg_").toLongOrNull() ?: return ""
+        if (id == 0L) return ""
+        return "https://yuzgram.app/u/$uid"
     }
 
     /** Izoh muallifining profili — native Telegram oynasida. */

@@ -33043,6 +33043,34 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         if (url == null || getParentActivity() == null) {
             return;
         }
+        if (!longPress && url instanceof URLSpan) {
+            String yuzUrl = ((URLSpan) url).getURL();
+            // YuzGram: Firebase reel'dan "yuklagan odam" havolasi — brauzer
+            // o'rniga shu yerda native profil ochamiz.
+            if (yuzUrl != null && (yuzUrl.startsWith("https://yuzgram.app/u/") || yuzUrl.startsWith("http://yuzgram.app/u/"))) {
+                String uid = yuzUrl.substring(yuzUrl.indexOf("/u/") + 3);
+                int cut = uid.indexOf('?');
+                int cutHash = uid.indexOf('#');
+                if (cutHash >= 0 && (cut < 0 || cutHash < cut)) cut = cutHash;
+                if (cut >= 0) uid = uid.substring(0, cut);
+                if (uid.endsWith("/")) uid = uid.substring(0, uid.length() - 1);
+                long peerId = Utilities.parseLong(uid.startsWith("tg_") ? uid.substring(3) : uid);
+                if (peerId != 0) {
+                    Bundle profileArgs = new Bundle();
+                    if (peerId > 0) {
+                        profileArgs.putLong("user_id", peerId);
+                        profileArgs.putBoolean("my_profile", peerId == getUserConfig().getClientUserId());
+                    } else {
+                        profileArgs.putLong("chat_id", -peerId);
+                    }
+                    presentFragment(new ProfileActivity(profileArgs, null));
+                }
+                if (cell != null) {
+                    cell.resetPressedLink(-1);
+                }
+                return;
+            }
+        }
         boolean noforwards = getMessagesController().isChatNoForwards(currentChat) || (messageObject != null && messageObject.messageOwner != null && messageObject.messageOwner.noforwards);
         if (url instanceof URLSpanMono) {
             if (!noforwards) {

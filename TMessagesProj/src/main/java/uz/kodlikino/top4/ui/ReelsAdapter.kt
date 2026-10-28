@@ -89,6 +89,8 @@ class ReelsAdapter(
     private val onDelete: (Reel) -> Unit,
     /** Muallif ustuni bosilganda — reel egasining YuzGram profilini ochadi. */
     private val onOpenProfile: (Reel) -> Unit,
+    /** "Do'stlarga yuborish" — Instagram uslubidagi Telegram chat tanlagichi. */
+    private val onShareReel: (Reel) -> Unit,
     /** Sahifa kichik holatda bosilganda — ovozni ochish + to'liq ekran (chaqiruvchi ochadi). */
     private val onExpandTap: () -> Unit
 ) : RecyclerView.Adapter<ReelsAdapter.PageHolder>() {
@@ -1457,42 +1459,15 @@ class ReelsAdapter(
                 .start()
         }
 
-        /** Reel'ni tizim ulashish menyusiga chiqaradi (sarlavha + hashtag + havola). */
+        /**
+         * "Do'stlarga yuborish" — Telegram'ning Instagram uslubidagi chat
+         * tanlagichi [ReelsActivity]da ochiladi (ShareAlert): hikoya xabari
+         * yoki yuklagan odam profili havolasi bilan.
+         */
         private fun shareReel() {
             val r = reel ?: return
             if (r.videoUrl.isBlank() && !r.isStory) return
-            val header = r.title.ifBlank { appContext.getString(R.string.reels_title) }
-            // Hikoya Telegram'da mavjud — ochiq havola yuboriladi (ochilganda
-            // hikoya Telegram'ning o'z oynasida ko'rinadi). Username yo'q
-            // (yopiq profil) bo'lsa matnli ulashish bilan cheklanamiz.
-            val storyLink = if (r.isStory) YuzStoryFeed.storyShareLink(account, r) else ""
-            val body = buildString {
-                append(header)
-                if (r.hashtags.isNotBlank()) {
-                    append("\n"); append(r.hashtags)
-                }
-                val by = r.uploadedByName.takeIf { it.isNotBlank() }
-                if (by != null) {
-                    append("\n"); append("— ").append(by)
-                }
-                if (storyLink.isNotBlank()) {
-                    append("\n"); append(storyLink)
-                } else if (r.videoUrl.isNotBlank()) {
-                    append("\n"); append(r.videoUrl)
-                }
-            }
-            val send = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, body)
-            }
-            try {
-                appContext.startActivity(
-                    Intent.createChooser(send, appContext.getString(R.string.reels_share))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                )
-            } catch (_: Exception) {
-                Toast.makeText(appContext, R.string.reels_share_failed, Toast.LENGTH_SHORT).show()
-            }
+            onShareReel(r)
         }
 
         /** Tashqi havola (kino/sponsor) — brauzer yoki o'ynatuvchi o'zi tanlaydi. */
