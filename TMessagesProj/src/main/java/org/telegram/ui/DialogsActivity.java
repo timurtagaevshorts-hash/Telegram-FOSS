@@ -610,6 +610,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private uz.kodlikino.top4.ui.YuzAdBannerView yuzChatAd;
     private boolean yuzChatAdBound;
     private String yuzChatAdSignature;
+    // YuzGram r57: filtrlar YUQORI tab qatoriga ko'chirilgan rejim. Tugma
+    // gumbaz tepasida turadi, tanlov prefs'da saqlanadi, sarlavha bloki
+    // shu balandlikka silliq siljiydi.
+    private uz.kodlikino.top4.ui.YuzGramTopTabs yuzTopTabs;
+    private ImageView yuzTabsToggle;
+    private boolean yuzTabsAtTop;
+    private boolean yuzTabsSwitching;
+    private static final String YUZ_TABS_TOP_PREF = "yuz_chat_tabs_top";
 
     private final static int pin = 100;
     private final static int read = 101;
@@ -1748,6 +1756,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (yuzChatAd != null) {
                 yuzChatAd.setTranslationY(scrollYOffset);
             }
+            if (yuzTopTabs != null) {
+                yuzTopTabs.setTranslationY(scrollYOffset);
+            }
         }
         if (containersAlpha != 1f) {
             actionBar.getTitlesContainer().setPivotY(AndroidUtilities.statusBarHeight + ActionBar.getCurrentActionBarHeight() / 2f);
@@ -2255,7 +2266,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 setClipToPadding(false);
                 // YuzGram #93b: gumbaz reyka ENDI suzuvchi — chatlar ro'yxati
                 // butun kenglikda (maketdagi kabi), shisha gumbaz ostidan o'tadi.
-                if (yuzChatRail != null && yuzChatRail.getVisibility() == VISIBLE) {
+                if (yuzHeaderVisible()) {
                     // YuzGram #95: header yashirilganda (scrollYOffset < 0) padding
                     // ham shu qadar qisqaradi — pill bilan birga yuqoriga suriladi.
                     int headerBottom = Math.max(0, yuzChatHeaderBottom() + (int) scrollYOffset);
@@ -2883,6 +2894,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     /** YuzGram #93: sarlavha bloki endi faqat qidiruv pill'i — reyka o'ng ustun. */
     private int yuzSearchBarTopMargin() {
+        int top = yuzHeaderBaseTop();
+        if (yuzTabsAtTop) {
+            top += uz.kodlikino.top4.ui.YuzGramTopTabs.height();
+        }
+        return top;
+    }
+
+    /** Sarlavha blokining bazaviy cheti — yuqori tablar ham, qidiruv pill'i ham shundan boshlanadi. */
+    private int yuzHeaderBaseTop() {
         int barBottom;
         if (actionBar != null) {
             // getMeasuredHeight() birinchi layout'da 0 bo'lishi mumkin — u holda
@@ -2898,6 +2918,22 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         // YuzGram #70: storiya qatori chatdan olib tashlandi — tepada faqat
         // action bar o'rni qoladi.
         return barBottom + dp(10);
+    }
+
+    /** YuzGram r57: yuqori tab qatori — sarlavha ostidagi birinchi qator. */
+    private int yuzTopTabsTopMargin() {
+        return yuzHeaderBaseTop();
+    }
+
+    /**
+     * Filtr menyusi (gumbaz yoki yuqori tablar) hozir ko'rinib turadimi —
+     * sarlavha siljishi/kesimi shu holatga bog'lanadi.
+     */
+    private boolean yuzHeaderVisible() {
+        if (yuzTabsAtTop) {
+            return yuzTopTabs != null && yuzTopTabs.getVisibility() == View.VISIBLE;
+        }
+        return yuzChatRail != null && yuzChatRail.getVisibility() == View.VISIBLE;
     }
 
     /** YuzGram #193b: vertikal filtr ustuni pastki-o'ng burchakda, nav bar ustida. */
@@ -2950,7 +2986,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
      * uchun qatorlar pill ortiga bir kadrlik kechikish bilan ham chiqmaydi.
      */
     private int yuzLiveHeaderClip() {
-        if (!isYuzGramMainRoot() || yuzChatRail == null || yuzChatRail.getVisibility() != View.VISIBLE) {
+        if (!isYuzGramMainRoot() || !yuzHeaderVisible()) {
             return 0;
         }
         int header = Math.max(0, yuzChatHeaderBottom() + (int) scrollYOffset);
@@ -3060,8 +3096,23 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (yuzChatAd != null) {
             yuzChatAd.setVisibility(visible && yuzChatAdBound ? View.VISIBLE : View.GONE);
         }
-        if (yuzChatRail.getVisibility() != wantVisibility) {
-            yuzChatRail.setVisibility(wantVisibility);
+        if (yuzTabsToggle != null) {
+            FrameLayout.LayoutParams togLp = (FrameLayout.LayoutParams) yuzTabsToggle.getLayoutParams();
+            int toggleBottom = yuzChatRailBottomMargin()
+                    + uz.kodlikino.top4.ui.YuzGramChatWheel.height() - dp(6);
+            if (togLp != null && togLp.bottomMargin != toggleBottom) {
+                togLp.bottomMargin = toggleBottom;
+                yuzTabsToggle.setLayoutParams(togLp);
+            }
+            yuzTabsToggle.setVisibility(wantVisibility);
+        }
+        if (yuzTopTabs != null && yuzTabsAtTop
+                && yuzTopTabs.getVisibility() != wantVisibility) {
+            yuzTopTabs.setVisibility(wantVisibility);
+        }
+        int railVisibility = !yuzTabsAtTop ? wantVisibility : View.GONE;
+        if (yuzChatRail.getVisibility() != railVisibility) {
+            yuzChatRail.setVisibility(railVisibility);
             if (fragmentView != null) {
                 fragmentView.invalidate();
             }
@@ -3097,6 +3148,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 yuzSearchBar.setLayoutParams(blp);
             }
         }
+        if (yuzTopTabs != null) {
+            FrameLayout.LayoutParams tabsLp = (FrameLayout.LayoutParams) yuzTopTabs.getLayoutParams();
+            int tabsTop = yuzTopTabsTopMargin();
+            if (tabsLp != null && tabsLp.topMargin != tabsTop) {
+                tabsLp.topMargin = tabsTop;
+                yuzTopTabs.setLayoutParams(tabsLp);
+            }
+            yuzTopTabs.setTranslationY(scrollYOffset);
+        }
         if (yuzChatAd != null && yuzChatAdBound) {
             FrameLayout.LayoutParams adLp = (FrameLayout.LayoutParams) yuzChatAd.getLayoutParams();
             int adTop = yuzChatAdTopMargin();
@@ -3121,6 +3181,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         // Papkalar umuman yo'q bo'lsa ustun bitta "Barchasi"dan iborat bo'lib qoladi,
         // shuning uchun oxiriga papka qo'shish tugmasini qo'yamiz.
         yuzChatRail.setFilters(filters, selected, filters.size() <= 1, animated);
+        if (yuzTopTabs != null && yuzTabsAtTop) {
+            yuzTopTabs.bind(filters, selected, this::yuzChatRailCounter, animated);
+        }
     }
 
     /**
@@ -3178,6 +3241,111 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             return Math.max(0, getMessagesStorage().getMainUnreadCount());
         }
         return Math.max(0, filter.unreadCount);
+    }
+
+    /**
+     * YuzGram r57: filtr menyusini pastki gumbaz bilan yuqori tab qatori
+     * o'rtasida almashtiradi — sarlavha bloki silliq siljiydi, gumbaz va
+     * tablar fade+scale bilan o'rin almashadi.
+     */
+    private void setYuzTabsAtTop(boolean atTop, boolean animated) {
+        if (yuzTopTabs == null || yuzChatRail == null || yuzTabsAtTop == atTop || yuzTabsSwitching) {
+            return;
+        }
+        yuzTabsAtTop = atTop;
+        MessagesController.getGlobalMainSettings().edit()
+                .putBoolean(YUZ_TABS_TOP_PREF, atTop).apply();
+        if (yuzTabsToggle != null) {
+            yuzTabsToggle.setContentDescription(atTop
+                    ? "Filtr menyusini pastga qaytarish"
+                    : "Filtr menyusini yuqoriga ko'chirish");
+            if (animated) {
+                yuzTabsToggle.animate().rotation(atTop ? 0f : 180f)
+                        .setDuration(240)
+                        .setInterpolator(CubicBezierInterpolator.EASE_OUT).start();
+            } else {
+                yuzTabsToggle.setRotation(atTop ? 0f : 180f);
+            }
+        }
+        // Yangi chegaralar darhol qo'llanadi — ro'yxat padding'i ham shundan.
+        updateYuzGramChatRail(false);
+        if (viewPages != null) {
+            for (int a = 0; a < viewPages.length; a++) {
+                if (viewPages[a] != null && viewPages[a].listView != null) {
+                    viewPages[a].listView.requestLayout();
+                }
+            }
+        }
+        if (fragmentView != null) {
+            fragmentView.requestLayout();
+        }
+        if (!animated || fragmentView == null) {
+            return;
+        }
+        final float t0 = scrollYOffset;
+        final int shift = uz.kodlikino.top4.ui.YuzGramTopTabs.height();
+        // Layout allaqachon sakradi — pill va reklamani avval eski joyiga
+        // qaytarib qo'yamiz, keyin yangi joyga silliq suramiz.
+        final float from = atTop ? t0 - shift : t0 + shift;
+        if (yuzSearchBar != null) {
+            yuzSearchBar.animate().cancel();
+            yuzSearchBar.setTranslationY(from);
+            yuzSearchBar.animate().translationY(t0).setDuration(240)
+                    .setInterpolator(CubicBezierInterpolator.EASE_OUT).start();
+        }
+        if (yuzChatAd != null && yuzChatAdBound) {
+            yuzChatAd.animate().cancel();
+            yuzChatAd.setTranslationY(from);
+            yuzChatAd.animate().translationY(t0).setDuration(240)
+                    .setInterpolator(CubicBezierInterpolator.EASE_OUT).start();
+        }
+        yuzTabsSwitching = true;
+        if (atTop) {
+            yuzTopTabs.animate().cancel();
+            yuzTopTabs.setVisibility(View.VISIBLE);
+            yuzTopTabs.setAlpha(0f);
+            yuzTopTabs.setTranslationY(t0);
+            yuzTopTabs.animate().alpha(1f).setDuration(220)
+                    .setInterpolator(CubicBezierInterpolator.EASE_OUT)
+                    .withEndAction(() -> {
+                        yuzTabsSwitching = false;
+                        yuzTopTabs.setAlpha(1f);
+                    }).start();
+            yuzChatRail.animate().cancel();
+            yuzChatRail.setVisibility(View.VISIBLE);
+            yuzChatRail.setAlpha(1f);
+            yuzChatRail.animate().alpha(0f).scaleX(0.92f).scaleY(0.92f)
+                    .setDuration(200).setInterpolator(CubicBezierInterpolator.EASE_IN)
+                    .withEndAction(() -> {
+                        yuzChatRail.setAlpha(1f);
+                        yuzChatRail.setScaleX(1f);
+                        yuzChatRail.setScaleY(1f);
+                        if (yuzTabsAtTop) {
+                            yuzChatRail.setVisibility(View.GONE);
+                        }
+                    }).start();
+        } else {
+            yuzTopTabs.animate().cancel();
+            yuzTopTabs.setVisibility(View.VISIBLE);
+            yuzTopTabs.setAlpha(1f);
+            yuzTopTabs.setTranslationY(t0);
+            yuzTopTabs.animate().alpha(0f).setDuration(160)
+                    .setInterpolator(CubicBezierInterpolator.EASE_IN)
+                    .withEndAction(() -> {
+                        yuzTabsSwitching = false;
+                        yuzTopTabs.setAlpha(1f);
+                        if (!yuzTabsAtTop) {
+                            yuzTopTabs.setVisibility(View.GONE);
+                        }
+                    }).start();
+            yuzChatRail.animate().cancel();
+            yuzChatRail.setAlpha(0f);
+            yuzChatRail.setScaleX(0.92f);
+            yuzChatRail.setScaleY(0.92f);
+            yuzChatRail.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                    .setDuration(240).setInterpolator(CubicBezierInterpolator.EASE_OUT)
+                    .start();
+        }
     }
 
     /**
@@ -5587,6 +5755,59 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     Gravity.RIGHT | Gravity.BOTTOM);
             railLp.bottomMargin = yuzChatRailBottomMargin();
             contentView.addView(yuzChatRail, railLp);
+            // YuzGram r57: yuqori tab qatori — xuddi shu filtrlar, eski
+            // Telegram uslubida. Bildirishnoma-sonlar gumbaz bilan bir xil.
+            yuzTabsAtTop = MessagesController.getGlobalMainSettings()
+                    .getBoolean(YUZ_TABS_TOP_PREF, false);
+            yuzTopTabs = new uz.kodlikino.top4.ui.YuzGramTopTabs(context);
+            yuzTopTabs.setListener(index -> {
+                // Chip darhol kattalashib qaytadi — sahifa almashishi bilan birga.
+                yuzTopTabs.setSelected(index, true);
+                selectYuzGramFilter(index);
+            });
+            yuzTopTabs.setReselectListener(() -> {
+                if (viewPages != null && viewPages[0] != null && viewPages[0].listView != null) {
+                    viewPages[0].listView.smoothScrollToPosition(0);
+                }
+            });
+            FrameLayout.LayoutParams tabsLp = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    uz.kodlikino.top4.ui.YuzGramTopTabs.height(),
+                    Gravity.LEFT | Gravity.TOP);
+            tabsLp.topMargin = yuzTopTabsTopMargin();
+            contentView.addView(yuzTopTabs, tabsLp);
+            // Rejim almashtirish tugmasi — gumbaz tepasidagi shisha doira.
+            yuzTabsToggle = new ImageView(context);
+            yuzTabsToggle.setImageResource(R.drawable.ic_yuz_chevron_down);
+            yuzTabsToggle.setScaleType(ImageView.ScaleType.CENTER);
+            yuzTabsToggle.setRotation(yuzTabsAtTop ? 0f : 180f);
+            yuzTabsToggle.setContentDescription(yuzTabsAtTop
+                    ? "Filtr menyusini pastga qaytarish"
+                    : "Filtr menyusini yuqoriga ko'chirish");
+            android.graphics.drawable.GradientDrawable toggleBg =
+                    new android.graphics.drawable.GradientDrawable();
+            toggleBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            toggleBg.setColor(0xE60D131B);
+            toggleBg.setStroke(dp(1), 0x592AABEE);
+            yuzTabsToggle.setBackground(new android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(0x402AABEE), toggleBg, null));
+            FrameLayout.LayoutParams togLp = new FrameLayout.LayoutParams(dp(44), dp(44),
+                    Gravity.RIGHT | Gravity.BOTTOM);
+            togLp.rightMargin = dp(10);
+            togLp.bottomMargin = yuzChatRailBottomMargin()
+                    + uz.kodlikino.top4.ui.YuzGramChatWheel.height() - dp(6);
+            yuzTabsToggle.setOnTouchListener((view, event) -> {
+                int action = event.getActionMasked();
+                if (action == android.view.MotionEvent.ACTION_DOWN) {
+                    view.animate().scaleX(0.92f).scaleY(0.92f).setDuration(90).start();
+                } else if (action == android.view.MotionEvent.ACTION_UP
+                        || action == android.view.MotionEvent.ACTION_CANCEL) {
+                    view.animate().scaleX(1f).scaleY(1f).setDuration(140).start();
+                }
+                return false;
+            });
+            yuzTabsToggle.setOnClickListener(v -> setYuzTabsAtTop(!yuzTabsAtTop, true));
+            contentView.addView(yuzTabsToggle, togLp);
             // YuzGram #85: nebula fon — ContentView'ning birinchi bolasi (index 0),
             // shunda chat qatorlari shu nur ustidan o'tadi. Tekis qora o'rniga
             // brend ko'kida chuqurlik.
@@ -6203,7 +6424,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private boolean checkAutoscrollToStories(ViewPage viewPage) {
         // YuzGram: asosiy ekranda yarim holat qoldirmaymiz — skroll to'xtaganda
         // storylar+sarlavha ya to'liq ko'rinadi, ya to'liq yuqoriga g'oyib bo'ladi.
-        if (isYuzGramMainRoot() && (hasStories || (yuzChatRail != null && yuzChatRail.getVisibility() == View.VISIBLE))
+        if (isYuzGramMainRoot() && (hasStories || yuzHeaderVisible())
                 && progressToActionMode == 0f && !searching
                 && (rightSlidingDialogContainer == null || !rightSlidingDialogContainer.hasFragment())) {
             float max = hasStories ? dp(DialogStoriesCell.HEIGHT_IN_DP) + yuzHeaderBarHeight()
@@ -9507,8 +9728,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     private boolean yuzHeaderScroll(int dy, boolean listAtTop) {
-        boolean yuzMainHeader = isYuzGramMainRoot() && yuzChatRail != null
-                && yuzChatRail.getVisibility() == View.VISIBLE;
+        boolean yuzMainHeader = isYuzGramMainRoot() && yuzHeaderVisible();
         if (dy == 0 || (!hasStories && !yuzMainHeader) || progressToActionMode != 0f || searching
                 || rightSlidingDialogContainer != null && rightSlidingDialogContainer.hasFragment()
                 || actionBar != null && actionBar.isActionModeShowed()) {
@@ -9596,6 +9816,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             }
             if (yuzChatAd != null) {
                 yuzChatAd.setTranslationY(value);
+            }
+            if (yuzTopTabs != null) {
+                yuzTopTabs.setTranslationY(value);
             }
             if (viewPages != null && viewPages[0] != null && viewPages[0].listView != null) {
                 // YuzGram #102: padding faqat haqiqiy o'zgarishda qayta
