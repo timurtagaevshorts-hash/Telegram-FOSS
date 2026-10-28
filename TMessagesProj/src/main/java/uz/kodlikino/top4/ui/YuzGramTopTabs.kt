@@ -160,6 +160,7 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
             visibility = View.GONE
         }
         private var active = false
+        private var count = 0
 
         init {
             orientation = HORIZONTAL
@@ -176,24 +177,26 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
             setActive(false, false)
         }
 
-        fun setCounter(count: Int) {
-            if (count > 0) {
-                badge.visibility = View.VISIBLE
-                badge.text = if (count > 999) "999+" else count.toString()
-                badge.setPadding(dp(5f), 0, dp(5f), 0)
-                badge.background = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    cornerRadius = dpf(9f)
-                    if (active) {
-                        setColor(0x40FFFFFF)
-                    } else {
-                        setColor(0x332AABEE)
-                    }
-                }
-                badge.setTextColor(if (active) 0xFFFFFFFF.toInt() else 0xFF7CC4F5.toInt())
-            } else {
+        fun setCounter(value: Int) {
+            count = value
+            applyBadge()
+        }
+
+        /** Badge ranglari chip holatiga bog'liq — faol chip almashganda ham yangilanadi. */
+        private fun applyBadge() {
+            if (count <= 0) {
                 badge.visibility = View.GONE
+                return
             }
+            badge.visibility = View.VISIBLE
+            badge.text = if (count > 999) "999+" else count.toString()
+            badge.setPadding(dp(5f), 0, dp(5f), 0)
+            badge.background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dpf(9f)
+                setColor(if (active) 0x40FFFFFF else 0x332AABEE)
+            }
+            badge.setTextColor(if (active) 0xFFFFFFFF.toInt() else 0xFF7CC4F5.toInt())
         }
 
         fun setActive(value: Boolean, animate: Boolean) {
@@ -231,6 +234,7 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
             }
             title.setTextColor(if (value) 0xFFFFFFFF.toInt() else 0xFFA9C0D8.toInt())
             title.typeface = if (value) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            applyBadge()
         }
     }
 }

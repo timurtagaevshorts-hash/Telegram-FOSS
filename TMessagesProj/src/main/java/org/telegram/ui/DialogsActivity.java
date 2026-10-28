@@ -3269,6 +3269,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         // Yangi chegaralar darhol qo'llanadi — ro'yxat padding'i ham shundan.
         updateYuzGramChatRail(false);
+        // Sarlavha balandligi o'zgardi: eski siljish yangi chegaradan oshib ketsa,
+        // ro'yxat tepasida bo'sh lenta qolmasligi uchun uni qisqartiramiz.
+        float minOffset = -yuzHeaderScrollMax();
+        if (scrollYOffset < minOffset) {
+            setScrollY(minOffset);
+        }
         if (viewPages != null) {
             for (int a = 0; a < viewPages.length; a++) {
                 if (viewPages[a] != null && viewPages[a].listView != null) {
@@ -9727,6 +9733,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 + (actionBar != null && actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0);
     }
 
+    /** Sarlavha qancha yuqoriga siljishi mumkin — rejim almashganda chegara o'zgaradi. */
+    private float yuzHeaderScrollMax() {
+        boolean yuzMainHeader = isYuzGramMainRoot() && yuzHeaderVisible();
+        return yuzMainHeader && !hasStories ? yuzChatHeaderBottom()
+                : dp(DialogStoriesCell.HEIGHT_IN_DP) + yuzHeaderBarHeight();
+    }
+
     private boolean yuzHeaderScroll(int dy, boolean listAtTop) {
         boolean yuzMainHeader = isYuzGramMainRoot() && yuzHeaderVisible();
         if (dy == 0 || (!hasStories && !yuzMainHeader) || progressToActionMode != 0f || searching
@@ -9739,8 +9752,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (dy > 0 && yuzRestoreAnim != null) {
             yuzRestoreAnim.cancel();
         }
-        float max = yuzMainHeader && !hasStories ? yuzChatHeaderBottom()
-                : dp(DialogStoriesCell.HEIGHT_IN_DP) + yuzHeaderBarHeight();
+        float max = yuzHeaderScrollMax();
         float n = scrollYOffset;
         if (dy > 0) {
             n -= dy;
