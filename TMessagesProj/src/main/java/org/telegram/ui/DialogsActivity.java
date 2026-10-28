@@ -22,6 +22,8 @@ import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.Dialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -47,6 +49,7 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.SpannableStringBuilder;
 import android.text.TextPaint;
 import android.text.TextUtils;
@@ -1774,13 +1777,20 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (!isYuzGramMainRoot()) {
             yuzBrandMark.setAlpha(0f);
             yuzBrandMark.setClickable(false);
+            yuzBrandMark.setLongClickable(false);
             return;
         }
         yuzBrandMark.setTranslationY(actionBar.getTranslationY());
         float fade = (1f - progressToActionMode) * (1f - Utilities.clamp(searchAnimationProgress / 0.5f, 1f, 0f));
         float a = containersAlpha * fade;
         yuzBrandMark.setAlpha(a);
-        yuzBrandMark.setClickable(a > 0.5f);
+        // YuzGram #252: wordmark action bar ustida yotadi va qidiruv paytida
+        // shaffof bo'ladi, lekin alpha teginishni to'smaydi. Faqat clickable
+        // o'chirilsa ham longClickable qolib ketadi — shu sabab maydon ustida
+        // bosib turish papka sozlamalarini ochib yuborardi.
+        boolean interactive = a > 0.5f;
+        yuzBrandMark.setClickable(interactive);
+        yuzBrandMark.setLongClickable(interactive);
         if (yuzApkToggle != null) {
             boolean guardOn = org.telegram.messenger.YuzApkGuard.isEnabled();
             if (yuzApkToggle.isGuardEnabled() != guardOn) {
@@ -2989,6 +2999,49 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     /**
+     * YuzGram #252: qidiruv maydonida bosib turish — clipboard matnini
+     * kursor (yoki tanlov) o'rniga qo'yadi.
+     */
+    private void pasteYuzSearchClipboard(EditTextBoldCursor field) {
+        if (field == null) {
+            return;
+        }
+        ClipboardManager clipboard = (ClipboardManager) ApplicationLoader.applicationContext.getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard == null || !clipboard.hasPrimaryClip()) {
+            return;
+        }
+        ClipData clip = clipboard.getPrimaryClip();
+        if (clip == null || clip.getItemCount() == 0) {
+            return;
+        }
+        ClipData.Item item = clip.getItemAt(0);
+        CharSequence text = item.getText();
+        if (text == null) {
+            text = item.coerceToText(ApplicationLoader.applicationContext);
+        }
+        if (TextUtils.isEmpty(text)) {
+            return;
+        }
+        int start = Math.max(0, field.getSelectionStart());
+        int end = Math.max(0, field.getSelectionEnd());
+        if (start > end) {
+            int swap = start;
+            start = end;
+            end = swap;
+        }
+        Editable editable = field.getText();
+        if (editable == null) {
+            return;
+        }
+        editable.replace(start, Math.min(end, editable.length()), text);
+        field.setSelection(Math.min(start + text.length(), editable.length()));
+        if (!field.hasFocus()) {
+            field.requestFocus();
+        }
+        AndroidUtilities.showKeyboard(field);
+    }
+
+    /**
      * YuzGram o'ng ustunini Telegram papkalari bilan sinxronlaydi: nomlar,
      * o'qilmaganlar soni, faol indeks va ko'rinish holati.
      */
@@ -3585,6 +3638,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
             @Override
             public void onSearchExpand() {
+                // YuzGram #252: qidiruv maydonini bosib turish — nusxalangan
+                // matnni kursorga qo'yadi (standart matn tanlash oynasi o'rniga).
+                EditTextBoldCursor yuzSearchField = searchItem.getSearchField();
+                if (yuzSearchField != null) {
+                    yuzSearchField.setOnLongClickListener(v -> {
+                        pasteYuzSearchClipboard((EditTextBoldCursor) v);
+                        return true;
+                    });
+                }
                 searching = true;
                 if (switchItem != null) {
                     switchItem.setVisibility(View.GONE);
@@ -6056,6 +6118,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     AndroidUtilities.statusBarHeight + ActionBar.getCurrentActionBarHeight());
             yuzBrandMark.setOnClickListener(v -> onYuzGramBrandClicked());
             yuzBrandMark.setOnLongClickListener(v -> {
+                // YuzGram #252: qidiruv paytida bu teginish qidiruv maydoniga
+                // tegishli — papka sozlamalarini ochmaymiz.
+                if (searching || searchIsShowed || (actionBar != null && actionBar.isSearchFieldVisible())) {
+                    return false;
+                }
                 presentFragment(new FiltersSetupActivity());
                 return true;
             });
