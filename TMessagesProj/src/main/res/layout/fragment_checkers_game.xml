@@ -218,6 +218,47 @@
                     android:visibility="gone" />
             </LinearLayout>
 
+            <!-- Ovoz va qoidalar -->
+            <LinearLayout
+                android:id="@+id/chkVoiceRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_3"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <uz.kodlikino.top4.ui.GameMicButton
+                    android:id="@+id/btnChkMic"
+                    android:layout_width="52dp"
+                    android:layout_height="52dp" />
+
+                <TextView
+                    android:id="@+id/tvChkVoice"
+                    style="@style/YuzCaption"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/yuz_space_3"
+                    android:layout_weight="1"
+                    android:text="@string/games_voice_idle" />
+
+                <TextView
+                    android:id="@+id/btnChkRules"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_yuz_games_chip"
+                    android:clickable="true"
+                    android:contentDescription="@string/games_rules_hint"
+                    android:focusable="true"
+                    android:paddingLeft="@dimen/yuz_space_3"
+                    android:paddingTop="8dp"
+                    android:paddingRight="@dimen/yuz_space_3"
+                    android:paddingBottom="8dp"
+                    android:text="@string/games_rules"
+                    android:textColor="@color/yuz_action"
+                    android:textSize="@dimen/yuz_text_secondary"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
             <TextView
                 style="@style/YuzCaption"
                 android:layout_width="match_parent"

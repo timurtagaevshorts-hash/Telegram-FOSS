@@ -1,5 +1,6 @@
 package uz.kodlikino.top4.ui
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -9,6 +10,7 @@ import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.view.animation.DecelerateInterpolator
 import org.telegram.messenger.R
 import uz.kodlikino.top4.games.CheckersEngine
 import kotlin.math.min
@@ -40,6 +42,7 @@ class CheckersBoardView @JvmOverloads constructor(
     private val pieceBlackEdge = context.getColor(R.color.yuz_games_piece_black_edge)
     private val kingGold = context.getColor(R.color.yuz_games_king)
     private val accent = context.getColor(R.color.yuz_action)
+    private val danger = context.getColor(R.color.yuz_danger)
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -64,6 +67,18 @@ class CheckersBoardView @JvmOverloads constructor(
 
     private var side = 0
 
+    private var animFrom: CheckersEngine.Sq? = null
+    private var animTo: CheckersEngine.Sq? = null
+    private var animT = 1f
+    private val mover = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 240L
+        interpolator = DecelerateInterpolator()
+        addUpdateListener {
+            animT = it.animatedValue as Float
+            invalidate()
+        }
+    }
+
     fun setPosition(
         board: String,
         mySide: CheckersEngine.Side?,
@@ -74,12 +89,24 @@ class CheckersBoardView @JvmOverloads constructor(
     ) {
         val boardChanged = board != this.board
         val sideChanged = mySide != this.mySide
+        val previousTo = this.lastTo
         this.board = if (CheckersEngine.isValidBoard(board)) board else CheckersEngine.initialBoard()
         this.mySide = mySide
         this.turn = turn
         this.lastFrom = lastFrom
         this.lastTo = lastTo
         this.interactive = interactive && mySide != null && mySide == turn
+        if (boardChanged && lastTo.isNotBlank() && lastTo != previousTo) {
+            val from = CheckersEngine.Sq.parse(lastFrom)
+            val to = CheckersEngine.Sq.parse(lastTo)
+            if (from != null && to != null) {
+                animFrom = from
+                animTo = to
+                animT = 0f
+                mover.cancel()
+                mover.start()
+            }
+        }
         if (boardChanged || sideChanged) {
             origin = null
             chain.clear()
@@ -145,6 +172,25 @@ class CheckersBoardView @JvmOverloads constructor(
         origin?.let { highlightSquare(canvas, ox, cell, it.key(), 0x332AABEE) }
         for (step in chain) highlightSquare(canvas, ox, cell, step.key(), 0x222AABEE)
 
+        // Majburiy urish: qaysi donalar urishi mumkinligini belgilaymiz
+        if (interactive && origin == null) {
+            val captureOrigins = LinkedHashSet<CheckersEngine.Sq>()
+            for (move in legal) if (move.isCapture) captureOrigins.add(move.from)
+            if (captureOrigins.isNotEmpty()) {
+                strokePaint.color = danger
+                strokePaint.strokeWidth = 2.2f * density
+                for (square in captureOrigins) {
+                    val (dx, dy) = displayCell(square.row, square.col)
+                    canvas.drawCircle(
+                        ox + (dx + 0.5f) * cell,
+                        (dy + 0.5f) * cell,
+                        cell * 0.42f,
+                        strokePaint
+                    )
+                }
+            }
+        }
+
         // Qonuniy nishonlar
         if (interactive && origin != null) {
             val prefix = chain.toList()
@@ -182,13 +228,31 @@ class CheckersBoardView @JvmOverloads constructor(
         }
 
         // Donalar
+        val landing = animTo
         for (r in 0 until CheckersEngine.SIZE) {
             for (c in 0 until CheckersEngine.SIZE) {
                 if (!CheckersEngine.isPlayable(r, c)) continue
                 val piece = board[r * CheckersEngine.SIZE + c]
                 if (piece == CheckersEngine.EMPTY) continue
+                if (landing != null && animT < 1f && landing.row == r && landing.col == c) {
+                    continue
+                }
                 val (dx, dy) = displayCell(r, c)
                 drawPiece(canvas, ox + (dx + 0.5f) * cell, (dy + 0.5f) * cell, cell, piece)
+            }
+        }
+
+        // Yurish animatsiyasi — dona manbadan manzilga sirg‘aladi
+        val fromSq = animFrom
+        if (fromSq != null && landing != null && animT < 1f) {
+            val piece = board[landing.row * CheckersEngine.SIZE + landing.col]
+            if (piece != CheckersEngine.EMPTY) {
+                val (fx, fy) = displayCell(fromSq.row, fromSq.col)
+                val (tx, ty) = displayCell(landing.row, landing.col)
+                val t = animT.coerceIn(0f, 1f)
+                val cx = ox + (fx + (tx - fx) * t + 0.5f) * cell
+                val cy = (fy + (ty - fy) * t + 0.5f) * cell
+                drawPiece(canvas, cx, cy, cell, piece)
             }
         }
 
@@ -338,5 +402,10 @@ class CheckersBoardView @JvmOverloads constructor(
     init {
         isClickable = true
         setWillNotDraw(false)
+    }
+
+    override fun onDetachedFromWindow() {
+        mover.cancel()
+        super.onDetachedFromWindow()
     }
 }

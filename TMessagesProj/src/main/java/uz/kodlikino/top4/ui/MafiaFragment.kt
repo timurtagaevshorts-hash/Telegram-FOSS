@@ -1,6 +1,8 @@
 package uz.kodlikino.top4.ui
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Paint
 import android.os.Handler
@@ -15,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
 import com.google.firebase.firestore.ListenerRegistration
@@ -26,6 +29,8 @@ import kotlinx.coroutines.launch
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.BaseFragment
+import uz.kodlikino.top4.games.GameSfx
+import uz.kodlikino.top4.games.GameVoice
 import uz.kodlikino.top4.games.GamesCore
 import uz.kodlikino.top4.games.MafiaRoom
 import uz.kodlikino.top4.games.MafiaRules
@@ -74,11 +79,26 @@ class MafiaFragment(
     private var btnPrimary: MaterialButton? = null
     private var btnSecondary: MaterialButton? = null
     private var logBox: LinearLayout? = null
+    private var noticeView: TextView? = null
+    private var teamView: TextView? = null
+    private var mic: GameMicButton? = null
+    private var voiceView: TextView? = null
+    private var btnRules: TextView? = null
+
+    private var voiceBusy = false
+    private var lastVoiceAt = 0L
+    private var playingVoiceAt = 0L
+    private var prevPhase: MafiaRules.Phase? = null
+    private var prevAlive = -1
+    private var prevSeats = -1
+    private var prevWinner: MafiaRules.Winner? = null
+    private var prevStatus = ""
 
     private val ticker = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
         override fun run() {
             updateTimer()
+            if (GameVoice.isRecording()) mic?.setElapsed(GameVoice.elapsedMs())
             driveHost()
             beatHost()
             ticker.postDelayed(this, 1000L)
@@ -118,10 +138,28 @@ class MafiaFragment(
         btnPrimary = root.findViewById(R.id.btnMafPrimary)
         btnSecondary = root.findViewById(R.id.btnMafSecondary)
         logBox = root.findViewById(R.id.mafLog)
+        noticeView = root.findViewById(R.id.tvMafNotice)
+        teamView = root.findViewById(R.id.tvMafTeam)
+        mic = root.findViewById(R.id.btnMafMic)
+        voiceView = root.findViewById(R.id.tvMafVoice)
+        btnRules = root.findViewById(R.id.btnMafRules)
 
         btnPrimary?.setOnClickListener { onPrimary() }
         btnSecondary?.setOnClickListener { onSecondary() }
 
+        mic?.onHoldStart = { startVoice() }
+        mic?.onHoldEnd = { finishVoice() }
+        mic?.onHoldCancel = {
+            GameVoice.cancel()
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            voiceView?.text = str(R.string.games_voice_idle)
+        }
+        btnRules?.setOnClickListener {
+            GameRulesDialog.show(ctx(), GameRulesDialog.MAFIA)
+        }
+        voiceView?.setOnClickListener { toggleVoicePlayback() }
+
+        GameSfx.prepare(themed)
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         return root
     }
@@ -160,6 +198,10 @@ class MafiaFragment(
         secretListener?.remove()
         secretListener = null
         ticker.removeCallbacks(tick)
+        GameVoice.cancel()
+        GameVoice.stopPlayback()
+        playingVoiceAt = 0L
+        mic?.setMode(GameMicButton.Mode.IDLE)
         super.onPause()
     }
 
@@ -169,9 +211,26 @@ class MafiaFragment(
         secretListener?.remove()
         secretListener = null
         ticker.removeCallbacks(tick)
+        GameVoice.release()
+        GameSfx.release()
         scope?.cancel()
         scope = null
         super.onFragmentDestroy()
+    }
+
+    override fun onRequestPermissionsResultFragment(
+        requestCode: Int,
+        permissions: Array<out String>?,
+        grantResults: IntArray?
+    ) {
+        if (requestCode != REQ_MIC) return
+        val granted = grantResults?.isNotEmpty() == true &&
+            grantResults[0] == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            toast(R.string.games_voice_denied)
+        } else {
+            voiceView?.text = str(R.string.games_voice_hint)
+        }
     }
 
     // ----------------------------------------------------------------- state
@@ -224,6 +283,11 @@ class MafiaFragment(
             MafiaRules.Winner.CITY -> str(R.string.maf_winner_city)
             null -> ""
         }
+
+        renderNotice(r)
+        renderTeam(r)
+        syncVoice(r, me)
+        syncFeedback(r, me)
 
         seatsMeta?.text = listOf(
             str(R.string.maf_alive, r.aliveCount()),
@@ -459,6 +523,192 @@ class MafiaFragment(
         )
     }
 
+    // ------------------------------------------------------- sound and voice
+
+    private fun renderNotice(r: MafiaRoom.Room) {
+        val view = noticeView ?: return
+        if (r.isLobby() || r.isFinished()) {
+            view.visibility = View.GONE
+            return
+        }
+        val text = when (r.phase) {
+            MafiaRules.Phase.DAWN, MafiaRules.Phase.DAY -> {
+                val victim = r.seats.firstOrNull { it.uid == r.nightVictimUid }
+                when {
+                    victim != null -> str(R.string.maf_victim_named, victim.name)
+                    r.nightSaved -> str(R.string.maf_night_saved)
+                    else -> str(R.string.maf_night_quiet)
+                }
+            }
+            MafiaRules.Phase.EXECUTION -> {
+                val executed = r.seats.firstOrNull { it.uid == r.executedUid }
+                val role = r.executedRole
+                if (executed != null && role != null) {
+                    str(R.string.maf_executed, executed.name, roleLabel(role))
+                } else {
+                    str(R.string.maf_nobody_executed)
+                }
+            }
+            else -> ""
+        }
+        view.text = text
+        view.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
+    }
+
+    private fun renderTeam(r: MafiaRoom.Room) {
+        val view = teamView ?: return
+        val role = secret?.role
+        if (role == null || !role.isMafia || r.isLobby()) {
+            view.visibility = View.GONE
+            return
+        }
+        val mates = secret?.team.orEmpty()
+            .mapNotNull { uid -> r.seats.firstOrNull { it.uid == uid }?.name }
+            .filter { it.isNotBlank() }
+        view.text = if (mates.isEmpty()) {
+            str(R.string.maf_team_none)
+        } else {
+            str(R.string.maf_team_list, mates.joinToString(", "))
+        }
+        view.visibility = View.VISIBLE
+    }
+
+    private fun syncFeedback(r: MafiaRoom.Room, me: String) {
+        val ctx = ctx()
+        val seats = r.seats.size
+        val alive = r.aliveCount()
+        val winner = r.winner
+
+        if (prevStatus == GamesCore.STATUS_INVITE && r.status == GamesCore.STATUS_ACTIVE) {
+            GameSfx.play(ctx, GameSfx.START)
+        }
+        if (prevSeats >= 0 && seats > prevSeats) GameSfx.play(ctx, GameSfx.JOIN)
+        if (prevPhase != null && prevPhase != r.phase) {
+            when (r.phase) {
+                MafiaRules.Phase.NIGHT -> GameSfx.play(ctx, GameSfx.NIGHT)
+                MafiaRules.Phase.VOTE -> GameSfx.play(ctx, GameSfx.VOTE)
+                MafiaRules.Phase.EXECUTION -> GameSfx.play(ctx, GameSfx.BAD)
+                else -> Unit
+            }
+        }
+        if (prevAlive >= 0 && alive < prevAlive) GameSfx.play(ctx, GameSfx.DEATH)
+        if (prevWinner == null && winner != null) {
+            val role = secret?.role
+            if (role != null) {
+                val mafiaWon = winner == MafiaRules.Winner.MAFIA
+                GameSfx.play(ctx, if (role.isMafia == mafiaWon) GameSfx.WIN else GameSfx.LOSE)
+            }
+        }
+
+        prevStatus = r.status
+        prevSeats = seats
+        prevPhase = r.phase
+        prevAlive = alive
+        prevWinner = winner
+    }
+
+    private fun syncVoice(r: MafiaRoom.Room, me: String) {
+        val voice = r.voice ?: return
+        if (me.isNotEmpty() && voice.uid == me) return
+        if (voice.at <= lastVoiceAt) return
+        lastVoiceAt = voice.at
+        playVoice(voice)
+    }
+
+    private fun playVoice(voice: GameVoice.Message) {
+        val name = voice.name.ifBlank { str(R.string.games_unknown_host) }
+        playingVoiceAt = voice.at
+        voiceView?.text = str(R.string.games_voice_playing, name)
+        GameVoice.play(voice.url) {
+            if (playingVoiceAt == voice.at) {
+                playingVoiceAt = 0L
+                voiceView?.text = str(R.string.games_voice_idle)
+            }
+        }
+    }
+
+    private fun toggleVoicePlayback() {
+        if (GameVoice.isPlaying()) {
+            GameVoice.stopPlayback()
+            playingVoiceAt = 0L
+            voiceView?.text = str(R.string.games_voice_idle)
+            return
+        }
+        val voice = room?.voice ?: return
+        if (voice.url.isBlank()) return
+        playVoice(voice)
+    }
+
+    private fun startVoice() {
+        val ctx = ctx()
+        if (!GameVoice.hasPermission(ctx)) {
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            requestMicPermission()
+            toast(R.string.games_voice_need_permission)
+            return
+        }
+        if (voiceBusy) {
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            return
+        }
+        GameVoice.stopPlayback()
+        playingVoiceAt = 0L
+        if (!GameVoice.start(ctx)) {
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            toast(R.string.games_voice_failed)
+            return
+        }
+        voiceView?.text = str(R.string.games_voice_hold)
+        GameSfx.play(ctx, GameSfx.TAP)
+    }
+
+    private fun finishVoice() {
+        if (!GameVoice.isRecording()) {
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            return
+        }
+        val clip = GameVoice.stop()
+        if (clip == null) {
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            voiceView?.text = str(R.string.games_voice_idle)
+            return
+        }
+        if (voiceBusy) {
+            clip.file.delete()
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            return
+        }
+        voiceBusy = true
+        mic?.setMode(GameMicButton.Mode.BUSY)
+        voiceView?.text = str(R.string.games_voice_sending)
+        val me = GamesCore.uidOf(currentAccount)
+        val name = GamesCore.me(currentAccount).name
+        scope?.launch {
+            val ok = try {
+                GameVoice.publish(roomId, me, name, clip)
+            } catch (e: Exception) {
+                false
+            }
+            voiceBusy = false
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            voiceView?.text = str(R.string.games_voice_idle)
+            if (ok) {
+                GameSfx.play(ctx(), GameSfx.TAP)
+            } else {
+                toast(R.string.games_voice_failed)
+            }
+        }
+    }
+
+    private fun requestMicPermission() {
+        val activity = parentActivity ?: return
+        ActivityCompat.requestPermissions(
+            activity,
+            arrayOf(Manifest.permission.RECORD_AUDIO),
+            REQ_MIC
+        )
+    }
+
     // --------------------------------------------------------------- actions
 
     private fun onSeatTap(r: MafiaRoom.Room, seat: MafiaRules.Seat) {
@@ -669,6 +919,8 @@ class MafiaFragment(
     // --------------------------------------------------------------- helpers
 
     private companion object {
+        const val REQ_MIC = 4420
+
         val ADVANCE_PHASES = setOf(
             MafiaRules.Phase.DAWN,
             MafiaRules.Phase.DAY,

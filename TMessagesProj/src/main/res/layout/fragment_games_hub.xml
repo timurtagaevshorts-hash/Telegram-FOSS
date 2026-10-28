@@ -243,19 +243,43 @@
                 android:layout_marginTop="@dimen/yuz_space_6"
                 android:text="@string/games_rules_title" />
 
-            <TextView
-                style="@style/YuzBodySecondary"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/yuz_space_2"
-                android:text="@string/chk_rules" />
+                android:layout_marginTop="@dimen/yuz_space_3"
+                android:orientation="horizontal">
 
-            <TextView
-                style="@style/YuzBodySecondary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/yuz_space_2"
-                android:text="@string/maf_rules" />
+                <TextView
+                    android:id="@+id/btnHubRulesChk"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_yuz_games_panel"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:padding="@dimen/yuz_space_3"
+                    android:text="@string/games_rules_checkers"
+                    android:textColor="@color/yuz_action"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btnHubRulesMaf"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/yuz_space_3"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_yuz_games_panel"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:padding="@dimen/yuz_space_3"
+                    android:text="@string/games_rules_mafia"
+                    android:textColor="@color/yuz_games_mafia"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <ProgressBar
                 android:id="@+id/hubProgress"

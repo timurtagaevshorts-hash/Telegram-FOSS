@@ -106,6 +106,13 @@ class GamesHubFragment(
         checkersCard?.setOnClickListener { createCheckers() }
         mafiaCard?.setOnClickListener { createMafia() }
 
+        root.findViewById<View>(R.id.btnHubRulesChk).setOnClickListener {
+            GameRulesDialog.show(themed, GameRulesDialog.CHECKERS)
+        }
+        root.findViewById<View>(R.id.btnHubRulesMaf).setOnClickListener {
+            GameRulesDialog.show(themed, GameRulesDialog.MAFIA)
+        }
+
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         updateProgress()
         return root

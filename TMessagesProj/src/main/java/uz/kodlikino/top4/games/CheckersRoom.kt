@@ -52,6 +52,7 @@ object CheckersRoom {
         val lastTo: String,
         val expiresAt: Long,
         val rematchRoomId: String,
+        val voice: GameVoice.Message?,
         val createdAt: Long,
         val updatedAt: Long
     ) {
@@ -568,6 +569,7 @@ object CheckersRoom {
             lastTo = GamesCore.stringOf(data, "lastTo"),
             expiresAt = GamesCore.longOf(data, "expiresAt"),
             rematchRoomId = GamesCore.stringOf(data, "rematchRoomId"),
+            voice = GameVoice.parse(data["voice"]),
             createdAt = GamesCore.longOf(data, "createdAt"),
             updatedAt = GamesCore.longOf(data, "updatedAt")
         )

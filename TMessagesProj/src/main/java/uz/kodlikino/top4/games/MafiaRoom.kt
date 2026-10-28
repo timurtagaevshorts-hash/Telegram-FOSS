@@ -45,6 +45,7 @@ object MafiaRoom {
         val executedRole: Role?,
         val winner: Winner?,
         val log: List<String>,
+        val voice: GameVoice.Message?,
         val createdAt: Long,
         val updatedAt: Long
     ) {
@@ -68,7 +69,8 @@ object MafiaRoom {
         val role: Role?,
         val nightTarget: String,
         val check: String,
-        val checkRole: Role?
+        val checkRole: Role?,
+        val team: List<String>
     )
 
     // --------------------------------------------------------------- create
@@ -143,6 +145,9 @@ object MafiaRoom {
             GamesCore.db.runTransaction { tx ->
                 val snap = tx.get(ref)
                 if (!snap.exists()) return@runTransaction JoinResult.ERROR
+                if (snap.getString("status") == GamesCore.STATUS_CANCELLED) {
+                    return@runTransaction JoinResult.ERROR
+                }
                 val seats = MafiaRules.parseSeats(snap.get("players"))
                 if (seats.any { it.uid == uid }) return@runTransaction JoinResult.ALREADY
                 if (snap.getString("phase") != Phase.LOBBY.code) {
@@ -183,7 +188,7 @@ object MafiaRoom {
                 val lobby = snap.getString("phase") == Phase.LOBBY.code
                 if (lobby) {
                     val next = seats.filter { it.uid != uid }
-                    if (next.isEmpty() || snap.getString("hostUid") == uid) {
+                    if (next.isEmpty()) {
                         tx.update(
                             ref,
                             "status", GamesCore.STATUS_CANCELLED,
@@ -192,11 +197,17 @@ object MafiaRoom {
                         return@runTransaction
                     }
                     val resorted = next.mapIndexed { index, seat -> seat.copy(seat = index) }
+                    val nextHost = if (snap.getString("hostUid") == uid) {
+                        resorted.first().uid
+                    } else {
+                        snap.getString("hostUid").orEmpty()
+                    }
                     tx.update(
                         ref,
                         mapOf(
                             "players" to MafiaRules.seatsToMaps(resorted),
                             "uids" to resorted.map { it.uid },
+                            "hostUid" to nextHost,
                             "log" to appendLog(snap.get("log"), "➖ ${me.name} chiqdi."),
                             "updatedAt" to now
                         )
@@ -204,14 +215,21 @@ object MafiaRoom {
                 } else {
                     if (!me.alive) return@runTransaction
                     val next = seats.map { if (it.uid == uid) it.copy(alive = false) else it }
-                    tx.update(
-                        ref,
-                        mapOf(
-                            "players" to MafiaRules.seatsToMaps(next),
-                            "log" to appendLog(snap.get("log"), "🚪 ${me.name} o‘yindan chiqdi."),
-                            "updatedAt" to now
-                        )
-                    )
+                    val winner = winnerOf(next, tx, roomId)
+                    val updates = HashMap<String, Any>(6)
+                    updates["players"] = MafiaRules.seatsToMaps(next)
+                    updates["updatedAt"] = now
+                    val log = ArrayList<String>(2)
+                    log.add("🚪 ${me.name} o‘yindan chiqdi.")
+                    if (winner != null && snap.getString("phase") != Phase.END.code) {
+                        updates["phase"] = Phase.END.code
+                        updates["winner"] = winner.code
+                        updates["status"] = GamesCore.STATUS_FINISHED
+                        updates["phaseEndsAt"] = 0L
+                        log.add(winnerText(winner))
+                    }
+                    updates["log"] = appendLog(snap.get("log"), log)
+                    tx.update(ref, updates)
                 }
             }.await()
             true
@@ -236,15 +254,26 @@ object MafiaRoom {
                 if (!MafiaRules.canStart(seats.size)) return@runTransaction false
 
                 val roles = MafiaRules.assign(seats)
+                val mafiaNames = HashMap<String, String>(seats.size)
+                for (rest in seats) {
+                    if (roles[rest.uid]?.isMafia == true) mafiaNames[rest.uid] = rest.name
+                }
                 val now = GamesCore.now()
                 for (seat in seats) {
+                    val role = roles[seat.uid] ?: Role.CIVILIAN
+                    val team = if (role.isMafia) {
+                        mafiaNames.filterKeys { it != seat.uid }.values.toList()
+                    } else {
+                        emptyList()
+                    }
                     tx.set(
                         secretRef(roomId, seat.uid),
                         mapOf(
-                            "role" to (roles[seat.uid]?.code ?: Role.CIVILIAN.code),
+                            "role" to role.code,
                             "nightTarget" to "",
                             "check" to "",
-                            "checkRole" to ""
+                            "checkRole" to "",
+                            "team" to team
                         )
                     )
                 }
@@ -307,7 +336,8 @@ object MafiaRoom {
                             "role" to role.code,
                             "nightTarget" to target.uid,
                             "check" to (secretDoc.getString("check") ?: ""),
-                            "checkRole" to (secretDoc.getString("checkRole") ?: "")
+                            "checkRole" to (secretDoc.getString("checkRole") ?: ""),
+                            "team" to (secretDoc.get("team") ?: emptyList<String>())
                         )
                     )
                     tx.update(ref, "updatedAt", now)
@@ -332,10 +362,12 @@ object MafiaRoom {
                 val seats = MafiaRules.parseSeats(snap.get("players"))
 
                 val actions = ArrayList<Triple<Seat, Role, String>>()
+                val teams = HashMap<String, Any?>(seats.size)
                 for (seat in seats) {
                     if (!seat.alive) continue
                     val doc = tx.get(secretRef(roomId, seat.uid))
                     val role = Role.fromCode(doc.getString("role")) ?: continue
+                    teams[seat.uid] = doc.get("team")
                     actions.add(Triple(seat, role, doc.getString("nightTarget").orEmpty()))
                 }
 
@@ -369,7 +401,8 @@ object MafiaRoom {
                                 "role" to checkSeat.second.code,
                                 "nightTarget" to checkSeat.third,
                                 "check" to checkTarget,
-                                "checkRole" to targetRole.code
+                                "checkRole" to targetRole.code,
+                                "team" to (teams[checkSeat.first.uid] ?: emptyList<String>())
                             )
                         )
                     }
@@ -576,7 +609,8 @@ object MafiaRoom {
                                     "role" to role.code,
                                     "nightTarget" to "",
                                     "check" to (doc.getString("check") ?: ""),
-                                    "checkRole" to (doc.getString("checkRole") ?: "")
+                                    "checkRole" to (doc.getString("checkRole") ?: ""),
+                                    "team" to (doc.get("team") ?: emptyList<String>())
                                 )
                             )
                         }
@@ -672,7 +706,8 @@ object MafiaRoom {
                 role = Role.fromCode(doc.getString("role")),
                 nightTarget = doc.getString("nightTarget").orEmpty(),
                 check = doc.getString("check").orEmpty(),
-                checkRole = Role.fromCode(doc.getString("checkRole"))
+                checkRole = Role.fromCode(doc.getString("checkRole")),
+                team = (doc.get("team") as? List<*>)?.mapNotNull { it?.toString() }.orEmpty()
             )
         } catch (e: Exception) {
             Log.e(TAG, "readSecret: ${e.message}", e)
@@ -696,7 +731,8 @@ object MafiaRoom {
                     role = Role.fromCode(snap.getString("role")),
                     nightTarget = snap.getString("nightTarget").orEmpty(),
                     check = snap.getString("check").orEmpty(),
-                    checkRole = Role.fromCode(snap.getString("checkRole"))
+                    checkRole = Role.fromCode(snap.getString("checkRole")),
+                    team = (snap.get("team") as? List<*>)?.mapNotNull { it?.toString() }.orEmpty()
                 )
             )
         }
@@ -764,6 +800,7 @@ object MafiaRoom {
             executedRole = Role.fromCode(data["executedRole"]?.toString()),
             winner = Winner.fromCode(data["winner"]?.toString()),
             log = GamesCore.stringsOf(data, "log"),
+            voice = GameVoice.parse(data["voice"]),
             createdAt = GamesCore.longOf(data, "createdAt"),
             updatedAt = GamesCore.longOf(data, "updatedAt")
         )

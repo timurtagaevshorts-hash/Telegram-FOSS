@@ -1,6 +1,8 @@
 package uz.kodlikino.top4.ui
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.os.Handler
 import android.os.Looper
@@ -12,6 +14,7 @@ import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
 import com.google.firebase.firestore.ListenerRegistration
@@ -24,6 +27,8 @@ import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.games.CheckersEngine
 import uz.kodlikino.top4.games.CheckersRoom
+import uz.kodlikino.top4.games.GameSfx
+import uz.kodlikino.top4.games.GameVoice
 import uz.kodlikino.top4.games.GamesCore
 import java.util.Locale
 
@@ -64,12 +69,27 @@ class CheckersFragment(
     private var btnResign: MaterialButton? = null
     private var btnRematch: MaterialButton? = null
     private var btnCancel: MaterialButton? = null
+    private var mic: GameMicButton? = null
+    private var voiceView: TextView? = null
+    private var btnRules: TextView? = null
+
+    private var voiceBusy = false
+    private var lastVoiceAt = 0L
+    private var playingVoiceAt = 0L
+    private var soundKey = ""
+    private var prevTurn: CheckersEngine.Side? = null
+    private var prevActive = false
+    private var prevFinished = false
+    private var prevPieces = -1
+    private var lastAutoClaimAt = 0L
 
     private val clockHandler = Handler(Looper.getMainLooper())
     private val clockTick = object : Runnable {
         override fun run() {
             updateClocks()
-            clockHandler.postDelayed(this, 1000L)
+            if (GameVoice.isRecording()) mic?.setElapsed(GameVoice.elapsedMs())
+            maybeAutoClaim()
+            clockHandler.postDelayed(this, if (GameVoice.isRecording()) 200L else 1000L)
         }
     }
 
@@ -102,6 +122,21 @@ class CheckersFragment(
         btnResign = root.findViewById(R.id.btnChkResign)
         btnRematch = root.findViewById(R.id.btnChkRematch)
         btnCancel = root.findViewById(R.id.btnChkCancel)
+        mic = root.findViewById(R.id.btnChkMic)
+        voiceView = root.findViewById(R.id.tvChkVoice)
+        btnRules = root.findViewById(R.id.btnChkRules)
+
+        mic?.onHoldStart = { startVoice() }
+        mic?.onHoldEnd = { finishVoice() }
+        mic?.onHoldCancel = {
+            GameVoice.cancel()
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            voiceView?.text = str(R.string.games_voice_idle)
+        }
+        btnRules?.setOnClickListener {
+            GameRulesDialog.show(ctx(), GameRulesDialog.CHECKERS)
+        }
+        voiceView?.setOnClickListener { toggleVoicePlayback() }
 
         board = root.findViewById<CheckersBoardView>(R.id.chkBoard).apply {
             onMove = { wire -> submitMove(wire) }
@@ -111,6 +146,7 @@ class CheckersFragment(
         btnRematch?.setOnClickListener { onFinishAction() }
         btnCancel?.setOnClickListener { cancelInvite() }
 
+        GameSfx.prepare(themed)
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         return root
     }
@@ -140,6 +176,10 @@ class CheckersFragment(
         listener?.remove()
         listener = null
         clockHandler.removeCallbacks(clockTick)
+        GameVoice.cancel()
+        GameVoice.stopPlayback()
+        playingVoiceAt = 0L
+        mic?.setMode(GameMicButton.Mode.IDLE)
         super.onPause()
     }
 
@@ -147,9 +187,26 @@ class CheckersFragment(
         listener?.remove()
         listener = null
         clockHandler.removeCallbacks(clockTick)
+        GameVoice.release()
+        GameSfx.release()
         scope?.cancel()
         scope = null
         super.onFragmentDestroy()
+    }
+
+    override fun onRequestPermissionsResultFragment(
+        requestCode: Int,
+        permissions: Array<out String>?,
+        grantResults: IntArray?
+    ) {
+        if (requestCode != REQ_MIC) return
+        val granted = grantResults?.isNotEmpty() == true &&
+            grantResults[0] == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            toast(R.string.games_voice_denied)
+        } else {
+            voiceView?.text = str(R.string.games_voice_hint)
+        }
     }
 
     // ----------------------------------------------------------------- state
@@ -170,9 +227,13 @@ class CheckersFragment(
         val mySide = g.sideOf(me)
         val waiting = g.status == GamesCore.STATUS_INVITE
 
+        syncVoice(g, me)
+
         waitingPanel?.visibility = if (waiting) View.VISIBLE else View.GONE
         content?.visibility = if (waiting) View.GONE else View.VISIBLE
         if (waiting) return
+
+        syncFeedback(g, me, mySide)
 
         val top: GamesCore.Player?
         val bottom: GamesCore.Player?
@@ -265,7 +326,14 @@ class CheckersFragment(
         }
         if (g.status != GamesCore.STATUS_ACTIVE) return ""
         if (mySide == null) return str(R.string.games_status_active)
-        if (g.turn == mySide) return str(R.string.chk_turn_you)
+        if (g.turn == mySide) {
+            val moves = CheckersEngine.legalMoves(g.board, mySide)
+            return if (moves.isNotEmpty() && moves.all { it.isCapture }) {
+                str(R.string.chk_must_capture)
+            } else {
+                str(R.string.chk_your_turn_voice)
+            }
+        }
         val opponent = if (mySide == CheckersEngine.Side.WHITE) g.black else g.white
         return str(R.string.chk_turn_opponent, opponent?.name.orEmpty())
     }
@@ -345,6 +413,160 @@ class CheckersFragment(
         }
     }
 
+    // ------------------------------------------------------- sound and voice
+
+    private fun syncFeedback(
+        g: CheckersRoom.Game,
+        me: String,
+        mySide: CheckersEngine.Side?
+    ) {
+        val ctx = ctx()
+        val active = g.status == GamesCore.STATUS_ACTIVE
+        val finished = g.isFinished()
+        val pieces = CheckersEngine.count(g.board, CheckersEngine.Side.WHITE) +
+            CheckersEngine.count(g.board, CheckersEngine.Side.BLACK)
+
+        if (!prevActive && active) GameSfx.play(ctx, GameSfx.START)
+        if (!prevFinished && finished) {
+            when {
+                g.winnerUid.isNotEmpty() && g.winnerUid == me -> GameSfx.play(ctx, GameSfx.WIN)
+                g.winnerUid.isEmpty() -> GameSfx.play(ctx, GameSfx.TURN)
+                else -> GameSfx.play(ctx, GameSfx.LOSE)
+            }
+        }
+        if (g.lastMove.isNotBlank() && g.lastMove != soundKey) {
+            val first = soundKey.isBlank()
+            soundKey = g.lastMove
+            if (!first) {
+                val captured = prevPieces >= 0 && pieces < prevPieces
+                GameSfx.play(ctx, if (captured) GameSfx.CAPTURE else GameSfx.MOVE)
+            }
+        }
+        if (prevTurn != null && prevTurn != g.turn && active &&
+            mySide != null && g.turn == mySide
+        ) {
+            GameSfx.play(ctx, GameSfx.TURN)
+        }
+        prevTurn = g.turn
+        prevActive = active
+        prevFinished = finished
+        prevPieces = pieces
+    }
+
+    private fun syncVoice(g: CheckersRoom.Game, me: String) {
+        val voice = g.voice ?: return
+        if (me.isNotEmpty() && voice.uid == me) return
+        if (voice.at <= lastVoiceAt) return
+        lastVoiceAt = voice.at
+        playVoice(voice)
+    }
+
+    private fun playVoice(voice: GameVoice.Message) {
+        val name = voice.name.ifBlank { str(R.string.games_unknown_host) }
+        playingVoiceAt = voice.at
+        voiceView?.text = str(R.string.games_voice_playing, name)
+        GameSfx.play(ctx(), GameSfx.JOIN, 0.5f)
+        GameVoice.play(voice.url) {
+            if (playingVoiceAt == voice.at) {
+                playingVoiceAt = 0L
+                voiceView?.text = str(R.string.games_voice_idle)
+            }
+        }
+    }
+
+    private fun toggleVoicePlayback() {
+        if (GameVoice.isPlaying()) {
+            GameVoice.stopPlayback()
+            playingVoiceAt = 0L
+            voiceView?.text = str(R.string.games_voice_idle)
+            return
+        }
+        val voice = game?.voice ?: return
+        if (voice.url.isBlank()) return
+        playVoice(voice)
+    }
+
+    private fun startVoice() {
+        val ctx = ctx()
+        if (!GameVoice.hasPermission(ctx)) {
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            requestMicPermission()
+            toast(R.string.games_voice_need_permission)
+            return
+        }
+        if (voiceBusy) {
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            return
+        }
+        GameVoice.stopPlayback()
+        playingVoiceAt = 0L
+        if (!GameVoice.start(ctx)) {
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            toast(R.string.games_voice_failed)
+            return
+        }
+        voiceView?.text = str(R.string.games_voice_hold)
+        GameSfx.play(ctx, GameSfx.TAP)
+    }
+
+    private fun finishVoice() {
+        if (!GameVoice.isRecording()) {
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            return
+        }
+        val clip = GameVoice.stop()
+        if (clip == null) {
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            voiceView?.text = str(R.string.games_voice_idle)
+            return
+        }
+        if (voiceBusy) {
+            clip.file.delete()
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            return
+        }
+        voiceBusy = true
+        mic?.setMode(GameMicButton.Mode.BUSY)
+        voiceView?.text = str(R.string.games_voice_sending)
+        val me = GamesCore.uidOf(currentAccount)
+        val name = GamesCore.me(currentAccount).name
+        scope?.launch {
+            val ok = try {
+                GameVoice.publish(roomId, me, name, clip)
+            } catch (e: Exception) {
+                false
+            }
+            voiceBusy = false
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            voiceView?.text = str(R.string.games_voice_idle)
+            if (ok) {
+                GameSfx.play(ctx(), GameSfx.TAP)
+            } else {
+                toast(R.string.games_voice_failed)
+            }
+        }
+    }
+
+    private fun requestMicPermission() {
+        val activity = parentActivity ?: return
+        ActivityCompat.requestPermissions(
+            activity,
+            arrayOf(Manifest.permission.RECORD_AUDIO),
+            REQ_MIC
+        )
+    }
+
+    private fun maybeAutoClaim() {
+        val g = game ?: return
+        if (busy) return
+        val me = GamesCore.uidOf(currentAccount)
+        if (!g.canClaimTimeout(me)) return
+        val now = GamesCore.now()
+        if (now - lastAutoClaimAt < 12_000L) return
+        lastAutoClaimAt = now
+        claimTimeout()
+    }
+
     private fun confirmResign() {
         val ctx = themedContext ?: return
         AlertDialog.Builder(ctx)
@@ -415,6 +637,10 @@ class CheckersFragment(
     }
 
     // --------------------------------------------------------------- helpers
+
+    private companion object {
+        const val REQ_MIC = 4419
+    }
 
     private fun ctx(): Context = themedContext ?: context ?: throw IllegalStateException()
 

@@ -129,4 +129,85 @@
     <string name="maf_waiting_start">Xost o‘yinni boshlashini kutmoqda…</string>
     <string name="maf_role_hidden">Rol tun boshida ochiladi</string>
     <string name="maf_rules">Har kecha mafiya o‘ldiradi, shifokor davolaydi, komissar tekshiradi. Kunduz shahar mafiyani ovoz bilan topadi.</string>
+
+    <!-- ======================= Qoidalar oynasi ======================= -->
+    <string name="rules_close">Yopish</string>
+    <string name="rules_checkers_lead">Rus damasi — 8×8 doskada ikki o‘yinchi uchun klassik o‘yin.</string>
+    <string name="rules_mafia_lead">Mafiya — 5 dan 12 gacha o‘yinchi uchun partiya o‘yini.</string>
+    <string name="rules_chk_goal">🎯 Maqsad
+Raqibning barcha donalarini urib tushiring yoki uning yurishi qolmaydigan holatga keltiring.</string>
+    <string name="rules_chk_board">🧩 Doska
+8×8 katak, faqat qora kataklarda o‘ynaladi. Oq donalar pastdan yuqoriga, qora donalar yuqoridan pastga yuriydi.</string>
+    <string name="rules_chk_move">👣 Oddiy yurish
+Oddiy dona faqat bitta katak oldinga yuradi — orqaga yura olmaydi.</string>
+    <string name="rules_chk_kings">👑 Dama
+Oxirgi qatorga yetgan dona dama bo‘ladi. Dama diagonal bo‘ylab istalgan masofaga yuradi va uradi.</string>
+    <string name="rules_chk_capture">⚔️ Urish
+Dona raqib donasidan sakrab, orqasidagi bo‘sh katakka tushadi. Oddiy dona oldinga ham, orqaga ham uradi.</string>
+    <string name="rules_chk_max_capture">❗ Majburiy urish
+Urish imkoni bo‘lsa, oddiy yurish taqiqlanadi. Bir nechta variant bo‘lsa — eng ko‘p dona oladigan variant majburiy.</string>
+    <string name="rules_chk_chain">🔗 Zanjir
+Urishdan keyin yana urish mumkin bo‘lsa, davom ettirish shart. Zanjirda qatorga yetgan dona darhol dama bo‘lib, zanjirni davom ettiradi.</string>
+    <string name="rules_chk_time">⏱ Vaqt
+Har bir yurishga 90 soniya beriladi. Vaqt tugasa, raqib g‘alabani oladi.</string>
+    <string name="rules_chk_draw">🤝 Durang
+15 yurish davomida faqat damalar yurib, urish bo‘lmasa — durang.</string>
+    <string name="rules_chk_voice">🎙 Ovoz
+Mikrofon tugmasini bosib turing va gapiring — raqibingiz yozuvni avtomatik eshitadi.</string>
+    <string name="rules_maf_goal">🎯 Maqsad
+Shahar mafiyani topib chiqarishi kerak; mafiya esa tirik shaharliklar sonidan kam bo‘lmasligi kerak.</string>
+    <string name="rules_maf_roles">🎭 Rollar
+Don — mafiya yetakchisi, uning nishoni hal qiluvchi.
+Mafiya — tunda o‘ldiradi.
+Komissar — tunda bir kishini tekshiradi.
+Shifokor — tunda bir kishini davolaydi.
+Fuqaro — tunda uxlaydi, kunduz mantiq bilan o‘ynaydi.</string>
+    <string name="rules_maf_night">🌙 Tun (45 soniya)
+Mafiya nishon tanlaydi, shifokor davolaydi, komissar tekshiradi. Donning tanlovi ustuvor.</string>
+    <string name="rules_maf_day">☀️ Kun (90 soniya)
+Tong natijasi e’lon qilinadi va jonli muhokama boshlanadi — ovozli xabar orqali gaplashing.</string>
+    <string name="rules_maf_vote">🗳 Ovoz berish (40 soniya)
+Har bir tirik o‘yinchi bittaga ovoz beradi yoki betaraf qoladi. Eng ko‘p ovoz olgan chiqariladi; tenglikda hech kim chiqarilmaydi.</string>
+    <string name="rules_maf_host">👑 Xost
+Xost fazalarni boshqaradi. Agar xost 25 soniya jim qolsa, boshqa tirik o‘yinchi xostlikni olishi mumkin.</string>
+    <string name="rules_maf_voice">🎙 Ovoz
+Mikrofonni bosib turing — gapirayotganingiz shu xonadagi barcha o‘yinchilarga yetib boradi.</string>
+    <string name="games_rules">Qoidalar</string>
+    <string name="games_rules_hint">Qoidalarni o‘qish</string>
+
+    <!-- ==================== Ovozli aloqa (PTT) ==================== -->
+    <string name="games_voice_hint">Bosib turing va gapiring</string>
+    <string name="games_voice_hold">Mikrofon: bosib turing</string>
+    <string name="games_voice_need_permission">Mikrofon ruxsati kerak — sozlamalardan ruxsat bering.</string>
+    <string name="games_voice_denied">Mikrofon ruxsati berilmadi</string>
+    <string name="games_voice_short">Juda qisqa — uzoqroq gapiring</string>
+    <string name="games_voice_sending">Ovoz yuborilmoqda…</string>
+    <string name="games_voice_sent">Ovoz yuborildi</string>
+    <string name="games_voice_failed">Ovoz yuborilmadi — qayta urinib ko‘ring</string>
+    <string name="games_voice_playing">%1$s gapiradi…</string>
+    <string name="games_voice_idle">Ovozli xabar yuborish uchun mikrofonni bosing</string>
+
+    <!-- ================== Mafiya: qatl va jamoa ================== -->
+    <string name="maf_executed">Chiqarildi: %1$s — %2$s</string>
+    <string name="maf_nobody_executed">Teng ovoz — hech kim chiqarilmadi</string>
+    <string name="maf_team">Jamoangiz</string>
+    <string name="maf_team_none">Yolg‘izsiz — hech kimni ishonmang</string>
+    <string name="maf_team_list">Siz bilan birga: %1$s</string>
+    <string name="maf_victim_banner">Bu tun: %1$s</string>
+    <string name="maf_night_quiet">Tun tinch o‘tdi</string>
+
+    <!-- ================== Shashka: qo'shimcha ================== -->
+    <string name="chk_must_capture">Urish majburiy — urishni boshlang</string>
+    <string name="chk_your_turn_voice">Navbat sizda — yurish qiling yoki ovoz yuboring</string>
+    <string name="chk_opponent_left">Raqib o‘yindan chiqdi</string>
+
+    <!-- ================== Umumiy ================== -->
+    <string name="games_rematch_started">Yangi o‘yin boshlandi</string>
+    <string name="games_you">Siz</string>
+    <string name="games_rules_checkers">Shashka qoidalari</string>
+    <string name="games_rules_mafia">Mafiya qoidalari</string>
+    <string name="maf_team_mates">Siz bilan: %1$s</string>
+    <string name="chk_capture_hint">Urish majburiy</string>
+    <string name="maf_victim_named">☠️ Bu tun halok bo‘ldi: %1$s</string>
+    <string name="maf_night_saved">🩹 Hujum bo‘ldi — shifokor ulgurdi</string>
 </resources>

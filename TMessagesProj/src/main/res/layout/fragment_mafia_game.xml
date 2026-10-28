@@ -150,6 +150,15 @@
                     android:textSize="@dimen/yuz_text_secondary"
                     android:textStyle="bold"
                     android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvMafTeam"
+                    style="@style/YuzCaption"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/yuz_space_2"
+                    android:textColor="@color/yuz_games_mafia"
+                    android:visibility="gone" />
             </LinearLayout>
 
             <!-- G'olib banneri -->
@@ -163,6 +172,20 @@
                 android:padding="@dimen/yuz_space_4"
                 android:textColor="@color/yuz_action"
                 android:textSize="@dimen/yuz_text_section"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <!-- Tungi/ovoz natijasi banneri -->
+            <TextView
+                android:id="@+id/tvMafNotice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_3"
+                android:background="@drawable/bg_yuz_games_panel"
+                android:gravity="center"
+                android:padding="@dimen/yuz_space_3"
+                android:textColor="@color/yuz_text"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
 
@@ -213,6 +236,47 @@
                 android:layout_width="match_parent"
                 android:layout_marginTop="@dimen/yuz_space_2"
                 android:visibility="gone" />
+
+            <!-- Ovoz va qoidalar -->
+            <LinearLayout
+                android:id="@+id/mafVoiceRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_4"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <uz.kodlikino.top4.ui.GameMicButton
+                    android:id="@+id/btnMafMic"
+                    android:layout_width="52dp"
+                    android:layout_height="52dp" />
+
+                <TextView
+                    android:id="@+id/tvMafVoice"
+                    style="@style/YuzCaption"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/yuz_space_3"
+                    android:layout_weight="1"
+                    android:text="@string/games_voice_idle" />
+
+                <TextView
+                    android:id="@+id/btnMafRules"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_yuz_games_chip"
+                    android:clickable="true"
+                    android:contentDescription="@string/games_rules_hint"
+                    android:focusable="true"
+                    android:paddingLeft="@dimen/yuz_space_3"
+                    android:paddingTop="8dp"
+                    android:paddingRight="@dimen/yuz_space_3"
+                    android:paddingBottom="8dp"
+                    android:text="@string/games_rules"
+                    android:textColor="@color/yuz_action"
+                    android:textSize="@dimen/yuz_text_secondary"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <!-- Voqealar -->
             <TextView
