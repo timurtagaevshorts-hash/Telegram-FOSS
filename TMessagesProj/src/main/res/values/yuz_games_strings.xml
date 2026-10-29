@@ -23,8 +23,8 @@
     <string name="games_error">Amal bajarilmadi. Qayta urinib ko‘ring.</string>
     <string name="games_sign_in_error">Ulanish o‘rnatilmadi. Internetni tekshirib, qayta urinib ko‘ring.</string>
     <string name="games_invite_sent">Taklif chatga yuborildi</string>
-    <string name="games_invite_message">🎮 %1$s sizni «Shashka» o‘yiniga taklif qildi. Chat menyusidagi «O‘yinlar» bo‘limidan qabul qiling.</string>
-    <string name="games_invite_mafia_message">🎭 %1$s «Mafiya» xonasini ochdi. Chat menyusidagi «O‘yinlar» bo‘limidan qo‘shiling.</string>
+    <string name="games_invite_message">🎮 %1$s sizni «Shashka» o‘yiniga taklif qildi. Chat tepasidagi «O‘yinlar» tugmasidan qabul qiling.</string>
+    <string name="games_invite_mafia_message">🎭 %1$s «Mafiya» xonasini ochdi. Chat tepasidagi «O‘yinlar» tugmasidan qo‘shiling.</string>
     <string name="games_join">Qo‘shilish</string>
     <string name="games_continue">Davom etish</string>
     <string name="games_accept">Qabul qilish</string>
