@@ -524,11 +524,11 @@ class CheckersFragment(
     }
 
     private fun syncVoice(g: CheckersRoom.Game, me: String) {
-        if (!voiceEnabled) return
         val voice = g.voice ?: return
         if (me.isNotEmpty() && voice.uid == me) return
         if (voice.at <= lastVoiceAt) return
         lastVoiceAt = voice.at
+        if (!voiceEnabled) return
         playVoice(voice)
     }
 

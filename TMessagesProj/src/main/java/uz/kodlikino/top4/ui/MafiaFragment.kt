@@ -677,11 +677,11 @@ class MafiaFragment(
     }
 
     private fun syncVoice(r: MafiaRoom.Room, me: String) {
-        if (!voiceEnabled) return
         val voice = r.voice ?: return
         if (me.isNotEmpty() && voice.uid == me) return
         if (voice.at <= lastVoiceAt) return
         lastVoiceAt = voice.at
+        if (!voiceEnabled) return
         playVoice(voice)
     }
 
