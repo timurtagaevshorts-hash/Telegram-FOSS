@@ -400,6 +400,11 @@ object MafiaRoom {
                     }
                 }
 
+                val nextSeats = if (victim == null) seats else
+                    seats.map { if (it.uid == victim.uid) it.copy(alive = false) else it }
+                // Firestore tranzaksiyasi barcha o‘qishlarni yozishdan oldin talab qiladi.
+                val winner = winnerOf(nextSeats, tx, roomId)
+
                 // Komissar tekshiruvi natijasi — faqat uning maxfiy hujjatiga.
                 if (checkSeat != null && checkTarget.isNotBlank()) {
                     val targetRole = actions.firstOrNull { it.first.uid == checkTarget }?.second
@@ -426,10 +431,6 @@ object MafiaRoom {
                 } else {
                     log.add("🌙 Tun tinch o‘tdi.")
                 }
-
-                val nextSeats = if (victim == null) seats else
-                    seats.map { if (it.uid == victim.uid) it.copy(alive = false) else it }
-                val winner = winnerOf(nextSeats, tx, roomId)
 
                 val updates = HashMap<String, Any>(10)
                 updates["players"] = MafiaRules.seatsToMaps(nextSeats)
@@ -608,14 +609,19 @@ object MafiaRoom {
                         )
                     }
                     Phase.EXECUTION -> {
+                        // Avval barcha o‘qishlar, keyin yozishlar (Firestore talabi).
+                        val secrets = ArrayList<Triple<String, String, com.google.firebase.firestore.DocumentSnapshot>>(seats.size)
                         for (seat in seats) {
                             if (!seat.alive) continue
                             val doc = tx.get(secretRef(roomId, seat.uid))
                             val role = Role.fromCode(doc.getString("role")) ?: continue
+                            secrets.add(Triple(seat.uid, role.code, doc))
+                        }
+                        for ((seatUid, roleCode, doc) in secrets) {
                             tx.set(
-                                secretRef(roomId, seat.uid),
+                                secretRef(roomId, seatUid),
                                 mapOf(
-                                    "role" to role.code,
+                                    "role" to roleCode,
                                     "nightTarget" to "",
                                     "check" to (doc.getString("check") ?: ""),
                                     "checkRole" to (doc.getString("checkRole") ?: ""),
@@ -824,6 +830,7 @@ object MafiaRoom {
     fun listenChatRooms(chatId: Long, onUpdate: (List<Room>) -> Unit): ListenerRegistration {
         return GamesCore.rooms()
             .whereEqualTo("chatId", chatId)
+            .whereEqualTo("kind", KIND)
             .limit(24)
             .addSnapshotListener { snap, error ->
                 if (error != null) {

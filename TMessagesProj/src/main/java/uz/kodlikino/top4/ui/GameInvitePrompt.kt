@@ -53,6 +53,7 @@ object GameInvitePrompt {
     private var progressView: ProgressBar? = null
     private var activeInvite: Invite? = null
     private var remaining = COUNTDOWN_SECONDS
+    private var lastDocs: List<DocumentSnapshot> = emptyList()
 
     private val handled = HashSet<String>()
     private val handler = Handler(Looper.getMainLooper())
@@ -109,7 +110,8 @@ object GameInvitePrompt {
                 .addSnapshotListener { snap, error ->
                     if (error != null || snap == null) return@addSnapshotListener
                     if (host !== fragment) return@addSnapshotListener
-                    onDocs(snap.documents)
+                    lastDocs = snap.documents
+                    onDocs(lastDocs)
                 }
         }
     }
@@ -122,6 +124,7 @@ object GameInvitePrompt {
         scope?.cancel()
         scope = null
         host = null
+        lastDocs = emptyList()
         account = 0
         chatId = 0L
     }
@@ -333,6 +336,8 @@ object GameInvitePrompt {
             d?.dismiss()
         } catch (_: Exception) {
         }
+        // Oyna yopilganda navbatdagi kutilayotgan taklifni ko‘rsatamiz.
+        if (lastDocs.isNotEmpty()) handler.post { onDocs(lastDocs) }
     }
 
     // -------------------------------------------------------------- actions

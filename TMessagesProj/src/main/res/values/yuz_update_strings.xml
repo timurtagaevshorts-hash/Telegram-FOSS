@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Majburiy yangilash darvozasi -->
+    <string name="yuz_update_title">Yangilash kerak</string>
+    <string name="yuz_update_body">YuzGram’ning yangi versiyasi chiqdi. Ilovadan foydalanishni davom ettirish uchun Play Market orqali yangilang.</string>
+    <string name="yuz_update_versions">Sizdagi versiya: %1$s · Kerakli: %2$s</string>
+    <string name="yuz_update_open_store">Play Market’dan yangilash</string>
+    <string name="yuz_update_exit">Chiqish</string>
+
+    <!-- Admin: majburiy yangilash -->
+    <string name="yuz_admin_update_title">Majburiy yangilash</string>
+    <string name="yuz_admin_update_desc">Play Market’da yangi versiya chiqqanda foydalanuvchi ilovaga kira olmaydi — yangilash oynasi yopilmaydi. Minimal kodga Play’dagi versionCode’ni yozing (masalan 49439). 0 — talab o‘chirilgan.</string>
+    <string name="yuz_admin_update_enabled">Yangilashni majburiy qilish</string>
+    <string name="yuz_admin_update_min_code">Minimal versionCode</string>
+    <string name="yuz_admin_update_note">Qo‘shimcha izoh (ixtiyoriy)</string>
+    <string name="yuz_admin_update_invalid">Minimal kod 0 yoki undan katta butun son bo‘lishi kerak</string>
+    <string name="yuz_admin_update_saved">Yangilash sozlamasi saqlandi</string>
+    <string name="yuz_admin_update_save">Yangilash sozlamasini saqlash</string>
+    <string name="yuz_admin_update_saved_off">Majburiy yangilash o‘chirildi</string>
+    <string name="yuz_admin_update_load_failed">Yangilash sozlamasi yuklanmadi. Internetni tekshiring</string>
+</resources>

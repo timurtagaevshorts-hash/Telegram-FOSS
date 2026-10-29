@@ -845,10 +845,14 @@ class MafiaFragment(
     }
 
     private fun advance() {
+        if (working) return
+        working = true
         scope?.launch {
             try {
                 MafiaRoom.advance(currentAccount, roomId)
             } catch (_: Exception) {
+            } finally {
+                working = false
             }
         }
     }

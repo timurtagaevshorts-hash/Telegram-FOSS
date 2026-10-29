@@ -30,7 +30,7 @@ object GameSfx {
     const val JOIN = 12
 
     private var pool: SoundPool? = null
-    private var loaded = false
+    private val loadedIds = java.util.Collections.synchronizedSet(HashSet<Int>())
     private val ids = HashMap<Int, Int>()
     private var volume = 0.85f
 
@@ -47,7 +47,9 @@ object GameSfx {
             @Suppress("DEPRECATION")
             SoundPool(4, AudioManager.STREAM_MUSIC, 0)
         }
-        created.setOnLoadCompleteListener { _, _, status -> if (status == 0) loaded = true }
+        created.setOnLoadCompleteListener { _, sampleId, status ->
+            if (status == 0) loadedIds.add(sampleId)
+        }
         val app = context.applicationContext
         ids[TAP] = created.load(app, R.raw.sfx_tap, 1)
         ids[MOVE] = created.load(app, R.raw.sfx_move, 1)
@@ -67,7 +69,7 @@ object GameSfx {
     fun play(context: Context, sound: Int, volumeScale: Float = 1f) {
         prepare(context)
         val soundId = ids[sound] ?: return
-        if (soundId == 0 || !loaded) return
+        if (soundId == 0 || !loadedIds.contains(soundId)) return
         try {
             pool?.play(soundId, volume * volumeScale, volume * volumeScale, 1, 0, 1f)
         } catch (_: Exception) {
@@ -85,7 +87,7 @@ object GameSfx {
         } catch (_: Exception) {
         }
         pool = null
-        loaded = false
+        loadedIds.clear()
         ids.clear()
     }
 }

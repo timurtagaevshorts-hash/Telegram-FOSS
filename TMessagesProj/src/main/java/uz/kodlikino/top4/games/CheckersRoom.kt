@@ -517,6 +517,7 @@ object CheckersRoom {
     fun listenChatGames(chatId: Long, onUpdate: (List<Game>) -> Unit): ListenerRegistration {
         return GamesCore.rooms()
             .whereEqualTo("chatId", chatId)
+            .whereEqualTo("kind", KIND)
             .limit(24)
             .addSnapshotListener { snap, error ->
                 if (error != null) {

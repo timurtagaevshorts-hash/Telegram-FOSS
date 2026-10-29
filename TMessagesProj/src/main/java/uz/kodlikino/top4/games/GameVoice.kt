@@ -90,6 +90,8 @@ object GameVoice {
             rec.setAudioChannels(1)
             rec.setAudioEncodingBitRate(32000)
             rec.setOutputFile(file.absolutePath)
+            // 20 s chegara: recorder o‘zi to‘xtaydi, klip cheksiz o‘sib ketmaydi.
+            rec.setMaxDuration((MAX_MS + 200L).toInt())
             rec.prepare()
             rec.start()
             recorder = rec
@@ -125,8 +127,10 @@ object GameVoice {
                 rec.release()
             } catch (_: Exception) {
             }
-            file?.delete()
-            return null
+            // setMaxDuration chegara o‘zi to‘xtatgan bo‘lsa fayl baribir saqlangan.
+            val ok = file != null && file.exists() && file.length() > 600L
+            if (!ok) file?.delete()
+            return if (ok) Clip(file!!, MAX_MS) else null
         }
         try {
             rec.release()
@@ -210,6 +214,7 @@ object GameVoice {
         stopPlayback()
         return try {
             val mp = MediaPlayer()
+            player = mp
             mp.setAudioAttributes(
                 android.media.AudioAttributes.Builder()
                     .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
@@ -236,10 +241,10 @@ object GameVoice {
                 true
             }
             mp.prepareAsync()
-            player = mp
             true
         } catch (e: Exception) {
             Log.e(TAG, "play: ${e.message}", e)
+            stopPlayback()
             false
         }
     }
