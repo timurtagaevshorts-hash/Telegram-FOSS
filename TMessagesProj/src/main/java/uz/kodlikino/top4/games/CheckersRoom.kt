@@ -53,6 +53,7 @@ object CheckersRoom {
         val expiresAt: Long,
         val rematchRoomId: String,
         val voice: GameVoice.Message?,
+        val reaction: GamesCore.Reaction?,
         val createdAt: Long,
         val updatedAt: Long
     ) {
@@ -294,6 +295,26 @@ object CheckersRoom {
             } catch (e: Exception) {
                 Log.e(TAG, "move: ${e.message}", e)
                 MoveResult.ERROR
+            }
+        }
+
+    // ------------------------------------------------------------- reactions
+
+    /** Reaksiya yuborish — raqibning doskasi ustida 2 soniya ko‘rinadi. */
+    suspend fun sendReaction(account: Int, roomId: String, emoji: String): Boolean =
+        withContext(Dispatchers.IO) {
+            val clean = emoji.trim().take(8)
+            if (!GamesCore.REACTIONS.contains(clean)) return@withContext false
+            try {
+                GamesCore.signIn(account)
+                val me = GamesCore.me(account)
+                GamesCore.rooms().document(roomId.trim()).update(
+                    "reaction", GamesCore.reactionMap(me, clean, GamesCore.now())
+                ).await()
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "sendReaction: ${e.message}", e)
+                false
             }
         }
 
@@ -570,6 +591,7 @@ object CheckersRoom {
             expiresAt = GamesCore.longOf(data, "expiresAt"),
             rematchRoomId = GamesCore.stringOf(data, "rematchRoomId"),
             voice = GameVoice.parse(data["voice"]),
+            reaction = GamesCore.parseReaction(data["reaction"]),
             createdAt = GamesCore.longOf(data, "createdAt"),
             updatedAt = GamesCore.longOf(data, "updatedAt")
         )

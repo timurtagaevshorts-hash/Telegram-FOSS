@@ -50,6 +50,16 @@ object GamesCore {
     /** Firebase sessiyasi (`tg_<id>`) — tarmoq xatosida [IllegalStateException]. */
     suspend fun signIn(account: Int): String = YuzGramAdsAuth.ensureSignedIn(account)
 
+    /**
+     * Sessiya allaqachon ochiqmi (yangi kirishni talab qilmaydi). Fon
+     * o‘quvlari (masalan, taklif siyosati) uchun — u yerda akkaunt raqami
+     * yo‘q va bloklovchi kirish keraksiz.
+     */
+    fun hasSession(): Boolean {
+        val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+        return !uid.isNullOrBlank()
+    }
+
     fun me(account: Int, seat: Int = 0): Player {
         val cfg = UserConfig.getInstance(account)
         val user = cfg.currentUser
@@ -86,6 +96,38 @@ object GamesCore {
         "tgId" to player.tgId,
         "name" to player.name,
         "seat" to player.seat
+    )
+
+    // ------------------------------------------------------------- reactions
+
+    /** Doska ustida ko‘rsatiladigan reaksiya (2 soniya). */
+    data class Reaction(
+        val uid: String,
+        val name: String,
+        val emoji: String,
+        val at: Long
+    )
+
+    /** O‘yin ichidagi reaksiya tanlovi. */
+    val REACTIONS = listOf("👍", "😂", "😮", "🤔", "🔥", "👏")
+
+    fun parseReaction(raw: Any?): Reaction? {
+        val map = raw as? Map<*, *> ?: return null
+        val emoji = map["emoji"]?.toString().orEmpty()
+        if (emoji.isBlank()) return null
+        return Reaction(
+            uid = map["uid"]?.toString().orEmpty(),
+            name = map["name"]?.toString().orEmpty().take(40),
+            emoji = emoji.take(8),
+            at = (map["at"] as? Number)?.toLong() ?: 0L
+        )
+    }
+
+    fun reactionMap(player: Player, emoji: String, at: Long): Map<String, Any> = mapOf(
+        "uid" to player.uid,
+        "name" to player.name,
+        "emoji" to emoji,
+        "at" to at
     )
 
     fun parsePlayers(raw: Any?): List<Player> {

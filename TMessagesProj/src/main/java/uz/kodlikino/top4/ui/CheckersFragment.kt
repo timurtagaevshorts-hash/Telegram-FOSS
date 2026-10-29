@@ -72,6 +72,12 @@ class CheckersFragment(
     private var mic: GameMicButton? = null
     private var voiceView: TextView? = null
     private var btnRules: TextView? = null
+    private var voiceToggle: TextView? = null
+    private var reactionOverlay: GameReactionView? = null
+
+    private var voiceEnabled = true
+    private var lastReactionAt = 0L
+    private var reactionSeeded = false
 
     private var voiceBusy = false
     private var lastVoiceAt = 0L
@@ -125,6 +131,13 @@ class CheckersFragment(
         mic = root.findViewById(R.id.btnChkMic)
         voiceView = root.findViewById(R.id.tvChkVoice)
         btnRules = root.findViewById(R.id.btnChkRules)
+        voiceToggle = root.findViewById(R.id.btnChkVoiceToggle)
+        reactionOverlay = root.findViewById(R.id.chkReactionOverlay)
+
+        voiceEnabled = GameVoice.isEnabled(themed)
+        GameReactionView.buildChips(root.findViewById(R.id.chkReactionRow)) { sendReaction(it) }
+        voiceToggle?.setOnClickListener { toggleVoiceEnabled() }
+        paintVoiceState()
 
         mic?.onHoldStart = { startVoice() }
         mic?.onHoldEnd = { finishVoice() }
@@ -180,6 +193,7 @@ class CheckersFragment(
         GameVoice.stopPlayback()
         playingVoiceAt = 0L
         mic?.setMode(GameMicButton.Mode.IDLE)
+        reactionOverlay?.hideNow()
         super.onPause()
     }
 
@@ -228,6 +242,7 @@ class CheckersFragment(
         val waiting = g.status == GamesCore.STATUS_INVITE
 
         syncVoice(g, me)
+        syncReaction(g)
 
         waitingPanel?.visibility = if (waiting) View.VISIBLE else View.GONE
         content?.visibility = if (waiting) View.GONE else View.VISIBLE
@@ -453,7 +468,63 @@ class CheckersFragment(
         prevPieces = pieces
     }
 
+    // ------------------------------------------------------------ reactions
+
+    /** Doskadagi yangi reaksiyani 2 soniyaga chiqaradi (kirishda eskisini ko‘rsatmaydi). */
+    private fun syncReaction(g: CheckersRoom.Game) {
+        val reaction = g.reaction
+        if (!reactionSeeded) {
+            reactionSeeded = true
+            lastReactionAt = reaction?.at ?: 0L
+            return
+        }
+        if (reaction == null || reaction.at <= lastReactionAt) return
+        lastReactionAt = reaction.at
+        reactionOverlay?.show(reaction.emoji, reaction.name)
+    }
+
+    private fun sendReaction(emoji: String) {
+        GameSfx.play(ctx(), GameSfx.TAP, 0.7f)
+        scope?.launch {
+            val ok = try {
+                CheckersRoom.sendReaction(currentAccount, roomId, emoji)
+            } catch (e: Exception) {
+                false
+            }
+            if (!ok) toast(R.string.games_reaction_failed)
+        }
+    }
+
+    private fun toggleVoiceEnabled() {
+        voiceEnabled = !voiceEnabled
+        GameVoice.setEnabled(ctx(), voiceEnabled)
+        if (!voiceEnabled) {
+            playingVoiceAt = 0L
+            mic?.setMode(GameMicButton.Mode.IDLE)
+        }
+        paintVoiceState()
+        GameSfx.play(ctx(), GameSfx.TAP, 0.7f)
+    }
+
+    private fun paintVoiceState() {
+        voiceToggle?.text =
+            str(if (voiceEnabled) R.string.games_voice_on else R.string.games_voice_off)
+        voiceToggle?.setTextColor(
+            ContextCompat.getColor(
+                ctx(),
+                if (voiceEnabled) R.color.yuz_action else R.color.yuz_text_secondary
+            )
+        )
+        mic?.alpha = if (voiceEnabled) 1f else 0.45f
+        if (playingVoiceAt == 0L) {
+            voiceView?.text = str(
+                if (voiceEnabled) R.string.games_voice_idle else R.string.games_voice_off
+            )
+        }
+    }
+
     private fun syncVoice(g: CheckersRoom.Game, me: String) {
+        if (!voiceEnabled) return
         val voice = g.voice ?: return
         if (me.isNotEmpty() && voice.uid == me) return
         if (voice.at <= lastVoiceAt) return
@@ -475,6 +546,10 @@ class CheckersFragment(
     }
 
     private fun toggleVoicePlayback() {
+        if (!voiceEnabled) {
+            toast(R.string.games_voice_muted_hint)
+            return
+        }
         if (GameVoice.isPlaying()) {
             GameVoice.stopPlayback()
             playingVoiceAt = 0L
@@ -488,6 +563,11 @@ class CheckersFragment(
 
     private fun startVoice() {
         val ctx = ctx()
+        if (!voiceEnabled) {
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            toast(R.string.games_voice_muted_hint)
+            return
+        }
         if (!GameVoice.hasPermission(ctx)) {
             mic?.setMode(GameMicButton.Mode.IDLE)
             requestMicPermission()

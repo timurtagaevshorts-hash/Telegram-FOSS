@@ -25,6 +25,9 @@ object MafiaRoom {
 
     const val KIND = GamesCore.KIND_MAFIA
 
+    /** Taklif etilgan o‘yinchi kutishi mumkin bo‘lgan muddat. */
+    const val INVITE_TTL_MS = 10 * 60_000L
+
     enum class JoinResult { OK, FULL, STARTED, ALREADY, ERROR }
 
     data class Room(
@@ -46,6 +49,7 @@ object MafiaRoom {
         val winner: Winner?,
         val log: List<String>,
         val voice: GameVoice.Message?,
+        val reaction: GamesCore.Reaction?,
         val createdAt: Long,
         val updatedAt: Long
     ) {
@@ -75,7 +79,12 @@ object MafiaRoom {
 
     // --------------------------------------------------------------- create
 
-    suspend fun create(account: Int, chatId: Long, chatTitle: String): String? =
+    suspend fun create(
+        account: Int,
+        chatId: Long,
+        chatTitle: String,
+        invited: List<String> = emptyList()
+    ): String? =
         withContext(Dispatchers.IO) {
             try {
                 val signed = GamesCore.signIn(account)
@@ -94,7 +103,7 @@ object MafiaRoom {
                         "status" to GamesCore.STATUS_INVITE,
                         "uids" to listOf(me.uid),
                         "players" to listOf(seat.toMap()),
-                        "invited" to emptyList<String>(),
+                        "invited" to invited.filter { it.isNotBlank() && it != me.uid },
                         "phase" to Phase.LOBBY.code,
                         "day" to 0,
                         "phaseEndsAt" to 0L,
@@ -697,6 +706,63 @@ object MafiaRoom {
 
     // --------------------------------------------------------------- secret
 
+    // ------------------------------------------------------------- reactions
+
+    /** Taklifni rad etish — o‘zini `invited` dan olib tashlaydi (xost lobbini bekor qiladi). */
+    suspend fun decline(account: Int, roomId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val uid = GamesCore.signIn(account)
+            val ref = GamesCore.rooms().document(roomId.trim())
+            GamesCore.db.runTransaction { tx ->
+                val snap = tx.get(ref)
+                if (!snap.exists()) return@runTransaction
+                if (snap.getString("status") != GamesCore.STATUS_INVITE) return@runTransaction
+                val now = GamesCore.now()
+                if (snap.getString("hostUid") == uid) {
+                    tx.update(
+                        ref,
+                        mapOf(
+                            "status" to GamesCore.STATUS_CANCELLED,
+                            "updatedAt" to now
+                        )
+                    )
+                } else {
+                    val invited = GamesCore.stringsOf(snap.data, "invited")
+                    if (!invited.contains(uid)) return@runTransaction
+                    tx.update(
+                        ref,
+                        mapOf(
+                            "invited" to invited.filter { it != uid },
+                            "updatedAt" to now
+                        )
+                    )
+                }
+            }.await()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "decline: ${e.message}", e)
+            false
+        }
+    }
+
+    /** Reaksiya — barcha o‘yinchilarga 2 soniya ko‘rinadi. */
+    suspend fun sendReaction(account: Int, roomId: String, emoji: String): Boolean =
+        withContext(Dispatchers.IO) {
+            val clean = emoji.trim().take(8)
+            if (!GamesCore.REACTIONS.contains(clean)) return@withContext false
+            try {
+                GamesCore.signIn(account)
+                val me = GamesCore.me(account)
+                GamesCore.rooms().document(roomId.trim()).update(
+                    "reaction", GamesCore.reactionMap(me, clean, GamesCore.now())
+                ).await()
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "sendReaction: ${e.message}", e)
+                false
+            }
+        }
+
     suspend fun readSecret(account: Int, roomId: String): Secret? = withContext(Dispatchers.IO) {
         try {
             val uid = GamesCore.signIn(account)
@@ -775,6 +841,34 @@ object MafiaRoom {
             }
     }
 
+    /** Menga yo‘naltirilgan mafiya takliflari (hali boshlanmagan lobbi). */
+    fun listenInvites(uid: String, onUpdate: (List<Room>) -> Unit): ListenerRegistration? {
+        val clean = uid.trim()
+        if (clean.isEmpty()) return null
+        return GamesCore.rooms()
+            .whereArrayContains("invited", clean)
+            .addSnapshotListener { snap, error ->
+                if (error != null) {
+                    Log.e(TAG, "listenInvites: ${error.message}", error)
+                    return@addSnapshotListener
+                }
+                val now = GamesCore.now()
+                val list = ArrayList<Room>()
+                snap?.documents?.forEach { doc ->
+                    if (doc.getString("kind") != KIND) return@forEach
+                    if (doc.getString("status") != GamesCore.STATUS_INVITE) return@forEach
+                    val room = parse(doc.id, doc.data.orEmpty()) ?: return@forEach
+                    if (!room.isLobby()) return@forEach
+                    if (room.createdAt > 0L && now - room.createdAt > INVITE_TTL_MS) {
+                        return@forEach
+                    }
+                    list.add(room)
+                }
+                list.sortByDescending { it.createdAt }
+                onUpdate(list)
+            }
+    }
+
     fun parse(id: String, data: Map<String, Any?>): Room? {
         if (data["kind"]?.toString() != KIND) return null
         val votes = HashMap<String, String>()
@@ -801,6 +895,7 @@ object MafiaRoom {
             winner = Winner.fromCode(data["winner"]?.toString()),
             log = GamesCore.stringsOf(data, "log"),
             voice = GameVoice.parse(data["voice"]),
+            reaction = GamesCore.parseReaction(data["reaction"]),
             createdAt = GamesCore.longOf(data, "createdAt"),
             updatedAt = GamesCore.longOf(data, "updatedAt")
         )

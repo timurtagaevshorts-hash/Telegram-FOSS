@@ -20,9 +20,11 @@ import org.telegram.messenger.SendMessagesHelper
 import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.games.CheckersEngine
 import uz.kodlikino.top4.games.CheckersRoom
+import uz.kodlikino.top4.games.GameInvitePolicy
 import uz.kodlikino.top4.games.GamesCore
 import uz.kodlikino.top4.games.MafiaRoom
 import uz.kodlikino.top4.games.MafiaRules
+import uz.kodlikino.top4.utils.YuzGramProfileStore
 
 /**
  * Chat ichidagi o‘yinlar markazi.
@@ -67,10 +69,12 @@ class GamesHubFragment(
     private var checkersListener: ListenerRegistration? = null
     private var mafiaListener: ListenerRegistration? = null
     private var invitesListener: ListenerRegistration? = null
+    private var mafiaInvitesListener: ListenerRegistration? = null
 
     private var chatCheckers: List<CheckersRoom.Game> = emptyList()
     private var chatMafia: List<MafiaRoom.Room> = emptyList()
     private var invites: List<CheckersRoom.Game> = emptyList()
+    private var mafiaInvites: List<MafiaRoom.Room> = emptyList()
     private var gotCheckers = false
     private var gotMafia = false
     private var busy = false
@@ -150,6 +154,10 @@ class GamesHubFragment(
                 return@launch
             }
             if (!liveActive) return@launch
+            val me = GamesCore.me(currentAccount)
+            if (me.uid.isNotBlank()) {
+                YuzGramProfileStore.ensureSelfProfile(me.uid, me.name, "", "")
+            }
             attachListeners()
         }
     }
@@ -172,6 +180,10 @@ class GamesHubFragment(
             invites = it
             render()
         }
+        mafiaInvitesListener = MafiaRoom.listenInvites(myUid()) {
+            mafiaInvites = it
+            render()
+        }
     }
 
     private fun stopLive() {
@@ -179,14 +191,17 @@ class GamesHubFragment(
         checkersListener?.remove()
         mafiaListener?.remove()
         invitesListener?.remove()
+        mafiaInvitesListener?.remove()
         checkersListener = null
         mafiaListener = null
         invitesListener = null
+        mafiaInvitesListener = null
         gotCheckers = false
         gotMafia = false
         chatCheckers = emptyList()
         chatMafia = emptyList()
         invites = emptyList()
+        mafiaInvites = emptyList()
     }
 
     // ---------------------------------------------------------------- create
@@ -200,6 +215,12 @@ class GamesHubFragment(
         }
         setBusy(true)
         scope?.launch {
+            if (opponent != null && GameInvitePolicy.peerUsesYuzGram(opponent.uid) == false) {
+                setBusy(false)
+                sendChatMessage(str(R.string.games_upgrade_checkers))
+                toast(R.string.games_peer_no_yuzgram, opponent.name)
+                return@launch
+            }
             val id = try {
                 CheckersRoom.create(currentAccount, chatId, chatTitle, opponent, opponent == null)
             } catch (e: Exception) {
@@ -217,10 +238,26 @@ class GamesHubFragment(
 
     private fun createMafia() {
         if (busy) return
+        val invitee = if (!isGroup && peerUid.isNotBlank() && peerUid != myUid()) {
+            peerUid
+        } else {
+            ""
+        }
         setBusy(true)
         scope?.launch {
+            if (invitee.isNotBlank() && GameInvitePolicy.peerUsesYuzGram(invitee) == false) {
+                setBusy(false)
+                sendChatMessage(str(R.string.games_upgrade_mafia))
+                toast(R.string.games_peer_no_yuzgram, peerName)
+                return@launch
+            }
             val id = try {
-                MafiaRoom.create(currentAccount, chatId, chatTitle)
+                MafiaRoom.create(
+                    currentAccount,
+                    chatId,
+                    chatTitle,
+                    if (invitee.isBlank()) emptyList() else listOf(invitee)
+                )
             } catch (e: Exception) {
                 null
             }
@@ -267,10 +304,15 @@ class GamesHubFragment(
         emptyView?.visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
 
         val inviteRows = invites.filter { it.status == GamesCore.STATUS_INVITE }
-        invitesHeader?.visibility = if (inviteRows.isEmpty()) View.GONE else View.VISIBLE
+        val mafiaInviteRows = mafiaInvites.filter { it.isLobby() }
+        val hasInvites = inviteRows.isNotEmpty() || mafiaInviteRows.isNotEmpty()
+        invitesHeader?.visibility = if (hasInvites) View.VISIBLE else View.GONE
         inviteList?.removeAllViews()
         for (invite in inviteRows) {
             inviteList?.addView(buildRow(themed, inviteEntry(invite, me)))
+        }
+        for (room in mafiaInviteRows) {
+            inviteList?.addView(buildRow(themed, mafiaInviteEntry(room)))
         }
     }
 
@@ -372,6 +414,25 @@ class GamesHubFragment(
         )
     }
 
+    private fun mafiaInviteEntry(room: MafiaRoom.Room): Entry {
+        val host = room.seats.firstOrNull()?.name.orEmpty()
+            .ifBlank { str(R.string.games_unknown_host) }
+        val subtitle = listOfNotNull(
+            room.chatTitle.takeIf { it.isNotBlank() },
+            str(R.string.games_status_invite)
+        ).joinToString(" · ")
+        return Entry(
+            room.id,
+            str(R.string.games_mafia) + " · " + host,
+            subtitle,
+            room.updatedAt,
+            str(R.string.games_accept),
+            str(R.string.games_decline),
+            onClick = { joinMafia(room.id) },
+            onSecondary = { declineMafia(room.id) }
+        )
+    }
+
     private fun playersLine(game: CheckersRoom.Game): String {
         val white = game.white?.name.orEmpty().ifBlank { str(R.string.chk_white) }
         val black = game.black?.name.orEmpty().ifBlank { str(R.string.chk_black) }
@@ -458,6 +519,16 @@ class GamesHubFragment(
         }
     }
 
+    private fun declineMafia(roomId: String) {
+        scope?.launch {
+            try {
+                MafiaRoom.decline(currentAccount, roomId)
+            } catch (_: Exception) {
+            }
+            render()
+        }
+    }
+
     private fun joinMafia(roomId: String) {
         setBusy(true)
         scope?.launch {
@@ -499,5 +570,9 @@ class GamesHubFragment(
 
     private fun toast(resId: Int) {
         Toast.makeText(ctx(), str(resId), Toast.LENGTH_SHORT).show()
+    }
+
+    private fun toast(resId: Int, vararg args: Any) {
+        Toast.makeText(ctx(), str(resId, *args), Toast.LENGTH_LONG).show()
     }
 }

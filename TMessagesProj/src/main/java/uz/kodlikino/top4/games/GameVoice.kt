@@ -46,6 +46,26 @@ object GameVoice {
     private var startedAt = 0L
     private var player: MediaPlayer? = null
 
+    // ------------------------------------------------------------ preference
+
+    private const val PREFS = "yuz_games_voice"
+    private const val KEY_ENABLED = "enabled"
+
+    /** Ovozli chat yoqilganmi — fragmentlar tugma holatini shu yerdan oladi. */
+    fun isEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_ENABLED, true)
+
+    fun setEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_ENABLED, enabled)
+            .apply()
+        if (!enabled) {
+            cancel()
+            stopPlayback()
+        }
+    }
+
     fun hasPermission(context: Context): Boolean =
         context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED

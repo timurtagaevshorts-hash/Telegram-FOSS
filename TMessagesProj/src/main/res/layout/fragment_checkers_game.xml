@@ -120,11 +120,23 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <uz.kodlikino.top4.ui.CheckersBoardView
-                android:id="@+id/chkBoard"
+            <FrameLayout
+                android:id="@+id/chkBoardHost"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/yuz_space_3" />
+                android:layout_marginTop="@dimen/yuz_space_3">
+
+                <uz.kodlikino.top4.ui.CheckersBoardView
+                    android:id="@+id/chkBoard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <uz.kodlikino.top4.ui.GameReactionView
+                    android:id="@+id/chkReactionOverlay"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center" />
+            </FrameLayout>
 
             <TextView
                 android:id="@+id/tvChkStatus"
@@ -216,6 +228,48 @@
                     android:layout_weight="1"
                     android:text="@string/chk_rematch"
                     android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- Reaksiyalar va ovoz tugmasi -->
+            <LinearLayout
+                android:id="@+id/chkReactionBar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_3"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <HorizontalScrollView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:clipToPadding="false"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/chkReactionRow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
+
+                <TextView
+                    android:id="@+id/btnChkVoiceToggle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/yuz_space_2"
+                    android:background="@drawable/bg_yuz_games_chip"
+                    android:clickable="true"
+                    android:contentDescription="@string/games_voice_toggle"
+                    android:focusable="true"
+                    android:paddingLeft="@dimen/yuz_space_3"
+                    android:paddingTop="8dp"
+                    android:paddingRight="@dimen/yuz_space_3"
+                    android:paddingBottom="8dp"
+                    android:text="@string/games_voice_on"
+                    android:textColor="@color/yuz_action"
+                    android:textSize="@dimen/yuz_text_secondary"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Ovoz va qoidalar -->

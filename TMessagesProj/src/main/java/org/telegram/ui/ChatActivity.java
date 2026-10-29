@@ -326,6 +326,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     private ActionBarMenuItem.Item translateItem;
     private ActionBarMenuItem searchIconItem;
     private ActionBarMenu.LazyItem audioCallIconItem;
+    private ActionBarMenu.LazyItem yuzGamesIconItem;
     private boolean searchItemVisible;
     private RadialProgressView progressBar;
     private ActionBarMenuItem.Item addContactItem;
@@ -3818,6 +3819,12 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             }
         }
 
+        if (chatMode == 0 && (currentUser != null || currentChat != null) && currentEncryptedChat == null && !UserObject.isReplyUser(currentUser) && reportType < 0) {
+            yuzGamesIconItem = menu.lazilyAddItem(yuz_games, R.drawable.ic_yuz_games, themeDelegate);
+            yuzGamesIconItem.setContentDescription(LocaleController.getString("YuzGames", R.string.YuzGames));
+            yuzGamesIconItem.setVisibility(View.VISIBLE);
+        }
+
         editTextItem = menu.lazilyAddItem(chat_menu_edit_text_options, R.drawable.ic_ab_other, themeDelegate);
         editTextItem.setContentDescription(LocaleController.getString("AccDescrMoreOptions", R.string.AccDescrMoreOptions));
         editTextItem.setTag(null);
@@ -3956,9 +3963,6 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 headerItem.lazilyAddSubItem(add_shortcut, R.drawable.msg_home, LocaleController.getString(R.string.AddShortcut));
             }
             if (!isTopic) {
-                if (currentEncryptedChat == null) {
-                    headerItem.lazilyAddSubItem(yuz_games, R.drawable.ic_yuz_games, LocaleController.getString("YuzGames", R.string.YuzGames));
-                }
                 clearHistoryItem = headerItem.lazilyAddSubItem(clear_history, R.drawable.msg_clear, LocaleController.getString("ClearHistory", R.string.ClearHistory));
                 yuzOriginalsItem = headerItem.lazilyAddSubItem(yuz_original_messages, R.drawable.msg_archive, null, LocaleController.getString("YuzShowOriginals", R.string.YuzShowOriginals), true, true);
                 yuzOriginalsItem.setChecked(YuzMessageArchive.isEnabled());
@@ -27076,6 +27080,9 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             contentView.onResume();
         }
         checkChecksHint();
+        if (chatMode == 0) {
+            uz.kodlikino.top4.ui.GameInvitePrompt.attach(this, currentAccount, dialog_id);
+        }
 
         Bulletin.addDelegate(this, bulletinDelegate = new Bulletin.Delegate() {
             @Override
@@ -27225,6 +27232,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     @Override
     public void onPause() {
         super.onPause();
+        uz.kodlikino.top4.ui.GameInvitePrompt.detach();
         scrolling = false;
         if (scrimPopupWindow != null) {
             scrimPopupWindow.setPauseNotifications(false);

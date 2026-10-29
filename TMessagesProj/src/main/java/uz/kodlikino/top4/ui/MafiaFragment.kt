@@ -84,6 +84,12 @@ class MafiaFragment(
     private var mic: GameMicButton? = null
     private var voiceView: TextView? = null
     private var btnRules: TextView? = null
+    private var voiceToggle: TextView? = null
+    private var reactionOverlay: GameReactionView? = null
+
+    private var voiceEnabled = true
+    private var lastReactionAt = 0L
+    private var reactionSeeded = false
 
     private var voiceBusy = false
     private var lastVoiceAt = 0L
@@ -143,6 +149,13 @@ class MafiaFragment(
         mic = root.findViewById(R.id.btnMafMic)
         voiceView = root.findViewById(R.id.tvMafVoice)
         btnRules = root.findViewById(R.id.btnMafRules)
+        voiceToggle = root.findViewById(R.id.btnMafVoiceToggle)
+        reactionOverlay = root.findViewById(R.id.mafReactionOverlay)
+
+        voiceEnabled = GameVoice.isEnabled(themed)
+        GameReactionView.buildChips(root.findViewById(R.id.mafReactionRow)) { sendReaction(it) }
+        voiceToggle?.setOnClickListener { toggleVoiceEnabled() }
+        paintVoiceState()
 
         btnPrimary?.setOnClickListener { onPrimary() }
         btnSecondary?.setOnClickListener { onSecondary() }
@@ -202,6 +215,7 @@ class MafiaFragment(
         GameVoice.stopPlayback()
         playingVoiceAt = 0L
         mic?.setMode(GameMicButton.Mode.IDLE)
+        reactionOverlay?.hideNow()
         super.onPause()
     }
 
@@ -287,6 +301,7 @@ class MafiaFragment(
         renderNotice(r)
         renderTeam(r)
         syncVoice(r, me)
+        syncReaction(r)
         syncFeedback(r, me)
 
         seatsMeta?.text = listOf(
@@ -607,7 +622,62 @@ class MafiaFragment(
         prevWinner = winner
     }
 
+    // ------------------------------------------------------------ reactions
+
+    private fun syncReaction(r: MafiaRoom.Room) {
+        val reaction = r.reaction
+        if (!reactionSeeded) {
+            reactionSeeded = true
+            lastReactionAt = reaction?.at ?: 0L
+            return
+        }
+        if (reaction == null || reaction.at <= lastReactionAt) return
+        lastReactionAt = reaction.at
+        reactionOverlay?.show(reaction.emoji, reaction.name)
+    }
+
+    private fun sendReaction(emoji: String) {
+        GameSfx.play(ctx(), GameSfx.TAP, 0.7f)
+        scope?.launch {
+            val ok = try {
+                MafiaRoom.sendReaction(currentAccount, roomId, emoji)
+            } catch (e: Exception) {
+                false
+            }
+            if (!ok) toast(R.string.games_reaction_failed)
+        }
+    }
+
+    private fun toggleVoiceEnabled() {
+        voiceEnabled = !voiceEnabled
+        GameVoice.setEnabled(ctx(), voiceEnabled)
+        if (!voiceEnabled) {
+            playingVoiceAt = 0L
+            mic?.setMode(GameMicButton.Mode.IDLE)
+        }
+        paintVoiceState()
+        GameSfx.play(ctx(), GameSfx.TAP, 0.7f)
+    }
+
+    private fun paintVoiceState() {
+        voiceToggle?.text =
+            str(if (voiceEnabled) R.string.games_voice_on else R.string.games_voice_off)
+        voiceToggle?.setTextColor(
+            ContextCompat.getColor(
+                ctx(),
+                if (voiceEnabled) R.color.yuz_action else R.color.yuz_text_secondary
+            )
+        )
+        mic?.alpha = if (voiceEnabled) 1f else 0.45f
+        if (playingVoiceAt == 0L) {
+            voiceView?.text = str(
+                if (voiceEnabled) R.string.games_voice_idle else R.string.games_voice_off
+            )
+        }
+    }
+
     private fun syncVoice(r: MafiaRoom.Room, me: String) {
+        if (!voiceEnabled) return
         val voice = r.voice ?: return
         if (me.isNotEmpty() && voice.uid == me) return
         if (voice.at <= lastVoiceAt) return
@@ -628,6 +698,10 @@ class MafiaFragment(
     }
 
     private fun toggleVoicePlayback() {
+        if (!voiceEnabled) {
+            toast(R.string.games_voice_muted_hint)
+            return
+        }
         if (GameVoice.isPlaying()) {
             GameVoice.stopPlayback()
             playingVoiceAt = 0L
@@ -641,6 +715,11 @@ class MafiaFragment(
 
     private fun startVoice() {
         val ctx = ctx()
+        if (!voiceEnabled) {
+            mic?.setMode(GameMicButton.Mode.IDLE)
+            toast(R.string.games_voice_muted_hint)
+            return
+        }
         if (!GameVoice.hasPermission(ctx)) {
             mic?.setMode(GameMicButton.Mode.IDLE)
             requestMicPermission()

@@ -210,4 +210,24 @@ Mikrofonni bosib turing — gapirayotganingiz shu xonadagi barcha o‘yinchilarg
     <string name="chk_capture_hint">Urish majburiy</string>
     <string name="maf_victim_named">☠️ Bu tun halok bo‘ldi: %1$s</string>
     <string name="maf_night_saved">🩹 Hujum bo‘ldi — shifokor ulgurdi</string>
+
+    <!-- ================== Taklif oynasi (15 soniya) ================== -->
+    <string name="games_invite_prompt_checkers">Shashka taklifi</string>
+    <string name="games_invite_prompt_mafia">Mafiya taklifi</string>
+    <string name="games_invite_prompt_body">%1$s sizni o‘yinga chorlayapti</string>
+    <string name="games_invite_seconds">%1$d soniya ichida javob bering</string>
+    <string name="games_invite_expired">Taklif muddati tugadi</string>
+    <string name="games_invite_accept_failed">O‘yinni boshlab bo‘lmadi. Qayta urinib ko‘ring.</string>
+    <string name="games_peer_no_yuzgram">%1$s hali YuzGram’da emas — unga yangilash haqidagi xabar yuborildi.</string>
+    <string name="games_upgrade_checkers">Bu sizni shashka o‘yiniga taklif qilishdi. Afsus, bu versiyada o‘ynash imkoni yo‘q. Telegramni YuzGram ilovasiga yangilash orqali o‘yinlar o‘ynashingiz mumkin. YuzGram Play Market’dan yuklab oling.</string>
+    <string name="games_upgrade_mafia">Bu sizni mafiya o‘yiniga taklif qilishdi. Afsus, bu versiyada o‘ynash imkoni yo‘q. Telegramni YuzGram ilovasiga yangilash orqali o‘yinlar o‘ynashingiz mumkin. YuzGram Play Market’dan yuklab oling.</string>
+
+    <!-- ================== Reaksiyalar va ovoz ================== -->
+    <string name="games_reactions">Reaksiya</string>
+    <string name="games_reaction_sent">Reaksiya yuborildi</string>
+    <string name="games_reaction_failed">Reaksiya yuborilmadi</string>
+    <string name="games_voice_toggle">Ovozli chat</string>
+    <string name="games_voice_on">Ovoz yoniq</string>
+    <string name="games_voice_off">Ovoz o‘chirilgan</string>
+    <string name="games_voice_muted_hint">Ovozli chat o‘chirilgan — mikrofon va ijro to‘xtatilgan</string>
 </resources>
