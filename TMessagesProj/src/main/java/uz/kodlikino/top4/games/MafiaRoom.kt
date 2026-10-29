@@ -128,7 +128,7 @@ object MafiaRoom {
 
     private suspend fun cancelStaleLobbies(hostUid: String, chatId: Long) {
         try {
-            val snap = GamesCore.rooms().whereEqualTo("chatId", chatId).get().await()
+            val snap = GamesCore.rooms().whereEqualTo("chatId", chatId).limit(24).get().await()
             val now = GamesCore.now()
             for (doc in snap.documents) {
                 if (doc.getString("kind") != KIND) continue
@@ -663,11 +663,10 @@ object MafiaRoom {
 
     suspend fun heartbeat(account: Int, roomId: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            val uid = GamesCore.signIn(account)
+            GamesCore.signIn(account)
             val ref = GamesCore.rooms().document(roomId.trim())
-            val snap = ref.get().await()
-            if (!snap.exists()) return@withContext false
-            if (snap.getString("hostUid") != uid) return@withContext false
+            // O'qishsiz yozuv: qoidalar `hostSeenAt`ni faqat xostga yozdiradi,
+            // hujjat yo'q bo'lsa update istisno beradi — har beat'da 1 o'qish tejaladi.
             ref.update("hostSeenAt", GamesCore.now()).await()
             true
         } catch (e: Exception) {

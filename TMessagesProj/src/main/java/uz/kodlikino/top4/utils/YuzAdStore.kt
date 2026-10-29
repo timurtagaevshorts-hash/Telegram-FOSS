@@ -33,6 +33,7 @@ object YuzAdStore {
     private const val COLLECTION = "ad_banners"
     private const val PREFS = "yuz_ads_cache"
     private const val KEY_ACTIVE = "active"
+    private const val ACTIVE_LIMIT = 20L
 
     data class AdTheme(
         val key: String,
@@ -110,7 +111,11 @@ object YuzAdStore {
 
     suspend fun loadActive(): List<AdBanner> {
         return try {
-            val snapshot = db.collection(COLLECTION).get().await()
+            // Bepul kvota: butun kolleksiya o'rniga faqat faol bannerlar (<=20).
+            val snapshot = db.collection(COLLECTION)
+                .whereEqualTo("isActive", true)
+                .limit(ACTIVE_LIMIT)
+                .get().await()
             val list = snapshot.documents
                 .mapNotNull { doc -> doc.data?.let { toBanner(doc.id, it) } }
                 .filter { it.isActive && (it.title.isNotBlank() || it.imageUrl.isNotBlank()) }
@@ -208,9 +213,10 @@ object YuzAdStore {
 }
 
 /**
- * Bannerlarni UI'ga yetkazuvchi yengil qatlam: 60 s kesh + fonda yangilash.
- * Callback har doim UI thread'da. Java tomonidan (`DialogsActivity`) SAM
- * listener bilan chaqiriladi.
+ * Bannerlarni UI'ga yetkazuvchi yengil qatlam: 10 daqiqalik kesh + fonda
+ * yangilash (bepul kvota uchun 60 s juda tez-tez o'qirdi; admin saqlaganda
+ * [invalidate] orqali darhol yangilanadi). Callback har doim UI thread'da.
+ * Java tomonidan (`DialogsActivity`) SAM listener bilan chaqiriladi.
  */
 object YuzAdFeed {
 
@@ -218,7 +224,7 @@ object YuzAdFeed {
         fun onBanner(banner: AdBanner?)
     }
 
-    private const val FRESH_MS = 60_000L
+    private const val FRESH_MS = 10L * 60L * 1000L
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile

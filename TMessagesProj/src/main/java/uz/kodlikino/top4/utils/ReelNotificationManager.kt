@@ -21,6 +21,8 @@ object ReelNotificationManager {
     private const val TAG = "ReelNotificationManager"
     private const val ROOT = "user_notifications"
     private const val ITEMS = "items"
+    /** Badge uchun yetarli yuqori chegara ("99+" kabi sonlar bu yerda ko'rsatilmaydi). */
+    private const val UNREAD_BADGE_LIMIT = 20
 
     private val db = FirebaseFirestore.getInstance()
 
@@ -177,6 +179,9 @@ object ReelNotificationManager {
         if (uid.isBlank()) return null
         return db.collection(ROOT).document(uid).collection(ITEMS)
             .whereEqualTo("read", false)
+            // Badge uchun "bor/yo'q" yetarli — o'nlab o'qilmagan hujjatni
+            // to'liq yuklab, har o'zgarishda qayta o'qishning hojati yo'q.
+            .limit(UNREAD_BADGE_LIMIT.toLong())
             .addSnapshotListener { snap, err ->
                 if (err != null) {
                     onCount(0)

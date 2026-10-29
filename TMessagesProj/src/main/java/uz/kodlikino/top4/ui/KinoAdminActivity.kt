@@ -48,6 +48,7 @@ import uz.kodlikino.top4.utils.AdBannerStorageHelper
 import uz.kodlikino.top4.utils.ClassifiedAdRepository
 import uz.kodlikino.top4.utils.KinoAdminAuth
 import uz.kodlikino.top4.utils.MoviesRepository
+import uz.kodlikino.top4.utils.ReelStorageHelper
 import uz.kodlikino.top4.utils.ReelsRepository
 import uz.kodlikino.top4.utils.YuzAdminStats
 import uz.kodlikino.top4.utils.YuzAdModeration
@@ -655,6 +656,12 @@ class KinoAdminActivity : BaseFragment() {
         val s = scope ?: return
         s.launch {
             val result = runCatching { ReelsRepository.deleteReel(reel.id) }
+            // Video/poster Storage'da qolib ketmasin: bepul 5 GB limitini yetim
+            // fayllar to'ldirsa, yangi yuklashlar butunlay to'xtaydi.
+            if (result.isSuccess && reel.uploadedByUid.isNotBlank()) {
+                ReelStorageHelper.deleteVideo(reel.uploadedByUid, reel.videoUrl)
+                ReelStorageHelper.deleteThumbnail(reel.uploadedByUid, reel.thumbnailUrl)
+            }
             if (fragmentView == null) return@launch
             if (result.isSuccess) {
                 toast(R.string.kino_admin_deleted)

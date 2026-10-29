@@ -19,8 +19,11 @@ object MafiaRules {
     const val VOTE_SECONDS = 40
     const val EXECUTION_SECONDS = 7
 
-    const val HOST_STALE_MS = 25_000L
-    const val HOST_BEAT_MS = 6_000L
+    // Har partiyada 6 s'lik "tirik" yozuvi bepul kvotani tez yeb qo'yardi:
+    // 18 s — 3 baravar kam yozuv, 60 s stale esa uchta o'tkazib yuborilgan
+    // beat'ga toqat qiladi (sekin tarmoqda xostni behuda almashtirmaydi).
+    const val HOST_STALE_MS = 60_000L
+    const val HOST_BEAT_MS = 18_000L
 
     enum class Role(val code: String) {
         CIVILIAN("civ"),

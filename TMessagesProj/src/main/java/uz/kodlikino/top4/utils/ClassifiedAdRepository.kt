@@ -33,6 +33,8 @@ object ClassifiedAdRepository {
     private const val MAX_REGION_CHARS = 120
     private const val MAX_LISTING_TYPE_CHARS = 32
     private const val MAX_IMAGES = 5
+    /** "Mening e'lonlarim" uchun shift: cheksiz o'qish/xotira sarfini to'xtatadi. */
+    private const val MY_ADS_LIMIT = 100L
     private val db = FirebaseFirestore.getInstance()
 
     fun parseDocument(doc: DocumentSnapshot): ClassifiedAd? = parseAd(doc)
@@ -220,6 +222,7 @@ object ClassifiedAdRepository {
         return try {
             db.collection(COLLECTION)
                 .whereEqualTo("ownerUid", uid)
+                .limit(MY_ADS_LIMIT)
                 .get().await()
                 .documents
                 .mapNotNull { doc -> parseAd(doc) }
@@ -238,6 +241,7 @@ object ClassifiedAdRepository {
         if (uid.isBlank()) return null
         return db.collection(COLLECTION)
             .whereEqualTo("ownerUid", uid)
+            .limit(MY_ADS_LIMIT)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e(TAG, "listenUserAds: ${error.message}", error)
@@ -331,7 +335,16 @@ object ClassifiedAdRepository {
 
     suspend fun deleteAd(id: String) {
         if (id.isBlank()) return
-        db.collection(COLLECTION).document(id).delete().await()
+        val ref = db.collection(COLLECTION).document(id)
+        // Rasmlar Storage'da egasiz qolmasin (bepul 5 GB limiti uchun muhim);
+        // URL'larni o'chirishdan oldin olamiz, xato bo'lsa — jim o'tamiz.
+        val urls = try {
+            parseAd(ref.get().await())?.imageUrls.orEmpty()
+        } catch (_: Exception) {
+            emptyList()
+        }
+        ref.delete().await()
+        if (urls.isNotEmpty()) ClassifiedAdStorageHelper.deleteImages(urls)
     }
 
     suspend fun setActive(id: String, active: Boolean) {

@@ -3326,6 +3326,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             yuzNotifDot.setBackgroundResource(R.drawable.bg_yuz_unread_dot);
             yuzNotifDot.setVisibility(View.GONE);
             notificationsItem.addView(yuzNotifDot, LayoutHelper.createFrame(9, 9, Gravity.TOP | Gravity.RIGHT, 0, 7, 6, 0));
+            // createActionBarMenu bir necha marta chaqiriladi: eski tinglovchini
+            // yopmasak, har qayta qurishda Firestore'da yangi listener qolib ketadi.
+            uz.kodlikino.top4.utils.YuzReelNotifBadge.detach(yuzNotifListener);
             yuzNotifListener = uz.kodlikino.top4.utils.YuzReelNotifBadge.attach(yuzNotifDot, "tg_" + getUserConfig().clientUserId);
             // YuzGram: drawer'dan olib tashlangan "Sozlamalar"ni profil tepasiga, qalamcha yoniga qo'ydik.
             settingsItem = menu.addItem(open_settings, R.drawable.msg_settings, resourcesProvider);
