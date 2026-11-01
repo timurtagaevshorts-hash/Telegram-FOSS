@@ -57,7 +57,7 @@ class YuzPremiumActivity : BaseFragment() {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun createView(context: Context): View {
-        val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
+        val themed = YuzTheme.wrap(context)
         themedContext = themed
         val root = LayoutInflater.from(themed)
             .inflate(R.layout.fragment_yuz_premium, null) as ViewGroup

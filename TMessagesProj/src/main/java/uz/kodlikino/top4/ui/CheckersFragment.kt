@@ -100,7 +100,7 @@ class CheckersFragment(
     }
 
     override fun createView(context: Context): View {
-        val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
+        val themed = YuzTheme.wrap(context)
         themedContext = themed
         val root = LayoutInflater.from(themed)
             .inflate(R.layout.fragment_checkers_game, null) as ViewGroup

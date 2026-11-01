@@ -29,10 +29,11 @@
         android:layout_marginBottom="8dp"
         android:drawablePadding="4dp"
         android:drawableStart="@drawable/ic_yuz_eye"
+        android:drawableTint="@color/yuz_on_media"
         android:shadowColor="@color/yuz_scrim"
         android:shadowRadius="4"
         android:text="0"
-        android:textColor="@color/yuz_text"
+        android:textColor="@color/yuz_on_media"
         android:textSize="@dimen/yuz_text_caption"
         android:textStyle="bold" />
 
@@ -46,6 +47,6 @@
         android:foreground="?attr/selectableItemBackgroundBorderless"
         android:padding="@dimen/yuz_space_3"
         android:src="@drawable/ic_yuz_close"
-        android:tint="@color/yuz_text"
+        android:tint="@color/yuz_on_media"
         android:visibility="gone" />
 </FrameLayout>

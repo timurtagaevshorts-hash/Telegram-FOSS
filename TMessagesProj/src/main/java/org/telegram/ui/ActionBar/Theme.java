@@ -4592,9 +4592,10 @@ public class Theme {
         themes.add(themeInfo);
         themesDict.put("Dark Blue", themeInfo);
 
-        // YuzGram neon mavzusi: chat/Profil ekranlarini dizayndagi neon palitraga
-        // (#0A1120 chuqur fon, #2AABEE brend-ko'k akcent) keltiradi. Ranglar
-        // yuzgram_neon.attheme faylida (darkblue.asosida qayta bo'yalgan).
+        // YuzGram neon mavzusi — brend palitrasi (#000000 fon, #2AABEE akcent).
+        // Ro'yxatda oddiy tanlanadigan mavzu sifatida turadi; majburiy emas,
+        // foydalanuvchi Telegram'ning istalgan mavzusini tanlashi mumkin.
+        // Ranglar yuzgram_neon.attheme faylida (darkblue.asosida qayta bo'yalgan).
         themeInfo = new ThemeInfo();
         themeInfo.name = "YuzGram Neon";
         themeInfo.assetName = "yuzgram_neon.attheme";
@@ -4620,14 +4621,6 @@ public class Theme {
         sortAccents(themeInfo);
         themes.add(themeInfo);
         themesDict.put("YuzGram Neon", themeInfo);
-        // Neon mavzuni kunduzgi va tungi mavzu qilamiz (chat/Profil shu bo'ladi).
-        // MUHIM: defaultTheme'ni O'ZGARTIRMAYMIZ. getColor() ichida
-        // `if (currentTheme == defaultTheme)` bloki mavzuning o'z ranglarini
-        // e'borib yuborib, firstAccentIsDefault + default accent bo'lsa
-        // yorug' defaultColors'ni qaytaradi (windowBackgroundWhite => OQ).
-        // Neon defaultTheme bo'lmasa, shu shortcut chetlanadi va haqiqiy
-        // qora-neon ranglari o'qiladi.
-        currentDayTheme = currentNightTheme = themeInfo;
 
         themeInfo = new ThemeInfo();
         themeInfo.name = "Arctic Blue";
@@ -4965,33 +4958,22 @@ public class Theme {
             FileLog.e(e);
             throw new RuntimeException(e);
         }
-        // YuzGram: yagona majburiy mavzu — "YuzGram Neon". Undan oldin
-        // o'qilgan eski sozlamalar (stock "Night"/"Blue", serverdan kelgan
-        // remote mavzu nomi) bu yerdan keyin qayta yoziladi, applyTheme'da
-        // ham forceYuzGramTheme orqali buriladi.
-        ThemeInfo yuzGramNeon = themesDict.get("YuzGram Neon");
-        if (yuzGramNeon != null) {
-            // defaultTheme'ga tegmaymiz (yqoridagi izohga qarang) — aks holda
-            // getColor yorug' defaultColors'ga qaytadi.
-            currentDayTheme = yuzGramNeon;
-            currentNightTheme = yuzGramNeon;
-            applyingTheme = yuzGramNeon;
-        } else if (applyingTheme == null) {
+        if (applyingTheme == null) {
             applyingTheme = defaultTheme;
         } else {
             currentDayTheme = applyingTheme;
         }
+        if (currentNightTheme == null) {
+            currentNightTheme = themesDict.get("Dark Blue");
+        }
 
         // YuzGram: foydalanuvchi tanlagan rasm/gradient orqa fon tiklanmaydi —
-        // ilova foni doim brendning qora-neon rangi. Eski mavzu/orqa fon
-        // qoldiqlari bir marta tozalanadi, keyingi ochilishda yozilmaydi.
-        if (preferences.contains("overrideThemeWallpaper") || preferences.contains("selectedBackground2")
-                || preferences.contains("theme") || preferences.contains("nighttheme")) {
+        // ilova foni brendning qora rangi bo'lib qoladi. Eski orqa fon
+        // qoldiqlari bir marta tozalanadi.
+        if (preferences.contains("overrideThemeWallpaper") || preferences.contains("selectedBackground2")) {
             preferences.edit()
                     .remove("overrideThemeWallpaper")
                     .remove("selectedBackground2")
-                    .remove("theme")
-                    .remove("nighttheme")
                     .commit();
         }
 
@@ -6312,22 +6294,6 @@ public class Theme {
         return themesDict.get(key);
     }
 
-    /**
-     * YuzGram brend qoidasi (QAT'LIQ): ilova faqat yagona "YuzGram Neon"
-     * mavzusida ishlaydi — fon #0A1120, akcent #2AABEE.
-     * Telegramning stock (asset) mavzulari, serverdan kelgan remote mavzular
-     * (pathToFile != null) va foydalanuvchi kiritgan .attheme fayllarining
-     * HAMSASI shu mavzuga buriladi. Mavzu tanlash UI'si ham olib tashlangan.
-     * Neon topilmasa (registrsiz holat) so'ralgan mavzu qaytadi — crash bo'lmasin.
-     */
-    private static ThemeInfo forceYuzGramTheme(ThemeInfo themeInfo) {
-        if (themeInfo == null) {
-            return null;
-        }
-        ThemeInfo neon = themesDict.get("YuzGram Neon");
-        return neon != null ? neon : themeInfo;
-    }
-
     public static void applyTheme(ThemeInfo themeInfo) {
         applyTheme(themeInfo, true, true, false);
     }
@@ -6344,8 +6310,7 @@ public class Theme {
         applyTheme(themeInfo, save, true, nightTheme);
     }
 
-    private static void applyTheme(ThemeInfo requestedTheme, boolean save, boolean removeWallpaperOverride, final boolean nightTheme) {
-        final ThemeInfo themeInfo = forceYuzGramTheme(requestedTheme);
+    private static void applyTheme(ThemeInfo themeInfo, boolean save, boolean removeWallpaperOverride, final boolean nightTheme) {
         if (themeInfo == null) {
             return;
         }
@@ -6470,8 +6435,7 @@ public class Theme {
         }
     }
 
-    private static void applyThemeInBackground(ThemeInfo requestedTheme, boolean save, boolean removeWallpaperOverride, final boolean nightTheme, Runnable onDone) {
-        final ThemeInfo themeInfo = forceYuzGramTheme(requestedTheme);
+    private static void applyThemeInBackground(ThemeInfo themeInfo, boolean save, boolean removeWallpaperOverride, final boolean nightTheme, Runnable onDone) {
         if (themeInfo == null) {
             if (onDone != null) {
                 onDone.run();
@@ -7408,10 +7372,8 @@ public class Theme {
                     saveOtherThemes(true);
                     sortThemes();
                 }
-                // YuzGram: bu yo'l mavzu editoridan keladi — jonli mavzu
-                // hech qachon tashqi mavzuga o'tkazilmaydi, forceYuzGramTheme
-                // doim brend mavzusini qaytaradi.
-                currentTheme = forceYuzGramTheme(themeInfo);
+                // YuzGram: mavzu editoridan kelgan jonli mavzu ham to'g'ridan-to'g'ri qo'llanadi.
+                currentTheme = themeInfo;
                 if (currentTheme != currentNightTheme) {
                     currentDayTheme = currentTheme;
                 }

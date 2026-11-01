@@ -1105,7 +1105,7 @@ class ReelsAdapter(
 
     /** Tanlangan layk rangi — ikon va son bir xil belgini beradi. */
     private val likeOnColor = ContextCompat.getColor(appContext, R.color.yuz_like)
-    private val likeOffColor = ContextCompat.getColor(appContext, R.color.yuz_text)
+    private val likeOffColor = ContextCompat.getColor(appContext, R.color.yuz_on_media)
 
     private fun dpF(value: Float): Float = AndroidUtilities.dp(value).toFloat()
 
@@ -1536,7 +1536,7 @@ class ReelsAdapter(
                 } else {
                     Glide.with(ivThumbnail).clear(ivThumbnail)
                     ivThumbnail.setImageDrawable(null)
-                    ivThumbnail.setBackgroundColor(ContextCompat.getColor(appContext, R.color.yuz_bg))
+                    ivThumbnail.setBackgroundColor(ContextCompat.getColor(ivThumbnail.context, R.color.yuz_bg))
                 }
             }
             refreshLikeUi()

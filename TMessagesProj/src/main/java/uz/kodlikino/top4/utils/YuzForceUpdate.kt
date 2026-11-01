@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.ApplicationLoader
+import uz.kodlikino.top4.ui.YuzTheme
 import org.telegram.messenger.R
 
 /**
@@ -299,7 +300,7 @@ object YuzForceUpdate {
         val requiredCode = effectiveMinCode()
         if (requiredCode <= 0 || installedCode >= requiredCode) return
 
-        val themed = activity
+        val themed = YuzTheme.wrap(activity)
         val root = LinearLayout(themed).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL

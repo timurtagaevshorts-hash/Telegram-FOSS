@@ -624,9 +624,11 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
         } else if (currentType == THEME_TYPE_BASIC) {
             textSizeHeaderRow = rowCount++;
             textSizeRow = rowCount++;
-            // YuzGram: mavzu/orqa tanlash butunlay olib tashlandi — bu qatorlar
-            // yaratilmaydi (id = -1 qoladi), ekran faqat matn/gabaris/ro'yxat
-            // sozlamalarini ko'rsatadi.
+            newThemeInfoRow = rowCount++;
+            themeHeaderRow = rowCount++;
+
+            themeListRow2 = rowCount++;
+            themeInfoRow = rowCount++;
 
             bubbleRadiusHeaderRow = rowCount++;
             bubbleRadiusRow = rowCount++;
@@ -647,7 +649,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             swipeGestureRow = rowCount++;
             swipeGestureInfoRow = rowCount++;
 
-            // YuzGram: avto-tun mavzusi tanlash olib tashlandi (yagona neon mavzu)
+            nightThemeRow = rowCount++;
             liteModeRow = rowCount++;
             stickersRow = rowCount++;
             stickersSectionRow = rowCount++;
@@ -909,7 +911,9 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             ActionBarMenu menu = actionBar.createMenu();
             menuItem = menu.addItem(0, R.drawable.ic_ab_other);
             menuItem.setContentDescription(getString("AccDescrMoreOptions", R.string.AccDescrMoreOptions));
-            // YuzGram: mavzuni ulashish/tahrirlash/yaratish olib tashlandi.
+            menuItem.addSubItem(share_theme, R.drawable.msg_share, getString("ShareTheme", R.string.ShareTheme));
+            menuItem.addSubItem(edit_theme, R.drawable.msg_edit, getString("EditThemeColors", R.string.EditThemeColors));
+            menuItem.addSubItem(create_theme, R.drawable.msg_palette, getString("CreateNewThemeMenu", R.string.CreateNewThemeMenu));
             menuItem.addSubItem(reset_settings, R.drawable.msg_reset, getString("ThemeResetToDefaults", R.string.ThemeResetToDefaults));
         } else {
             actionBar.setTitle(getString("AutoNightTheme", R.string.AutoNightTheme));

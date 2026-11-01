@@ -2538,6 +2538,16 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
         }
     }
 
+    public void rebuildLastFragment() {
+        if (transitionAnimationInProgress || startedTracking || inPreviewMode || fragmentsStack.isEmpty()) {
+            return;
+        }
+        BaseFragment last = fragmentsStack.get(fragmentsStack.size() - 1);
+        last.clearViews();
+        last.setParentLayout(this);
+        showLastFragment();
+    }
+
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_MENU && !checkTransitionAnimation() && !startedTracking && currentActionBar != null) {

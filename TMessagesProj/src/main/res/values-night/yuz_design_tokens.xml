@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Qorong'i mavzu palitrasi (values/ dagi ranglarning tungi ko'rinishi).
+  Qaysi fayl ishlatilishi `YuzTheme.wrap()` bergan kontekstning uiMode'idan
+  o'lchanadi — u joriy Telegram mavzusining qorong'i/kunduzgi holatidan olinadi.
+  O'lchamlar (dimen) bu yerda takrorlanmaydi: ular values/ dan meros bo'ladi.
+-->
+<resources>
+
+    <color name="yuz_action">#2AABEE</color>
+    <color name="yuz_decor">#5B6CF9</color>
+    <color name="yuz_on_action">#06121C</color>
+
+    <color name="yuz_text">#EDF1F8</color>
+    <color name="yuz_text_bright">#FFFFFF</color>
+    <color name="yuz_text_secondary">#A9B6CC</color>
+    <color name="yuz_text_muted">#8C9BB2</color>
+    <color name="yuz_text_on_accent">#06121C</color>
+    <color name="yuz_text_on_accent_dim">#CC06121C</color>
+
+    <color name="yuz_bg">#000000</color>
+    <color name="yuz_surface">#0D121D</color>
+    <color name="yuz_surface_raised">#121925</color>
+    <color name="yuz_field">#121824</color>
+    <color name="yuz_stroke">#202B3C</color>
+    <color name="yuz_stroke_soft">#1CFFFFFF</color>
+    <color name="yuz_stroke_strong">#3DFFFFFF</color>
+    <color name="yuz_stroke_decor">#405B6CF9</color>
+    <color name="yuz_stroke_action">#332AABEE</color>
+
+    <color name="yuz_gold">#FFD84D</color>
+    <color name="yuz_gold_deep">#F0A93B</color>
+    <color name="yuz_stroke_gold">#33FFD84D</color>
+    <color name="yuz_gold_soft">#1FFFD84D</color>
+    <color name="yuz_stroke_gold_strong">#66F0A93B</color>
+    <color name="yuz_danger">#FF5C5C</color>
+    <color name="yuz_like">#FF4D6D</color>
+    <color name="yuz_ripple">#26FFFFFF</color>
+    <color name="yuz_danger_soft">#55FF5C5C</color>
+    <color name="yuz_fill_chip">#14FFFFFF</color>
+
+    <color name="yuz_scrim">#80000000</color>
+    <color name="yuz_scrim_strong">#A6000000</color>
+    <color name="yuz_panel_elevated">#E6121824</color>
+    <color name="yuz_fill_ghost">#0DFFFFFF</color>
+    <color name="yuz_on_media">#E6FFFFFF</color>
+    <color name="yuz_on_media_dim">#CCFFFFFF</color>
+
+</resources>

@@ -32,7 +32,7 @@ class KinoDetailActivity(private val movie: Movie) : BaseFragment() {
     private var current = movie
 
     override fun createView(context: Context): View {
-        val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
+        val themed = YuzTheme.wrap(context)
         themedContext = themed
         val root = LayoutInflater.from(themed)
             .inflate(R.layout.fragment_kino_detail, null) as ViewGroup

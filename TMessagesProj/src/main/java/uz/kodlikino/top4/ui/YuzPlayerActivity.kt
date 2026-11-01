@@ -127,7 +127,7 @@ class YuzPlayerActivity : BaseFragment() {
     }
 
     override fun createView(context: Context): View {
-        ctx = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
+        ctx = YuzTheme.wrap(context)
         root = LayoutInflater.from(ctx).inflate(R.layout.fragment_yuz_player, null)
         fragmentView = root
         lastDownloadState = null

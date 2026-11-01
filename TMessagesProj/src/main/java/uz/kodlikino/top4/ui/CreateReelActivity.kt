@@ -101,7 +101,7 @@ class CreateReelActivity : BaseFragment() {
     private var analyzeToken = 0
 
     override fun createView(context: Context): View {
-        val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
+        val themed = YuzTheme.wrap(context)
         themedContext = themed
         val root = LayoutInflater.from(themed)
             .inflate(R.layout.activity_create_reel, null) as ViewGroup

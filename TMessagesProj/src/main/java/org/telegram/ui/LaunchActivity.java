@@ -6672,6 +6672,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 checkNavigationBarColor = (boolean) args[1];
             }
             checkSystemBarColors(args.length > 2 && (boolean) args[2], true, checkNavigationBarColor && !isNavigationBarColorFrozen && !actionBarLayout.isTransitionAnimationInProgress(), true);
+            // YuzGram ekranlari XML ranglaridan chiziladi — rang animatsiyasi (400 ms)
+            // tugagach joriy YuzGram fragmentni yangi palitra bilan qayta quramiz.
+            AndroidUtilities.runOnUIThread(this::rebuildYuzGramTopFragmentIfNeeded, 450);
         } else if (id == NotificationCenter.needSetDayNightTheme) {
             boolean instant = false;
             if (Build.VERSION.SDK_INT >= 21 && args[2] != null) {
@@ -8025,6 +8028,22 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             layersActionBarLayout.rebuildAllFragmentViews(last, last);
         } else {
             actionBarLayout.rebuildAllFragmentViews(last, last);
+        }
+    }
+
+    /**
+     * YuzGram ekranlari ranglarni XML resurslaridan (values / values-night) oladi,
+     * shuning uchun mavzu almashganda Telegram'ning rang animatsiyasi ularni
+     * yangilamaydi — joriy fragmentni qayta inflate qilish kerak. Boshqa
+     * fragmentlar {@code animateThemedValues} ichida allaqachon tozalangan.
+     */
+    private void rebuildYuzGramTopFragmentIfNeeded() {
+        if (actionBarLayout == null || actionBarLayout.isTransitionAnimationInProgress()) {
+            return;
+        }
+        BaseFragment top = actionBarLayout.getLastFragment();
+        if (top != null && top.getClass().getName().startsWith("uz.kodlikino.top4.")) {
+            actionBarLayout.rebuildLastFragment();
         }
     }
 

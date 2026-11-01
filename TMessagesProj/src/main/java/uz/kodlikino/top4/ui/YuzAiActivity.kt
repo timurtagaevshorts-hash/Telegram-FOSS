@@ -90,7 +90,7 @@ class YuzAiActivity : BaseFragment() {
     private var pendingChoice: YuzAiEngine.Intent.NeedChoice? = null
 
     override fun createView(context: Context): View {
-        ctx = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
+        ctx = YuzTheme.wrap(context)
         val root = LayoutInflater.from(ctx)
             .inflate(R.layout.fragment_yuz_ai, null) as ViewGroup
         fragmentView = root

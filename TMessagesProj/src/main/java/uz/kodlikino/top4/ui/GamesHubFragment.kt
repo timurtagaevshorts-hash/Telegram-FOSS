@@ -83,7 +83,7 @@ class GamesHubFragment(
     private fun myUid(): String = GamesCore.uidOf(currentAccount)
 
     override fun createView(context: Context): View {
-        val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
+        val themed = YuzTheme.wrap(context)
         themedContext = themed
         val root = LayoutInflater.from(themed)
             .inflate(R.layout.fragment_games_hub, null) as ViewGroup

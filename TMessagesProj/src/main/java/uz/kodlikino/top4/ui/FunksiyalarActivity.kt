@@ -53,7 +53,7 @@ class FunksiyalarActivity : BaseFragment() {
     }
 
     override fun createView(context: Context): View {
-        val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
+        val themed = YuzTheme.wrap(context)
         val root = LayoutInflater.from(themed)
             .inflate(R.layout.fragment_funksiyalar, null) as ViewGroup
         fragmentView = root

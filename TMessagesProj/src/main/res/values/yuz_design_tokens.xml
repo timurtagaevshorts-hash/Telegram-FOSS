@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   YuzGram dizayn to'plami — butun ilova uchun yagona raqamlar.
-  Eski `yuz_classified_colors.xml` brend palstrasini saqlaydi; bu fayl qo'shimcha
-  ravishda tipografiya masshtabi, oraliq qadami, burchak radiusi va tugma balandliklarini
-  belgilaydi. Maqsad: bir xil rol — bir xil raqam (ekrandan ekranga "52 vs 54dp" kabi
+  Bu fayl YORUG' (Telegram'ning kunduzgi mavzusi) palitrasini beradi;
+  qorong'i qiymatlar `values-night/yuz_design_tokens.xml` da. Qaysi biri
+  ishlatilishi `YuzTheme.wrap()` bergan kontekstning uiMode'idan o'lchanadi —
+  u esa joriy Telegram mavzusining qorong'i/kunduzgi holatidan olinadi.
+
+  Maqsad: bir xil rol — bir xil raqam (ekrandan ekranga "52 vs 54dp" kabi
   farqlar tug'ilmasin).
 
   Uslublar: `yuz_design_styles.xml`.
@@ -11,7 +14,8 @@
 <resources>
 
     <!-- ============ Ranglar (brend palitrasining taxalluslari) ============ -->
-    <!-- Yagona HARAKAT aksenti: barcha CTA, faol holat, ikon-suzib bo'yash. -->
+    <!-- Yagona HARAKAT aksenti: barcha CTA, faol holat, ikon-suzib bo'yash.
+         Ikkala mavzuda ham bir xil — brend rangi o'zgarmaydi. -->
     <color name="yuz_action">#2AABEE</color>
     <!-- Ikkilamchi brend rangi — FAQAT bezak (navigatsiya doirasi, gradient),
          tugmalarda ishlatilmaydi. -->
@@ -20,55 +24,54 @@
          shuning uchun bu yerda to'q siyaq-siyoh ishlatiladi — 7.34:1. -->
     <color name="yuz_on_action">#06121C</color>
 
-    <!-- Premium matn rampasi: qop-qora ustida SOF oq (platinum) ko'z chamashmaydi,
-         oq faqat "yorug'lik akcenti" bo'lgan sarlavhalarda qoladi. Rol yorug'lik
-         bosqichi bilan o'qiladi: bright > platinum > secondary > muted. -->
-    <color name="yuz_text">#EDF1F8</color>
-    <color name="yuz_text_bright">#FFFFFF</color>
-    <color name="yuz_text_secondary">#A9B6CC</color>
-    <!-- Placeholder / hint: qorong'i sirt ustida 4.5:1 chegarasidan pastga
-         tushmasligi uchun eski `text_hint` (#5E6F84) dan bir pogona yuqori. -->
-    <color name="yuz_text_muted">#8C9BB2</color>
+    <!-- Premium matn rampasi: Telegram kunduzgi fonida (#FFFFFF) to'q bosqichlar.
+         Rol yorug'lik bosqichi bilan o'qiladi: bright > text > secondary > muted. -->
+    <color name="yuz_text">#1E242E</color>
+    <color name="yuz_text_bright">#0A0F16</color>
+    <color name="yuz_text_secondary">#5B6878</color>
+    <!-- Placeholder / hint: oq sirt ustida 4.5:1 chegarasidan pastga tushmasin. -->
+    <color name="yuz_text_muted">#7E8A99</color>
     <color name="yuz_text_on_accent">#06121C</color>
     <!-- Accent gradienti USTIDAGI ikkilamchi matn: kul emas, shu hue'dan
-         siyaqlangan (craft-floor qoidasi). Premium hero ijobiy izohi shu. -->
+         siyaqlangan (craft-floor qoidasi). -->
     <color name="yuz_text_on_accent_dim">#CC06121C</color>
 
-    <color name="yuz_bg">#000000</color>
-    <color name="yuz_surface">#0D121D</color>
-    <color name="yuz_surface_raised">#121925</color>
-    <color name="yuz_field">#121824</color>
-    <color name="yuz_stroke">#202B3C</color>
-    <color name="yuz_stroke_soft">#1CFFFFFF</color>
-    <color name="yuz_stroke_strong">#3DFFFFFF</color>
+    <!-- Sirtlar: Telegram kunduzgi oq fon + kulrang kartalar. -->
+    <color name="yuz_bg">#FFFFFF</color>
+    <color name="yuz_surface">#F2F3F5</color>
+    <color name="yuz_surface_raised">#FFFFFF</color>
+    <color name="yuz_field">#F0F2F5</color>
+    <color name="yuz_stroke">#E4E7EC</color>
+    <color name="yuz_stroke_soft">#14000000</color>
+    <color name="yuz_stroke_strong">#29000000</color>
     <!-- Tanlanmagan chip hoshiyasi: brendning ikkilamchi rangi, 25% shaffoflik. -->
     <color name="yuz_stroke_decor">#405B6CF9</color>
     <!-- Ko'tarilgan panelning accent hoshiyasi (mini-pleyer, 20%). -->
     <color name="yuz_stroke_action">#332AABEE</color>
 
-    <color name="yuz_gold">#FFD84D</color>
-    <!-- Oltin gradientning ikkinchi uchquli va uning "folga" chegarasi:
-         premium sirtlarda (hero, tarif kartasi) ishlatiladi. -->
-    <color name="yuz_gold_deep">#F0A93B</color>
-    <color name="yuz_stroke_gold">#33FFD84D</color>
-    <!-- Tarif kartasidagi oltin nishon/emoji foni va kuchliroq hoshiya. -->
-    <color name="yuz_gold_soft">#1FFFD84D</color>
-    <color name="yuz_stroke_gold_strong">#66F0A93B</color>
-    <color name="yuz_danger">#FF5C5C</color>
-    <!-- Reels\'dagi faol layk — brend palitrasidagi yagona issiq holat rangi. -->
-    <color name="yuz_like">#FF4D6D</color>
-    <!-- Bosish texurasi (ripple) — qorong\'i sirtlarda ko\'rinadigan yagona qiymat. -->
-    <color name="yuz_ripple">#26FFFFFF</color>
-    <!-- Xato holatdagi tug\'a hoshiyasi (to\'liq yulduz emas, yumshoq chegara). -->
-    <color name="yuz_danger_soft">#55FF5C5C</color>
+    <!-- Oltin: oq fonda yorqin #FFD84D o'qilmaydi, shuning uchun chuqurroq folga. -->
+    <color name="yuz_gold">#C79400</color>
+    <color name="yuz_gold_deep">#A97700</color>
+    <color name="yuz_stroke_gold">#33C79400</color>
+    <color name="yuz_gold_soft">#1FC79400</color>
+    <color name="yuz_stroke_gold_strong">#66A97700</color>
+    <color name="yuz_danger">#D7263D</color>
+    <!-- Reels'dagi faol layk — brend palitrasidagi yagona issiq holat rangi. -->
+    <color name="yuz_like">#E0245E</color>
+    <!-- Bosish texurasi (ripple) — yorug' sirtlarda ko'rinadigan yagona qiymat. -->
+    <color name="yuz_ripple">#14000000</color>
+    <!-- Xato holatdagi tug'a hoshiyasi (to'liq yulduz emas, yumshoq chegara). -->
+    <color name="yuz_danger_soft">#33D7263D</color>
+    <!-- Tanlanmagan chip foni: sirt ustida juda yengil ohang. -->
+    <color name="yuz_fill_chip">#14000000</color>
 
     <!-- ============ Media ustidagi qatlamlar ============ -->
     <!-- Bu ranglar palitra emas, ular faqat video/rasm USTIDA ishlaydi:
-         yarim shaffof qoplamalar to\'liq opaqqan rangdan yaxshi o\'qiladi. -->
+         ikkala mavzuda ham bir xil qoladi. -->
     <color name="yuz_scrim">#80000000</color>            <!-- panel ortidagi qoraytish -->
     <color name="yuz_scrim_strong">#A6000000</color>     <!-- media ustidagi matn soyasi -->
-    <color name="yuz_panel_elevated">#E6121824</color>   <!-- qalqib turuvchi mini-pleyer -->
-    <color name="yuz_fill_ghost">#0DFFFFFF</color>       <!-- media ustidagi mayda panel -->
+    <color name="yuz_panel_elevated">#F2FFFFFF</color>   <!-- qalqib turuvchi mini-pleyer -->
+    <color name="yuz_fill_ghost">#0D000000</color>       <!-- media ustidagi mayda panel -->
     <color name="yuz_on_media">#E6FFFFFF</color>         <!-- media ustidagi asosiy matn -->
     <color name="yuz_on_media_dim">#CCFFFFFF</color>     <!-- media ustidagi ikon/son -->
 

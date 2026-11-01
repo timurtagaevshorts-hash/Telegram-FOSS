@@ -49,7 +49,7 @@
             android:shadowColor="@color/yuz_scrim_strong"
             android:shadowRadius="3"
             android:text="@string/reels_pending_title"
-            android:textColor="@color/yuz_text"
+            android:textColor="@color/yuz_on_media"
             android:textSize="@dimen/yuz_text_micro"
             android:textStyle="bold" />
     </LinearLayout>
@@ -76,5 +76,5 @@
         android:foreground="?attr/selectableItemBackgroundBorderless"
         android:padding="8dp"
         android:src="@drawable/ic_yuz_close"
-        app:tint="@color/yuz_text" />
+        app:tint="@color/yuz_on_media" />
 </FrameLayout>

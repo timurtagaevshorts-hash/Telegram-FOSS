@@ -31,7 +31,7 @@ object YuzPremiumGate {
 
     fun showReelsRequired(fragment: BaseFragment) {
         val raw = fragment.parentActivity ?: return
-        val context = ContextThemeWrapper(raw, R.style.Theme_YuzGramAds)
+        val context = YuzTheme.wrap(raw)
         val dialog = Dialog(context)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
 

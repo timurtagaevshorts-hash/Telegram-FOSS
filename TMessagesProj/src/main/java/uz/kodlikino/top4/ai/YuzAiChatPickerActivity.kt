@@ -26,6 +26,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import uz.kodlikino.top4.ui.YuzTheme
 import org.telegram.messenger.R
 import org.telegram.messenger.UserConfig
 import org.telegram.tgnet.TLRPC
@@ -74,6 +75,10 @@ class YuzAiChatPickerActivity : Activity() {
     private var sendButton: TextView? = null
     private var pencilButton: View? = null
     private var doneButton: View? = null
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(YuzTheme.themeContext(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

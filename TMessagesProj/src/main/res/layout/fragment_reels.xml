@@ -60,7 +60,7 @@
                 android:foreground="?attr/selectableItemBackgroundBorderless"
                 android:padding="@dimen/yuz_space_3"
                 android:src="@drawable/ic_yuz_volume_off"
-                android:tint="@color/yuz_text" />
+                android:tint="@color/yuz_on_media" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPostReel"
@@ -129,7 +129,7 @@
         android:foreground="?attr/selectableItemBackgroundBorderless"
         android:padding="@dimen/yuz_space_3"
         android:src="@drawable/ic_yuz_close"
-        android:tint="@color/yuz_text"
+        android:tint="@color/yuz_on_media"
         android:visibility="gone" />
 
     <ProgressBar
@@ -146,6 +146,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:drawablePadding="12dp"
+        android:drawableTint="@color/yuz_text_muted"
         android:drawableTop="@drawable/ic_yuz_film"
         android:gravity="center"
         android:paddingStart="@dimen/yuz_space_6"

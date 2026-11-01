@@ -210,8 +210,8 @@ class ProfileReelsAdapter(
 
         fun bindProgress(upload: YuzReelUploads.Upload) {
             val failed = upload.failed
-            val danger = ContextCompat.getColor(appContext, R.color.yuz_danger)
-            val normal = ContextCompat.getColor(appContext, R.color.yuz_text)
+            val danger = ContextCompat.getColor(itemView.context, R.color.yuz_danger)
+            val normal = ContextCompat.getColor(itemView.context, R.color.yuz_text)
             label.setTextColor(if (failed) danger else normal)
             // Bosqich yoziladi: siqish bosqichida "Yuklanmoqda 20%" degan yozuv
             // yuklash qotib qolgandek taassurot berardi.
@@ -258,7 +258,7 @@ class ProfileReelsAdapter(
                 // Holder qayta ishlatilganda oldingi reelning rasmi qolib ketmasin.
                 Glide.with(thumb).clear(thumb)
                 thumb.setImageDrawable(null)
-                thumb.setBackgroundColor(ContextCompat.getColor(appContext, R.color.yuz_bg))
+                thumb.setBackgroundColor(ContextCompat.getColor(thumb.context, R.color.yuz_bg))
             }
             del.visibility = if (manageMode) View.VISIBLE else View.GONE
             del.setOnClickListener { onDelete(reel) }

@@ -150,7 +150,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     }
 
     override fun createView(context: Context): View {
-        ctx = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
+        ctx = YuzTheme.wrap(context)
         val root = LayoutInflater.from(ctx)
             .inflate(R.layout.fragment_musiqa, null) as ViewGroup
         fragmentView = root

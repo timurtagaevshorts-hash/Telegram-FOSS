@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  values-night ham `values/` palitrasining AYNI nusxasi — qorong'i neon, tizim
-  rejimiga qaramay bir xil (yorug'/qorong'i farqi bo'lmasligi uchun).
+  Qorong'i (Telegram dark) ko'rinish. Kunduzgi qiymatlar
+  `values/yuz_classified_colors.xml` da; qaysi biri ishlatilishi
+  `YuzTheme.wrap()` bergan kontekstning uiMode'idan o'lchanadi.
 -->
 <resources>
     <color name="text_primary">#FFFFFF</color>

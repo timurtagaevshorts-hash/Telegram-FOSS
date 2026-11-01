@@ -171,7 +171,7 @@ object GameInvitePrompt {
         handled.add(invite.id)
         activeInvite = invite
 
-        val themed = ContextThemeWrapper(activity, R.style.Theme_YuzGramAds)
+        val themed = YuzTheme.wrap(activity)
         val card = LinearLayout(themed).apply {
             orientation = LinearLayout.VERTICAL
             background = rounded(themed, R.color.yuz_surface_raised, 22f)

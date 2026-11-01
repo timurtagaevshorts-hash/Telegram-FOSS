@@ -48,7 +48,7 @@
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:singleLine="true"
-                    android:textColor="@color/yuz_text"
+                    android:textColor="@color/yuz_on_media"
                     android:textSize="13sp"
                     android:textStyle="bold" />
 
@@ -58,7 +58,7 @@
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:singleLine="true"
-                    android:textColor="@color/yuz_text_secondary"
+                    android:textColor="@color/yuz_on_media_dim"
                     android:textSize="@dimen/yuz_text_caption" />
             </LinearLayout>
 
@@ -70,7 +70,7 @@
                 android:contentDescription="@string/yuz_a11y_prev"
                 android:padding="5dp"
                 android:src="@drawable/ic_yuz_prev"
-                android:tint="@color/yuz_text" />
+                android:tint="@color/yuz_on_media" />
 
             <ImageButton
                 android:id="@+id/btnOverlayPlay"
@@ -90,7 +90,7 @@
                 android:contentDescription="@string/yuz_a11y_next"
                 android:padding="5dp"
                 android:src="@drawable/ic_yuz_next"
-                android:tint="@color/yuz_text" />
+                android:tint="@color/yuz_on_media" />
 
             <ImageButton
                 android:id="@+id/btnOverlayClose"
@@ -100,7 +100,7 @@
                 android:contentDescription="@string/yuz_a11y_close"
                 android:padding="6dp"
                 android:src="@drawable/ic_yuz_close"
-                android:tint="@color/yuz_text_secondary" />
+                android:tint="@color/yuz_on_media_dim" />
         </LinearLayout>
 
         <View

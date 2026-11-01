@@ -102,7 +102,7 @@ class ElonlarActivity : BaseFragment() {
 
     override fun createView(context: Context): View {
         // Material komponentlari Telegram temasida emas, alohida Material temasi ostida inflate qilinadi.
-        val themed = ContextThemeWrapper(context, R.style.Theme_YuzGramAds)
+        val themed = YuzTheme.wrap(context)
         themedContext = themed
         val root = LayoutInflater.from(themed)
             .inflate(R.layout.fragment_classified_ads_tab, null) as ViewGroup

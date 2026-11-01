@@ -5,9 +5,10 @@
       ChipGroup, ExtendedFloatingActionButton, TextInputLayout) foydalanadi. Ular Telegram'ning
       o'z temasi ostida emas, balki ContextThemeWrapper orqali shu Material tema ostida inflate
       qilinadi — aks holda "requires Theme.MaterialComponents" xatosi beradi.
-      Feed dizayni qorong'i (karta #121212, fon #000000), shuning uchun Material (dark) parent.
+      Feed dizayni joriy Telegram mavzusiga ergashadi: DayNight parent + values /
+      values-night palitralari (YuzTheme.wrap uiMode'ni Telegram mavzusidan oladi).
     -->
-    <style name="Theme.YuzGramAds" parent="Theme.MaterialComponents.NoActionBar">
+    <style name="Theme.YuzGramAds" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/home_accent</item>
         <item name="colorPrimaryVariant">@color/home_accent</item>
         <item name="colorOnPrimary">@color/white</item>
