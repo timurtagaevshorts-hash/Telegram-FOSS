@@ -133,6 +133,8 @@ class ReelsActivity @JvmOverloads constructor(
     private var authWarmedUp = false
     private var authJob: Job? = null
     private var currentReels: List<Reel> = emptyList()
+    /** Tasma asosi (takrorlanmas). Loop shu ro'yxatdan yangi aralashma qo'shadi. */
+    private var baseReels: List<Reel> = emptyList()
     private var selectedPosition = startIndex.coerceAtLeast(0)
     private var pendingTargetId = targetReelId
     private var feedOrder: YuzReelsOrder? = null
@@ -611,8 +613,28 @@ class ReelsActivity @JvmOverloads constructor(
             if (playbackVisible) adapter?.resumePlayback()
             refreshLikeState(currentReels.getOrNull(position)?.id)
             preloadNeighbours(position)
+            maybeExtendLoop(position)
         } catch (_: Exception) {
         }
+    }
+
+    /**
+     * Tugamaydigan tasma: oxiriga yaqinlashganda asosiy ro'yxatdan yangi
+     * aralashma qo'shiladi. Har safar boshqa tartib; ketma-ket bir xil reel
+     * takrorlanmaydi. Faol pleyer tegilmaydi.
+     */
+    private fun maybeExtendLoop(position: Int) {
+        val ad = adapter ?: return
+        if (baseReels.size < 2) return
+        if (position < currentReels.size - 2) return
+        val tail = currentReels.takeLast(2).mapTo(HashSet()) { it.id }
+        var batch = baseReels.filter { it.id !in tail }.shuffled()
+        if (batch.isEmpty()) batch = baseReels.shuffled()
+        if (batch.size > 1 && batch.first().id == currentReels.lastOrNull()?.id) {
+            batch = batch.drop(1) + batch.first()
+        }
+        currentReels = currentReels + batch
+        ad.append(batch)
     }
 
     private fun openCreate() {
@@ -860,8 +882,8 @@ class ReelsActivity @JvmOverloads constructor(
             // Tarkib o'zgarmagan — qayta submit playback'ni bekor restart qiladi.
             // Sonlar (ko'rish/layk/izoh) esa o'zgargan bo'lishi mumkin — ularni
             // adapter ichida, faol videoga tegmasdan almashtiramiz.
-            if (currentReels.isNotEmpty() && sameFeed(currentReels, reels)) {
-                currentReels = reels
+            if (baseReels.isNotEmpty() && sameFeed(baseReels, reels)) {
+                baseReels = reels
                 adapter?.applyStats(reels)
                 progressBar?.visibility = View.GONE
                 if (reels.isEmpty()) {
@@ -905,15 +927,21 @@ class ReelsActivity @JvmOverloads constructor(
         for (reel in firebase) {
             if (reel.createdAt >= freshCutoff) fresh.add(reel) else older.add(reel)
         }
-        val out = ArrayList<Reel>(fresh.size + arranged.size + older.size)
+        val olderArranged = try {
+            feedOrder?.arrangeOlder(older) ?: older
+        } catch (_: Exception) {
+            older
+        }
+        val out = ArrayList<Reel>(fresh.size + arranged.size + olderArranged.size)
         out.addAll(fresh)
         out.addAll(arranged)
-        out.addAll(older)
+        out.addAll(olderArranged)
         return out
     }
 
     /** Tasmani ko'rsatadi: [keepPosition] saqlangan holda snap + player + preload. */
     private fun renderReels(reels: List<Reel>, keepPosition: Int) {
+        baseReels = reels
         currentReels = reels
         adapter?.submit(reels)
         progressBar?.visibility = View.GONE
@@ -1195,6 +1223,7 @@ class ReelsActivity @JvmOverloads constructor(
                 if (fragmentView == null) return@launch
                 // currentReels/selectedPosition adapter bilan birga yangilanadi —
                 // aks holda o'chirilgan reel indeksi bo'yicha "arvoh" sahifa qoladi.
+                baseReels = baseReels.filter { it.id != reel.id }
                 val idx = currentReels.indexOfFirst { it.id == reel.id }
                 if (idx >= 0) {
                     currentReels = currentReels.toMutableList().also { it.removeAt(idx) }

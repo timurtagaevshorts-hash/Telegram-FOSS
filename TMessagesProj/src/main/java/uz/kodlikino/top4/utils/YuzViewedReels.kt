@@ -73,6 +73,19 @@ class YuzReelsOrder(
     private val ranks = HashMap<String, Long>()
     private var firstNewestAt: Long? = null
 
+    /**
+     * Eski (48 soatdan o'tgan) Firebase relslari — har bir id uchun bir marta
+     * olingan random rank bo'yicha aralash. Rank sessiya ichida saqlanadi:
+     * tasma qayta qurilganda tartib sakrab ketmaydi.
+     */
+    fun arrangeOlder(reels: List<Reel>): List<Reel> {
+        if (reels.size < 2) return reels
+        return reels
+            .map { it to ranks.getOrPut(it.id) { random.nextLong() } }
+            .sortedWith(compareBy({ it.second }, { it.first.id }))
+            .map { it.first }
+    }
+
     fun arrange(reels: List<Reel>): List<Reel> {
         val unique = reels.distinctBy { it.id }
         if (knownAtOpen.isEmpty() && firstNewestAt == null) {

@@ -345,6 +345,17 @@ class ReelsAdapter(
     }
 
     /**
+     * Loop uchun yangi aralashma qo'shadi. Faol sahifa/pleyer tegilmaydi —
+     * `notifyItemRangeInserted` mavjud holderlarni saqlab qoladi.
+     */
+    fun append(list: List<Reel>) {
+        if (list.isEmpty() || released) return
+        val start = items.size
+        items.addAll(list)
+        notifyItemRangeInserted(start, list.size)
+    }
+
+    /**
      * O'chirilgan reel'ni feed'dan chiqaradi. Faol sahifa o'chirilsa player
      * bo'shatiladi — chaqiruvchi tomon `[reactivate()]` qayta faollashtiriladi.
      */
