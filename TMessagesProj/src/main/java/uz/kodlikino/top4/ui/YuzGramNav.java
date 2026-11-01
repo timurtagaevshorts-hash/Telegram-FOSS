@@ -29,33 +29,31 @@ public final class YuzGramNav {
         return stack != null && stack.size() == 1 && stack.get(0) == f;
     }
 
-    public static void select(BaseFragment current, int tab) {
+    /** @return ekran haqiqatan ochildi (yoki allaqachon shu tab'da) — true. */
+    public static boolean select(BaseFragment current, int tab) {
         if (current == null) {
-            return;
+            return false;
         }
         switch (tab) {
             case YuzGramBottomBar.TAB_ASOSIY:
                 if (current instanceof DialogsActivity) {
-                    return;
+                    return true;
                 }
-                current.presentFragment(new DialogsActivity(null), true);
-                break;
+                return current.presentFragment(new DialogsActivity(null), true);
             case YuzGramBottomBar.TAB_REELS:
                 if (current instanceof ReelsActivity) {
-                    return;
+                    return true;
                 }
-                current.presentFragment(new ReelsActivity(), true);
-                break;
+                return current.presentFragment(new ReelsActivity(), true);
             case YuzGramBottomBar.TAB_ELONLAR:
                 if (current instanceof FunksiyalarActivity) {
-                    return;
+                    return true;
                 }
-                current.presentFragment(new FunksiyalarActivity(), true);
-                break;
+                return current.presentFragment(new FunksiyalarActivity(), true);
             case YuzGramBottomBar.TAB_PROFIL:
                 if (current instanceof org.telegram.ui.ProfileActivity
                         && ((org.telegram.ui.ProfileActivity) current).myProfile) {
-                    return;
+                    return true;
                 }
                 // Faqat native Telegram profil oynasi (o'zimizniki) — Instagram
                 // uslubidagi YuzGramProfileActivity endi o'z profil uchun
@@ -63,8 +61,8 @@ public final class YuzGramNav {
                 Bundle profileArgs = new Bundle();
                 profileArgs.putLong("user_id", UserConfig.getInstance(current.getCurrentAccount()).getClientUserId());
                 profileArgs.putBoolean("my_profile", true);
-                current.presentFragment(new org.telegram.ui.ProfileActivity(profileArgs, null), true);
-                break;
+                return current.presentFragment(new org.telegram.ui.ProfileActivity(profileArgs, null), true);
         }
+        return false;
     }
 }

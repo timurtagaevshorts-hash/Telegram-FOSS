@@ -958,27 +958,25 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                             listAdapter.notifyItemChanged(bubbleRadiusRow, new Object());
                         }
                         if (themesHorizontalListCell != null) {
-                            Theme.ThemeInfo themeInfo = Theme.getTheme("Blue");
+                            // YuzGram: "standart holatga qaytarish" brend mavzusiga
+                            // (YuzGram Neon) qaytaradi, Telegram'ning ko'k mavzusiga emas.
+                            Theme.ThemeInfo themeInfo = Theme.getTheme("YuzGram Neon");
                             Theme.ThemeInfo currentTheme = Theme.getCurrentTheme();
-                            Theme.ThemeAccent accent = themeInfo.themeAccentsMap.get(Theme.DEFALT_THEME_ACCENT_ID);
-                            if (accent != null) {
-                                Theme.OverrideWallpaperInfo info = new Theme.OverrideWallpaperInfo();
-                                info.slug = Theme.DEFAULT_BACKGROUND_SLUG;
-                                info.fileName = "Blue_99_wp.jpg";
-                                info.originalFileName = "Blue_99_wp.jpg";
-                                accent.overrideWallpaper = info;
-                                themeInfo.setOverrideWallpaper(info);
+                            if (themeInfo == null) {
+                                themeInfo = Theme.getTheme("Blue");
                             }
-                            if (themeInfo != currentTheme) {
-                                themeInfo.setCurrentAccentId(Theme.DEFALT_THEME_ACCENT_ID);
-                                Theme.saveThemeAccents(themeInfo, true, false, true, false);
-                                themesHorizontalListCell.selectTheme(themeInfo);
-                                themesHorizontalListCell.smoothScrollToPosition(0);
-                            } else if (themeInfo.currentAccentId != Theme.DEFALT_THEME_ACCENT_ID) {
-                                NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.needSetDayNightTheme, currentTheme, currentType == THEME_TYPE_NIGHT, null, Theme.DEFALT_THEME_ACCENT_ID);
-                                listAdapter.notifyItemChanged(themeAccentListRow);
-                            } else {
-                                Theme.reloadWallpaper(true);
+                            if (themeInfo != null) {
+                                if (themeInfo != currentTheme) {
+                                    themeInfo.setCurrentAccentId(Theme.DEFALT_THEME_ACCENT_ID);
+                                    Theme.saveThemeAccents(themeInfo, true, false, true, false);
+                                    themesHorizontalListCell.selectTheme(themeInfo);
+                                    themesHorizontalListCell.smoothScrollToPosition(0);
+                                } else if (themeInfo.currentAccentId != Theme.DEFALT_THEME_ACCENT_ID) {
+                                    NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.needSetDayNightTheme, currentTheme, currentType == THEME_TYPE_NIGHT, null, Theme.DEFALT_THEME_ACCENT_ID);
+                                    listAdapter.notifyItemChanged(themeAccentListRow);
+                                } else {
+                                    Theme.reloadWallpaper(true);
+                                }
                             }
                         }
                     });

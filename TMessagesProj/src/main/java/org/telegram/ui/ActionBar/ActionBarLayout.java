@@ -408,6 +408,12 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
     private View layoutToIgnore;
     private boolean beginTrackingSent;
     private boolean transitionAnimationInProgress;
+    /**
+     * YuzGram: swipe/animatsiya holati qachon boshlangani. Agar ACTION_UP yoki
+     * ACTION_CANCEL yo'qolsa (dialog ochildi, ota-ona touch'ni yutdi) bayroqlar
+     * abadiy yoqilgan qolib, ekranlar orasida o'tish butunlay bloklanardi.
+     */
+    private long trackingStartTime;
     private boolean transitionAnimationPreviewMode;
     private ArrayList<int[]> animateStartColors = new ArrayList<>();
     private ArrayList<int[]> animateEndColors = new ArrayList<>();
@@ -987,6 +993,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
         containerViewBack.setVisibility(View.INVISIBLE);
         startedTracking = false;
         animationInProgress = false;
+        trackingStartTime = 0;
         containerView.setTranslationX(0);
         containerViewBack.setTranslationX(0);
         setInnerTranslationX(0);
@@ -995,6 +1002,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
     private void prepareForMoving(MotionEvent ev) {
         maybeStartTracking = false;
         startedTracking = true;
+        trackingStartTime = System.currentTimeMillis();
         layoutToIgnore = containerViewBack;
         startedTrackingX = (int) ev.getX();
         containerViewBack.setVisibility(View.VISIBLE);
@@ -1152,6 +1160,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                         });
                         animatorSet.start();
                         animationInProgress = true;
+                        trackingStartTime = System.currentTimeMillis();
                         layoutToIgnore = containerViewBack;
                     } else {
                         maybeStartTracking = false;
@@ -1244,8 +1253,39 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
         }
         if (transitionAnimationInProgress && (transitionAnimationStartTime < System.currentTimeMillis() - 1500 || inPreviewMode)) {
             onAnimationEndCheck(true);
+        } else if ((startedTracking || animationInProgress) && trackingStartTime > 0
+                && System.currentTimeMillis() - trackingStartTime > 1500) {
+            // Swipe tugashi event'i kelmagan — holatni tiklaymiz, aks holda
+            // keyingi har qanday o'tish jimgina rad etilardi.
+            resetStuckSwipe();
         }
         return transitionAnimationInProgress;
+    }
+
+    /**
+     * Yarim qolgan swipe holatini xavfsiz tozalaydi: fragment stack'ga tegmaydi,
+     * faqat bayroqlar va siljishni tiklaydi.
+     */
+    private void resetStuckSwipe() {
+        if (containerView != null) {
+            containerView.setTranslationX(0);
+        }
+        if (containerViewBack != null) {
+            containerViewBack.setTranslationX(0);
+            if (!inPreviewMode) {
+                containerViewBack.setVisibility(View.INVISIBLE);
+            }
+        }
+        setInnerTranslationX(0);
+        layoutToIgnore = null;
+        startedTracking = false;
+        maybeStartTracking = false;
+        animationInProgress = false;
+        trackingStartTime = 0;
+        if (velocityTracker != null) {
+            velocityTracker.recycle();
+            velocityTracker = null;
+        }
     }
 
     @Override
@@ -2247,6 +2287,18 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
     }
 
     public void removeAllFragments() {
+        // Stack butunlay tozalanadi — yarim qolgan animatsiya bayroqlari keyingi
+        // ekranni ochishga xalaqit bermasin.
+        if (currentAnimation != null) {
+            currentAnimation.cancel();
+            currentAnimation = null;
+        }
+        transitionAnimationInProgress = false;
+        transitionAnimationPreviewMode = false;
+        transitionAnimationStartTime = 0;
+        onOpenAnimationEndRunnable = null;
+        onCloseAnimationEndRunnable = null;
+        resetStuckSwipe();
         for (int a = 0; a < fragmentsStack.size(); a++) {
             removeFragmentFromStackInternal(fragmentsStack.get(a), false);
             a--;
@@ -2590,7 +2642,6 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
             if (endRunnable != null) {
                 endRunnable.run();
             }
-            checkNeedRebuild();
             checkNeedRebuild();
         }
     }

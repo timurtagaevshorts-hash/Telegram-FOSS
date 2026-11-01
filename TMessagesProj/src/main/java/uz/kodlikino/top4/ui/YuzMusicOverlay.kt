@@ -150,7 +150,10 @@ object YuzMusicOverlay : Application.ActivityLifecycleCallbacks, YuzMusicEngine.
     private fun show() {
         val a = app ?: return
         if (view == null) {
-            val v = LayoutInflater.from(a).inflate(R.layout.view_yuz_music_overlay, null)
+            // Application konteksti uiMode'ni tizimdan oladi; kover va sirt
+            // ranglari Telegram mavzusiga mos bo'lishi uchun uiMode'ni almashtiramiz.
+            val v = LayoutInflater.from(YuzTheme.themeContext(a))
+                .inflate(R.layout.view_yuz_music_overlay, null)
             ivCover = v.findViewById(R.id.ivOverlayCover)
             tvTitle = v.findViewById(R.id.tvOverlayTitle)
             tvArtist = v.findViewById(R.id.tvOverlayArtist)

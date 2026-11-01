@@ -3077,6 +3077,9 @@ public class Theme {
     private static ThemeInfo currentNightTheme;
     private static ThemeInfo currentDayTheme;
     private static ThemeInfo defaultTheme;
+    // YuzGram brend mavzusi. Yangi o'rnatishda va mavzu "tiklanganda" shu
+    // mavzu qo'llanadi; `defaultTheme` Telegram semantikasi uchun qoladi.
+    private static ThemeInfo yuzDefaultTheme;
     private static ThemeInfo previousTheme;
     private static boolean changingWallpaper;
     private static boolean hasPreviousTheme;
@@ -4621,6 +4624,7 @@ public class Theme {
         sortAccents(themeInfo);
         themes.add(themeInfo);
         themesDict.put("YuzGram Neon", themeInfo);
+        yuzDefaultTheme = themeInfo;
 
         themeInfo = new ThemeInfo();
         themeInfo.name = "Arctic Blue";
@@ -4746,8 +4750,7 @@ public class Theme {
 
             String theme = preferences.getString("theme", null);
             if ("Default".equals(theme)) {
-                applyingTheme = themesDict.get("Blue");
-                applyingTheme.currentAccentId = DEFALT_THEME_ACCENT_ID;
+                applyingTheme = yuzDefaultTheme != null ? yuzDefaultTheme : themesDict.get("Blue");
             } else if ("Dark".equals(theme)) {
                 applyingTheme = themeDarkBlue;
                 applyingTheme.currentAccentId = 9;
@@ -4762,8 +4765,7 @@ public class Theme {
 
             theme = preferences.getString("nighttheme", null);
             if ("Default".equals(theme)) {
-                applyingTheme = themesDict.get("Blue");
-                applyingTheme.currentAccentId = DEFALT_THEME_ACCENT_ID;
+                currentNightTheme = yuzDefaultTheme != null ? yuzDefaultTheme : themesDict.get("Blue");
             } else if ("Dark".equals(theme)) {
                 currentNightTheme = themeDarkBlue;
                 themeDarkBlue.currentAccentId = 9;
@@ -4958,13 +4960,18 @@ public class Theme {
             FileLog.e(e);
             throw new RuntimeException(e);
         }
+        // YuzGram: yangi o'rnatishda saqlangan mavzu bo'lmaydi — ilova brend
+        // mavzusi (YuzGram Neon) bilan ochiladi. Foydalanuvchi boshqa mavzu
+        // tanlasa, keyingi ochilishlarda o'sha tanlov hurmat qilinadi.
+        ThemeInfo yuzDefault = yuzDefaultTheme != null ? yuzDefaultTheme : themesDict.get("YuzGram Neon");
         if (applyingTheme == null) {
-            applyingTheme = defaultTheme;
+            applyingTheme = yuzDefault != null ? yuzDefault : defaultTheme;
+            currentDayTheme = applyingTheme;
         } else {
             currentDayTheme = applyingTheme;
         }
         if (currentNightTheme == null) {
-            currentNightTheme = themesDict.get("Dark Blue");
+            currentNightTheme = yuzDefault != null ? yuzDefault : themesDict.get("Dark Blue");
         }
 
         // YuzGram: foydalanuvchi tanlagan rasm/gradient orqa fon tiklanmaydi —
@@ -7031,7 +7038,11 @@ public class Theme {
     };
 
     public static void setCurrentNightTheme(ThemeInfo theme) {
-        boolean apply = currentTheme == currentNightTheme;
+        // YuzGram: kunduzgi va tungi mavzu bir xil bo'lishi mumkin (brend mavzusi),
+        // shuning uchun `currentTheme == currentNightTheme` "hozir tunda" degani emas.
+        // Juftlik bir xil bo'lsa darhol qo'llamaymiz — aks holda kunduz kuni tungi
+        // mavzu tanlanganda ekran birdan o'sha mavzuga o'tib ketardi.
+        boolean apply = currentTheme == currentNightTheme && currentDayTheme != currentNightTheme;
         currentNightTheme = theme;
         if (apply) {
             applyDayNightThemeMaybe(true);
@@ -7205,11 +7216,11 @@ public class Theme {
         }
         boolean currentThemeDeleted = false;
         if (currentTheme == themeInfo) {
-            applyTheme(defaultTheme, true, false, false);
+            applyTheme(yuzDefaultTheme != null ? yuzDefaultTheme : defaultTheme, true, false, false);
             currentThemeDeleted = true;
         }
         if (themeInfo == currentNightTheme) {
-            currentNightTheme = themesDict.get("Dark Blue");
+            currentNightTheme = yuzDefaultTheme != null ? yuzDefaultTheme : themesDict.get("Dark Blue");
         }
 
         themeInfo.removeObservers();
@@ -7596,9 +7607,9 @@ public class Theme {
                         file.delete();
                         boolean isNightTheme = false;
                         if (currentDayTheme == info) {
-                            currentDayTheme = defaultTheme;
+                            currentDayTheme = yuzDefaultTheme != null ? yuzDefaultTheme : defaultTheme;
                         } else if (currentNightTheme == info) {
-                            currentNightTheme = themesDict.get("Dark Blue");
+                            currentNightTheme = yuzDefaultTheme != null ? yuzDefaultTheme : themesDict.get("Dark Blue");
                             isNightTheme = true;
                         }
                         if (currentTheme == info) {

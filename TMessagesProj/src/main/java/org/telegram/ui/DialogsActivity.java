@@ -1481,6 +1481,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         float scrollProgress = Math.abs(dx) / (float) viewPages[0].getMeasuredWidth();
                         if (viewPages[1].isLocked && scrollProgress > 0.3f) {
                             dispatchTouchEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_CANCEL, 0, 0, 0));
+                            if (!tabsAnimationInProgress) {
+                                // Nested CANCEL animatsiya boshlay olmasa ham sarlavha
+                                // va filtr tab'lari o'chirilgan holatda qolmasin —
+                                // aks holda ular umuman bosilmay qolardi.
+                                startedTracking = false;
+                                maybeStartTracking = false;
+                                actionBar.setEnabled(true);
+                                filterTabsView.setEnabled(true);
+                            }
                             filterTabsView.shakeLock(viewPages[1].selectedType);
                             AndroidUtilities.runOnUIThread(() -> {
                                 showDialog(new LimitReachedBottomSheet(DialogsActivity.this, getContext(), LimitReachedBottomSheet.TYPE_FOLDERS, currentAccount, null));

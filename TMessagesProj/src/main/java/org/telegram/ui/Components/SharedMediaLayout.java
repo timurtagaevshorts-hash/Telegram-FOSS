@@ -1454,8 +1454,10 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
         }
         boolean wasVisible = false;
         if (yuzReelsOverlay == null) {
+            // Profil oynasi konteksti YuzGram ranglariga o'ralmagan — bo'sh holat
+            // yozuvi tizim rejimiga qarab kontrastini yo'qotardi.
             yuzReelsOverlay = new uz.kodlikino.top4.ui.YuzProfileReelsView(
-                    getContext(), profileActivity.getCurrentAccount(), profileActivity,
+                    uz.kodlikino.top4.ui.YuzTheme.wrap(getContext()), profileActivity.getCurrentAccount(), profileActivity,
                     "tg_" + dialog_id, isYuzSelfProfile());
         } else {
             wasVisible = yuzReelsOverlay.getVisibility() == VISIBLE;

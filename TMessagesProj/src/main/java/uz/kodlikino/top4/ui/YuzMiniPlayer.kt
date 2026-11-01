@@ -77,7 +77,9 @@ object YuzMiniPlayer : Application.ActivityLifecycleCallbacks, YuzMusicEngine.Ob
         host = a
         val content = a.window.decorView.findViewById<ViewGroup>(android.R.id.content)
             ?: return
-        val v = LayoutInflater.from(a)
+        // Kontekst joriy Telegram mavzusiga o'raladi — aks holda `yuz_*`
+        // ranglar tizim uiMode'idan olinib, qorong'i chatda oq karta chiqardi.
+        val v = LayoutInflater.from(YuzTheme.wrap(a))
             .inflate(R.layout.view_yuz_mini_player, content, false)
         ivCover = v.findViewById(R.id.ivMiniCover)
         ivCover?.imageTintList = null

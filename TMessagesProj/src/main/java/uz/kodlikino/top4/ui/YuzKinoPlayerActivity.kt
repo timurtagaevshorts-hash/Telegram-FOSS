@@ -1,5 +1,6 @@
 package uz.kodlikino.top4.ui
 
+import android.content.Context
 import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.os.Handler
@@ -30,6 +31,13 @@ class YuzKinoPlayerActivity : AppCompatActivity() {
     private lateinit var btnBack: ImageView
     private lateinit var tvTitle: TextView
     private val handler = Handler(Looper.getMainLooper())
+
+    // Ekran alohida Activity: tizim kunduzgi rejimda bo'lsa `@color/yuz_text`
+    // oq bo'lib qolar, qora fon ustida sarlavha ko'rinmasdi. Kontekstni joriy
+    // Telegram mavzusiga moslaymiz (manifest temasini o'zgartirmaymiz).
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(YuzTheme.themeContext(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

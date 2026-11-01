@@ -485,9 +485,16 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             if (tab == uz.kodlikino.top4.ui.YuzGramBottomBar.TAB_ASOSIY
                     && top instanceof DialogsActivity && ((DialogsActivity) top).isYuzGramMainRoot()) {
                 showYuzGramComposeMenu(top);
-                return;
+                return true;
             }
-            uz.kodlikino.top4.ui.YuzGramNav.select(top, tab);
+            if (actionBarLayout != null && actionBarLayout.isTransitionAnimationInProgress()) {
+                // O'tish tugamaguncha yangi ekran ochish stack'ni buzadi (ekran
+                // ochilmay qolardi). Navbar highlight joyida qoladi, o'tish
+                // tugagach so'rov bir marta qayta yuboriladi.
+                retryYuzGramTabSwitch(tab, 4);
+                return false;
+            }
+            return uz.kodlikino.top4.ui.YuzGramNav.select(top, tab);
         });
         // Markaz "+" FAB olib tashlandi: e'lon/reel joylash tugmalari o'z bo'limlari
         // ichida (ElonlarActivity / ReelsActivity) joylashgan.
@@ -8038,7 +8045,19 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
      * fragmentlar {@code animateThemedValues} ichida allaqachon tozalangan.
      */
     private void rebuildYuzGramTopFragmentIfNeeded() {
-        if (actionBarLayout == null || actionBarLayout.isTransitionAnimationInProgress()) {
+        rebuildYuzGramTopFragmentIfNeeded(4);
+    }
+
+    private void rebuildYuzGramTopFragmentIfNeeded(int attemptsLeft) {
+        if (actionBarLayout == null) {
+            return;
+        }
+        if (actionBarLayout.isTransitionAnimationInProgress()) {
+            // Mavzu animatsiyasi ekran almashinuviga to'g'ri kelsa — tugagach
+            // qayta urinamiz, aks holda ekran eski palitrada qolib ketadi.
+            if (attemptsLeft > 0) {
+                actionBarLayout.postDelayed(() -> rebuildYuzGramTopFragmentIfNeeded(attemptsLeft - 1), 200);
+            }
             return;
         }
         BaseFragment top = actionBarLayout.getLastFragment();
@@ -8056,6 +8075,29 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             }
         }
         drawerLayoutAdapter.notifyDataSetChanged();
+    }
+
+    /**
+     * Dock bosilganda animatsiya ketayotgan bo'lsa, tugagach tab almashinuvini
+     * qayta uradi. Bir necha urinishdan keyin tashlab ketiladi: stack o'zgarishi
+     * barni o'zi sinxronlaydi (`setFragmentStackChangedListener`).
+     */
+    private void retryYuzGramTabSwitch(int tab, int attemptsLeft) {
+        if (yuzGramBottomBar == null || actionBarLayout == null) {
+            return;
+        }
+        yuzGramBottomBar.postDelayed(() -> {
+            if (actionBarLayout.isTransitionAnimationInProgress()) {
+                if (attemptsLeft > 1) {
+                    retryYuzGramTabSwitch(tab, attemptsLeft - 1);
+                }
+                return;
+            }
+            BaseFragment now = getLastFragment();
+            if (now != null) {
+                uz.kodlikino.top4.ui.YuzGramNav.select(now, tab);
+            }
+        }, 150);
     }
 
     /**

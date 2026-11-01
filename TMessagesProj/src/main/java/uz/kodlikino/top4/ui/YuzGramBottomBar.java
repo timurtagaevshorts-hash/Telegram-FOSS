@@ -120,7 +120,13 @@ public class YuzGramBottomBar extends View {
     private float glassBottom = Float.NaN;
 
     public interface OnTabSelectedListener {
-        void onTabSelected(int tab);
+        /**
+         * @return true — tab ochildi va bar faol holatni yangilashi mumkin;
+         * false — o'tish amalga oshmadi (masalan animatsiya ketmoqda), faol
+         * tab joyida qoladi. Ilgari highlight har doim siljib ketardi va
+         * ekran ochilmay qolganda foydalanuvchi "qotib qoldi" deb o'ylardi.
+         */
+        boolean onTabSelected(int tab);
     }
 
     public YuzGramBottomBar(Context context) {
@@ -609,14 +615,17 @@ public class YuzGramBottomBar extends View {
             animatePress(0f, 200);
             if (slot >= 0) {
                 performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
-                if (slot != activeTab) {
-                    setActiveTab(slot);
+                boolean handled = listener == null || listener.onTabSelected(slot);
+                if (handled) {
+                    if (slot != activeTab) {
+                        setActiveTab(slot);
+                    } else {
+                        // qayta bosish: indicator joyida, faqat ikon "pop" qiladi
+                        animatePop(slot, true);
+                    }
                 } else {
-                    // qayta bosish: indicator joyida, faqat ikon "pop" qiladi
-                    animatePop(slot, true);
-                }
-                if (listener != null) {
-                    listener.onTabSelected(slot);
+                    // O'tish amalga oshmadi — highlight avvalgi tab'da qoladi.
+                    animatePop(activeTab, true);
                 }
             }
             return true;
