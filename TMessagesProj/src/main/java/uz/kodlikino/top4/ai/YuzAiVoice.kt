@@ -16,15 +16,21 @@ import android.os.VibratorManager
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import uz.kodlikino.top4.utils.NetworkReachability
 import java.io.File
 import java.util.Locale
 
 /**
- * Ovoz yordamchisi: SpeechRecognizer (uz -> ru -> default retry) + Android TextToSpeech.
- * Gemini/Internet STT yo'q — faqat tizim mikrofoni va tizim TTS'i ishlatiladi.
+ * Ovoz yordamchisi: nutqni tanish — tizim SpeechRecognizer (uz -> ru -> default),
+ * javob ovozi — worker'dagi Gemini TTS. Tizim TTS ataylab ishlatilmaydi:
+ * robot ovoz o'rniga yordamchi internet bo'lmasa jim qoladi.
  */
 class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
 
@@ -42,17 +48,23 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
     private val appContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
     private var recognizer: SpeechRecognizer? = null
-    private var tts: TextToSpeech? = null
-    private var ttsReady = false
-    private var pendingSpeak: String? = null
     private var listening = false
     private var speaking = false
     private var languageIndex = 0
     private var ignoreNextError = false
     private var released = false
-    private var lastSpeakId = "yuz_ai_0"
+    private val speakScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var speakJob: Job? = null
+    private var speakToken = 0
+    private val readyAudio = ArrayDeque<ByteArray>()
+    private var fetchDone = true
+    private var playerActive = false
     private var cloudPlayer: MediaPlayer? = null
     private var cloudFile: File? = null
+    /** Takroriy javoblar (salomlashuv, tasdiqlar) qayta sintez qilinmaydi. */
+    private val audioCache = object : LinkedHashMap<String, ByteArray>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>?): Boolean = size > 24
+    }
 
     /**
      * Tizim tanishi jim qotib qolsa (natija ham, xato ham kelmasa) —
@@ -73,87 +85,113 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
     }
 
     /**
-     * Worker'dan kelgan WAV (inson ovozi) bilan gapirish. Xato bo'lsa — tizim TTS'ga tushadi.
+     * Bulut ovozi: javob jumlalarga bo'linadi, birinchi audio kelishi bilan
+     * ijro boshlanadi, qolganlari shu paytda yuklanadi. Tizim TTS'ga
+     * qaytish yo'q — internet yo'q bo'lsa yordamchi jim qoladi.
      */
-    fun playCloudAudio(bytes: ByteArray, fallback: String) {
-        stopListening()
-        stopSpeakingInternal()
-        val spoken = speakable(fallback)
-        if (bytes.size < 2000 || spoken.isBlank()) {
-            if (bytes.size < 2000) speak(fallback) else callbacks.onSpeakFinished()
+    fun speakCloud(text: String) {
+        val spoken = speakable(text)
+        if (released || spoken.isBlank()) {
+            callbacks.onSpeakFinished()
             return
         }
+        stopListening()
+        stopSpeakingInternal()
+        if (!NetworkReachability.isOnline(appContext)) {
+            callbacks.onSpeakFinished()
+            return
+        }
+        val chunks = splitForSpeech(spoken)
+        val token = ++speakToken
         speaking = true
+        fetchDone = false
+        speakJob = speakScope.launch {
+            for (chunk in chunks) {
+                if (token != speakToken) return@launch
+                val bytes = fetchAudio(chunk)
+                if (token != speakToken) return@launch
+                if (bytes == null) break
+                readyAudio.addLast(bytes)
+                pumpSpeaker(token)
+            }
+            if (token == speakToken) {
+                fetchDone = true
+                pumpSpeaker(token)
+            }
+        }
+    }
+
+    private suspend fun fetchAudio(text: String): ByteArray? {
+        audioCache[text]?.let { return it }
+        val bytes = withContext(Dispatchers.IO) { YuzAiCloud.speakText(text) } ?: return null
+        if (bytes.size < 2000) return null
+        audioCache[text] = bytes
+        return bytes
+    }
+
+    private fun pumpSpeaker(token: Int) {
+        if (token != speakToken || playerActive) return
+        val bytes = if (readyAudio.isEmpty()) null else readyAudio.removeFirst()
+        if (bytes == null) {
+            if (fetchDone) finishSpeak(token)
+            return
+        }
+        playerActive = true
+        val file = try {
+            File(appContext.cacheDir, "ai_tts_" + System.nanoTime() + ".wav").also { it.writeBytes(bytes) }
+        } catch (_: Exception) {
+            playerActive = false
+            pumpSpeaker(token)
+            return
+        }
+        val player = MediaPlayer()
+        cloudPlayer = player
+        cloudFile = file
         try {
-            cloudFile?.delete()
-            val f = File(appContext.cacheDir, "ai_tts_" + System.currentTimeMillis() + ".wav")
-            f.writeBytes(bytes)
-            cloudFile = f
-            val p = MediaPlayer()
-            cloudPlayer = p
-            p.setAudioAttributes(
+            player.setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
             )
-            p.setOnCompletionListener { finishCloud(p, null) }
-            p.setOnErrorListener { _, _, _ -> finishCloud(p, fallback); true }
-            p.setDataSource(f.absolutePath)
-            p.setOnPreparedListener { it.start() }
-            p.prepareAsync()
-        } catch (e: Exception) {
-            Log.w(TAG, "playCloudAudio: " + e.message)
-            finishCloud(cloudPlayer, fallback)
-        }
-    }
-
-    private fun finishCloud(p: MediaPlayer?, fallback: String?) {
-        try { p?.release() } catch (_: Exception) { }
-        if (cloudPlayer === p) cloudPlayer = null
-        cloudFile?.delete()
-        cloudFile = null
-        if (!speaking && fallback == null) return
-        speaking = false
-        mainHandler.post {
-            if (!released) callbacks.onSpeakFinished()
-        }
-        if (!fallback.isNullOrBlank() && !released) {
-            mainHandler.post { speak(fallback) }
-        }
-    }
-
-    init {
-        tts = TextToSpeech(appContext) { status ->
-            if (released || status != TextToSpeech.SUCCESS) return@TextToSpeech
-            ttsReady = true
-            applyVoiceLocale()
-            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {
-                    speaking = true
-                }
-
-                override fun onDone(utteranceId: String?) {
-                    if (utteranceId != null && utteranceId != lastSpeakId) return
-                    speaking = false
-                    mainHandler.post {
-                        if (!released) callbacks.onSpeakFinished()
-                    }
-                }
-
-                @Deprecated("Deprecated in Java")
-                override fun onError(utteranceId: String?) {
-                    speaking = false
-                    mainHandler.post {
-                        if (!released) callbacks.onSpeakFinished()
-                    }
-                }
-            })
-            pendingSpeak?.let { queued ->
-                pendingSpeak = null
-                speak(queued)
+            player.setOnPreparedListener { it.start() }
+            player.setOnCompletionListener {
+                releasePlayer(player, file)
+                playerActive = false
+                pumpSpeaker(token)
             }
+            player.setOnErrorListener { _, _, _ ->
+                releasePlayer(player, file)
+                playerActive = false
+                pumpSpeaker(token)
+                true
+            }
+            player.setDataSource(file.absolutePath)
+            player.prepareAsync()
+        } catch (_: Exception) {
+            releasePlayer(player, file)
+            playerActive = false
+            pumpSpeaker(token)
         }
+    }
+
+    private fun releasePlayer(player: MediaPlayer, file: File) {
+        try {
+            player.release()
+        } catch (_: Exception) {
+        }
+        if (cloudPlayer === player) cloudPlayer = null
+        if (cloudFile === file) cloudFile = null
+        try {
+            file.delete()
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun finishSpeak(token: Int) {
+        if (token != speakToken || !speaking) return
+        speaking = false
+        if (!released) callbacks.onSpeakFinished()
     }
 
     fun isListening(): Boolean = listening
@@ -220,53 +258,18 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
         }
     }
 
-    fun speak(text: String) {
-        val spoken = speakable(text)
-        if (spoken.isBlank()) {
-            callbacks.onSpeakFinished()
-            return
-        }
-        stopListening()
-        speaking = true
-        if (!ttsReady) {
-            pendingSpeak = spoken
-            return
-        }
-        val engine = tts
-        if (engine == null) {
-            speaking = false
-            callbacks.onSpeakFinished()
-            return
-        }
-        val chunks = spoken
-            .split(Regex("(?<=[.!?])\\s+"))
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .ifEmpty { listOf(spoken) }
-        lastSpeakId = "yuz_ai_" + chunks.lastIndex
-        chunks.forEachIndexed { index, chunk ->
-            val mode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
-            val id = "yuz_ai_$index"
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-                engine.speak(humanize(chunk), mode, null, id)
-            } else {
-                @Suppress("DEPRECATION")
-                engine.speak(humanize(chunk), mode, null)
-            }
-        }
-    }
-
     fun stopSpeaking() {
-        pendingSpeak = null
         stopSpeakingInternal()
     }
 
     private fun stopSpeakingInternal() {
+        speakJob?.cancel()
+        speakJob = null
+        speakToken += 1
+        readyAudio.clear()
+        fetchDone = true
+        playerActive = false
         speaking = false
-        try {
-            tts?.stop()
-        } catch (_: Exception) {
-        }
         cloudPlayer?.let {
             try {
                 it.stop()
@@ -300,13 +303,7 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
         } catch (_: Exception) {
         }
         recognizer = null
-        try {
-            tts?.stop()
-            tts?.shutdown()
-        } catch (_: Exception) {
-        }
-        tts = null
-        ttsReady = false
+        speakScope.coroutineContext[Job]?.cancel()
         muteRecognizerCue(false)
     }
 
@@ -520,29 +517,6 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
         }
     }
 
-    private fun applyVoiceLocale() {
-        val engine = tts ?: return
-        val picked = listOf(
-            Locale("uz", "UZ"),
-            Locale("uz"),
-            Locale("tr", "TR"),
-            Locale("ru", "RU"),
-            Locale.getDefault()
-        ).firstOrNull { locale ->
-            try {
-                engine.isLanguageAvailable(locale) >= TextToSpeech.LANG_AVAILABLE
-            } catch (_: Exception) {
-                false
-            }
-        } ?: Locale.getDefault()
-        try {
-            engine.language = picked
-            engine.setSpeechRate(1.05f)
-            engine.setPitch(1.0f)
-        } catch (_: Exception) {
-        }
-    }
-
     private fun firstResult(bundle: Bundle?): String {
         val list = bundle?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
         return list?.firstOrNull()?.trim().orEmpty()
@@ -579,12 +553,34 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
             .replace(Regex("\\s+"), " ")
             .trim()
 
-        private fun humanize(text: String): String = text
-            .replace("’", "'")
-            .replace("‘", "'")
-            .replace("“", "\"")
-            .replace("”", "\"")
-            .replace(Regex("\\s+"), " ")
-            .trim()
+        /** Jumlalab bo'lish: birinchi audio tezroq tayyor bo'ladi. */
+        private fun splitForSpeech(text: String): List<String> {
+            val sentences = text.split(Regex("(?<=[.!?…])\\s+"))
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+            if (sentences.isEmpty()) return listOf(text)
+            val out = ArrayList<String>()
+            var buf = StringBuilder()
+            fun flush() {
+                val s = buf.toString().trim()
+                if (s.isNotEmpty()) out.add(s)
+                buf = StringBuilder()
+            }
+            for (s in sentences) {
+                if (buf.isNotEmpty() && buf.length + s.length > 180) flush()
+                if (s.length <= 180) {
+                    buf.append(s).append(' ')
+                } else {
+                    flush()
+                    var i = 0
+                    while (i < s.length) {
+                        out.add(s.substring(i, minOf(i + 180, s.length)).trim())
+                        i += 180
+                    }
+                }
+            }
+            flush()
+            return out.ifEmpty { listOf(text) }
+        }
     }
 }

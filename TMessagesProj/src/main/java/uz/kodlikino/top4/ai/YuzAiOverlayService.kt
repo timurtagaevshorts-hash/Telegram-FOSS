@@ -818,7 +818,7 @@ class YuzAiOverlayService : Service() {
         }
         phase = Phase.SPEAKING
         setOrb(YuzAiOrbView.Mode.SPEAKING)
-        v.speak(spoken)
+        v.speakCloud(spoken)
     }
 
     private fun openApp() {

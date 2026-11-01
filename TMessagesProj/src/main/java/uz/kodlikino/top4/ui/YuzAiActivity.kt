@@ -8,7 +8,6 @@ import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Bundle
-import android.os.SystemClock
 import android.provider.Settings
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
@@ -27,7 +26,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.MessagesController
 import org.telegram.messenger.R
@@ -75,7 +73,6 @@ class YuzAiActivity : BaseFragment() {
     private var listeningPending = false
     // Tizimli SpeechRecognizer sessiyasi ketmoqda (bulut oqimi emas).
     private var recognizerPending = false
-    private var cloudTtsBlockedUntil = 0L
     // Har yangi muloqot eski asinxron javob/TTS'ni bekor qiladi — kechikkan
     // javob yangi buyruq ustidan yozib yubormasin.
     private var interactionSeq = 0
@@ -778,22 +775,22 @@ class YuzAiActivity : BaseFragment() {
         }
     }
 
-    /** Qisqa tasdiq: tizim TTS — bir zumda, tarmoq kutmasdan. */
+    /** Qisqa tasdiq — bulut ovozi; internet yo'q bo'lsa jim. */
     private fun fastSay(text: String, resume: Boolean = true) {
         statusView.text = text
         assistant(text)
         setOrb(YuzAiOrbView.Mode.SPEAKING)
         autoListenArmed = resume
-        voice?.speak(text)
+        voice?.speakCloud(text)
     }
 
     private fun speakAndResume(text: String) {
         setOrb(YuzAiOrbView.Mode.SPEAKING)
         autoListenArmed = true
-        voice?.speak(text)
+        voice?.speakCloud(text)
     }
 
-    /** Suhbat javobi — Gemini ovozi (1.5 s ichida kelmasa tizim TTS). */
+    /** Suhbat javobi — Gemini bulut ovozi; audio kelmasa matn bilan jim davom etadi. */
     private fun say(text: String) {
         statusView.text = text
         assistant(text)
@@ -802,28 +799,9 @@ class YuzAiActivity : BaseFragment() {
         speakNice(text)
     }
 
+    /** Javob ovozi — bulut (Gemini TTS), jumlalab. Tizim TTS fallback yo'q. */
     private fun speakNice(text: String) {
-        val v = voice ?: return
-        // /speak bir marta ishlamasa, 5 daqiqa tizim TTS bilan darhol gapiramiz.
-        if (SystemClock.elapsedRealtime() < cloudTtsBlockedUntil) {
-            v.speak(text)
-            return
-        }
-        val seq = interactionSeq
-        scope.launch {
-            val b = try {
-                withTimeoutOrNull(400L) { YuzAiCloud.speakText(text) }
-            } catch (_: Exception) {
-                null
-            }
-            if (!screenActive || parentActivity == null || cloudBusy || seq != interactionSeq) return@launch
-            if (b != null && b.size > 2000) {
-                v.playCloudAudio(b, text)
-            } else {
-                cloudTtsBlockedUntil = SystemClock.elapsedRealtime() + 5 * 60_000L
-                v.speak(text)
-            }
-        }
+        voice?.speakCloud(text)
     }
 
     private fun mapGoto(tag: String): YuzAiEngine.Section? = when (tag) {
