@@ -54,6 +54,9 @@ public class YuzGramChatWheel extends View {
     private static final float CIRCLE_DP = 24f;
     /** Surish paytida menyu shu nisbatda kattalashadi (dam olish = 1.0). */
     private static final float SCALE_DRAG = 1.16f;
+    /** Gumbaz ichidagi doimiy qalamcha (tepa qismi) va top-rejimdagi kattasi. */
+    private static final float SMALL_COMPOSE_R_DP = 13.5f;
+    private static final float BIG_COMPOSE_R_DP = 30f;
 
     private static final int BORDER = 0x592AABEE;
     private static final int GLOW = 0x662AABEE;
@@ -124,9 +127,21 @@ public class YuzGramChatWheel extends View {
     private float pulseT = 1f;
 
     private LinearGradient activeShader;
+    private LinearGradient bigShader;
     private float shaderCx = Float.MIN_VALUE, shaderCy = Float.MIN_VALUE, shaderR = Float.MIN_VALUE;
     /** Fokus nomining asosiy o'lchami (sp) — sig'imganda shundan pastga tushadi. */
     private float labelBaseSize;
+
+    /** Top-tab rejimi: gumbaz o'rniga katta qalamcha (0 = gumbaz, 1 = qalamcha). */
+    private boolean topTabsMode;
+    private float topBlend;
+    private ValueAnimator topBlendAnim;
+    /** Scroll bilan yashiriladigan doimiy qalamcha shaffofligi. */
+    private float composeAlpha = 1f;
+    private ValueAnimator composeAnim;
+    private boolean composePressed;
+    private boolean composeTracking;
+    private float composeDownX, composeDownY;
 
     public YuzGramChatWheel(Context context) {
         super(context);
@@ -215,6 +230,72 @@ public class YuzGramChatWheel extends View {
         }
     }
 
+    /** Top-tab rejimida gumbaz o'rniga katta qalamcha ko'rsatiladi. */
+    public void setTopTabsMode(boolean on, boolean animated) {
+        if (topTabsMode == on) {
+            return;
+        }
+        topTabsMode = on;
+        if (topBlendAnim != null) {
+            topBlendAnim.cancel();
+            topBlendAnim = null;
+        }
+        float target = on ? 1f : 0f;
+        if (!animated) {
+            topBlend = target;
+            if (animator != null) {
+                animator.cancel();
+                animator = null;
+            }
+            invalidate();
+            return;
+        }
+        topBlendAnim = ValueAnimator.ofFloat(topBlend, target);
+        topBlendAnim.setDuration(180);
+        topBlendAnim.setInterpolator(new DecelerateInterpolator());
+        topBlendAnim.addUpdateListener(a -> {
+            topBlend = (float) a.getAnimatedValue();
+            invalidate();
+        });
+        topBlendAnim.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                topBlendAnim = null;
+            }
+        });
+        topBlendAnim.start();
+    }
+
+    /** Scroll holati: qalamcha gumbaz menyusi kabi yashirinadi/ko'rinadi. */
+    public void setComposeHidden(boolean hidden) {
+        float target = hidden ? 0f : 1f;
+        if (Math.abs(composeAlpha - target) < 0.001f) {
+            return;
+        }
+        if (composeAnim != null) {
+            composeAnim.cancel();
+            composeAnim = null;
+        }
+        composeAnim = ValueAnimator.ofFloat(composeAlpha, target);
+        composeAnim.setDuration(hidden ? 140 : 180);
+        composeAnim.setInterpolator(new DecelerateInterpolator());
+        composeAnim.addUpdateListener(a -> {
+            composeAlpha = (float) a.getAnimatedValue();
+            if (composeAlpha <= 0f) {
+                composePressed = false;
+                composeTracking = false;
+            }
+            invalidate();
+        });
+        composeAnim.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                composeAnim = null;
+            }
+        });
+        composeAnim.start();
+    }
+
     // --------------------------------------------------------- geometriya
 
     /** Dona turi: 0..n-1 filtr, n=compose, n+1=add. */
@@ -282,20 +363,35 @@ public class YuzGramChatWheel extends View {
         if (menuScale != 1f) {
             canvas.scale(menuScale, menuScale, getWidth(), getHeight() / 2f);
         }
-        drawPanel(canvas);
-        int n = slotCount();
-        float[] p = new float[4];
-        // Chetdakilardan markazga: fokus eng ustida chizilsin.
-        for (int pass = 0; pass < 2; pass++) {
-            for (int i = 0; i < n; i++) {
-                if (!itemCenter(i, p)) {
-                    continue;
+        if (topBlend < 1f) {
+            int layer = topBlend > 0f
+                    ? canvas.saveLayerAlpha(null, (int) (255 * (1f - topBlend))) : -1;
+            drawPanel(canvas);
+            int n = slotCount();
+            float[] p = new float[4];
+            // Chetdakilardan markazga: fokus eng ustida chizilsin.
+            for (int pass = 0; pass < 2; pass++) {
+                for (int i = 0; i < n; i++) {
+                    if (!itemCenter(i, p)) {
+                        continue;
+                    }
+                    boolean focus = Math.abs(i - pos) < 0.5f;
+                    if ((pass == 0) == focus) {
+                        continue;
+                    }
+                    drawSlot(canvas, i, p[0], p[1], p[2], p[3], focus);
                 }
-                boolean focus = Math.abs(i - pos) < 0.5f;
-                if ((pass == 0) == focus) {
-                    continue;
-                }
-                drawSlot(canvas, i, p[0], p[1], p[2], p[3], focus);
+            }
+            if (layer >= 0) {
+                canvas.restoreToCount(layer);
+            }
+        }
+        if (composeAlpha > 0f) {
+            if (topBlend > 0f) {
+                drawBigCompose(canvas, topBlend * composeAlpha);
+            }
+            if (topBlend < 1f) {
+                drawSmallCompose(canvas, (1f - topBlend) * composeAlpha);
             }
         }
         canvas.restore();
@@ -321,6 +417,65 @@ public class YuzGramChatWheel extends View {
         strokePaint.setStrokeWidth(dp(5f));
         canvas.drawCircle(cx, cy, R + dp(3.5f), strokePaint);
         strokePaint.setStrokeWidth(dp(1.4f));
+    }
+
+    /** Gumbaz ichidagi doimiy qalamcha — halqa ichida, tepa qismida suzadi. */
+    private void drawSmallCompose(Canvas canvas, float alpha) {
+        float cx = getWidth() - dp(20f);
+        float cy = dp(36f);
+        float r = dp(SMALL_COMPOSE_R_DP) * (composePressed ? 0.92f : 1f);
+        int a = (int) (255 * alpha);
+        fillPaint.setShader(null);
+        fillPaint.setColor(0xE60D1B33);
+        fillPaint.setAlpha((int) (0xE6 * alpha));
+        canvas.drawCircle(cx, cy, r, fillPaint);
+        fillPaint.setAlpha(255);
+        strokePaint.setColor(composePressed ? 0xFF7FD4FF : 0x99A8E4FF);
+        strokePaint.setStrokeWidth(dp(1.3f));
+        strokePaint.setAlpha(a);
+        canvas.drawCircle(cx, cy, r, strokePaint);
+        strokePaint.setAlpha(255);
+        strokePaint.setStrokeWidth(dp(1.4f));
+        iconPaint.setColor(ICON_ACTIVE);
+        iconPaint.setAlpha(a);
+        drawPencil(canvas, cx, cy, r * 1.35f);
+        iconPaint.setAlpha(255);
+    }
+
+    /** Top-tab rejimida gumbaz o'rnidagi katta gradient qalamcha. */
+    private void drawBigCompose(Canvas canvas, float alpha) {
+        float cx = getWidth() - dp(40f);
+        float cy = getHeight() / 2f;
+        float r = dp(BIG_COMPOSE_R_DP) * (composePressed ? 0.94f : 1f);
+        int a = (int) (255 * alpha);
+        if (bigShader == null) {
+            bigShader = new LinearGradient(cx - dp(BIG_COMPOSE_R_DP), cy - dp(BIG_COMPOSE_R_DP),
+                    cx + dp(BIG_COMPOSE_R_DP), cy + dp(BIG_COMPOSE_R_DP),
+                    new int[]{ACTIVE_START, ACTIVE_END}, null, Shader.TileMode.CLAMP);
+        }
+        strokePaint.setColor(0x33A8E4FF);
+        strokePaint.setStrokeWidth(dp(8f));
+        strokePaint.setAlpha(a);
+        canvas.drawCircle(cx, cy, r + dp(2f), strokePaint);
+        strokePaint.setAlpha(255);
+        strokePaint.setStrokeWidth(dp(1.4f));
+        fillPaint.setShader(bigShader);
+        fillPaint.setAlpha(a);
+        canvas.drawCircle(cx, cy, r, fillPaint);
+        fillPaint.setShader(null);
+        fillPaint.setAlpha(255);
+        strokePaint.setColor(0xB3A8E4FF);
+        strokePaint.setStrokeWidth(dp(1.6f));
+        strokePaint.setAlpha(a);
+        canvas.drawCircle(cx, cy, r, strokePaint);
+        strokePaint.setAlpha(255);
+        strokePaint.setStrokeWidth(dp(1.4f));
+        iconPaint.setColor(ICON_ACTIVE);
+        iconPaint.setAlpha(a);
+        iconPaint.setStrokeWidth(dp(2.6f));
+        drawPencil(canvas, cx, cy, r * 1.05f);
+        iconPaint.setAlpha(255);
+        iconPaint.setStrokeWidth(dp(2f));
     }
 
     private void drawSlot(Canvas canvas, int slot, float x, float y, float scale,
@@ -772,15 +927,50 @@ public class YuzGramChatWheel extends View {
         return dp(ARC_R_DP) * ARC_STEP;
     }
 
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        if (slotCount() == 0) {
+    private boolean composeHit(float x, float y) {
+        if (composeAlpha < 0.2f) {
             return false;
         }
+        float cx;
+        float cy;
+        float rr;
+        if (topTabsMode) {
+            cx = getWidth() - dp(40f);
+            cy = getHeight() / 2f;
+            rr = dp(BIG_COMPOSE_R_DP) + dp(10f);
+        } else {
+            cx = getWidth() - dp(20f);
+            cy = dp(36f);
+            rr = dp(SMALL_COMPOSE_R_DP) + dp(6f);
+        }
+        float dx = x - cx, dy = y - cy;
+        return dx * dx + dy * dy <= rr * rr;
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
         final float ex = unscaledX(event.getX());
         final float ey = unscaledY(event.getY());
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN: {
+                if (composeHit(ex, ey)) {
+                    if (getParent() != null) {
+                        getParent().requestDisallowInterceptTouchEvent(true);
+                    }
+                    if (animator != null) {
+                        animator.cancel();
+                        animator = null;
+                    }
+                    composePressed = true;
+                    composeTracking = true;
+                    composeDownX = ex;
+                    composeDownY = ey;
+                    invalidate();
+                    return true;
+                }
+                if (topTabsMode || slotCount() == 0) {
+                    return false;
+                }
                 // Gumbaz doirasi TASHQARISIDagi urishlar o'tib ketadi: ostdagi
                 // chat qatorlari to'liq kenglikda bosiladigan bo'lib qoladi.
                 float rdx = ex - (getWidth() - dp(DOME_INSET_DP));
@@ -808,6 +998,17 @@ public class YuzGramChatWheel extends View {
                 return true;
             }
             case MotionEvent.ACTION_MOVE: {
+                if (composeTracking) {
+                    float cdx = ex - composeDownX, cdy = ey - composeDownY;
+                    if (composePressed && cdx * cdx + cdy * cdy > dp(12f) * dp(12f)) {
+                        composePressed = false;
+                        invalidate();
+                    }
+                    return true;
+                }
+                if (topTabsMode) {
+                    return false;
+                }
                 float y = ey;
                 float t = event.getEventTime();
                 float dt = Math.max(1f, t - lastT);
@@ -836,6 +1037,21 @@ public class YuzGramChatWheel extends View {
             }
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL: {
+                if (composeTracking) {
+                    boolean fire = composePressed
+                            && event.getActionMasked() == MotionEvent.ACTION_UP
+                            && composeHit(ex, ey);
+                    composeTracking = false;
+                    composePressed = false;
+                    invalidate();
+                    if (fire && actionListener != null) {
+                        actionListener.onActionClicked(ACTION_COMPOSE);
+                    }
+                    return true;
+                }
+                if (topTabsMode) {
+                    return false;
+                }
                 boolean wasDragging = dragging;
                 boolean tap = !dragging && event.getActionMasked() == MotionEvent.ACTION_UP;
                 dragging = false;
@@ -899,6 +1115,14 @@ public class YuzGramChatWheel extends View {
         if (scaleAnim != null) {
             scaleAnim.cancel();
             scaleAnim = null;
+        }
+        if (topBlendAnim != null) {
+            topBlendAnim.cancel();
+            topBlendAnim = null;
+        }
+        if (composeAnim != null) {
+            composeAnim.cancel();
+            composeAnim = null;
         }
         super.onDetachedFromWindow();
     }

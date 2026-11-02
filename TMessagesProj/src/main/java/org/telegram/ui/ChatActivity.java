@@ -50,7 +50,6 @@ import android.graphics.Region;
 import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
 import android.net.Uri;
@@ -2581,6 +2580,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         getNotificationCenter().addObserver(this, NotificationCenter.topicsDidLoaded);
         getNotificationCenter().addObserver(this, NotificationCenter.chatWasBoostedByUser);
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.didSetNewWallpapper);
+        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.didSetNewTheme);
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.didApplyNewTheme);
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.goingToPreviewTheme);
         getNotificationCenter().addObserver(this, NotificationCenter.channelRightsUpdated);
@@ -2993,6 +2993,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
         getNotificationCenter().removeObserver(this, NotificationCenter.topicsDidLoaded);
         getNotificationCenter().removeObserver(this, NotificationCenter.chatWasBoostedByUser);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.didSetNewWallpapper);
+        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.didSetNewTheme);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.didApplyNewTheme);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.goingToPreviewTheme);
         getNotificationCenter().removeObserver(this, NotificationCenter.channelRightsUpdated);
@@ -22040,6 +22041,10 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 }
                 chatListView.invalidateViews();
             }
+        } else if (id == NotificationCenter.didSetNewTheme) {
+            if (fragmentView != null && themeDelegate != null) {
+                themeDelegate.onGlobalThemeChanged();
+            }
         } else if (id == NotificationCenter.didApplyNewTheme) {
             if (undoView == null || paused) {
                 return;
@@ -38718,6 +38723,49 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             }
         }
 
+        private void onGlobalThemeChanged() {
+            if (parentThemeDelegate != null || ThemeEditorView.getInstance() != null) return;
+            isDark = Theme.getActiveTheme().isDark();
+            if (chatTheme == null && wallpaper == null) {
+                updateBackground();
+                if (contentView != null) {
+                    contentView.invalidateBackground();
+                }
+                if (chatListView != null) {
+                    chatListView.invalidateViews();
+                }
+                return;
+            }
+            if (ApplicationLoader.applicationContext != null) {
+                Theme.createChatResources(ApplicationLoader.applicationContext, false);
+            }
+            if (chatTheme != null) {
+                currentColors = chatTheme.createColors(currentAccount, isDark ? 1 : 0);
+            }
+            if (!TextUtils.isEmpty(ChatThemeController.getWallpaperEmoticon(wallpaper))) {
+                backgroundDrawable = PreviewView.getBackgroundDrawable(backgroundDrawable, currentAccount, wallpaper, isDark);
+            } else if (wallpaper != null) {
+                backgroundDrawable = ChatBackgroundDrawable.getOrCreate(backgroundDrawable, wallpaper, isDark);
+            } else if (chatTheme != null) {
+                backgroundDrawable = getBackgroundDrawableFromTheme(chatTheme, 0);
+            }
+            if (backgroundDrawable != null) {
+                int[] colors = AndroidUtilities.calcDrawableColor(backgroundDrawable);
+                currentColor = colors[0];
+                initDrawables();
+                initPaints();
+                initServiceMessageColors(backgroundDrawable);
+                updateServiceMessageColor(1f);
+            }
+            updateBackground();
+            if (contentView != null) {
+                contentView.invalidateBackground();
+            }
+            if (chatListView != null) {
+                chatListView.invalidateViews();
+            }
+        }
+
         private void initDrawables() {
             Map<String, Drawable> chatDrawablesMap = Theme.getThemeDrawablesMap();
             for (Map.Entry<String, Drawable> entry : chatDrawablesMap.entrySet()) {
@@ -39041,7 +39089,6 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 String wallpaperLink = chatTheme.getWallpaperLink(isDark ? 1 : 0);
                 Theme.BackgroundDrawableSettings settings = Theme.createBackgroundDrawable(themeInfo, currentColors, wallpaperLink, prevPhase, false);
                 drawable = settings.wallpaper;
-                drawable = new ColorDrawable(Color.BLACK);
             } else {
                 int backgroundColor = getColor(Theme.key_chat_wallpaper);
                 int gradientColor1 = getColor(Theme.key_chat_wallpaper_gradient_to1);

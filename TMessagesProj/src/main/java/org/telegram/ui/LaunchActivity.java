@@ -8153,7 +8153,12 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     }
 
     private void applyYuzGramBarVisibility() {
-        yuzGramBottomBar.setVisible(yuzGramBarEligible && !yuzGramBarScrollHidden);
+        boolean visible = yuzGramBarEligible && !yuzGramBarScrollHidden;
+        yuzGramBottomBar.setVisible(visible);
+        BaseFragment top = getLastFragment();
+        if (top instanceof DialogsActivity && ((DialogsActivity) top).isYuzGramMainRoot()) {
+            ((DialogsActivity) top).setYuzGramComposeHidden(!visible);
+        }
     }
 
     /**
