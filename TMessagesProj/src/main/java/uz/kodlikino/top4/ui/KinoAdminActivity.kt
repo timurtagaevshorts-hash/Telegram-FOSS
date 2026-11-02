@@ -9,8 +9,10 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.text.Editable
+import android.text.TextUtils
 import android.text.TextWatcher
 import android.view.ContextThemeWrapper
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -107,6 +109,11 @@ class KinoAdminActivity : BaseFragment() {
     private var llRecentUsers: ViewGroup? = null
     private var btnRefreshStats: View? = null
     private var dashBusy = false
+    private var activePage: YuzAdminStats.ActiveUsersPage? = null
+    private var activeLoading = false
+    private var btnMoreUsers: TextView? = null
+    private var dashDayStart = 0L
+    private var activeGen = 0
 
     private var rv: RecyclerView? = null
     private var adapter: KinoAdminAdapter? = null
@@ -388,15 +395,21 @@ class KinoAdminActivity : BaseFragment() {
             if (fragmentView == null) return@launch
             progressDash?.visibility = View.GONE
             val dash = result.getOrNull()
-            if (dash == null) {
+            if (dash == null || dash.failed) {
+                tvStatsUpdated?.text = getString(R.string.yuz_admin_stats_error)
                 toast(R.string.yuz_admin_stats_failed)
                 return@launch
             }
-            tvStatsUpdated?.text =
-                getString(R.string.yuz_admin_updated, timeFormat.format(Date()))
+            dashDayStart = dash.dayStart
+            val updated = timeFormat.format(Date())
+            tvStatsUpdated?.text = if (dash.approximate) {
+                getString(R.string.yuz_admin_updated_approx, updated)
+            } else {
+                getString(R.string.yuz_admin_updated, updated)
+            }
             fillUsersGrid(dash)
             fillContentGrid(dash)
-            fillRecent(dash.recentActive)
+            fillRecent(dash.activeUsers)
         }
     }
 
@@ -443,31 +456,151 @@ class KinoAdminActivity : BaseFragment() {
         grid.addView(tile)
     }
 
-    private fun fillRecent(recent: List<Pair<String, Long>>) {
+    private fun fillRecent(page: YuzAdminStats.ActiveUsersPage) {
         val themed = themedContext ?: return
         val ll = llRecentUsers ?: return
         ll.removeAllViews()
-        tvRecentTitle?.visibility = if (recent.isEmpty()) View.GONE else View.VISIBLE
-        if (recent.isEmpty()) return
+        activePage = page
+        activeGen++
+        btnMoreUsers = null
+        tvRecentTitle?.visibility = if (page.users.isEmpty()) View.GONE else View.VISIBLE
+        if (page.users.isEmpty()) return
         val now = System.currentTimeMillis()
-        val m = AndroidUtilities.dp(4f)
-        for ((name, ts) in recent) {
-            val row = TextView(themed).apply {
-                text = "$name · ${agoLabel(ts, now)}"
-                setTextColor(ContextCompat.getColor(themed, R.color.yuz_text_secondary))
-                textSize = 13f
-                setBackgroundResource(R.drawable.bg_profile_modern_card)
-                setPadding(
-                    AndroidUtilities.dp(12f), AndroidUtilities.dp(9f),
-                    AndroidUtilities.dp(12f), AndroidUtilities.dp(9f)
-                )
-            }
-            val lp = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-            lp.setMargins(0, m, 0, m)
-            ll.addView(row, lp)
+        for (user in page.users) {
+            ll.addView(buildActiveUserRow(themed, user, now), recentRowParams())
         }
+        val more = TextView(themed).apply {
+            text = getString(R.string.yuz_admin_load_more)
+            setTextColor(ContextCompat.getColor(themed, R.color.yuz_action))
+            setTypeface(null, Typeface.BOLD)
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setBackgroundResource(R.drawable.bg_yuz_chip)
+            setPadding(
+                AndroidUtilities.dp(12f), AndroidUtilities.dp(9f),
+                AndroidUtilities.dp(12f), AndroidUtilities.dp(9f)
+            )
+            isClickable = true
+            isFocusable = true
+            visibility = if (page.hasMore) View.VISIBLE else View.GONE
+            setOnClickListener { loadMoreActiveUsers() }
+        }
+        ll.addView(more, recentRowParams())
+        btnMoreUsers = more
+    }
+
+    private fun buildActiveUserRow(
+        ctx: Context,
+        user: YuzAdminStats.ActiveUser,
+        now: Long
+    ): View {
+        val row = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundResource(R.drawable.bg_profile_modern_card)
+            setPadding(
+                AndroidUtilities.dp(12f), AndroidUtilities.dp(10f),
+                AndroidUtilities.dp(12f), AndroidUtilities.dp(10f)
+            )
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { openUserProfile(user) }
+        }
+        val name = TextView(ctx).apply {
+            text = user.name
+            setTextColor(ContextCompat.getColor(ctx, R.color.yuz_text))
+            setTypeface(null, Typeface.BOLD)
+            textSize = 13f
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        }
+        val ago = TextView(ctx).apply {
+            text = agoLabel(user.lastActiveAt, now)
+            setTextColor(ContextCompat.getColor(ctx, R.color.yuz_text_muted))
+            textSize = 12f
+        }
+        row.addView(
+            name,
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        )
+        row.addView(
+            ago,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { marginStart = AndroidUtilities.dp(8f) }
+        )
+        return row
+    }
+
+    private fun recentRowParams(): LinearLayout.LayoutParams =
+        LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            val m = AndroidUtilities.dp(4f)
+            setMargins(0, m, 0, m)
+        }
+
+    private fun loadMoreActiveUsers() {
+        if (activeLoading) return
+        val current = activePage ?: return
+        if (!current.hasMore) return
+        if (dashDayStart <= 0L) return
+        val cursor = current.cursor ?: return
+        val s = scope ?: return
+        val themed = themedContext ?: return
+        val ll = llRecentUsers ?: return
+        val more = btnMoreUsers ?: return
+        val gen = activeGen
+        activeLoading = true
+        more.isEnabled = false
+        more.text = getString(R.string.yuz_admin_loading)
+        s.launch {
+            val next = runCatching {
+                YuzAdminStats.loadActiveUsers(
+                    dashDayStart,
+                    cursor,
+                    YuzAdminStats.ACTIVE_PAGE
+                )
+            }.getOrNull()
+            activeLoading = false
+            // Ro'yxat shu orada yangilangan bo'lsa eski sahifani aralashtirmaymiz.
+            if (fragmentView == null || gen != activeGen) return@launch
+            if (next == null) {
+                toast(R.string.yuz_admin_stats_failed)
+                more.isEnabled = true
+                more.text = getString(R.string.yuz_admin_load_more)
+                return@launch
+            }
+            val now = System.currentTimeMillis()
+            var index = ll.indexOfChild(more).let { if (it < 0) ll.childCount else it }
+            for (user in next.users) {
+                ll.addView(buildActiveUserRow(themed, user, now), index, recentRowParams())
+                index++
+            }
+            activePage = next
+            more.isEnabled = true
+            more.text = getString(R.string.yuz_admin_load_more)
+            more.visibility = if (next.hasMore) View.VISIBLE else View.GONE
+        }
+    }
+
+    /** Faol foydalanuvchi profilini Telegram'ning native profil oynasida ochadi. */
+    private fun openUserProfile(user: YuzAdminStats.ActiveUser) {
+        val id = user.uid.removePrefix("tg_").toLongOrNull()
+        if (id == null || id <= 0L) {
+            toast(R.string.yuz_admin_profile_unavailable)
+            return
+        }
+        val args = android.os.Bundle()
+        args.putLong("user_id", id)
+        args.putBoolean(
+            "my_profile",
+            id == org.telegram.messenger.UserConfig
+                .getInstance(currentAccount).clientUserId
+        )
+        presentFragment(org.telegram.ui.ProfileActivity(args, null), false)
     }
 
     private fun agoLabel(ts: Long, now: Long): String {

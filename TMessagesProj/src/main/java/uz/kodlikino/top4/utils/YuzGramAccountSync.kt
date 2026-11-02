@@ -7,12 +7,18 @@ import org.telegram.messenger.UserConfig
 import java.util.concurrent.Executors
 
 /**
- * Firebase Auth sessiyasini faol Telegram akkauntiga bog'lab turadi.
+ * Firebase Auth sessiyasini faol Telegram akkauntiga bog'lab turadi va shu
+ * sessiya bilan faollik izini (`lastActiveAt`) yozadi.
  *
  * Firestore qoidalari yozuvni `tg_<clientUserId>` uid'iga bog'laydi; Telegram'da
  * akkaunt almashsa uid ham o'zgarishi shart. [YuzGramAdsAuth.ensureSignedIn]
  * boshqa uid bilan sessiyani yopib, yangisini ochadi — bu obyekt uni akkaunt
  * almashinuvida va ilova ochilishida avtomatik chaqiradi.
+ *
+ * Ilova ochilishida sessiya bo'lmasa ham kiramiz: faollik izi faqat Firebase
+ * sessiyasi bilan yoziladi, admin statistikasi esa shu izga tayanadi. Sessiya
+ * mavjud bo'lsa `ensureSignedIn` tarmoqqa chiqmaydi (uid mos bo'lsa darhol
+ * qaytadi), presence yozuvi esa [YuzPresence] ichida 20 daqiqaga cheklangan.
  *
  * Barcha ishlar bitta fon oqimida ketadi: ketma-ket chaqiruvlar tartibi
  * saqlanadi, oxirgi akkaunt g'olib bo'ladi.
@@ -23,28 +29,16 @@ object YuzGramAccountSync {
         Thread(r, "yuz-firebase-account").apply { isDaemon = true }
     }
 
-    /**
-     * Firebase sessiyasi mavjud bo'lsa (oldingi akkauntdan qolgan bo'lsa),
-     * uni [account] uid'iga o'tkazadi. Sessiya bo'lmasa hech narsa qilmaydi —
-     * birinchi Firebase amali o'zi kerakli akkaunt bilan kiradi.
-     */
     @JvmStatic
     fun syncActiveAccount(account: Int) {
         if (account < 0 || account >= UserConfig.MAX_ACCOUNT_COUNT) return
         executor.execute {
-            val expected = try {
-                YuzGramAdsAuth.expectedUid(account)
+            val signedIn = try {
+                UserConfig.getInstance(account).clientUserId > 0L
             } catch (_: Exception) {
-                return@execute
+                false
             }
-            if (expected.isEmpty()) return@execute
-            val auth = try {
-                FirebaseAuth.getInstance()
-            } catch (_: Exception) {
-                return@execute
-            }
-            val current = auth.currentUser?.uid ?: return@execute
-            if (current == expected) return@execute
+            if (!signedIn) return@execute
             try {
                 runBlocking { YuzGramAdsAuth.ensureSignedIn(account) }
             } catch (e: Exception) {

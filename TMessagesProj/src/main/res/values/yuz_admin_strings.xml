@@ -6,12 +6,16 @@
     <string name="yuz_admin_tab_reels">Reels</string>
     <string name="yuz_admin_refresh">Yangilash</string>
     <string name="yuz_admin_updated">Yangilangan: %1$s</string>
+    <string name="yuz_admin_updated_approx">Taxminiy (server bilan aloqa yo\'q): %1$s</string>
     <string name="yuz_admin_loading">Statistika yig\'ilmoqda…</string>
     <string name="yuz_admin_group_users">Foydalanuvchilar va faollik</string>
     <string name="yuz_admin_group_content">Kontent va yuklashlar</string>
-    <string name="yuz_admin_recent">So\'nggi faol foydalanuvchilar</string>
+    <string name="yuz_admin_recent">Bugungi faol foydalanuvchilar</string>
+    <string name="yuz_admin_load_more">Yana yuklash</string>
     <string name="yuz_admin_no_recent">Hozircha faollik izi yo\'q</string>
     <string name="yuz_admin_stats_failed">Statistika yuklanmadi. Internetni tekshiring</string>
+    <string name="yuz_admin_stats_error">Statistika olinmadi — qayta urinib ko\'ring</string>
+    <string name="yuz_admin_profile_unavailable">Bu foydalanuvchi profili mavjud emas</string>
 
     <string name="yuz_stat_today_active">Bugun faol</string>
     <string name="yuz_stat_week_active">7 kunda faol</string>

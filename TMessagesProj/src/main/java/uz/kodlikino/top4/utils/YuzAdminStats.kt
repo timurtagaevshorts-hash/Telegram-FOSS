@@ -2,6 +2,7 @@ package uz.kodlikino.top4.utils
 
 import com.google.firebase.firestore.AggregateField
 import com.google.firebase.firestore.AggregateSource
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Source
@@ -18,7 +19,7 @@ import java.util.Calendar
  * sanaladi (sun'iy/lokal hisob yo'q):
  *
  *  - Foydalanuvchilar va faollik: `comment_profiles/{uid}` hujjatlaridagi
- *    `lastActiveAt`/`createdAt`/`isPremium` ([YuzPresence] har ~20 daqiqada
+ *    `lastActiveAt`/`createdAt`/`isPremium` ([YuzPresence] ilova ochilganda
  *    `lastActiveAt`-ni yangilaydi — shu iz bugungi/haftalik/oylik faollarni
  *    haqiqiy qiladi);
  *  - Reels kontenti: `reels` kolleksiyasi (views/likeCount/commentCount
@@ -29,9 +30,13 @@ import java.util.Calendar
  * Firestore bitta agregat uchun ~1000 indeks yozuvi evaziga 1 o'qish yozadi,
  * ya'ni butun kolleksiyani hujjatma-hujjat o'qish (~12k o'qish) o'rniga
  * ~10-150 o'qish yetadi. Agregat ishlamasa (oflayn / qoida rad etsa) —
- * cheklangan lokal kesh skaneriga tushamiz: kesh o'qishlari bepul.
+ * cheklangan lokal kesh skaneriga tushamiz va natija [Dashboard.approximate]
+ * bilan belgilanadi: noto'g'ri raqam "aniq" bo'lib ko'rinmasligi shart.
  */
 object YuzAdminStats {
+
+    /** "Bugungi faol" ro'yxatining bir sahifasi. */
+    const val ACTIVE_PAGE = 10
 
     private const val COLLECTION_REELS = "reels"
     private const val COLLECTION_MOVIES = "movies"
@@ -39,7 +44,23 @@ object YuzAdminStats {
 
     private const val PAGE = 200
     private const val FALLBACK_MAX_DOCS = 600
-    private const val RECENT_LIMIT = 8
+
+    /** Bitta faol foydalanuvchi qatori. `uid` = `tg_<telegram id>`. */
+    data class ActiveUser(
+        val uid: String,
+        val name: String,
+        val lastActiveAt: Long
+    )
+
+    /**
+     * Sahifalangan ro'yxat. [cursor] — keyingi sahifa uchun Firestore hujjat
+     * ko'rsatkichi, uni [loadActiveUsers] ga qaytarib berish kerak.
+     */
+    data class ActiveUsersPage(
+        val users: List<ActiveUser>,
+        val hasMore: Boolean,
+        val cursor: DocumentSnapshot? = null
+    )
 
     data class Dashboard(
         val totalUsers: Int = 0,
@@ -55,8 +76,14 @@ object YuzAdminStats {
         val totalComments: Long = 0,
         val uploadsToday: Int = 0,
         val uploadsWeek: Int = 0,
-        /** lastActiveAt bo'yicha eng yaqin 8 kishi: (ism, epoch ms). */
-        val recentActive: List<Pair<String, Long>> = emptyList()
+        /** Bugun faol bo'lganlar — birinchi [ACTIVE_PAGE] tasi. */
+        val activeUsers: ActiveUsersPage = ActiveUsersPage(emptyList(), false),
+        /** Kun boshlanishi (epoch ms) — "yana yuklash" shu chegaradan davom etadi. */
+        val dayStart: Long = 0L,
+        /** Server agregatlari ishlamadi — raqamlar lokal keshdan, taxminiy. */
+        val approximate: Boolean = false,
+        /** Na server, na kesh javob berdi — raqamlarni ko'rsatish mumkin emas. */
+        val failed: Boolean = false
     )
 
     suspend fun load(): Dashboard = withContext(Dispatchers.IO) {
@@ -67,7 +94,18 @@ object YuzAdminStats {
             loadAggregated(startOfToday, startOfWeek, startOfMonth)
         } catch (e: Exception) {
             FileLog.e(e)
-            loadFromCache(startOfToday, startOfWeek, startOfMonth)
+            try {
+                val cached = loadFromCache(startOfToday, startOfWeek, startOfMonth)
+                if (cached.totalUsers == 0 && cached.reelsCount == 0) {
+                    // Bo'sh kesh — nollarni "haqiqiy statistika" sifatida ko'rsatmaymiz.
+                    cached.copy(failed = true, approximate = false)
+                } else {
+                    cached
+                }
+            } catch (e2: Exception) {
+                FileLog.e(e2)
+                Dashboard(dayStart = startOfToday, failed = true)
+            }
         }
     }
 
@@ -98,7 +136,7 @@ object YuzAdminStats {
                 reels.aggregate(sumViews, sumLikes, sumComments)
                     .get(AggregateSource.SERVER).await()
             }
-            val recent = async { recentActive() }
+            val active = async { loadActiveUsers(startOfToday) }
 
             val agg = sums.await()
             Dashboard(
@@ -115,30 +153,50 @@ object YuzAdminStats {
                 totalComments = num(agg.get(sumComments)),
                 uploadsToday = uploadsToday.await(),
                 uploadsWeek = uploadsWeek.await(),
-                recentActive = recent.await()
+                activeUsers = active.await(),
+                dayStart = startOfToday
             )
         }
+    }
+
+    /**
+     * "Bugungi faol foydalanuvchilar" sahifasi — `lastActiveAt DESC`, faqat
+     * [since] (kun boshlanishi) dan keyin faol bo'lganlar. [cursor] berilsa
+     * keyingi sahifa qaytadi.
+     */
+    suspend fun loadActiveUsers(
+        since: Long,
+        cursor: DocumentSnapshot? = null,
+        pageSize: Int = ACTIVE_PAGE
+    ): ActiveUsersPage = withContext(Dispatchers.IO) {
+        var q: Query = db.collection(COLLECTION_PROFILES)
+            .whereGreaterThanOrEqualTo("lastActiveAt", since)
+            .orderBy("lastActiveAt", Query.Direction.DESCENDING)
+            .limit((pageSize + 1).toLong())
+        if (cursor != null) q = q.startAfter(cursor)
+        val docs = q.get(Source.SERVER).await().documents
+        val hasMore = docs.size > pageSize
+        val page = if (hasMore) docs.subList(0, pageSize) else docs
+        ActiveUsersPage(
+            users = page.map { doc ->
+                ActiveUser(
+                    uid = doc.id,
+                    name = displayName(doc),
+                    lastActiveAt = getLong(doc, "lastActiveAt")
+                )
+            },
+            hasMore = hasMore,
+            cursor = page.lastOrNull()
+        )
     }
 
     private suspend fun count(query: Query): Int =
         query.count().get(AggregateSource.SERVER).await().count.toInt()
 
-    private suspend fun recentActive(): List<Pair<String, Long>> = try {
-        db.collection(COLLECTION_PROFILES)
-            .whereGreaterThan("lastActiveAt", 0L)
-            .orderBy("lastActiveAt", Query.Direction.DESCENDING)
-            .limit(RECENT_LIMIT.toLong())
-            .get().await()
-            .documents
-            .map { doc -> displayName(doc) to getLong(doc, "lastActiveAt") }
-    } catch (e: Exception) {
-        FileLog.e(e)
-        emptyList()
-    }
-
     /**
      * Zaxira yo'l: agregat mavjud bo'lmaganda (oflayn, qoida o'zgargan) —
-     * cheklangan kesh skani. Kesh o'qishlari hisoblanmaydi, tarmoq ishlatilmaydi.
+     * cheklangan kesh skani. Kesh o'qishlari hisoblanmaydi, tarmoq ishlatilmaydi;
+     * natija har doim taxminiy ([Dashboard.approximate]).
      */
     private suspend fun loadFromCache(
         startOfToday: Long,
@@ -151,8 +209,8 @@ object YuzAdminStats {
         var month = 0
         var newMonth = 0
         var premium = 0
-        val recent = ArrayList<Pair<String, Long>>()
-        var last: com.google.firebase.firestore.DocumentSnapshot? = null
+        val activeToday = ArrayList<ActiveUser>()
+        var last: DocumentSnapshot? = null
         while (users < FALLBACK_MAX_DOCS) {
             var q = db.collection(COLLECTION_PROFILES).limit(PAGE.toLong())
             if (last != null) q = q.startAfter(last)
@@ -166,12 +224,14 @@ object YuzAdminStats {
                 if (active >= startOfMonth) month++
                 if (created >= startOfMonth) newMonth++
                 if (doc.getBoolean("isPremium") == true) premium++
-                if (active > 0) recent.add(displayName(doc) to active)
+                if (active >= startOfToday) {
+                    activeToday.add(ActiveUser(doc.id, displayName(doc), active))
+                }
             }
             last = docs.lastOrNull()
             if (docs.size < PAGE) break
         }
-        recent.sortByDescending { it.second }
+        activeToday.sortByDescending { it.lastActiveAt }
 
         var reels = 0
         var views = 0L
@@ -218,7 +278,9 @@ object YuzAdminStats {
             totalComments = comments,
             uploadsToday = upToday,
             uploadsWeek = upWeek,
-            recentActive = recent.take(RECENT_LIMIT)
+            activeUsers = ActiveUsersPage(activeToday.take(ACTIVE_PAGE), false),
+            dayStart = startOfToday,
+            approximate = true
         )
     }
 
@@ -226,13 +288,13 @@ object YuzAdminStats {
 
     private fun num(v: Any?): Long = (v as? Number)?.toLong() ?: 0L
 
-    private fun getLong(doc: com.google.firebase.firestore.DocumentSnapshot, key: String): Long =
+    private fun getLong(doc: DocumentSnapshot, key: String): Long =
         when (val v = doc.get(key)) {
             is Number -> v.toLong()
             else -> 0L
         }
 
-    private fun displayName(doc: com.google.firebase.firestore.DocumentSnapshot): String {
+    private fun displayName(doc: DocumentSnapshot): String {
         val first = doc.getString("firstName").orEmpty().trim()
         val last = doc.getString("lastName").orEmpty().trim()
         return listOf(first, last).filter { it.isNotBlank() }.joinToString(" ")
