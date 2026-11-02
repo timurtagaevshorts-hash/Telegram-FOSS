@@ -4,7 +4,9 @@ import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -21,7 +23,9 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import com.bumptech.glide.Glide
 import org.telegram.messenger.AndroidUtilities
+import org.telegram.messenger.NotificationCenter
 import org.telegram.messenger.R
+import org.telegram.ui.ActionBar.Theme
 import uz.kodlikino.top4.utils.YuzAnim
 import uz.kodlikino.top4.utils.YuzMusicEngine
 
@@ -46,6 +50,14 @@ object YuzMusicOverlay : Application.ActivityLifecycleCallbacks, YuzMusicEngine.
     private var dismissed = false
     private var listenedPlayer: Player? = null
 
+    /** Brend aksenti — mavzu bilan o'zgarmaydi (`yuz_action` qoidasi). */
+    private val accent = 0xFF2AABEE.toInt()
+
+    /** Mavzu almashganda parda o'z oynasida eski ranglarda qolib ketmasin. */
+    private val themeObserver = NotificationCenter.NotificationCenterDelegate { id, _, _ ->
+        if (id == NotificationCenter.didSetNewTheme) ui.post { applyTheme() }
+    }
+
     private val tick = object : Runnable {
         override fun run() {
             updateProgress()
@@ -60,6 +72,8 @@ object YuzMusicOverlay : Application.ActivityLifecycleCallbacks, YuzMusicEngine.
         app = a
         a.registerActivityLifecycleCallbacks(this)
         YuzMusicEngine.addObserver(this)
+        NotificationCenter.getGlobalInstance()
+            .addObserver(themeObserver, NotificationCenter.didSetNewTheme)
     }
 
     // ------------------------------------------------------- lifecycle
@@ -186,6 +200,7 @@ object YuzMusicOverlay : Application.ActivityLifecycleCallbacks, YuzMusicEngine.
             if (!added) return
             v.visibility = View.GONE
             view = v
+            applyTheme()
         }
         val v = view ?: return
         if (visible) return
@@ -233,6 +248,41 @@ object YuzMusicOverlay : Application.ActivityLifecycleCallbacks, YuzMusicEngine.
             gravity = Gravity.TOP
             y = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(6f)
         }
+    }
+
+    /**
+     * Parda alohida oynada yashaydi — Telegram mavzusi resurslarini avtomatik
+     * qayta o'qimaydi. Shuning uchun oq/qora mavzuga mos ranglarni qo'lda
+     * qo'llaymiz; `didSetNewTheme` ham shu yerni chaqiradi.
+     */
+    private fun applyTheme() {
+        val v = view ?: return
+        val card = v.findViewById<View>(R.id.overlayCard) ?: return
+        val dark = Theme.getActiveTheme()?.isDark ?: Theme.isCurrentThemeNight()
+        val fillTop = if (dark) Color.argb(0xE6, 13, 19, 27) else Color.argb(0xF2, 255, 255, 255)
+        val fillBottom = if (dark) Color.argb(0xF2, 11, 16, 23) else Color.argb(0xFF, 255, 255, 255)
+        val stroke = if (dark) Color.argb(0x2E, 255, 255, 255) else Color.argb(0x1F, 0, 0, 0)
+        card.background = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(fillTop, fillBottom)
+        ).apply {
+            cornerRadius = AndroidUtilities.dp(18f).toFloat()
+            setStroke(AndroidUtilities.dp(1f), stroke)
+        }
+        val titleColor = if (dark) Color.argb(0xF2, 255, 255, 255) else Color.rgb(10, 15, 22)
+        val artistColor = if (dark) Color.argb(0xB3, 255, 255, 255) else Color.rgb(91, 104, 120)
+        val iconColor = if (dark) Color.argb(0xE6, 255, 255, 255) else Color.rgb(30, 36, 46)
+        val iconDim = if (dark) Color.argb(0x8C, 255, 255, 255) else Color.rgb(126, 138, 153)
+        val coverFill = if (dark) Color.rgb(13, 18, 29) else Color.rgb(242, 243, 245)
+        tvTitle?.setTextColor(titleColor)
+        tvArtist?.setTextColor(artistColor)
+        v.findViewById<ImageButton>(R.id.btnOverlayPrev).setColorFilter(iconColor)
+        v.findViewById<ImageButton>(R.id.btnOverlayNext).setColorFilter(iconColor)
+        v.findViewById<ImageButton>(R.id.btnOverlayClose).setColorFilter(iconDim)
+        ivCover?.background = GradientDrawable().apply {
+            cornerRadius = v.resources.getDimensionPixelSize(R.dimen.yuz_radius_card).toFloat()
+            setColor(coverFill)
+        }
+        progress?.setBackgroundColor(accent)
     }
 
     private fun update() {
