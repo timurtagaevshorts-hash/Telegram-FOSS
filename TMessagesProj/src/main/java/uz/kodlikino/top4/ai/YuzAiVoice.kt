@@ -3,6 +3,7 @@ package uz.kodlikino.top4.ai
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.ToneGenerator
@@ -53,6 +54,10 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
     private var languageIndex = 0
     private var ignoreNextError = false
     private var released = false
+    /** Tinglash davomida musiqa/video avtomatik pauza bo'lishi uchun audio fokus. */
+    private var focusHeld = false
+    private var focusRequest: AudioFocusRequest? = null
+    private val focusListener = AudioManager.OnAudioFocusChangeListener { }
     private val speakScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var speakJob: Job? = null
     private var speakToken = 0
@@ -76,6 +81,7 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
         ignoreNextError = true
         listening = false
         muteRecognizerCue(false)
+        abandonAudioFocus()
         try {
             recognizer?.cancel()
         } catch (_: Exception) {
@@ -238,6 +244,7 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
             ignoreNextError = true
             listening = false
             muteRecognizerCue(false)
+            abandonAudioFocus()
             try {
                 recognizer?.stopListening()
                 recognizer?.cancel()
@@ -261,6 +268,14 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
     fun stopSpeaking() {
         stopSpeakingInternal()
     }
+
+    /**
+     * AudioRecord (bulut) zaxira oqimi uchun: yozuv paytida musiqa/video
+     * pauza bo'lsin, mikrofon faqat gapga yozilsin.
+     */
+    fun holdAudioFocus() = requestAudioFocus()
+
+    fun releaseAudioFocus() = abandonAudioFocus()
 
     private fun stopSpeakingInternal() {
         speakJob?.cancel()
@@ -305,6 +320,7 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
         recognizer = null
         speakScope.coroutineContext[Job]?.cancel()
         muteRecognizerCue(false)
+        abandonAudioFocus()
     }
 
     // #126: postDelayed tone.release() mainHandler.removeCallbacksAndMessages
@@ -449,6 +465,7 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
             if (ignoreNextError || released) {
                 ignoreNextError = false
                 listening = false
+                abandonAudioFocus()
                 callbacks.onListeningStopped()
                 return
             }
@@ -458,6 +475,7 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
                 return
             }
             listening = false
+            abandonAudioFocus()
             callbacks.onListeningStopped()
             val retry = error == SpeechRecognizer.ERROR_NO_MATCH ||
                 error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
@@ -469,6 +487,7 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
             mainHandler.removeCallbacks(listenTimeout)
             muteRecognizerCue(false)
             listening = false
+            abandonAudioFocus()
             callbacks.onListeningStopped()
             val text = firstResult(results)
             if (text.isBlank()) {
@@ -492,13 +511,13 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, language)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, appContext.packageName)
-            // 1300/1100 -> 1000/850 ms: qisqa buyruq ("salom", "Sardorga yoz")
+            // 1300/1100 -> 1000/870 ms: qisqa buyruq ("salom", "Sardorga yoz")
             // tugagach natija ~0.3 s tezroq keladi; 350 ms minimal — juda
             // erta kesib yubormaydi.
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 850L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 870L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 350L)
         }
         listening = true
@@ -507,13 +526,80 @@ class YuzAiVoice(context: Context, private val callbacks: Callbacks) {
         mainHandler.postDelayed(listenTimeout, LISTEN_TIMEOUT_MS)
         try {
             muteRecognizerCue(true)
+            requestAudioFocus()
             recognizer?.startListening(intent)
         } catch (e: Exception) {
             muteRecognizerCue(false)
+            abandonAudioFocus()
             Log.w(TAG, "startListening failed: " + e.message)
             listening = false
             callbacks.onListeningStopped()
             callbacks.onListenError("Mikrofon ochilmadi.", false)
+        }
+    }
+
+    /**
+     * Musiqa/video ijro paytida tanish aniqligi uchun qisqa vaqtga eksklyuziv
+     * fokus olinadi: ExoPlayer (va boshqa pleyerlar) avtomatik pauza qiladi,
+     * tinglash tugagach fokus qaytariladi va ijro o'zi davom etadi.
+     */
+    private fun requestAudioFocus() {
+        if (focusHeld) return
+        val am = try {
+            appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        } catch (_: Exception) {
+            null
+        } ?: return
+        focusHeld = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build()
+                    )
+                    .setWillPauseWhenDucked(false)
+                    .setOnAudioFocusChangeListener(focusListener)
+                    .build()
+                focusRequest = request
+                am.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+            } else {
+                @Suppress("DEPRECATION")
+                am.requestAudioFocus(
+                    focusListener,
+                    AudioManager.STREAM_MUSIC,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
+                ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        if (!focusHeld) return
+        focusHeld = false
+        val am = try {
+            appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        } catch (_: Exception) {
+            null
+        }
+        focusRequest?.let { request ->
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    am?.abandonAudioFocusRequest(request)
+                }
+            } catch (_: Exception) {
+            }
+        }
+        focusRequest = null
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            try {
+                @Suppress("DEPRECATION")
+                am?.abandonAudioFocus(focusListener)
+            } catch (_: Exception) {
+            }
         }
     }
 

@@ -8,10 +8,13 @@ import android.graphics.Canvas;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
@@ -102,6 +105,10 @@ public class YuzGramChatWheel extends View {
     private final Paint countPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
     private final Path path = new Path();
+    /** Telegram'ning asl compose qalamchasi (floating_pencil) — ikonka silliq chiziladi. */
+    private final Drawable pencilDrawable;
+    private PorterDuffColorFilter pencilTint;
+    private int pencilTintColor = Integer.MIN_VALUE;
 
     private ArrayList<MessagesController.DialogFilter> filters = new ArrayList<>();
     private Listener listener;
@@ -162,6 +169,8 @@ public class YuzGramChatWheel extends View {
         countPaint.setTextAlign(Paint.Align.CENTER);
         countPaint.setColor(COUNT_TEXT);
         countPaint.setTypeface(Typeface.DEFAULT_BOLD);
+        Drawable pencil = getResources().getDrawable(R.drawable.floating_pencil);
+        pencilDrawable = pencil.mutate();
     }
 
     public static int width() {
@@ -438,7 +447,7 @@ public class YuzGramChatWheel extends View {
         strokePaint.setStrokeWidth(dp(1.4f));
         iconPaint.setColor(ICON_ACTIVE);
         iconPaint.setAlpha(a);
-        drawPencil(canvas, cx, cy, r * 1.35f);
+        drawPencil(canvas, cx, cy, r * 1.25f);
         iconPaint.setAlpha(255);
     }
 
@@ -685,16 +694,27 @@ public class YuzGramChatWheel extends View {
         canvas.drawLine(cx, cy - s * 0.85f, cx, cy + s * 0.85f, iconPaint);
     }
 
+    /**
+     * Telegram'ning asl compose qalamchasi: korpus + alohida o'chirg'ich qopqog'i,
+     * 45° qiyshaygan holda. Vektor emas, asl drawable — siluet aynan Telegram'dagi.
+     */
     private void drawPencil(Canvas canvas, float cx, float cy, float size) {
-        float s = size / 2f;
-        canvas.drawLine(cx - s * 0.55f, cy + s * 0.55f, cx + s * 0.5f, cy - s * 0.5f, iconPaint);
-        path.reset();
-        path.moveTo(cx - s * 0.78f, cy + s * 0.78f);
-        path.lineTo(cx - s * 0.55f, cy + s * 0.28f);
-        path.lineTo(cx - s * 0.05f, cy + s * 0.78f);
-        path.close();
-        canvas.drawPath(path, iconPaint);
-        canvas.drawLine(cx + s * 0.28f, cy - s * 0.78f, cx + s * 0.78f, cy - s * 0.28f, iconPaint);
+        if (pencilDrawable == null) {
+            return;
+        }
+        int color = iconPaint.getColor();
+        if (pencilTint == null || color != pencilTintColor) {
+            pencilTint = new PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN);
+            pencilTintColor = color;
+        }
+        pencilDrawable.setColorFilter(pencilTint);
+        pencilDrawable.setAlpha(iconPaint.getAlpha());
+        // Rasm o'z kvadratining ~92% ini egallaydi — vizual o'lcham size bo'lsin.
+        int half = Math.round(size * 0.545f);
+        int ix = Math.round(cx), iy = Math.round(cy);
+        pencilDrawable.setBounds(ix - half, iy - half, ix + half, iy + half);
+        pencilDrawable.draw(canvas);
+        pencilDrawable.setColorFilter(null);
     }
 
     private void drawGlyph(Canvas canvas, int type, float cx, float cy, float size) {

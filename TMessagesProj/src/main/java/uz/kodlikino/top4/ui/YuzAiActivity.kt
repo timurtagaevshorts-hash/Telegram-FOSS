@@ -384,6 +384,8 @@ class YuzAiActivity : BaseFragment() {
         cloudBusy = true
         listeningPending = true
         recorder.prepare()
+        // Yozuv paytida musiqa pauza bo'lsin — mikrofon faqat ovozni eshitadi.
+        v.holdAudioFocus()
         val seq = ++interactionSeq
         statusView.text = ctx.getString(R.string.ai_listening)
         setOrb(YuzAiOrbView.Mode.LISTENING)
@@ -407,6 +409,8 @@ class YuzAiActivity : BaseFragment() {
             } catch (_: Exception) {
                 null
             } finally {
+                // Yozuv tugadi — musiqa o'z holatiga (davomiga) qaytadi.
+                v.releaseAudioFocus()
                 // Yangi muloqot boshlangan bo'lsa — uning holatini buzmaymiz.
                 if (seq == interactionSeq) listeningPending = false
             }

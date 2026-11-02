@@ -8,28 +8,39 @@ import android.graphics.RadialGradient;
 import android.graphics.Shader;
 import android.view.View;
 
-import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.NotificationCenter;
+import org.telegram.ui.ActionBar.Theme;
 
 /**
- * YuzGram #85: chat ro'yxati ORQASIDagi nebula fon. Tekis qora o'rniga brend
+ * YuzGram #85: chat ro'yxati ORQASIDAGI nebula fon. Tekis qora o'rniga brend
  * palitrasidagi chuqurlik: chuqur ko'm-ko'k asos + ikki yumshoq nur manbasi
  * (yuqori-o'ng to'q sariq-binafsha, past-chap ko'k).
  *
  * Nurlar ATALADIGAN yorug'lik emas, past alfa bilan chiziladi — chat qatorlari
  * matnining kontrast (4.5:1) shu fon ustida ham saqlanishi uchun.
+ *
+ * Palitra joriy Telegram mavzusiga bog'langan: tungi mavzuda chuqur ko'm-ko'k,
+ * kunduzgi mavzuda oq-sovuq ko'k yuvindi — baza mavzuga mos bo'ladi.
  */
-public class YuzGramNebula extends View {
+public class YuzGramNebula extends View implements NotificationCenter.NotificationCenterDelegate {
 
-    private static final int BASE_TOP = 0xFF0D1830;
-    private static final int BASE_BOTTOM = 0xFF070D1A;
-    private static final int GLOW_VIOLET = 0x335B6CF9;
-    private static final int GLOW_CYAN = 0x2E2AABEE;
-    private static final int GLOW_AZURE = 0x2438B6FF;
+    private static final int DARK_BASE_TOP = 0xFF0D1830;
+    private static final int DARK_BASE_BOTTOM = 0xFF070D1A;
+    private static final int DARK_GLOW_VIOLET = 0x335B6CF9;
+    private static final int DARK_GLOW_CYAN = 0x2E2AABEE;
+    private static final int DARK_GLOW_AZURE = 0x2438B6FF;
+
+    private static final int LIGHT_BASE_TOP = 0xFFFFFFFF;
+    private static final int LIGHT_BASE_BOTTOM = 0xFFEDF3FF;
+    private static final int LIGHT_GLOW_VIOLET = 0x1F5B6CF9;
+    private static final int LIGHT_GLOW_CYAN = 0x1C2AABEE;
+    private static final int LIGHT_GLOW_AZURE = 0x1738B6FF;
 
     private final Paint basePaint = new Paint();
     private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private int builtW = -1, builtH = -1;
+    private boolean builtDark;
     private LinearGradient baseShader;
     private RadialGradient violetShader, cyanShader, azureShader;
     private float violetCx, violetCy, violetR;
@@ -44,12 +55,32 @@ public class YuzGramNebula extends View {
     }
 
     private void build(int w, int h) {
-        if (w <= 0 || h <= 0 || (w == builtW && h == builtH)) {
+        boolean dark = Theme.isCurrentThemeDark();
+        if (w <= 0 || h <= 0 || (w == builtW && h == builtH && dark == builtDark)) {
             return;
         }
         builtW = w;
         builtH = h;
-        baseShader = new LinearGradient(0, 0, 0, h, BASE_TOP, BASE_BOTTOM, Shader.TileMode.CLAMP);
+        builtDark = dark;
+        int baseTop;
+        int baseBottom;
+        int glowViolet;
+        int glowCyan;
+        int glowAzure;
+        if (dark) {
+            baseTop = DARK_BASE_TOP;
+            baseBottom = DARK_BASE_BOTTOM;
+            glowViolet = DARK_GLOW_VIOLET;
+            glowCyan = DARK_GLOW_CYAN;
+            glowAzure = DARK_GLOW_AZURE;
+        } else {
+            baseTop = LIGHT_BASE_TOP;
+            baseBottom = LIGHT_BASE_BOTTOM;
+            glowViolet = LIGHT_GLOW_VIOLET;
+            glowCyan = LIGHT_GLOW_CYAN;
+            glowAzure = LIGHT_GLOW_AZURE;
+        }
+        baseShader = new LinearGradient(0, 0, 0, h, baseTop, baseBottom, Shader.TileMode.CLAMP);
         float big = Math.max(w, h);
         // Binafsha nur sarlavha blokining (gildirak + qidiruv) ortida gullaydi:
         // tepadan ~0.2h — action bar osti. Nurlar yorug'lik emas, past alfa.
@@ -62,9 +93,9 @@ public class YuzGramNebula extends View {
         azureCx = w * 0.72f;
         azureCy = h * 0.99f;
         azureR = big * 0.44f;
-        violetShader = new RadialGradient(violetCx, violetCy, violetR, GLOW_VIOLET, 0, Shader.TileMode.CLAMP);
-        cyanShader = new RadialGradient(cyanCx, cyanCy, cyanR, GLOW_CYAN, 0, Shader.TileMode.CLAMP);
-        azureShader = new RadialGradient(azureCx, azureCy, azureR, GLOW_AZURE, 0, Shader.TileMode.CLAMP);
+        violetShader = new RadialGradient(violetCx, violetCy, violetR, glowViolet, 0, Shader.TileMode.CLAMP);
+        cyanShader = new RadialGradient(cyanCx, cyanCy, cyanR, glowCyan, 0, Shader.TileMode.CLAMP);
+        azureShader = new RadialGradient(azureCx, azureCy, azureR, glowAzure, 0, Shader.TileMode.CLAMP);
     }
 
     @Override
@@ -89,9 +120,27 @@ public class YuzGramNebula extends View {
     }
 
     @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.didSetNewTheme);
+        invalidate();
+    }
+
+    @Override
     protected void onDetachedFromWindow() {
+        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.didSetNewTheme);
         glowPaint.setShader(null);
         basePaint.setShader(null);
         super.onDetachedFromWindow();
+    }
+
+    @Override
+    public void didReceivedNotification(int id, int account, Object... args) {
+        if (id == NotificationCenter.didSetNewTheme) {
+            // Mavzu almashdi — geyzerlar keshini tashlaymiz va qayta chizamiz.
+            builtW = -1;
+            builtH = -1;
+            invalidate();
+        }
     }
 }

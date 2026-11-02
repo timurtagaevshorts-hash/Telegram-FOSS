@@ -449,6 +449,49 @@ object ReelsRepository {
     suspend fun getCommentsFromCache(reelId: String): List<ReelComment>? =
         readComments(reelId, Source.CACHE)
 
+    /**
+     * Panel ochiq paytida jonli kuzatuv: boshqa foydalanuvchining izohi yoki
+     * javobi darhol ko'rinadi (qayta ochish shart emas).
+     *
+     * @return listener (yopish/yakunlashda `remove()` chaqiriladi).
+     */
+    fun observeComments(reelId: String, onChange: (List<ReelComment>?) -> Unit): ListenerRegistration? {
+        if (reelId.isBlank()) return null
+        return try {
+            db.collection(COLLECTION).document(reelId)
+                .collection(COMMENTS)
+                .orderBy("createdAt", Query.Direction.ASCENDING)
+                .limit(COMMENTS_LIMIT)
+                .addSnapshotListener { snap, error ->
+                    if (error != null) {
+                        Log.e(TAG, "observeComments $reelId: ${error.message}", error)
+                        onChange(null)
+                        return@addSnapshotListener
+                    }
+                    if (snap == null) return@addSnapshotListener
+                    val list = snap.documents.mapNotNull { doc ->
+                        try {
+                            val c = doc.toObject(ReelComment::class.java) ?: return@mapNotNull null
+                            c.copy(
+                                id = c.id.ifBlank { doc.id },
+                                reelId = c.reelId.ifBlank { reelId }
+                            ).takeIf { it.text.isNotBlank() }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "comment parse ${doc.id}: ${e.message}", e)
+                            null
+                        }
+                    }
+                    // Bo'sh kesh snapshot'i allaqachon yuklangan ro'yxatni
+                    // tozalamasin — faqat server javobi manba.
+                    if (snap.metadata.isFromCache && list.isEmpty()) return@addSnapshotListener
+                    onChange(list)
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "observeComments $reelId: ${e.message}", e)
+            null
+        }
+    }
+
     private suspend fun readComments(reelId: String, source: Source): List<ReelComment>? {
         if (reelId.isBlank()) return emptyList()
         return try {

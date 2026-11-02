@@ -336,12 +336,56 @@ class ReelsAdapter(
         renderedReelId = null
         items.clear()
         items.addAll(list)
-        likeShown.clear()
-        liked.clear()
-        commentShown.keys.retainAll(list.map { it.id }.toSet())
+        // Layk holati foydalanuvchining o'z harakati — feed qayta yuklanganda
+        // (iLova qayta ochilishi, storiya yangilanishi) yo'qolmasligi kerak.
+        // Faqat ro'yxatdan chiqib ketgan id'lar tozalanadi.
+        val liveIds = list.mapTo(HashSet()) { it.id }
+        liked.keys.retainAll(liveIds)
+        likeShown.keys.retainAll(liveIds)
+        commentShown.keys.retainAll(liveIds)
+        // Firebase reel'ining sonlari hujjatdan yangi keladi — eski optimistik
+        // qatlam eskirgan bo'lishi mumkin. Hikoyalarda son feed'da yo'q, shuning
+        // uchun optimistik qiymat saqlanadi.
+        for (reel in list) {
+            if (!reel.isStory) {
+                likeShown.remove(reel.id)
+                commentShown.remove(reel.id)
+            }
+            if (reel.isLikedByMe) liked[reel.id] = true
+        }
         activePos = retained
         activeHolder = null
         notifyDataSetChanged()
+    }
+
+    /**
+     * Serverdan yoki lokal keshedan olingan layk holatlarini qo'llaydi.
+     * Ro'yxatda bor id'largina hisobga olinadi.
+     */
+    fun seedLiked(states: Map<String, Boolean>) {
+        if (states.isEmpty()) return
+        val liveIds = items.mapTo(HashSet()) { it.id }
+        var changed = false
+        for ((id, isLiked) in states) {
+            if (id !in liveIds) continue
+            if (liked[id] != isLiked) {
+                liked[id] = isLiked
+                changed = true
+            }
+        }
+        if (!changed) return
+        val holder = activeHolder ?: return
+        if (holder.reel?.id?.let { it in states } == true) holder.refreshLikeUi()
+    }
+
+    /** Ma'lum layk holati (`null` — hali serverdan tekshirilmagan). */
+    fun knownLiked(reelId: String): Boolean? = liked[reelId]
+
+    /** Ko'rsatilayotgan izohlar soni (server + optimistik qatlam). */
+    fun commentCount(reelId: String): Int {
+        val shown = commentShown[reelId]
+        if (shown != null) return shown
+        return items.firstOrNull { it.id == reelId }?.commentCount ?: 0
     }
 
     /**
@@ -870,10 +914,12 @@ class ReelsAdapter(
             items[i] = merged
             // Hikoyada feed statistikani olib kelmaydi — optimistik qatlam
             // (yangi layk/izoh) Firebase javobigacha saqlanishi kerak.
+            // `liked` (foydalanuvchining o'z layki) esa HECH QACHON statistik
+            // yangilanishi bilan o'chirilmaydi: layk holati serverdan alohida
+            // tekshiriladi ([applyLikeState]).
             if (!merged.isStory) {
                 likeShown.remove(fresh.id)
                 commentShown.remove(fresh.id)
-                liked.remove(fresh.id)
             }
             if (fresh.id == activeId) activeChanged = true
         }

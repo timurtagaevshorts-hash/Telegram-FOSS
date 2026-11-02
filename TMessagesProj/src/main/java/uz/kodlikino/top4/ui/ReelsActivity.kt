@@ -46,6 +46,7 @@ import uz.kodlikino.top4.utils.ReelStorageHelper
 import uz.kodlikino.top4.utils.ReelsRepository
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 import uz.kodlikino.top4.utils.YuzGramProfileStore
+import uz.kodlikino.top4.utils.YuzReelsLikeStore
 import uz.kodlikino.top4.utils.YuzStoryFeed
 import uz.kodlikino.top4.utils.YuzViewedReels
 import uz.kodlikino.top4.utils.YuzReelsOrder
@@ -120,6 +121,8 @@ class ReelsActivity @JvmOverloads constructor(
     private var commentsOpen = false
     private var commentsLoading = false
     private var commentsJob: Job? = null
+    /** Panel ochiq paytida yangi izoh/javoblar darhol ko'rinishi uchun listener. */
+    private var commentsObserver: ListenerRegistration? = null
     private var commentsLoadSeq = 0
     private var sendingComment = false
     private var commentsReelId = ""
@@ -152,6 +155,12 @@ class ReelsActivity @JvmOverloads constructor(
     // Hikoya statistikasi ham Firebase'dan (count so'rovlari) — faol sahifa uchun.
     private var storyStatsJob: Job? = null
     private var storyStatsFor = ""
+
+    // Layk holatlari: bitta collection-group so'rov + kesh. Ilova qayta
+    // o'rnatilganda ham Firestore'dan tiklanadi.
+    private var likesHydrateJob: Job? = null
+    private var likesSyncedUid = ""
+    private var likesGroupUnsupportedUid = ""
 
     // #99: tarmoq qayta urilganda feed/videoni avto-tiklash.
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
@@ -475,6 +484,9 @@ class ReelsActivity @JvmOverloads constructor(
             if (fragmentView == null) return@launch
             adapter?.applyServerStats(reelId, stats.views, stats.likeCount, stats.commentCount)
             adapter?.applyLikeState(reelId, stats.likedByMe)
+            cacheCtx()?.let { ctx ->
+                YuzReelsLikeStore.merge(ctx, currentAccount, signedUid, mapOf(reelId to stats.likedByMe))
+            }
             val idx = currentReels.indexOfFirst { it.id == reelId }
             if (idx >= 0) {
                 currentReels = currentReels.toMutableList().also {
@@ -964,6 +976,8 @@ class ReelsActivity @JvmOverloads constructor(
             selectedPosition = finalTarget
             layoutManager?.scrollToPositionWithOffset(finalTarget, 0)
             adapter?.setActivePosition(finalTarget)
+            seedLikesFromCache()
+            hydrateLikeStates(reels, finalTarget)
             refreshLikeState(reels.getOrNull(finalTarget)?.id)
             preloadNeighbours(finalTarget)
             if (fromNotification.isNotEmpty() && openTargetComments) openComments(fromNotification)
@@ -1010,6 +1024,97 @@ class ReelsActivity @JvmOverloads constructor(
         return true
     }
 
+    /** Lokal keshdagi layk holatlari — birinchi kadrda yurakchalar to'g'ri ko'rinadi. */
+    private fun seedLikesFromCache() {
+        val uid = currentUid()
+        if (uid.isBlank()) return
+        val ctx = cacheCtx() ?: return
+        val cached = YuzReelsLikeStore.likedIds(ctx, currentAccount, uid)
+        if (cached.isEmpty()) return
+        adapter?.seedLiked(cached.associateWith { true })
+    }
+
+    /**
+     * Keshda yo'q reels uchun layk holatini Firestore'dan to'ldiradi.
+     * Birinchi navbatda BITTA collection-group so'rov (foydalanuvchining barcha
+     * layklari — ilova yangilanganda/qayta o'rnatilganda ham), u ishlamasa
+     * faol sahifa atrofidagi reels sahifa-sahifa tekshiriladi.
+     */
+    private fun hydrateLikeStates(reels: List<Reel>, center: Int) {
+        val uid = currentUid()
+        if (uid.isBlank() || reels.isEmpty()) return
+        val ctx = cacheCtx() ?: return
+        val s = scope ?: return
+        val cached = YuzReelsLikeStore.likedIds(ctx, currentAccount, uid)
+        val unknown = reels.filter { it.id !in cached && adapter?.knownLiked(it.id) == null }
+        if (unknown.isEmpty()) return
+        val firstSync = likesSyncedUid != uid && likesGroupUnsupportedUid != uid
+        likesHydrateJob?.cancel()
+        val account = currentAccount
+        likesHydrateJob = s.launch {
+            if (firstSync) {
+                val all = YuzReelsLikeStore.fetchLikedIds(uid)
+                if (fragmentView == null) return@launch
+                if (all != null) {
+                    likesSyncedUid = uid
+                    val states = unknown.associate { it.id to all.contains(it.id) }
+                    YuzReelsLikeStore.merge(ctx, account, uid, states)
+                    adapter?.seedLiked(states)
+                    markLikedFlag(states)
+                    return@launch
+                }
+                // Qoidalar collection-group so'rovni qo'llamaydi — qayta urinmaymiz.
+                likesGroupUnsupportedUid = uid
+            }
+            // Zaxira: reels hujjat-hujjat, faol sahifadan boshlab butun ro'yxat.
+            val ordered = ArrayList<Reel>(reels.size)
+            val c = center.coerceIn(0, reels.size - 1)
+            val maxRadius = maxOf(c, reels.size - 1 - c)
+            for (r in 0..maxRadius) {
+                if (c - r >= 0) ordered.add(reels[c - r])
+                if (r != 0 && c + r < reels.size) ordered.add(reels[c + r])
+            }
+            val states = HashMap<String, Boolean>()
+            var fetched = 0
+            for (reel in ordered.take(60)) {
+                if (adapter?.knownLiked(reel.id) != null) continue
+                states[reel.id] = try {
+                    ReelsRepository.isLiked(reel.id, uid)
+                } catch (_: Exception) {
+                    continue
+                }
+                fetched++
+                if (fetched % 6 == 0) {
+                    YuzReelsLikeStore.merge(ctx, account, uid, states)
+                    adapter?.seedLiked(states)
+                    markLikedFlag(states)
+                    states.clear()
+                }
+            }
+            if (states.isEmpty() || fragmentView == null) return@launch
+            YuzReelsLikeStore.merge(ctx, account, uid, states)
+            adapter?.seedLiked(states)
+            markLikedFlag(states)
+        }
+    }
+
+    /** `currentReels` nusxalarida `isLikedByMe` — keyingi submit'lar uchun. */
+    private fun markLikedFlag(states: Map<String, Boolean>) {
+        var changed = false
+        val updated = currentReels.map { reel ->
+            val liked = states[reel.id]
+            if (liked == null || reel.isLikedByMe == liked) {
+                reel
+            } else {
+                changed = true
+                reel.copy(isLikedByMe = liked)
+            }
+        }
+        if (changed) currentReels = updated
+    }
+
+    private fun cacheCtx(): Context? = themedContext ?: context
+
     /**
      * Faol reel uchun yangi statistikani yuklaydi: hikoya — Firebase
      * hisoblagichlari ([refreshStoryStats]), Firebase reel — `reels/{id}/likes`
@@ -1035,6 +1140,10 @@ class ReelsActivity @JvmOverloads constructor(
                 val liked = ReelsRepository.isLiked(rid, signedUid)
                 if (fragmentView == null) return@launch
                 adapter?.applyLikeState(rid, liked)
+                cacheCtx()?.let { ctx ->
+                    YuzReelsLikeStore.merge(ctx, account, signedUid, mapOf(rid to liked))
+                }
+                markLikedFlag(mapOf(rid to liked))
             } catch (_: Exception) {
             }
         }
@@ -1073,11 +1182,16 @@ class ReelsActivity @JvmOverloads constructor(
     private fun toggleLike(reelId: String, likedNow: Boolean) {
         val key = YuzStoryFeed.parseKey(reelId)
         if (key != null) {
-            if (currentUid().isBlank()) {
+            val uidNow = currentUid()
+            if (uidNow.isBlank()) {
                 adapter?.revertLike(reelId, !likedNow)
                 toast(R.string.reels_sign_in_required)
                 return
             }
+            // Optimistik holat darhol keshlanadi — ilova yopilib ochilsa ham
+            // yurakcha o'z holatida qoladi; xatoda qaytariladi.
+            val ctx = cacheCtx()
+            ctx?.let { YuzReelsLikeStore.setLiked(it, currentAccount, uidNow, reelId, likedNow) }
             try {
                 YuzStoryFeed.likeStory(currentAccount, key.first, key.second, likedNow)
             } catch (_: Exception) {
@@ -1109,6 +1223,9 @@ class ReelsActivity @JvmOverloads constructor(
                     refreshStoryStats(reelId, force = true)
                 } catch (_: Exception) {
                     if (fragmentView == null) return@launch
+                    ctx?.let {
+                        YuzReelsLikeStore.setLiked(it, account, uidNow, reelId, !likedNow)
+                    }
                     adapter?.revertLike(reelId, !likedNow)
                     toast(R.string.reels_like_failed)
                 }
@@ -1121,6 +1238,8 @@ class ReelsActivity @JvmOverloads constructor(
             toast(R.string.reels_sign_in_required)
             return
         }
+        val ctx = cacheCtx()
+        ctx?.let { YuzReelsLikeStore.setLiked(it, currentAccount, uid, reelId, likedNow) }
         val s = scope ?: return
         val account = currentAccount
         s.launch {
@@ -1131,6 +1250,7 @@ class ReelsActivity @JvmOverloads constructor(
                 // Firestore tranzaksiyasi yakunlandi — server sonini qayta o'qiymiz.
                 refreshLikeState(reelId)
             } catch (_: Exception) {
+                ctx?.let { YuzReelsLikeStore.setLiked(it, account, uid, reelId, !likedNow) }
                 if (fragmentView == null) return@launch
                 adapter?.revertLike(reelId, !likedNow)
                 toast(R.string.reels_like_failed)
@@ -1271,11 +1391,21 @@ class ReelsActivity @JvmOverloads constructor(
         commentsOpen = false
         commentsReelId = ""
         replyTarget = null
+        detachCommentsObserver()
         hideKeyboard()
         commentInput?.setText("")
         updateReplyHint()
         commentsScrim?.visibility = View.GONE
         commentsPanel?.visibility = View.GONE
+    }
+
+    /** Panel yopilganda/yakunlanganda jonli izoh listener'i bo'shatiladi. */
+    private fun detachCommentsObserver() {
+        try {
+            commentsObserver?.remove()
+        } catch (_: Exception) {
+        }
+        commentsObserver = null
     }
 
     /** Izohlarni Firestore'dan o'qiydi (`null` = xato, bo'sh ro'yxat = izoh yo'q). */
@@ -1284,6 +1414,7 @@ class ReelsActivity @JvmOverloads constructor(
         // Oldingi so'rov bekor qilinadi: boshqa reel ochilsa eski javob
         // spinner'ni abadiy qoldirib ketmasligi kerak.
         commentsJob?.cancel()
+        detachCommentsObserver()
         val seq = ++commentsLoadSeq
         commentsLoading = true
         commentsProgress?.visibility =
@@ -1326,6 +1457,7 @@ class ReelsActivity @JvmOverloads constructor(
                 commentsEmpty?.visibility = if (comments.isEmpty()) View.VISIBLE else View.GONE
                 commentsEmpty?.text = getString(R.string.reels_comments_empty)
                 updateCommentsTitle()
+                attachCommentsObserver(reelId)
                 if (comments.isNotEmpty()) {
                     // Eng yangi izoh ko'rinsin (ro'yxat eskidana yangi tartibida).
                     commentsLayoutManager?.scrollToPositionWithOffset(comments.size - 1, 0)
@@ -1334,6 +1466,44 @@ class ReelsActivity @JvmOverloads constructor(
                 if (seq == commentsLoadSeq) commentsLoading = false
             }
         }
+    }
+
+    /**
+     * Ochilgan panel uchun jonli kuzatuv: boshqa qurilmadan yangi izoh yoki
+     * javob kelganda ro'yxat va son o'zi yangilanadi.
+     */
+    private fun attachCommentsObserver(reelId: String) {
+        detachCommentsObserver()
+        if (reelId.isBlank()) return
+        commentsObserver = ReelsRepository.observeComments(reelId) { list ->
+            if (list == null) return@observeComments
+            val view = fragmentView ?: return@observeComments
+            view.post { applyLiveComments(reelId, list) }
+        }
+    }
+
+    private fun applyLiveComments(reelId: String, list: List<ReelComment>) {
+        if (fragmentView == null || !commentsOpen || commentsReelId != reelId) return
+        val listAdapter = commentsAdapter ?: return
+        if (list.size == loadedCommentCount && list.lastOrNull()?.id == listAdapter.lastId()) return
+        val atBottom = isCommentsAtBottom()
+        val grown = (list.size - loadedCommentCount).coerceAtLeast(0)
+        listAdapter.submit(list)
+        loadedCommentCount = list.size
+        if (grown > 0) adapter?.addCommentCount(reelId, grown)
+        commentsList?.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
+        commentsEmpty?.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+        commentsEmpty?.text = getString(R.string.reels_comments_empty)
+        updateCommentsTitle()
+        if (atBottom && list.isNotEmpty()) {
+            commentsLayoutManager?.scrollToPositionWithOffset(list.size - 1, 0)
+        }
+    }
+
+    /** Ro'yxat oxirida turibdimi — yangi izoh kelganda avto-scroll shartmi. */
+    private fun isCommentsAtBottom(): Boolean {
+        val list = commentsList ?: return true
+        return !list.canScrollVertically(1)
     }
 
     /**
@@ -1422,7 +1592,12 @@ class ReelsActivity @JvmOverloads constructor(
         if (comment.id.isBlank()) return
         replyTarget = comment
         updateReplyHint()
-        commentInput?.requestFocus()
+        val input = commentInput ?: return
+        input.requestFocus()
+        // Ba'zi qurilmalarda requestFocus klaviaturani o'zi ochmaydi — qo'lda.
+        val activity = parentActivity ?: return
+        val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        input.post { imm?.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT) }
     }
 
     private fun updateReplyHint() {
@@ -1447,13 +1622,22 @@ class ReelsActivity @JvmOverloads constructor(
         }
     }
 
-    /** Sarlavhadagi son — o'qilgan izohlar + yozilgan yangilar. */
+    /**
+     * Sarlavhadagi son — o'qilgan izohlar + yozilgan yangilar, lekin reel'ning
+     * haqiqiy `commentCount`'idan kam ko'rsatilmaydi (200 tadan ko'p bo'lsa ham).
+     */
     private fun updateCommentsTitle() {
         val title = commentsTitle ?: return
-        title.text = if (loadedCommentCount <= 0) {
+        val known = if (commentsReelId.isNotBlank()) {
+            adapter?.commentCount(commentsReelId) ?: 0
+        } else {
+            0
+        }
+        val total = maxOf(loadedCommentCount, known)
+        title.text = if (total <= 0) {
             getString(R.string.reels_comments)
         } else {
-            getString(R.string.reels_comments_title, loadedCommentCount)
+            getString(R.string.reels_comments_title, total)
         }
     }
 
@@ -1580,6 +1764,7 @@ class ReelsActivity @JvmOverloads constructor(
             loadReels()
             // Ekranga qaytganda faol reel'ning jonli statistikasi qayta ulanadi.
             refreshLikeState(currentReels.getOrNull(selectedPosition)?.id)
+            if (commentsOpen && commentsReelId.isNotBlank()) attachCommentsObserver(commentsReelId)
             if (reelsList?.scrollState == RecyclerView.SCROLL_STATE_IDLE) adapter?.resumePlayback()
             preloadNeighbours(selectedPosition)
         }
@@ -1610,6 +1795,7 @@ class ReelsActivity @JvmOverloads constructor(
         playbackVisible = false
         // Fon rejimida Firestore so'rovlari kerak emas — batareya/trafik.
         detachFirebaseStats()
+        detachCommentsObserver()
         storyStatsJob?.cancel()
         storyStatsJob = null
         storyStatsFor = ""
@@ -1622,6 +1808,9 @@ class ReelsActivity @JvmOverloads constructor(
         exitReelFullscreen()
         unregisterNetworkWatch()
         unregisterStoryWatch()
+        detachCommentsObserver()
+        likesHydrateJob?.cancel()
+        likesHydrateJob = null
         adapter?.release()
         adapter = null
         keyboardListener?.let { listener ->

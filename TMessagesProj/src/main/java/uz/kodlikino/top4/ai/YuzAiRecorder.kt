@@ -72,8 +72,15 @@ class YuzAiRecorder(
         }
         val pcm = ByteArrayOutputStream()
         val chunk = ShortArray(320) // 20 ms
+        val filtered = ShortArray(320)
         var voiceSeen = false
         var levelTick = 0
+        // 80 Hz high-pass: musiqa basi va xona g'uvillashi nutqni bosmasin.
+        val hpR = 0.968f
+        var hpPrevIn = 0f
+        var hpPrevOut = 0f
+        // Shovqin polasi asta moslashadi (pastga tez, yuqoriga sekin).
+        var noiseFloor = -1.0
         try {
             rec.startRecording()
             recording = true
@@ -89,19 +96,34 @@ class YuzAiRecorder(
                 }
                 var acc = 0.0
                 for (i in 0 until n) {
-                    val s = chunk[i].toInt()
-                    acc += (s * s).toDouble()
+                    val x = chunk[i].toFloat()
+                    val y = hpR * (hpPrevOut + x - hpPrevIn)
+                    hpPrevIn = x
+                    hpPrevOut = y
+                    var s = y.toInt()
+                    if (s > 32767) s = 32767 else if (s < -32768) s = -32768
+                    filtered[i] = s.toShort()
+                    acc += (s.toDouble() * s)
                 }
                 val rms = sqrt(acc / n)
+                if (noiseFloor < 0) noiseFloor = minOf(rms, 220.0)
+                val level = ((rms - noiseFloor) / 5000.0).coerceIn(0.0, 1.0)
                 if (++levelTick % 3 == 0) {
-                    onLevel?.invoke((rms / 5000.0).toFloat().coerceIn(0f, 1f))
+                    onLevel?.invoke(level.toFloat())
                 }
                 val totalMs = now - startedAt
-                // 500 -> 360: "salom" kabi qisqa va past ovozli so'zlar ham
-                // nutq sifatida qabul qilinadi (aks holda jim deb tashlanardi).
-                if (rms > 360.0) {
+                // Polga NISBATAN chegara: shovqinli/musiqali joyda ham
+                // "salom" kabi past ovozli so'z nutq sifatida qabul qilinadi.
+                val threshold = maxOf(280.0, noiseFloor * 2.2)
+                if (rms > threshold) {
                     voiceSeen = true
                     lastVoiceAt = now
+                } else {
+                    noiseFloor = if (rms < noiseFloor) {
+                        noiseFloor + (rms - noiseFloor) * 0.35
+                    } else {
+                        noiseFloor + (rms - noiseFloor) * 0.02
+                    }.coerceAtMost(2500.0)
                 }
                 // 4500 -> 3800 ms: signaldan keyin o'ylanib gapirsa ham
                 // yozuv yopilib qolmaydi, lekin jim bosish tezroq tugaydi.
@@ -111,7 +133,7 @@ class YuzAiRecorder(
                 if (voiceSeen && now - lastVoiceAt > 400L) break
                 if (totalMs > 6500L) break
                 for (i in 0 until n) {
-                    val v = chunk[i].toInt()
+                    val v = filtered[i].toInt()
                     pcm.write((v and 0xFF))
                     pcm.write((v shr 8) and 0xFF)
                 }
@@ -124,9 +146,39 @@ class YuzAiRecorder(
             try { rec.release() } catch (_: Exception) { }
         }
         if (!voiceSeen) return null
-        val bytes = pcm.toByteArray()
+        val bytes = normalize(pcm.toByteArray())
         if (bytes.size < 3200) return null // <0.1 s — keraksiz
         return wavOf(bytes, rate)
+    }
+
+    /**
+     * Jimroq gapirilgan yozuvni ko'taradi (faqat kuchaytirish, bosilmaydi) —
+     * shovqinli joyda STT'ga balandroq va toza PCM boradi.
+     */
+    private fun normalize(pcm: ByteArray): ByteArray {
+        var peak = 0
+        var i = 0
+        while (i + 1 < pcm.size) {
+            val s = ((pcm[i].toInt() and 0xFF) or
+                ((pcm[i + 1].toInt() and 0xFF) shl 8)).toShort().toInt()
+            val abs = if (s < 0) -s else s
+            if (abs > peak) peak = abs
+            i += 2
+        }
+        if (peak <= 0 || peak >= 18000) return pcm
+        val gain = minOf(3.5, 16000.0 / peak).toFloat()
+        if (gain < 1.25f) return pcm
+        val out = ByteArray(pcm.size)
+        i = 0
+        while (i + 1 < pcm.size) {
+            var s = (((pcm[i].toInt() and 0xFF) or
+                ((pcm[i + 1].toInt() and 0xFF) shl 8)).toShort().toInt() * gain).toInt()
+            if (s > 32767) s = 32767 else if (s < -32768) s = -32768
+            out[i] = (s and 0xFF).toByte()
+            out[i + 1] = ((s shr 8) and 0xFF).toByte()
+            i += 2
+        }
+        return out
     }
 
     private fun wavOf(pcm: ByteArray, rate: Int): ByteArray {
