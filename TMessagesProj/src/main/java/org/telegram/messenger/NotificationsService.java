@@ -24,10 +24,14 @@ public class NotificationsService extends Service {
     private static final String CHANNEL_ID = "yuz_background_service";
     private static final String LEGACY_CHANNEL_ID = "push_service_channel";
 
+    private boolean yuzInitialized;
+
     @Override
     public void onCreate() {
         super.onCreate();
-        ApplicationLoader.postInitApplication();
+        // startForegroundService() foreground holatni 5 soniya ichida talab
+        // qiladi, shuning uchun og'ir postInitApplication()dan OLDIN
+        // startForeground() chaqiriladi.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             // YuzGram: eski inglizcha "Push service" kanali foydalanuvchi
@@ -53,8 +57,19 @@ public class NotificationsService extends Service {
                     .setCategory(NotificationCompat.CATEGORY_SERVICE)
                     .setSmallIcon(R.drawable.notification)
                     .build();
-            startForeground(9999, notification);
+            try {
+                startForeground(9999, notification);
+            } catch (Throwable t) {
+                // ForegroundServiceStartNotAllowedException (API 31+) — fon
+                // holatdan boshlangan servis ruxsat bermaydi; yiqilmasdan
+                // o'zini to'xtatadi va push xizmatini alarm qayta tiklaydi.
+                FileLog.e(t);
+                stopSelf();
+                return;
+            }
         }
+        ApplicationLoader.postInitApplication();
+        yuzInitialized = true;
     }
 
     @Override
@@ -69,6 +84,11 @@ public class NotificationsService extends Service {
 
     public void onDestroy() {
         super.onDestroy();
+        // Initializatsiya boshlanmasdan to'xtatilgan bo'lsa, global
+        // sozlamalarni o'qishga urinmaymiz (u hali yaratilmagan bo'ladi).
+        if (!yuzInitialized) {
+            return;
+        }
         SharedPreferences preferences = MessagesController.getGlobalNotificationsSettings();
         if (preferences.getBoolean("pushService", true)) {
             Intent intent = new Intent("org.telegram.start");
