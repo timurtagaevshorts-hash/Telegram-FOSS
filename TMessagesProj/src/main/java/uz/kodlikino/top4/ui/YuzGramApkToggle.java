@@ -18,13 +18,13 @@ import org.telegram.ui.ActionBar.Theme;
  */
 public class YuzGramApkToggle extends View {
 
-    private static final int ON = 0xFF38B6FF;
+    private static final int ON = 0xFF9738FF;
     private static final int OFF = 0xFF7A8794;
-    private static final int ON_TEXT = 0xFFE8F6FF;
+    private static final int ON_TEXT = 0xFFF3E8FF;
     private static final int OFF_TEXT = 0xFFA7B4C2;
 
     // Kunduzgi mavzu: oq-ko'k pill, to'q matn — oq fonda ko'rinadi.
-    private static final int ON_LIGHT = 0xFF2AABEE;
+    private static final int ON_LIGHT = 0xFF852AEE;
     private static final int OFF_LIGHT = 0xFF7E8A99;
     private static final int ON_TEXT_LIGHT = 0xFF1E242E;
     private static final int OFF_TEXT_LIGHT = 0xFF7E8A99;
@@ -70,14 +70,14 @@ public class YuzGramApkToggle extends View {
             offIconColor = OFF;
             textColor = ON_TEXT;
             offTextColor = OFF_TEXT;
-            fillColor = 0x2E38B6FF;
+            fillColor = 0x2E9738FF;
             offFillColor = 0x1A7A8794;
         } else {
             iconColor = ON_LIGHT;
             offIconColor = OFF_LIGHT;
             textColor = ON_TEXT_LIGHT;
             offTextColor = OFF_TEXT_LIGHT;
-            fillColor = 0x1F2AABEE;
+            fillColor = 0x1F852AEE;
             offFillColor = 0x0D000000;
         }
     }
@@ -140,7 +140,7 @@ public class YuzGramApkToggle extends View {
         stroke.setStrokeWidth(AndroidUtilities.dp(1.4f) / scale);
         canvas.drawPath(shield, stroke);
         if (enabled) {
-            check.setColor(0xFF06131F);
+            check.setColor(0xFF13061F);
             check.setStrokeWidth(AndroidUtilities.dp(2.6f) / scale);
             canvas.drawLine(0.3f, 0.52f, 0.45f, 0.67f, check);
             canvas.drawLine(0.45f, 0.67f, 0.72f, 0.36f, check);

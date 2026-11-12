@@ -56,7 +56,7 @@ class YuzAiOrbView @JvmOverloads constructor(
         }
     }
     private val halo: Paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-        colorFilter = PorterDuffColorFilter(Color.parseColor("#2AABEE"), PorterDuff.Mode.SRC_IN)
+        colorFilter = PorterDuffColorFilter(Color.parseColor("#852AEE"), PorterDuff.Mode.SRC_IN)
     }
     private val core: Paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
@@ -200,9 +200,9 @@ class YuzAiOrbView @JvmOverloads constructor(
         private const val HALF = 128f
         private val SPRITE_RECT = RectF(-HALF, -HALF, HALF, HALF)
         private val BLOB_COLORS = intArrayOf(
-            0xFF2AABEE.toInt(), // brend ko'k
-            0xFF7B5CFF.toInt(), // binafsha
-            0xFF00D5FF.toInt(), // moviy
+            0xFF852AEE.toInt(), // brend ko'k
+            0xFFEA5CFF.toInt(), // binafsha
+            0xFF6100FF.toInt(), // moviy
             0xFFFF5C8A.toInt()  // pushti
         )
     }

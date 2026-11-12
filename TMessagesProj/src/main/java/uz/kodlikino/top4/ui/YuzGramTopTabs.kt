@@ -198,16 +198,16 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
                 setColor(
                     when {
                         active -> 0x40FFFFFF
-                        dark -> 0x332AABEE
-                        else -> 0x1F2AABEE
+                        dark -> 0x33852AEE
+                        else -> 0x1F852AEE
                     }
                 )
             }
             badge.setTextColor(
                 when {
-                    active -> 0xFF06121C.toInt()
-                    dark -> 0xFF7CC4F5.toInt()
-                    else -> 0xFF2AABEE.toInt()
+                    active -> 0xFF11061C.toInt()
+                    dark -> 0xFFB87CF5.toInt()
+                    else -> 0xFF852AEE.toInt()
                 }
             )
         }
@@ -235,30 +235,30 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
         private fun applyColors(value: Boolean) {
             background = if (value) {
                 GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
-                    0xFF38B6FF.toInt(), accent
+                    0xFF9738FF.toInt(), accent
                 )).apply { cornerRadius = dpf(CHIP_R_DP) }
             } else if (dark) {
                 GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
-                    0xCC1E3352.toInt(), 0xCC14263F.toInt()
+                    0xCC3C1E52.toInt(), 0xCC2D143F.toInt()
                 )).apply {
                     cornerRadius = dpf(CHIP_R_DP)
-                    setStroke(dp(1f), 0x4D6FA8E0)
+                    setStroke(dp(1f), 0x4DAC6FE0)
                 }
             } else {
                 // Kunduzgi fon: oq-sovuq shisha chip, brend hoshiyasi.
                 GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
-                    0xF2FFFFFF.toInt(), 0xFFF1F6FD.toInt()
+                    0xF2FFFFFF.toInt(), 0xFFF8F1FD.toInt()
                 )).apply {
                     cornerRadius = dpf(CHIP_R_DP)
-                    setStroke(dp(1f), 0x4D5B6CF9)
+                    setStroke(dp(1f), 0x4DCE5BF9)
                 }
             }
             title.setTextColor(
                 when {
                     // Faol chip brend gradientida: to'q siyoh ham kun, ham tun
                     // mavzusida 7.3:1 kontrast beradi.
-                    value -> 0xFF06121C.toInt()
-                    dark -> 0xFFA9C0D8.toInt()
+                    value -> 0xFF11061C.toInt()
+                    dark -> 0xFFC3A9D8.toInt()
                     else -> 0xFF5B6878.toInt()
                 }
             )

@@ -94,7 +94,7 @@ public class YuzGramBrandMark extends View {
         Theme.ThemeInfo active = Theme.getActiveTheme();
         boolean dark = active != null ? active.isDark() : Theme.isCurrentThemeNight();
         wordPrimaryColor = ContextCompat.getColor(themed, R.color.yuz_text_bright);
-        // Oq fonda #2AABEE faqat 2.57:1 — "Gram" uchun chuqurroq binafsha-ko'k.
+        // Oq fonda #852AEE faqat 2.57:1 — "Gram" uchun chuqurroq binafsha-ko'k.
         wordAccentColor = ContextCompat.getColor(themed,
                 dark ? R.color.yuz_action : R.color.yuz_decor);
         taglineColor = ContextCompat.getColor(themed, R.color.yuz_text_secondary);
@@ -181,7 +181,7 @@ public class YuzGramBrandMark extends View {
         if (shaderCy != cx) {
             shaderCy = cx;
             haloShader = new RadialGradient(bx + badgeSize / 2f, by + badgeSize * 0.62f,
-                    badgeSize * 0.95f, 0x4038B6FF, 0, Shader.TileMode.CLAMP);
+                    badgeSize * 0.95f, 0x409738FF, 0, Shader.TileMode.CLAMP);
         }
 
         // Nishon ostidagi nur — tekis doira emas, chuqurlik (ofset + yumshatish).

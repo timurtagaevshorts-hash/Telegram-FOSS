@@ -163,7 +163,7 @@ class YuzAiOverlayService : Service() {
             isFocusable = true
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(0xE6101A26.toInt())
+                setColor(0xE61C1026.toInt())
                 setStroke(dp(1), 0x59FFFFFF)
             }
             elevation = dp(6).toFloat()

@@ -44,12 +44,12 @@ object YuzAdStore {
     )
 
     val THEMES: List<AdTheme> = listOf(
-        AdTheme("brand", R.string.yuz_ad_theme_brand, 0xFF2AABEE.toInt(), 0xFF1B5E96.toInt(), 0xFF2AABEE.toInt()),
-        AdTheme("violet", R.string.yuz_ad_theme_violet, 0xFF8B5CF6.toInt(), 0xFF4C1D95.toInt(), 0xFF8B5CF6.toInt()),
+        AdTheme("brand", R.string.yuz_ad_theme_brand, 0xFF852AEE.toInt(), 0xFF5B1B96.toInt(), 0xFF852AEE.toInt()),
+        AdTheme("violet", R.string.yuz_ad_theme_violet, 0xFFEB5CF6.toInt(), 0xFF4C1D95.toInt(), 0xFFEB5CF6.toInt()),
         AdTheme("emerald", R.string.yuz_ad_theme_emerald, 0xFF10B981.toInt(), 0xFF065F46.toInt(), 0xFF10B981.toInt()),
         AdTheme("sunset", R.string.yuz_ad_theme_sunset, 0xFFFF8A3D.toInt(), 0xFFD9366B.toInt(), 0xFFFF8A3D.toInt()),
         AdTheme("crimson", R.string.yuz_ad_theme_crimson, 0xFFFF4D6D.toInt(), 0xFF7F1D3A.toInt(), 0xFFFF4D6D.toInt()),
-        AdTheme("graphite", R.string.yuz_ad_theme_graphite, 0xFF475569.toInt(), 0xFF0F172A.toInt(), 0xFF94A3B8.toInt())
+        AdTheme("graphite", R.string.yuz_ad_theme_graphite, 0xFF475569.toInt(), 0xFF200F2A.toInt(), 0xFF94A3B8.toInt())
     )
 
     fun theme(key: String?): AdTheme =

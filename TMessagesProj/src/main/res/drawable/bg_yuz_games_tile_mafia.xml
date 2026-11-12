@@ -3,7 +3,7 @@
     <gradient
         android:angle="315"
         android:startColor="#2C1726"
-        android:endColor="#0D121D" />
+        android:endColor="#170D1D" />
     <corners android:radius="@dimen/yuz_radius_card" />
     <stroke android:width="@dimen/yuz_stroke" android:color="@color/yuz_games_stroke_mafia" />
 </shape>

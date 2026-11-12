@@ -16,25 +16,25 @@
     <!-- ============ Ranglar (brend palitrasining taxalluslari) ============ -->
     <!-- Yagona HARAKAT aksenti: barcha CTA, faol holat, ikon-suzib bo'yash.
          Ikkala mavzuda ham bir xil — brend rangi o'zgarmaydi. -->
-    <color name="yuz_action">#2AABEE</color>
+    <color name="yuz_action">#852AEE</color>
     <!-- Ikkilamchi brend rangi — FAQAT bezak (navigatsiya doirasi, gradient),
          tugmalarda ishlatilmaydi. -->
-    <color name="yuz_decor">#5B6CF9</color>
-    <!-- Accent (#2AABEE) ustidagi yozuv: oq matn 2.57:1 beradi (AA osti),
+    <color name="yuz_decor">#CE5BF9</color>
+    <!-- Accent (#852AEE) ustidagi yozuv: oq matn 2.57:1 beradi (AA osti),
          shuning uchun bu yerda to'q siyaq-siyoh ishlatiladi — 7.34:1. -->
-    <color name="yuz_on_action">#06121C</color>
+    <color name="yuz_on_action">#FFFFFF</color>
 
     <!-- Premium matn rampasi: Telegram kunduzgi fonida (#FFFFFF) to'q bosqichlar.
          Rol yorug'lik bosqichi bilan o'qiladi: bright > text > secondary > muted. -->
     <color name="yuz_text">#1E242E</color>
-    <color name="yuz_text_bright">#0A0F16</color>
+    <color name="yuz_text_bright">#110A16</color>
     <color name="yuz_text_secondary">#5B6878</color>
     <!-- Placeholder / hint: oq sirt ustida 4.5:1 chegarasidan pastga tushmasin. -->
     <color name="yuz_text_muted">#7E8A99</color>
-    <color name="yuz_text_on_accent">#06121C</color>
+    <color name="yuz_text_on_accent">#FFFFFF</color>
     <!-- Accent gradienti USTIDAGI ikkilamchi matn: kul emas, shu hue'dan
          siyaqlangan (craft-floor qoidasi). -->
-    <color name="yuz_text_on_accent_dim">#CC06121C</color>
+    <color name="yuz_text_on_accent_dim">#CCFFFFFF</color>
 
     <!-- Sirtlar: Telegram kunduzgi oq fon + kulrang kartalar. -->
     <color name="yuz_bg">#FFFFFF</color>
@@ -45,9 +45,9 @@
     <color name="yuz_stroke_soft">#14000000</color>
     <color name="yuz_stroke_strong">#29000000</color>
     <!-- Tanlanmagan chip hoshiyasi: brendning ikkilamchi rangi, 25% shaffoflik. -->
-    <color name="yuz_stroke_decor">#405B6CF9</color>
+    <color name="yuz_stroke_decor">#40CE5BF9</color>
     <!-- Ko'tarilgan panelning accent hoshiyasi (mini-pleyer, 20%). -->
-    <color name="yuz_stroke_action">#332AABEE</color>
+    <color name="yuz_stroke_action">#33852AEE</color>
 
     <!-- Oltin: oq fonda yorqin #FFD84D o'qilmaydi, shuning uchun chuqurroq folga. -->
     <color name="yuz_gold">#C79400</color>

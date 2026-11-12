@@ -4595,7 +4595,7 @@ public class Theme {
         themes.add(themeInfo);
         themesDict.put("Dark Blue", themeInfo);
 
-        // YuzGram neon mavzusi — brend palitrasi (#000000 fon, #2AABEE akcent).
+        // YuzGram neon mavzusi — brend palitrasi (#000000 fon, #852AEE akcent).
         // Ro'yxatda oddiy tanlanadigan mavzu sifatida turadi; majburiy emas,
         // foydalanuvchi Telegram'ning istalgan mavzusini tanlashi mumkin.
         // Ranglar yuzgram_neon.attheme faylida (darkblue.asosida qayta bo'yalgan).
@@ -4603,8 +4603,8 @@ public class Theme {
         themeInfo.name = "YuzGram Neon";
         themeInfo.assetName = "yuzgram_neon.attheme";
         themeInfo.previewBackgroundColor = 0xff000000;
-        themeInfo.previewInColor = 0xff121925;
-        themeInfo.previewOutColor = 0xff16324d;
+        themeInfo.previewInColor = 0xff15102a;
+        themeInfo.previewOutColor = 0xff2f1a55;
         // MUHIM: firstAccentIsDefault=FALSE. Bu true bo'lsa + accent 99
         // bo'lsa, Theme `currentTheme == defaultTheme` va loadWallpaper'dagi
         // `firstAccentIsDefault && accent==99` shortcut'lari orqali ranglarni
@@ -4617,7 +4617,7 @@ public class Theme {
         // Kamida id=0 (accentBaseColor shu orqali o'qiladi) va id=99
         // bo'lishi shart, aks holda applyTheme'da themeAccentsMap.get(...) null → NPE.
         themeInfo.setAccentColorOptions(
-                new int[]{0xFF2AABEE, 0xFF2AABEE},
+                new int[]{0xFF852AEE, 0xFF852AEE},
                 null, null, null, null, null, null,
                 new int[]{0, DEFALT_THEME_ACCENT_ID},
                 null, null, null);

@@ -24,17 +24,17 @@ import org.telegram.ui.ActionBar.Theme;
  */
 public class YuzGramNebula extends View implements NotificationCenter.NotificationCenterDelegate {
 
-    private static final int DARK_BASE_TOP = 0xFF0D1830;
-    private static final int DARK_BASE_BOTTOM = 0xFF070D1A;
-    private static final int DARK_GLOW_VIOLET = 0x335B6CF9;
-    private static final int DARK_GLOW_CYAN = 0x2E2AABEE;
-    private static final int DARK_GLOW_AZURE = 0x2438B6FF;
+    private static final int DARK_BASE_TOP = 0xFF230D30;
+    private static final int DARK_BASE_BOTTOM = 0xFF13071A;
+    private static final int DARK_GLOW_VIOLET = 0x33CE5BF9;
+    private static final int DARK_GLOW_CYAN = 0x2E852AEE;
+    private static final int DARK_GLOW_AZURE = 0x249738FF;
 
     private static final int LIGHT_BASE_TOP = 0xFFFFFFFF;
-    private static final int LIGHT_BASE_BOTTOM = 0xFFEDF3FF;
-    private static final int LIGHT_GLOW_VIOLET = 0x1F5B6CF9;
-    private static final int LIGHT_GLOW_CYAN = 0x1C2AABEE;
-    private static final int LIGHT_GLOW_AZURE = 0x1738B6FF;
+    private static final int LIGHT_BASE_BOTTOM = 0xFFF8EDFF;
+    private static final int LIGHT_GLOW_VIOLET = 0x1FCE5BF9;
+    private static final int LIGHT_GLOW_CYAN = 0x1C852AEE;
+    private static final int LIGHT_GLOW_AZURE = 0x179738FF;
 
     private final Paint basePaint = new Paint();
     private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);

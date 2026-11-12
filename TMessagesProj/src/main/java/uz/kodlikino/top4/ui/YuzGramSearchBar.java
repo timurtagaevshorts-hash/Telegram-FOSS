@@ -35,30 +35,30 @@ public class YuzGramSearchBar extends View {
     private static final float BTN_ZONE_DP = 46f;
     private static final float BTN_R_DP = 15f;
 
-    private static final int FILL_TOP_DARK = 0xCC1E3352;
-    private static final int FILL_BOTTOM_DARK = 0xCC14263F;
-    private static final int STROKE_DARK = 0x4D6FA8E0;
-    private static final int STROKE_PRESSED_DARK = 0x998FC4F0;
-    private static final int HINT_DARK = 0xFFA9C0D8;
-    private static final int LENS_DARK = 0xFF7FA6C8;
-    private static final int SLIDER_DARK = 0xFF9FC4E8;
-    private static final int KNOB_FILL_DARK = 0xFF0E1B2E;
+    private static final int FILL_TOP_DARK = 0xCC3C1E52;
+    private static final int FILL_BOTTOM_DARK = 0xCC2D143F;
+    private static final int STROKE_DARK = 0x4DAC6FE0;
+    private static final int STROKE_PRESSED_DARK = 0x99C18FF0;
+    private static final int HINT_DARK = 0xFFC3A9D8;
+    private static final int LENS_DARK = 0xFFA57FC8;
+    private static final int SLIDER_DARK = 0xFFC69FE8;
+    private static final int KNOB_FILL_DARK = 0xFF210E2E;
     private static final int PRESS_DARK = 0x1FFFFFFF;
-    private static final int SEPARATOR_DARK = 0x336FA8E0;
-    private static final int SEPARATOR_ACTIVE_DARK = 0x668FC4F0;
+    private static final int SEPARATOR_DARK = 0x33AC6FE0;
+    private static final int SEPARATOR_ACTIVE_DARK = 0x66C18FF0;
 
     // Kunduzgi mavzu: oq-sovuq shisha pill, to'q matn va brend aksenti.
     private static final int FILL_TOP_LIGHT = 0xF2FFFFFF;
-    private static final int FILL_BOTTOM_LIGHT = 0xFFF1F6FD;
-    private static final int STROKE_LIGHT = 0x4D5B6CF9;
-    private static final int STROKE_PRESSED_LIGHT = 0x995B6CF9;
+    private static final int FILL_BOTTOM_LIGHT = 0xFFF8F1FD;
+    private static final int STROKE_LIGHT = 0x4DCE5BF9;
+    private static final int STROKE_PRESSED_LIGHT = 0x99CE5BF9;
     private static final int HINT_LIGHT = 0xFF5B6878;
     private static final int LENS_LIGHT = 0xFF5B6878;
-    private static final int SLIDER_LIGHT = 0xFF2AABEE;
+    private static final int SLIDER_LIGHT = 0xFF852AEE;
     private static final int KNOB_FILL_LIGHT = 0xFFFFFFFF;
     private static final int PRESS_LIGHT = 0x14000000;
-    private static final int SEPARATOR_LIGHT = 0x335B6CF9;
-    private static final int SEPARATOR_ACTIVE_LIGHT = 0x665B6CF9;
+    private static final int SEPARATOR_LIGHT = 0x33CE5BF9;
+    private static final int SEPARATOR_ACTIVE_LIGHT = 0x66CE5BF9;
 
     private static final int ZONE_NONE = 0;
     private static final int ZONE_SEARCH = 1;

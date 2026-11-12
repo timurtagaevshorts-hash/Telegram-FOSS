@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   YuzGram "Elonlar" palitrasi — kunduzgi (Telegram light) ko'rinish.
-  Aksent bitta brend-ko'k (#2AABEE, Telegram'ning o'z ko'ki = chat/Profil bilan mos),
-  ikkilamchi aksent — bitta brend indigo (#5B6CF9, ustundagi faol doiraning
+  Aksent bitta brend-ko'k (#852AEE, Telegram'ning o'z ko'ki = chat/Profil bilan mos),
+  ikkilamchi aksent — bitta brend indigo (#CE5BF9, ustundagi faol doiraning
   ikkinchi yarmi), ilova bo'ylab boshqa binafsha ishlatilmaydi.
   Qorong'i qiymatlar `values-night/yuz_classified_colors.xml` da.
 -->
@@ -11,9 +11,9 @@
     <color name="text_secondary">#5B6878</color>
 
     <!-- Brend aksentlari (bar bilan bitta) -->
-    <color name="primary">#2AABEE</color>
-    <color name="home_accent">#2AABEE</color>
-    <color name="home_accent_purple">#5B6CF9</color>
+    <color name="primary">#852AEE</color>
+    <color name="home_accent">#852AEE</color>
+    <color name="home_accent_purple">#CE5BF9</color>
 
     <!-- Sirtlar -->
     <color name="home_card">#FFFFFF</color>
@@ -36,7 +36,7 @@
     <!-- Fond -->
     <color name="home_bg">#FFFFFF</color>
     <color name="chat_bg_top">#FFFFFF</color>
-    <color name="nav_chat_active">#5B6CF9</color>
+    <color name="nav_chat_active">#CE5BF9</color>
     <color name="telegram_white">#FFFFFF</color>
-    <color name="telegram_blue">#2AABEE</color>
+    <color name="telegram_blue">#852AEE</color>
 </resources>

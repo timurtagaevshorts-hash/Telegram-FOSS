@@ -51,7 +51,7 @@ object YuzMusicOverlay : Application.ActivityLifecycleCallbacks, YuzMusicEngine.
     private var listenedPlayer: Player? = null
 
     /** Brend aksenti — mavzu bilan o'zgarmaydi (`yuz_action` qoidasi). */
-    private val accent = 0xFF2AABEE.toInt()
+    private val accent = 0xFF852AEE.toInt()
 
     /** Mavzu almashganda parda o'z oynasida eski ranglarda qolib ketmasin. */
     private val themeObserver = NotificationCenter.NotificationCenterDelegate { id, _, _ ->

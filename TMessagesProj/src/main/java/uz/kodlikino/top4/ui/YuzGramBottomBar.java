@@ -62,21 +62,21 @@ public class YuzGramBottomBar extends View {
     // #286: bar endi fon bilan qo'shilib ketmaydi — ancha quyuq, to'yingan
     // tungi-ko'k shisha (taxminan 84% → 95%). Qatorlar ostidan xira ko'rinadi,
     // lekin panel chegara bilan aniq ajralib turadi.
-    private static final int GLASS_TOP = 0xD6142236;    // ~84%
-    private static final int GLASS_BOTTOM = 0xF2081220; // ~95%
-    private static final int BORDER = 0x802AABEE;       // brend-ko'k neon border (#2AABEE)
-    private static final int GLOW_BLUE = 0xAA2AABEE;    // tashqi nur (#2AABEE)
-    private static final int PILL_START = 0xFF38B6FF;   // och-ko'k (rail ACTIVE_START)
-    private static final int PILL_END = 0xFF5B6CF9;     // brend indigo (rail ACTIVE_END)
-    private static final int PILL_STROKE = 0x99A8E4FF; // pill ustidagi yorqin neon chet
+    private static final int GLASS_TOP = 0xD6281436;    // ~84%
+    private static final int GLASS_BOTTOM = 0xF2160820; // ~95%
+    private static final int BORDER = 0x80852AEE;       // brend-ko'k neon border (#852AEE)
+    private static final int GLOW_BLUE = 0xAA852AEE;    // tashqi nur (#852AEE)
+    private static final int PILL_START = 0xFF9738FF;   // och-ko'k (rail ACTIVE_START)
+    private static final int PILL_END = 0xFFCE5BF9;     // brend indigo (rail ACTIVE_END)
+    private static final int PILL_STROKE = 0x99CFA8FF; // pill ustidagi yorqin neon chet
     private static final int ICON_ACTIVE = 0xFFFFFFFF;  // faol ikon (pill ustida oq)
     private static final int ICON_IDLE = 0xFF8E9DBB;    // o'chiq ikon
-    private static final int TEXT_ACTIVE = 0xFFE9F6FF;  // faol matn
+    private static final int TEXT_ACTIVE = 0xFFF4E9FF;  // faol matn
     // 10.5sp kichik matn — sirt ustida kamida 4.5:1 kerak (bu juftlikda ~6.3:1).
     private static final int TEXT_IDLE = 0xFF8794AF;    // o'chiq matn
     /** Profil avatari halqasi: faol — oq, aks holda xira ko'k-kul. */
     private static final int AVATAR_RING_ACTIVE = 0xFFFFFFFF;
-    private static final int AVATAR_RING_IDLE = 0x4D9FB4D0;
+    private static final int AVATAR_RING_IDLE = 0x4DBB9FD0;
 
     private final Paint surfacePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);

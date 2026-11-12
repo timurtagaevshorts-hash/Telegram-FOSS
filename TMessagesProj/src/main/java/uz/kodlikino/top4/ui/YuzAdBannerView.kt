@@ -146,14 +146,14 @@ class YuzAdBannerView @JvmOverloads constructor(
             gravity = Gravity.CENTER_VERTICAL
         }
         cta.apply {
-            setTextColor(0xFF06121C.toInt())
+            setTextColor(0xFF11061C.toInt())
             textSize = 12f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             setPadding(
                 AndroidUtilities.dp(14f), AndroidUtilities.dp(7f),
                 AndroidUtilities.dp(14f), AndroidUtilities.dp(7f)
             )
-            background = rounded(0xFF2AABEE.toInt(), AndroidUtilities.dp(15f).toFloat())
+            background = rounded(0xFF852AEE.toInt(), AndroidUtilities.dp(15f).toFloat())
         }
         ctaRow.addView(cta, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
 

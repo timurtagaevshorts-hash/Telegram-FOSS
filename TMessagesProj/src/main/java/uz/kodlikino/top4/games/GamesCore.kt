@@ -147,14 +147,14 @@ object GamesCore {
     // ------------------------------------------------------------- avatars
 
     private val AVATAR_COLORS = intArrayOf(
-        0xFF2AABEE.toInt(), // brand action
-        0xFF5B6CF9.toInt(), // brand decor
-        0xFF38BDF8.toInt(),
+        0xFF852AEE.toInt(), // brand action
+        0xFFCE5BF9.toInt(), // brand decor
+        0xFF8E38F8.toInt(),
         0xFF34D399.toInt(),
         0xFFF59E0B.toInt(),
         0xFFF472B6.toInt(),
-        0xFFA78BFA.toInt(),
-        0xFF22D3EE.toInt()
+        0xFFEF8BFA.toInt(),
+        0xFF6C22EE.toInt()
     )
 
     /** Barqaror (uid bo‘yicha) avatar rangi. */

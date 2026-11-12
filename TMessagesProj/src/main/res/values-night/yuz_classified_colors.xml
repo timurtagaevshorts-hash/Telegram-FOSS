@@ -8,19 +8,19 @@
     <color name="text_primary">#FFFFFF</color>
     <color name="text_secondary">#95A1B4</color>
 
-    <color name="primary">#2AABEE</color>
-    <color name="home_accent">#2AABEE</color>
-    <color name="home_accent_purple">#5B6CF9</color>
+    <color name="primary">#852AEE</color>
+    <color name="home_accent">#852AEE</color>
+    <color name="home_accent_purple">#CE5BF9</color>
 
-    <color name="home_card">#0D121D</color>
-    <color name="modern_border">#202B3C</color>
+    <color name="home_card">#170D1D</color>
+    <color name="modern_border">#31203C</color>
     <color name="modern_surface">#000000</color>
-    <color name="modern_surface_high">#0D121D</color>
-    <color name="surface_elevated">#121925</color>
+    <color name="modern_surface_high">#170D1D</color>
+    <color name="surface_elevated">#1D1225</color>
 
-    <color name="classified_field_bg">#121824</color>
+    <color name="classified_field_bg">#1D1224</color>
     <color name="classified_field_stroke">#26FFFFFF</color>
-    <color name="classified_card_default_bg">#0E141E</color>
+    <color name="classified_card_default_bg">#180E1E</color>
     <color name="classified_card_default_stroke">#1CFFFFFF</color>
     <color name="classified_price_gold">#FFD84D</color>
 
@@ -30,7 +30,7 @@
 
     <color name="home_bg">#000000</color>
     <color name="chat_bg_top">#000000</color>
-    <color name="nav_chat_active">#5B6CF9</color>
+    <color name="nav_chat_active">#CE5BF9</color>
     <color name="telegram_white">#FFFFFF</color>
-    <color name="telegram_blue">#2AABEE</color>
+    <color name="telegram_blue">#852AEE</color>
 </resources>

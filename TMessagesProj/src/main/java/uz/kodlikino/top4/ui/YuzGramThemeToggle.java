@@ -26,24 +26,24 @@ public class YuzGramThemeToggle extends View {
 
     public static final int SIZE_DP = 40;
 
-    private static final int PANEL_CENTER_DARK = 0xFF1B3556;
-    private static final int PANEL_EDGE_DARK = 0xFF08111D;
-    private static final int RING_DARK = 0x662AABEE;
-    private static final int GLOW_DARK = 0x2E38B6FF;
+    private static final int PANEL_CENTER_DARK = 0xFF3D1B56;
+    private static final int PANEL_EDGE_DARK = 0xFF14081D;
+    private static final int RING_DARK = 0x66852AEE;
+    private static final int GLOW_DARK = 0x2E9738FF;
     private static final int PRESS_DARK = 0x26FFFFFF;
 
     private static final int PANEL_CENTER_LIGHT = 0xFFFFFFFF;
-    private static final int PANEL_EDGE_LIGHT = 0xFFDCE9F8;
-    private static final int RING_LIGHT = 0x335B6CF9;
-    private static final int GLOW_LIGHT = 0x262AABEE;
+    private static final int PANEL_EDGE_LIGHT = 0xFFECDCF8;
+    private static final int RING_LIGHT = 0x33CE5BF9;
+    private static final int GLOW_LIGHT = 0x26852AEE;
     private static final int PRESS_LIGHT = 0x14000000;
 
     /** Quyosh — iliq oltin; yarim oy — sovuq kumush-ko'k. */
     private static final int SUN_CORE_TOP = 0xFFFFE6A8;
     private static final int SUN_CORE_BOTTOM = 0xFFFFA63D;
     private static final int SUN_RAY = 0xFFFFC86B;
-    private static final int MOON_DARK = 0xFFD6E8FF;
-    private static final int MOON_LIGHT = 0xFF3D5478;
+    private static final int MOON_DARK = 0xFFEDD6FF;
+    private static final int MOON_LIGHT = 0xFF603D78;
 
     private final Paint panelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);

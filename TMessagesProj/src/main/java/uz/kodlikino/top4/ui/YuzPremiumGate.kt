@@ -41,7 +41,7 @@ object YuzPremiumGate {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = AndroidUtilities.dp(26f).toFloat()
-                colors = intArrayOf(0xFF16202F.toInt(), 0xFF0A0F19.toInt())
+                colors = intArrayOf(0xFF25162F.toInt(), 0xFF130A19.toInt())
                 gradientType = GradientDrawable.LINEAR_GRADIENT
                 orientation = GradientDrawable.Orientation.TOP_BOTTOM
                 setStroke(AndroidUtilities.dp(1f), 0x33FFD84D)
@@ -97,14 +97,14 @@ object YuzPremiumGate {
 
         val cta = TextView(context).apply {
             text = context.getString(R.string.YuzPremiumReelCta)
-            setTextColor(0xFF06121C.toInt())
+            setTextColor(0xFF11061C.toInt())
             textSize = 16f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = AndroidUtilities.dp(18f).toFloat()
-                colors = intArrayOf(0xFF38B6FF.toInt(), 0xFF5B6CF9.toInt())
+                colors = intArrayOf(0xFF9738FF.toInt(), 0xFFCE5BF9.toInt())
                 gradientType = GradientDrawable.LINEAR_GRADIENT
                 orientation = GradientDrawable.Orientation.LEFT_RIGHT
             }
@@ -177,7 +177,7 @@ object YuzPremiumGate {
         }, LinearLayout.LayoutParams(dp(20f), ViewGroup.LayoutParams.WRAP_CONTENT))
         row.addView(TextView(context).apply {
             this.text = text
-            setTextColor(0xFFEDF1F8.toInt())
+            setTextColor(0xFFF4EDF8.toInt())
             textSize = 14f
         }, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,

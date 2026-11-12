@@ -165,12 +165,12 @@ class CheckersBoardView @JvmOverloads constructor(
         }
 
         // Oxirgi yurish izlari
-        highlightSquare(canvas, ox, cell, lastFrom, 0x332AABEE)
-        highlightSquare(canvas, ox, cell, lastTo, 0x552AABEE)
+        highlightSquare(canvas, ox, cell, lastFrom, 0x33852AEE)
+        highlightSquare(canvas, ox, cell, lastTo, 0x55852AEE)
 
         // Tanlangan dona va zanjir yo‘li
-        origin?.let { highlightSquare(canvas, ox, cell, it.key(), 0x332AABEE) }
-        for (step in chain) highlightSquare(canvas, ox, cell, step.key(), 0x222AABEE)
+        origin?.let { highlightSquare(canvas, ox, cell, it.key(), 0x33852AEE) }
+        for (step in chain) highlightSquare(canvas, ox, cell, step.key(), 0x22852AEE)
 
         // Majburiy urish: qaysi donalar urishi mumkinligini belgilaymiz
         if (interactive && origin == null) {
@@ -211,7 +211,7 @@ class CheckersBoardView @JvmOverloads constructor(
                     strokePaint.strokeWidth = 2f * density
                     canvas.drawCircle(cx, cy, cell * 0.19f, strokePaint)
                 } else {
-                    fillPaint.color = 0x992AABEE.toInt()
+                    fillPaint.color = 0x99852AEE.toInt()
                     canvas.drawCircle(cx, cy, cell * 0.10f, fillPaint)
                 }
             }
@@ -258,7 +258,7 @@ class CheckersBoardView @JvmOverloads constructor(
 
         canvas.restore()
 
-        strokePaint.color = 0xFF202B3C.toInt()
+        strokePaint.color = 0xFF31203C.toInt()
         strokePaint.strokeWidth = 1f * density
         canvas.drawRoundRect(frame, radius, radius, strokePaint)
     }

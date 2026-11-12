@@ -3158,7 +3158,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (yuzTabsToggle != null) {
             FrameLayout.LayoutParams togLp = (FrameLayout.LayoutParams) yuzTabsToggle.getLayoutParams();
             int toggleBottom = yuzChatRailBottomMargin()
-                    + uz.kodlikino.top4.ui.YuzGramChatWheel.height() - dp(6);
+                    + uz.kodlikino.top4.ui.YuzGramChatWheel.height()
+                    - dp(uz.kodlikino.top4.ui.YuzGramChatWheel.toggleBottomInsetDp());
             if (togLp != null && togLp.bottomMargin != toggleBottom) {
                 togLp.bottomMargin = toggleBottom;
                 yuzTabsToggle.setLayoutParams(togLp);
@@ -5874,34 +5875,35 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     Gravity.LEFT | Gravity.TOP);
             tabsLp.topMargin = yuzTopTabsTopMargin();
             contentView.addView(yuzTopTabs, tabsLp);
-            // Rejim almashtirish tugmasi — gumbaz tepasidagi shisha doira.
+            // Rejim almashtirish belgisi — r60: fon yo'q, faqat ixcham shaffof
+            // strelka (yarim oy yelkasining tepasida suzib turadi).
             yuzTabsToggle = new ImageView(context);
             yuzTabsToggle.setImageResource(R.drawable.ic_yuz_chevron_down);
-            yuzTabsToggle.setScaleType(ImageView.ScaleType.CENTER);
+            yuzTabsToggle.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            yuzTabsToggle.setPadding(dp(11), dp(11), dp(11), dp(11));
+            yuzTabsToggle.setColorFilter(0xB3D9CCF7);
             yuzTabsToggle.setRotation(yuzTabsAtTop ? 0f : 180f);
             yuzTabsToggle.setContentDescription(yuzTabsAtTop
                     ? "Filtr menyusini pastga qaytarish"
                     : "Filtr menyusini yuqoriga ko'chirish");
-            android.graphics.drawable.GradientDrawable toggleBg =
-                    new android.graphics.drawable.GradientDrawable();
-            toggleBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-            toggleBg.setColor(0xE60D131B);
-            toggleBg.setStroke(dp(1), 0x592AABEE);
             yuzTabsToggle.setBackground(new android.graphics.drawable.RippleDrawable(
-                    android.content.res.ColorStateList.valueOf(0x402AABEE), toggleBg, null));
-            FrameLayout.LayoutParams togLp = new FrameLayout.LayoutParams(dp(44), dp(44),
+                    android.content.res.ColorStateList.valueOf(0x33852AEE), null, null));
+            FrameLayout.LayoutParams togLp = new FrameLayout.LayoutParams(dp(40), dp(40),
                     Gravity.RIGHT | Gravity.BOTTOM);
-            // r59: kapsula markazi (W - ARC_CX) ustida turadi.
-            togLp.rightMargin = dp(60);
+            // r60: yarim oyning tepa-chap yelkasi ustida.
+            togLp.rightMargin = dp(uz.kodlikino.top4.ui.YuzGramChatWheel.toggleRightMarginDp());
             togLp.bottomMargin = yuzChatRailBottomMargin()
-                    + uz.kodlikino.top4.ui.YuzGramChatWheel.height() - dp(6);
+                    + uz.kodlikino.top4.ui.YuzGramChatWheel.height()
+                    - dp(uz.kodlikino.top4.ui.YuzGramChatWheel.toggleBottomInsetDp());
             yuzTabsToggle.setOnTouchListener((view, event) -> {
                 int action = event.getActionMasked();
                 if (action == android.view.MotionEvent.ACTION_DOWN) {
-                    view.animate().scaleX(0.92f).scaleY(0.92f).setDuration(90).start();
+                    view.animate().scaleX(0.90f).scaleY(0.90f).alpha(0.75f)
+                            .setDuration(100).start();
                 } else if (action == android.view.MotionEvent.ACTION_UP
                         || action == android.view.MotionEvent.ACTION_CANCEL) {
-                    view.animate().scaleX(1f).scaleY(1f).setDuration(140).start();
+                    view.animate().scaleX(1f).scaleY(1f).alpha(1f)
+                            .setDuration(180).start();
                 }
                 return false;
             });
