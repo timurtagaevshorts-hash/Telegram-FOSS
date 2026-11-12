@@ -1636,7 +1636,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             if (view instanceof ChatMessageCell) {
                 MessageObject msg = ((ChatMessageCell) view).getMessageObject();
                 if (msg != null && msg.yuzGhost) {
-                    showYuzGhostDeleteDialog(msg);
+                    showYuzGhostViewer(msg);
                     return;
                 }
                 if (msg != null && msg.type == MessageObject.TYPE_JOINED_CHANNEL) {
@@ -14375,6 +14375,36 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             }
         }
         return merged;
+    }
+
+    private void showYuzGhostViewer(MessageObject ghostObject) {
+        if (ghostObject == null || getParentActivity() == null) {
+            return;
+        }
+        CharSequence text = ghostObject.messageText;
+        if (text == null || text.length() == 0) {
+            showYuzGhostDeleteDialog(ghostObject);
+            return;
+        }
+        final String plainText = text.toString();
+        TextView textView = new TextView(getParentActivity());
+        textView.setText(text);
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
+        textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        textView.setLinkTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteLinkText));
+        textView.setTextIsSelectable(true);
+        textView.setLineSpacing(AndroidUtilities.dp(5), 1f);
+        textView.setPadding(AndroidUtilities.dp(24), AndroidUtilities.dp(4), AndroidUtilities.dp(24), AndroidUtilities.dp(4));
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), themeDelegate);
+        builder.setTitle(LocaleController.getString("YuzDeletedMessage", R.string.YuzDeletedMessage));
+        builder.setView(textView);
+        builder.setNegativeButton(LocaleController.getString("Close", R.string.Close), null);
+        builder.setNeutralButton(LocaleController.getString("Copy", R.string.Copy), (dialogInterface, i) -> {
+            AndroidUtilities.addToClipboard(plainText);
+            BulletinFactory.of(ChatActivity.this).createSimpleBulletin(R.raw.copy, LocaleController.getString("TextCopied", R.string.TextCopied)).show();
+        });
+        builder.setPositiveButton(LocaleController.getString("YuzGhostDelete", R.string.YuzGhostDelete), (dialogInterface, i) -> showYuzGhostDeleteDialog(ghostObject));
+        showDialog(builder.create());
     }
 
     private void showYuzGhostDeleteDialog(MessageObject ghostObject) {

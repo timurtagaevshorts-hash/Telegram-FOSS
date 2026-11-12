@@ -28,7 +28,7 @@
             android:layout_height="20dp"
             android:layout_marginStart="@dimen/yuz_space_2"
             android:src="@drawable/ic_yuz_mic"
-            app:tint="@color/yuz_action" />
+            android:tint="@color/yuz_action" />
 
         <TextView
             android:layout_width="0dp"
@@ -83,7 +83,7 @@
                 android:padding="16dp"
                 android:scaleType="centerInside"
                 android:src="@drawable/ic_yuz_mic"
-                app:tint="@color/yuz_text" />
+                android:tint="@color/yuz_text" />
         </FrameLayout>
 
         <TextView

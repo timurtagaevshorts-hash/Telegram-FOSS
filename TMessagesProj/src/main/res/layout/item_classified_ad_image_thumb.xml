@@ -29,5 +29,5 @@
         android:contentDescription="@string/classified_remove_image"
         android:padding="@dimen/yuz_space_3"
         android:src="@drawable/ic_yuz_close"
-        app:tint="@color/yuz_on_media" />
+        android:tint="@color/yuz_on_media" />
 </FrameLayout>

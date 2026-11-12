@@ -9,6 +9,7 @@ import android.view.View;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.R;
 import org.telegram.messenger.YuzApkGuard;
+import org.telegram.ui.ActionBar.Theme;
 
 /**
  * YuzGram #100 / #178: "APK himoya" pill tugmasi — chat tepasida, brend
@@ -21,6 +22,19 @@ public class YuzGramApkToggle extends View {
     private static final int OFF = 0xFF7A8794;
     private static final int ON_TEXT = 0xFFE8F6FF;
     private static final int OFF_TEXT = 0xFFA7B4C2;
+
+    // Kunduzgi mavzu: oq-ko'k pill, to'q matn — oq fonda ko'rinadi.
+    private static final int ON_LIGHT = 0xFF2AABEE;
+    private static final int OFF_LIGHT = 0xFF7E8A99;
+    private static final int ON_TEXT_LIGHT = 0xFF1E242E;
+    private static final int OFF_TEXT_LIGHT = 0xFF7E8A99;
+
+    private int iconColor;
+    private int offIconColor;
+    private int textColor;
+    private int offTextColor;
+    private int fillColor;
+    private int offFillColor;
 
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -46,7 +60,30 @@ public class YuzGramApkToggle extends View {
         textPaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         textPaint.setTextSize(AndroidUtilities.dp(12));
         buildShield();
+        applyThemeColors();
         width = Math.round(padding * 2 + iconSize + gap + textPaint.measureText(label));
+    }
+
+    private void applyThemeColors() {
+        if (Theme.isCurrentThemeDark()) {
+            iconColor = ON;
+            offIconColor = OFF;
+            textColor = ON_TEXT;
+            offTextColor = OFF_TEXT;
+            fillColor = 0x2E38B6FF;
+            offFillColor = 0x1A7A8794;
+        } else {
+            iconColor = ON_LIGHT;
+            offIconColor = OFF_LIGHT;
+            textColor = ON_TEXT_LIGHT;
+            offTextColor = OFF_TEXT_LIGHT;
+            fillColor = 0x1F2AABEE;
+            offFillColor = 0x0D000000;
+        }
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return (color & 0x00FFFFFF) | (alpha << 24);
     }
 
     /** Material "security" yo'li (24x24 katak) 0..1 kvadratiga normalelangan. */
@@ -79,13 +116,13 @@ public class YuzGramApkToggle extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
-        int color = enabled ? ON : OFF;
+        int color = enabled ? iconColor : offIconColor;
         float radius = height / 2f;
 
-        fill.setColor(enabled ? 0x2E38B6FF : 0x1A7A8794);
+        fill.setColor(enabled ? fillColor : offFillColor);
         canvas.drawRoundRect(0, 0, width, height, radius, radius, fill);
 
-        stroke.setColor(enabled ? 0x9938B6FF : 0x667A8794);
+        stroke.setColor(withAlpha(color, enabled ? 0x99 : 0x66));
         stroke.setStrokeWidth(AndroidUtilities.dp(1));
         float inset = AndroidUtilities.dp(0.5f);
         canvas.drawRoundRect(inset, inset, width - inset, height - inset, radius - inset, radius - inset, stroke);
@@ -96,7 +133,7 @@ public class YuzGramApkToggle extends View {
         canvas.translate(padding + iconSize * 0.04f, iconTop + iconSize * 0.02f);
         canvas.scale(scale, scale);
         if (enabled) {
-            fill.setColor(ON);
+            fill.setColor(iconColor);
             canvas.drawPath(shield, fill);
         }
         stroke.setColor(color);
@@ -110,7 +147,7 @@ public class YuzGramApkToggle extends View {
         }
         canvas.restore();
 
-        textPaint.setColor(enabled ? ON_TEXT : OFF_TEXT);
+        textPaint.setColor(enabled ? textColor : offTextColor);
         Paint.FontMetrics fm = textPaint.getFontMetrics();
         float textY = height / 2f - (fm.ascent + fm.descent) / 2f;
         canvas.drawText(label, padding + iconSize + gap, textY, textPaint);

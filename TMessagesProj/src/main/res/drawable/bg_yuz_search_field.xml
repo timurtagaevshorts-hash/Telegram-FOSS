@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Qidiruv maydoni — mavzuga bog'langan (kunduzgi oq fonda ham matn o'qiladi). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/yuz_field" />
+    <corners android:radius="16dp" />
+    <stroke
+        android:width="1dp"
+        android:color="@color/yuz_stroke" />
+</shape>

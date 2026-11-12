@@ -272,9 +272,21 @@ class YuzPlayerActivity : BaseFragment() {
         if (t.coverUrl.isNotBlank()) {
             // #128: muqova yangi qo'shiqqa silliq "erib" o'tadi.
             ivCover?.let {
+                // XML tint faqat o'rin egallovchi ikonka uchun — bitmapga
+                // qo'llansa, muqova butunlay akcent rangga bo'yaladi.
+                it.imageTintList = null
                 Glide.with(it).load(t.coverUrl)
                     .transition(DrawableTransitionOptions.withCrossFade(260))
                     .into(it)
+            }
+        } else {
+            // Muqovasiz trekda oldingi rasm qolib ketmasin; o'rin egallovchi
+            // ikonka akcent rangda ko'rinadi (oq fonda oq ikonka emas).
+            ivCover?.let {
+                Glide.with(it).clear(it)
+                it.setImageResource(R.drawable.ic_yuz_music)
+                it.imageTintList =
+                    ContextCompat.getColorStateList(it.context, R.color.yuz_action)
             }
         }
         ivHeart?.setImageResource(

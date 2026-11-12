@@ -61,7 +61,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/yuz_a11y_prev"
             android:src="@drawable/ic_yuz_prev"
-            app:tint="@color/yuz_text" />
+            android:tint="@color/yuz_text" />
 
         <ImageButton
             android:id="@+id/btnPlayerPlay"
@@ -72,7 +72,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/yuz_a11y_pause"
             android:src="@drawable/ic_yuz_pause"
-            app:tint="@color/yuz_action" />
+            android:tint="@color/yuz_action" />
 
         <ImageButton
             android:id="@+id/btnPlayerNext"
@@ -81,7 +81,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/yuz_a11y_next"
             android:src="@drawable/ic_yuz_next"
-            app:tint="@color/yuz_text" />
+            android:tint="@color/yuz_text" />
     </LinearLayout>
 
     <LinearLayout
@@ -98,7 +98,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/yuz_a11y_equalizer"
             android:src="@drawable/ic_yuz_eq"
-            app:tint="@color/yuz_action" />
+            android:tint="@color/yuz_action" />
 
         <TextView
             android:id="@+id/tvPlayerPos"
@@ -133,7 +133,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/yuz_a11y_repeat"
             android:src="@drawable/ic_yuz_loop"
-            app:tint="@color/yuz_action" />
+            android:tint="@color/yuz_action" />
 
         <ImageButton
             android:id="@+id/btnPlayerDl"
@@ -142,6 +142,6 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/yuz_a11y_download"
             android:src="@drawable/ic_yuz_download"
-            app:tint="@color/yuz_text" />
+            android:tint="@color/yuz_text" />
     </LinearLayout>
 </LinearLayout>

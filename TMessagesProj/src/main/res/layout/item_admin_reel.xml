@@ -46,5 +46,5 @@
         android:contentDescription="@string/kino_admin_delete"
         android:padding="@dimen/yuz_space_2"
         android:src="@drawable/ic_delete"
-        app:tint="@color/yuz_text_secondary" />
+        android:tint="@color/yuz_text_secondary" />
 </LinearLayout>

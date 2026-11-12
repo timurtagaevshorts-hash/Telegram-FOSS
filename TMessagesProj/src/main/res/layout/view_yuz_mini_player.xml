@@ -32,7 +32,7 @@
             android:padding="@dimen/yuz_space_2"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_yuz_music"
-            app:tint="@color/yuz_action" />
+            android:tint="@color/yuz_action" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -71,7 +71,7 @@
             android:contentDescription="@string/yuz_a11y_prev"
             android:padding="5dp"
             android:src="@drawable/ic_yuz_prev"
-            app:tint="@color/yuz_text" />
+            android:tint="@color/yuz_text" />
 
         <ImageButton
             android:id="@+id/btnMiniPlay"
@@ -81,7 +81,7 @@
             android:contentDescription="@string/yuz_a11y_play"
             android:padding="@dimen/yuz_space_2"
             android:src="@drawable/ic_yuz_play"
-            app:tint="@color/yuz_action" />
+            android:tint="@color/yuz_action" />
 
         <ImageButton
             android:id="@+id/btnMiniNext"
@@ -91,7 +91,7 @@
             android:contentDescription="@string/yuz_a11y_next"
             android:padding="5dp"
             android:src="@drawable/ic_yuz_next"
-            app:tint="@color/yuz_text" />
+            android:tint="@color/yuz_text" />
 
         <ImageButton
             android:id="@+id/btnMiniClose"
@@ -101,6 +101,6 @@
             android:contentDescription="@string/yuz_a11y_close"
             android:padding="@dimen/yuz_space_2"
             android:src="@drawable/ic_yuz_close"
-            app:tint="@color/yuz_text_secondary" />
+            android:tint="@color/yuz_text_secondary" />
     </LinearLayout>
 </LinearLayout>

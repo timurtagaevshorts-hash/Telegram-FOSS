@@ -17,6 +17,10 @@ import android.view.animation.DecelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ImageReceiver;
+import org.telegram.messenger.UserConfig;
+import org.telegram.tgnet.TLRPC;
+import org.telegram.ui.Components.AvatarDrawable;
 
 /**
  * YuzGram pastki navigatsiya bari — neon "floating dock".
@@ -50,18 +54,18 @@ public class YuzGramBottomBar extends View {
     private static final String[] LABELS = {"Asosiy", "Reels", "Funksiyalar", "Profil"};
 
     // Neon palitra (YuzGram brendi; rail bilan bir xil ko'klar)
-    // YuzGram #96/#102/#108: sirt shaffof shisha — ostidan o'tayotgan chat
-    // qatorlari aniq ko'rinadi (#102 talab: "orqasi korinsin"; #108: "bar
-    // shaffof bolsin").
+    // YuzGram #96/#102/#108: sirt shaffof shisha edi — ostidan o'tayotgan chat
+    // qatorlari aniq ko'rinardi.
     // #185: chat ro'yxati endi bar ORTIDAN davom etadi (padding 0).
-    // #192: sirt yassi rang emas, vertikal gradient: tepada shisha deyarli
-    // ochiq (qatorlar yaqqol ko'rinadi), pastda yorliqlar zonasi quyuqlashadi
-    // (matn kontrasti saqlanadi). Shu bilan bar orqasi "bo'sh qora lenta"
-    // bo'lib ko'rinmaydi.
-    private static final int GLASS_TOP = 0x520C1626;    // ~32% — qatorlar ko'rinadi
-    private static final int GLASS_BOTTOM = 0xAA0C1626; // ~67% — yorliqlar o'qiladi
-    private static final int BORDER = 0x662AABEE;       // brend-ko'k neon border (#2AABEE)
-    private static final int GLOW_BLUE = 0x992AABEE;    // tashqi nur (#2AABEE)
+    // #192: sirt yassi rang emas, vertikal gradient: tepada ochiqroq, pastda
+    // yorliqlar zonasi quyuqlashadi.
+    // #286: bar endi fon bilan qo'shilib ketmaydi — ancha quyuq, to'yingan
+    // tungi-ko'k shisha (taxminan 84% → 95%). Qatorlar ostidan xira ko'rinadi,
+    // lekin panel chegara bilan aniq ajralib turadi.
+    private static final int GLASS_TOP = 0xD6142236;    // ~84%
+    private static final int GLASS_BOTTOM = 0xF2081220; // ~95%
+    private static final int BORDER = 0x802AABEE;       // brend-ko'k neon border (#2AABEE)
+    private static final int GLOW_BLUE = 0xAA2AABEE;    // tashqi nur (#2AABEE)
     private static final int PILL_START = 0xFF38B6FF;   // och-ko'k (rail ACTIVE_START)
     private static final int PILL_END = 0xFF5B6CF9;     // brend indigo (rail ACTIVE_END)
     private static final int PILL_STROKE = 0x99A8E4FF; // pill ustidagi yorqin neon chet
@@ -70,6 +74,9 @@ public class YuzGramBottomBar extends View {
     private static final int TEXT_ACTIVE = 0xFFE9F6FF;  // faol matn
     // 10.5sp kichik matn — sirt ustida kamida 4.5:1 kerak (bu juftlikda ~6.3:1).
     private static final int TEXT_IDLE = 0xFF8794AF;    // o'chiq matn
+    /** Profil avatari halqasi: faol — oq, aks holda xira ko'k-kul. */
+    private static final int AVATAR_RING_ACTIVE = 0xFFFFFFFF;
+    private static final int AVATAR_RING_IDLE = 0x4D9FB4D0;
 
     private final Paint surfacePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -96,6 +103,12 @@ public class YuzGramBottomBar extends View {
     private int pressSlot = -1;        // bosilayotgan slot (0..COUNT-1)
     private float pressAmount = 0f;    // 0..1
     private boolean shown = false;
+
+    /** Profil slotidagi dumaloq avatar — Telegram bilan bir xil manba va fallback. */
+    private final ImageReceiver avatarReceiver = new ImageReceiver(this);
+    private final AvatarDrawable avatarDrawable = new AvatarDrawable();
+    private long avatarUserId;
+    private long avatarPhotoId;
 
     private OnTabSelectedListener listener;
 
@@ -162,6 +175,49 @@ public class YuzGramBottomBar extends View {
                 PILL_START, PILL_END, Shader.TileMode.CLAMP);
         setLayerType(LAYER_TYPE_SOFTWARE, null); // glow (setShadowLayer) uchun
         indicatorPos = activeTab;
+        avatarReceiver.setDelegate((receiver, set, thumb, memCache) -> invalidate());
+    }
+
+    /**
+     * Profil slotidagi avatarni joriy akkauntga moslaydi. Telegram'ning
+     * o'zidagi kabi: surat bo'lsa ImageReceiver yuklaydi, bo'lmasa
+     * AvatarDrawable bosh harflar + rangli doirani chizadi.
+     * Har chaqiruvda ishlaydi, lekin user/photo o'zgarmasa — hech narsa qilmaydi.
+     */
+    public void updateAvatar() {
+        int account = UserConfig.selectedAccount;
+        TLRPC.User user = UserConfig.getInstance(account).getCurrentUser();
+        if (user == null) {
+            return;
+        }
+        if (avatarReceiver.getCurrentAccount() != account) {
+            // Akkaunt almashdi — ImageReceiver keshi boshqa akkauntniki.
+            avatarReceiver.setCurrentAccount(account);
+            avatarUserId = 0;
+            avatarPhotoId = 0;
+        }
+        long photoId = user.photo != null ? user.photo.photo_id : 0;
+        if (user.id == avatarUserId && photoId == avatarPhotoId) {
+            return;
+        }
+        avatarUserId = user.id;
+        avatarPhotoId = photoId;
+        avatarDrawable.setInfo(user);
+        avatarReceiver.setForUserOrChat(user, avatarDrawable);
+        invalidate();
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        avatarReceiver.onAttachedToWindow();
+        updateAvatar();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        avatarReceiver.onDetachedFromWindow();
+        super.onDetachedFromWindow();
     }
 
     public static int height() {
@@ -507,10 +563,16 @@ public class YuzGramBottomBar extends View {
                 canvas.drawPath(path, iconPaint);
                 iconPaint.setStyle(Paint.Style.STROKE);
                 if (homeCompose) {
-                    float arm = AndroidUtilities.dp(3.9f) * k;
+                    // "+" — ko'pik ichida optik markazda. Qanotlar qisqaroq va
+                    // chiziq biroz ingichka: ilgari belgi ko'pikning deyarli
+                    // butun balandligini egallab, ichki bo'shliq qolmasdi.
+                    float arm = AndroidUtilities.dp(3.05f) * k;
                     float plusCy = tmpRect.centerY();
+                    float prevStroke = iconPaint.getStrokeWidth();
+                    iconPaint.setStrokeWidth(AndroidUtilities.dp(1.95f) * k);
                     canvas.drawLine(cx - arm, plusCy, cx + arm, plusCy, iconPaint);
                     canvas.drawLine(cx, plusCy - arm, cx, plusCy + arm, iconPaint);
+                    iconPaint.setStrokeWidth(prevStroke);
                 }
                 break;
             }
@@ -557,20 +619,17 @@ public class YuzGramBottomBar extends View {
                 break;
             }
             case TAB_PROFIL: {
-                float headR = AndroidUtilities.dp(4.3f) * k;
-                float headCy = cy - AndroidUtilities.dp(3.8f) * k;
-                if (active) {
-                    iconPaint.setStyle(Paint.Style.FILL);
-                    canvas.drawCircle(cx, headCy, headR, iconPaint);
-                    iconPaint.setStyle(Paint.Style.STROKE);
-                } else {
-                    canvas.drawCircle(cx, headCy, headR, iconPaint);
-                }
-                path.reset();
-                tmpRect.set(cx - half * 0.96f, cy + AndroidUtilities.dp(1.4f) * k,
-                        cx + half * 0.96f, cy + half + AndroidUtilities.dp(6.6f) * k);
-                path.addArc(tmpRect, 200f, 140f);
-                canvas.drawPath(path, iconPaint);
+                // Telegram'dagi kabi dumaloq avatar: surat bo'lsa surat, bo'lmasa
+                // bosh harflar + rangli doira (AvatarDrawable). Halqa faol tabda
+                // yorqinlashadi — slot tanlanganini ikonkasiz ham bildiradi.
+                float r = AndroidUtilities.dp(10.6f) * k;
+                avatarReceiver.setImageCoords(cx - r, cy - r, r * 2f, r * 2f);
+                avatarReceiver.setRoundRadius((int) r);
+                avatarReceiver.draw(canvas);
+                iconPaint.setStyle(Paint.Style.STROKE);
+                iconPaint.setStrokeWidth(AndroidUtilities.dp(active ? 1.7f : 1.3f) * k);
+                iconPaint.setColor(active ? AVATAR_RING_ACTIVE : AVATAR_RING_IDLE);
+                canvas.drawCircle(cx, cy, r - iconPaint.getStrokeWidth() / 2f, iconPaint);
                 break;
             }
         }

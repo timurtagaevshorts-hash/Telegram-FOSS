@@ -141,7 +141,7 @@
                             android:contentDescription="@string/yuz_a11y_prev"
                             android:padding="8dp"
                             android:src="@drawable/ic_yuz_prev"
-                            app:tint="@color/yuz_text" />
+                            android:tint="@color/yuz_text" />
 
                         <ImageButton
                             android:id="@+id/btnMusicTilePlay"
@@ -153,7 +153,7 @@
                             android:contentDescription="@string/yuz_a11y_play"
                             android:padding="10dp"
                             android:src="@drawable/ic_yuz_play"
-                            app:tint="@color/yuz_action" />
+                            android:tint="@color/yuz_action" />
 
                         <ImageButton
                             android:id="@+id/btnMusicTileNext"
@@ -163,7 +163,7 @@
                             android:contentDescription="@string/yuz_a11y_next"
                             android:padding="8dp"
                             android:src="@drawable/ic_yuz_next"
-                            app:tint="@color/yuz_text" />
+                            android:tint="@color/yuz_text" />
                     </LinearLayout>
 
                     <View

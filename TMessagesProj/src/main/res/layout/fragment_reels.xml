@@ -305,7 +305,7 @@
                 android:foreground="?attr/selectableItemBackgroundBorderless"
                 android:padding="@dimen/yuz_space_3"
                 android:src="@drawable/ic_yuz_send"
-                android:tint="@color/yuz_text" />
+                android:tint="@color/yuz_text_on_accent" />
         </LinearLayout>
     </LinearLayout>
 

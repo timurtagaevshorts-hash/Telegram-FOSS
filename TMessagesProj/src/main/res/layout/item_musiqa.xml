@@ -83,7 +83,7 @@
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/yuz_a11y_download"
         android:src="@drawable/ic_yuz_download"
-        app:tint="@color/yuz_text_secondary" />
+        android:tint="@color/yuz_text_secondary" />
 
     <ImageButton
         android:id="@+id/btnMusiqaPlay"
@@ -93,5 +93,5 @@
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/yuz_a11y_play"
         android:src="@drawable/ic_yuz_play"
-        app:tint="@color/yuz_action" />
+        android:tint="@color/yuz_action" />
 </LinearLayout>

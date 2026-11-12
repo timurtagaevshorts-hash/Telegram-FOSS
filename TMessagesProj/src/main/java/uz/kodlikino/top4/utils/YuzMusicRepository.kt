@@ -40,15 +40,109 @@ object YuzMusicRepository {
 
     private const val BASE = "https://api.deezer.com"
 
+    // ------------------------------------------------------------ #287 keys
+
+    private val TITLE_BRACKETS = Regex("\\([^)]*\\)|\\[[^]]*]")
+    private val WORD_SPLIT = Regex("[^\\p{L}\\p{N}]+")
+    private val APOSTROPHES = Regex("[’‘`´ʼ]")
+    private val NOISE_WORDS = setOf(
+        "official", "video", "audio", "lyric", "lyrics", "music", "clip",
+        "premyera", "premiere", "hd", "hq", "4k", "8k", "remix", "cover",
+        "live", "slowed", "reverb", "bass", "boosted", "topic", "records",
+        "qoshiq", "qoshig", "song", "songs", "ashula", "muzika", "musiqa"
+    )
+
+    /** Matnni so'zlarga ajratadi; apostrof turlari olib tashlanadi. */
+    private fun words(raw: String): List<String> =
+        WORD_SPLIT.split(APOSTROPHES.replace(raw.lowercase(), ""))
+            .filter { it.isNotBlank() }
+
+    /** Ijrochi kaliti — "Artist - Topic" kanal nomi ham bir xil kalitga tushsin. */
+    fun artistKey(artist: String): String =
+        words(artist.replace("- topic", " ")).filter { it !in NOISE_WORDS }.joinToString(" ")
+
+    /**
+     * #287: qo'shiq imzosi — nom tartibidan, "(Official Video)" kabi
+     * qo'shimchalardan va ijrochi nomidan mustaqil. Shu tufayli "Ummon -
+     * Sokin tun" bilan boshqa kanaldagi "Sokin tun (Official)" bir xil
+     * imzo beradi va ketma-ket takrorlanmaydi.
+     */
+    fun titleSignature(title: String, artist: String = ""): String {
+        val artistTokens = words(artist.replace("- topic", " ")).toSet()
+        val core = words(TITLE_BRACKETS.replace(title, " "))
+            .filter { it !in NOISE_WORDS && it !in artistTokens }
+        val chosen = core.ifEmpty { words(title).filter { it !in NOISE_WORDS } }
+        return chosen.sorted().joinToString(" ")
+    }
+
+    fun titleSignature(t: YuzTrack): String = titleSignature(t.title, t.artist)
+
+    private fun artistTokens(artist: String): Set<String> =
+        words(artist.replace("- topic", " ")).toSet()
+
+    private val EMPTY_TOKENS = emptySet<String>()
+
+    private fun signatureTokens(t: YuzTrack): Set<String> =
+        titleSignature(t.title, t.artist).split(' ').filter { it.isNotEmpty() }.toSet()
+
+    private fun signaturesConflict(a: Set<String>, b: Set<String>): Boolean {
+        if (a.isEmpty() || b.isEmpty()) return false
+        if (a == b) return true
+        if (a.size < 2 || b.size < 2) return false
+        val common = a.count { it in b }
+        if (common == minOf(a.size, b.size)) return true
+        return common >= 3 && common.toDouble() / a.union(b).size >= 0.8
+    }
+
+    /** Ikki imzo SATRI bir xil qo'shiqnikimi ("sokin tun jonli" ~ "sokin tun"). */
+    fun titleSignaturesConflict(a: String, b: String): Boolean {
+        if (a.isEmpty() || b.isEmpty()) return false
+        if (a == b) return true
+        return signaturesConflict(
+            a.split(' ').filter { it.isNotEmpty() }.toSet(),
+            b.split(' ').filter { it.isNotEmpty() }.toSet()
+        )
+    }
+
+    /** Bir xil qo'shiqning boshqa kanal/nomlanishdagi nusxasimi. */
+    fun sameSong(a: YuzTrack, b: YuzTrack): Boolean {
+        if (a.videoId.isNotBlank() && a.videoId == b.videoId) return true
+        val sa = signatureTokens(a)
+        val sb = signatureTokens(b)
+        if (sa.isEmpty() || sb.isEmpty()) return a.id == b.id
+        if (sa == sb || signaturesConflict(sa, sb)) return true
+        /*
+         * Ijrochi maydoni bo'sh qatorlarda ("Massa - Soqqa" kanal nomisiz)
+         * imzoga ijrochi so'zlari tushib qoladi; shu so'zlarni ikkinchi
+         * qatorning ijrochisi bo'yicha olib tashlab qayta solishtiramiz.
+         */
+        val extraA = if (a.artist.isBlank()) artistTokens(b.artist) else EMPTY_TOKENS
+        val extraB = if (b.artist.isBlank()) artistTokens(a.artist) else EMPTY_TOKENS
+        if (extraA.isEmpty() && extraB.isEmpty()) return false
+        val ca = (sa - extraA).ifEmpty { sa }
+        val cb = (sb - extraB).ifEmpty { sb }
+        return ca == cb || signaturesConflict(ca, cb)
+    }
+
+    /** Ro'yxatdan bir xil qo'shiqlarni olib tashlaydi (birinchi qator qoladi). */
+    fun dedupe(list: List<YuzTrack>): List<YuzTrack> {
+        val out = ArrayList<YuzTrack>(list.size)
+        for (t in list) {
+            if (out.any { sameSong(it, t) }) continue
+            out.add(t)
+        }
+        return out
+    }
+
     /** Qo'shiq nomi/ijrochi bo'yicha qidirish — avval to'liq audio manbasi. */
     fun search(query: String): List<YuzTrack> {
         // YuzGram #67: avval worker /search (tez), keyin to'g'ridan-to'g'ri YT, Deezer.
         val gw = runCatching { YuzMusicGateway.search(query) }.getOrDefault(emptyList())
-        if (gw.isNotEmpty()) return gw
+        if (gw.isNotEmpty()) return dedupe(gw)
         val yt = runCatching { YuzYouTubeApi.search(query) }.getOrDefault(emptyList())
-        if (yt.isNotEmpty()) return yt
+        if (yt.isNotEmpty()) return dedupe(yt)
         val q = URLEncoder.encode(query.trim(), "UTF-8")
-        return fetchTracks("$BASE/search?q=$q&limit=25")
+        return dedupe(fetchTracks("$BASE/search?q=$q&limit=25"))
     }
 
     /**
@@ -143,9 +237,56 @@ object YuzMusicRepository {
         list: List<YuzTrack>,
         exclude: Set<Long>
     ) {
+        val kept = ArrayList<YuzTrack>(map.values)
         for (t in list) {
             if (t.id in exclude || t.title.isBlank()) continue
-            if (!map.containsKey(t.id)) map[t.id] = t
+            if (map.containsKey(t.id)) continue
+            if (kept.any { sameSong(it, t) }) continue
+            map[t.id] = t
+            kept.add(t)
+        }
+    }
+
+    /**
+     * #287: Deezer "o'xshash ijrochilar" grafi — faqat NOMLAR qaytadi.
+     * To'liq treklar baribir YouTube shlyuzidan olinadi; Deezer preview
+     * qatorlari ishlatilmaydi.
+     */
+    fun relatedArtistNames(artist: String, limit: Int = 6): List<String> {
+        val name = artist.trim()
+        if (name.length < 2) return emptyList()
+        return try {
+            val q = URLEncoder.encode(name, "UTF-8")
+            val body = httpGet("$BASE/search/artist?q=$q&limit=5", 3000, 4000)
+                ?: return emptyList()
+            val data = JSONObject(body).optJSONArray("data") ?: return emptyList()
+            val target = artistKey(name)
+            var id = 0L
+            for (i in 0 until data.length()) {
+                val a = data.optJSONObject(i) ?: continue
+                val aid = a.optLong("id")
+                if (aid == 0L) continue
+                if (id == 0L) id = aid
+                if (artistKey(a.optString("name")) == target) {
+                    id = aid
+                    break
+                }
+            }
+            if (id == 0L) return emptyList()
+            val relBody = httpGet("$BASE/artist/$id/related?limit=$limit", 3000, 4000)
+                ?: return emptyList()
+            val rel = JSONObject(relBody).optJSONArray("data") ?: return emptyList()
+            val out = ArrayList<String>(limit)
+            for (i in 0 until rel.length()) {
+                val n = rel.optJSONObject(i)?.optString("name").orEmpty().trim()
+                if (n.isEmpty()) continue
+                if (artistKey(n) == target) continue
+                if (out.any { artistKey(it) == artistKey(n) }) continue
+                out.add(n)
+            }
+            out
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 
@@ -181,12 +322,12 @@ object YuzMusicRepository {
         }
     }
 
-    private fun httpGet(url: String): String? {
+    private fun httpGet(url: String, connectMs: Int = 6000, readMs: Int = 8000): String? {
         var connection: HttpURLConnection? = null
         return try {
             connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 6000
-                readTimeout = 8000
+                connectTimeout = connectMs
+                readTimeout = readMs
                 requestMethod = "GET"
                 setRequestProperty("User-Agent", "YuzGram/1.0")
                 instanceFollowRedirects = true

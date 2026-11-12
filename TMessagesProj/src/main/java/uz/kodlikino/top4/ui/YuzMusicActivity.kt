@@ -628,7 +628,9 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
     /** Replace source results only for a new query, preset, or playlist. */
     private fun applyList(list: List<YuzTrack>) {
         catalogGeneration++
-        catalogList = list.distinctBy { it.id }
+        // #287: bir xil qo'shiqning boshqa kanaldagi nusxasi ro'yxatda
+        // ketma-ket turmasin — imzo bo'yicha dedupe.
+        catalogList = YuzMusicRepository.dedupe(list)
         shownIds.clear()
         shownIds.addAll(catalogList.map { it.id })
         moreRound = 0
@@ -683,7 +685,7 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
                 if (more != null) moreAvailable = false
             } else {
                 shownIds.addAll(more.map { it.id })
-                catalogList = (catalogList + more).distinctBy { it.id }
+                catalogList = YuzMusicRepository.dedupe(catalogList + more)
                 refreshDownloading()
             }
         }

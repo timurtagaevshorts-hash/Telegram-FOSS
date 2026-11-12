@@ -30,6 +30,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -1163,6 +1164,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 					VoIPFragment.getInstance().onScreenCastStart();
 				}
 			}
+			updateForegroundTypeForScreenCapture();
 		} else {
 			if (captureDevice[index] != 0 || tgVoip[index] == null) {
 				if (tgVoip[index] != null && captureDevice[index] != 0) {
@@ -2962,6 +2964,59 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 		}
 	}
 
+	private Notification yuzForegroundNotification;
+	private int yuzForegroundId = ID_ONGOING_CALL_NOTIFICATION;
+
+	/**
+	 * Android 14+ (targetSdk 34+) 2-argumentli startForeground'da manifestdagi BARCHA
+	 * turlar tekshiriladi; mediaProjection turi ekran ulashish roziligisiz
+	 * SecurityException beradi. Shu sabab turlar har safar aniq ko'rsatiladi.
+	 */
+	private int yuzForegroundType() {
+		int type = 0;
+		if (Build.VERSION.SDK_INT >= 30 && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+			type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
+		}
+		if (Build.VERSION.SDK_INT >= 30 && videoState[CAPTURE_DEVICE_CAMERA] == Instance.VIDEO_STATE_ACTIVE
+				&& checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+			type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA;
+		}
+		if ((isPrivateScreencast || captureDevice[CAPTURE_DEVICE_SCREEN] != 0) && VideoCapturerDevice.mediaProjectionPermissionResultData != null) {
+			type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION;
+		}
+		if (type == 0) {
+			type = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK;
+		}
+		return type;
+	}
+
+	private void startForegroundCompat(int id, Notification notification) {
+		yuzForegroundId = id;
+		yuzForegroundNotification = notification;
+		if (Build.VERSION.SDK_INT < 29) {
+			startForeground(id, notification);
+			return;
+		}
+		try {
+			startForeground(id, notification, yuzForegroundType());
+			return;
+		} catch (Exception e) {
+			FileLog.e(e);
+		}
+		try {
+			startForeground(id, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+		} catch (Exception e) {
+			FileLog.e(e);
+		}
+	}
+
+	private void updateForegroundTypeForScreenCapture() {
+		if (yuzForegroundNotification == null || Build.VERSION.SDK_INT < 29) {
+			return;
+		}
+		startForegroundCompat(yuzForegroundId, yuzForegroundNotification);
+	}
+
 	private void showNotification(String name, Bitmap photo) {
 		Intent intent = new Intent(this, LaunchActivity.class).setAction(groupCall != null ? "voip_chat" : "voip");
 		if (groupCall != null) {
@@ -3005,7 +3060,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 			builder.setLargeIcon(photo);
 		}
 		try {
-			startForeground(ID_ONGOING_CALL_NOTIFICATION, builder.getNotification());
+			startForegroundCompat(ID_ONGOING_CALL_NOTIFICATION, builder.getNotification());
 		} catch (Exception e) {
 			if (photo != null && e instanceof IllegalArgumentException) {
 				showNotification(name, null);
@@ -3656,7 +3711,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 			} else {
 				bldr.setSmallIcon(R.drawable.ic_call);
 			}
-			startForeground(ID_ONGOING_CALL_NOTIFICATION, bldr.build());
+			startForegroundCompat(ID_ONGOING_CALL_NOTIFICATION, bldr.build());
 		}
 	}
 
@@ -4240,7 +4295,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 			builder.addAction(R.drawable.ic_call, answerTitle, answerPendingIntent);
 			incomingNotification = builder.getNotification();
 		}
-		startForeground(ID_INCOMING_CALL_NOTIFICATION, incomingNotification);
+		startForegroundCompat(ID_INCOMING_CALL_NOTIFICATION, incomingNotification);
 		startRingtoneAndVibration();
 	}
 

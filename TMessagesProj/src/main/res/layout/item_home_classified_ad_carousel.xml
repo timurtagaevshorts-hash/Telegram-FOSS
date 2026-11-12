@@ -40,7 +40,7 @@
                 android:paddingTop="@dimen/yuz_space_1"
                 android:paddingEnd="@dimen/yuz_space_2"
                 android:paddingBottom="@dimen/yuz_space_1"
-                android:textColor="@color/yuz_text"
+                android:textColor="@color/yuz_on_media"
                 android:textSize="@dimen/yuz_text_micro"
                 android:textStyle="bold"
                 android:visibility="gone" />
@@ -94,7 +94,7 @@
                     android:layout_height="12dp"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_location_pin"
-                    app:tint="@color/yuz_action" />
+                    android:tint="@color/yuz_action" />
 
                 <TextView
                     android:id="@+id/tvAdAddress"
@@ -142,7 +142,7 @@
                 android:paddingTop="2dp"
                 android:paddingEnd="@dimen/yuz_space_2"
                 android:paddingBottom="2dp"
-                android:textColor="@color/yuz_text"
+                android:textColor="@color/yuz_on_media"
                 android:textSize="@dimen/yuz_text_micro"
                 android:textStyle="bold"
                 android:visibility="gone" />

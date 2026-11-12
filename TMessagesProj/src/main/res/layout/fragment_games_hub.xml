@@ -100,7 +100,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/games_checkers"
-                        android:textColor="@color/yuz_text_bright"
+                        android:textColor="@color/yuz_on_media"
                         android:textSize="18sp"
                         android:textStyle="bold" />
 
@@ -109,7 +109,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="@string/games_checkers_desc" />
+                        android:text="@string/games_checkers_desc"
+                        android:textColor="@color/yuz_on_media_dim" />
 
                     <TextView
                         style="@style/YuzCaption"
@@ -126,7 +127,7 @@
                     android:layout_marginStart="@dimen/yuz_space_2"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_yuz_chevron_right"
-                    android:tint="@color/yuz_text_muted" />
+                    android:tint="@color/yuz_on_media_dim" />
             </LinearLayout>
 
             <!-- ============================= Mafiya ============================ -->
@@ -168,7 +169,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/games_mafia"
-                        android:textColor="@color/yuz_text_bright"
+                        android:textColor="@color/yuz_on_media"
                         android:textSize="18sp"
                         android:textStyle="bold" />
 
@@ -177,7 +178,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="@string/games_mafia_desc" />
+                        android:text="@string/games_mafia_desc"
+                        android:textColor="@color/yuz_on_media_dim" />
 
                     <TextView
                         style="@style/YuzCaption"
@@ -194,7 +196,7 @@
                     android:layout_marginStart="@dimen/yuz_space_2"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_yuz_chevron_right"
-                    android:tint="@color/yuz_text_muted" />
+                    android:tint="@color/yuz_on_media_dim" />
             </LinearLayout>
 
             <!-- ========================= Faol o'yinlar ========================= -->

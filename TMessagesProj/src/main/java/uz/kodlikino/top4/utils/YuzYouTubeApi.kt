@@ -54,6 +54,7 @@ object YuzYouTubeApi {
     private const val UA_TV = "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version"
     private const val SEARCH_URL = "https://www.youtube.com/youtubei/v1/search"
     private const val PLAYER_URL = "https://www.youtube.com/youtubei/v1/player"
+    private const val NEXT_URL = "https://www.youtube.com/youtubei/v1/next"
 
     private val JSON_MT = "application/json; charset=utf-8".toMediaType()
     private val http = OkHttpClient.Builder()
@@ -102,7 +103,11 @@ object YuzYouTubeApi {
     )
 
     /** Birinchi sinovdan o'tgan so'rovlar 3 ta rendererni qaytardi. */
-    private val RENDERERS = arrayOf("videoRenderer", "compactVideoRenderer", "gridVideoRenderer")
+    private val RENDERERS = arrayOf(
+        "videoRenderer", "compactVideoRenderer", "gridVideoRenderer",
+        // #287: watch-next javobidagi avto-miks qatorlari.
+        "playlistPanelVideoRenderer"
+    )
 
     /** Qidiruv natijalari (to'liq qo'shiq videoId'lari). */
     fun search(query: String, limit: Int = 25): List<YuzTrack> {
@@ -115,6 +120,25 @@ object YuzYouTubeApi {
         collect(resp, out, HashSet(), limit)
         // #223: 1 daqiqadan qisqa videolar (shorts) musiqa qatoriga chiqmaydi.
         return out.filter(YuzMusicRepository::longEnough)
+    }
+
+    /**
+     * #287: YouTube'ning o'zi shu trekka tavsiya qiladigan "keyingi"
+     * ro'yxati (watch-next avto-miks). Janr, kayfiyat va o'xshash
+     * ijrochilar bo'yicha eng yaqin qo'shiqlar — radio navbati shu
+     * manbadan to'ldiriladi.
+     */
+    fun radio(videoId: String, limit: Int = 30): List<YuzTrack> {
+        if (videoId.length != 11) return emptyList()
+        val c = ANDROID_CLIENT
+        val body = baseBody(c)
+            .put("videoId", videoId)
+            .put("contentCheckOk", true)
+            .put("racyCheckOk", true)
+        val resp = post(NEXT_URL, body, c) ?: return emptyList()
+        val out = ArrayList<YuzTrack>()
+        collect(resp, out, HashSet(), limit + 1)
+        return out.filter { it.videoId != videoId && YuzMusicRepository.longEnough(it) }.take(limit)
     }
 
     /** videoId bo'yicha ijroga MOS eng sifatli sof audio oqimini topadi. */

@@ -8110,6 +8110,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         if (yuzGramBottomBar == null) {
             return;
         }
+        yuzGramBottomBar.updateAvatar();
         BaseFragment top = getLastFragment();
         if (top == null) {
             return; // o'tish payti — joriy holatni saqlaymiz (flicker oldini oladi)
@@ -8155,10 +8156,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     private void applyYuzGramBarVisibility() {
         boolean visible = yuzGramBarEligible && !yuzGramBarScrollHidden;
         yuzGramBottomBar.setVisible(visible);
-        BaseFragment top = getLastFragment();
-        if (top instanceof DialogsActivity && ((DialogsActivity) top).isYuzGramMainRoot()) {
-            ((DialogsActivity) top).setYuzGramComposeHidden(!visible);
-        }
     }
 
     /**

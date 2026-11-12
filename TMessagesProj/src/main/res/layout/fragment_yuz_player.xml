@@ -30,7 +30,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/musiqa_pl_close"
                 android:src="@drawable/ic_yuz_chevron_down"
-                app:tint="@color/yuz_text" />
+                android:tint="@color/yuz_text" />
 
             <TextView
                 android:layout_width="0dp"
@@ -63,6 +63,7 @@
                 android:contentDescription="@null"
                 android:scaleType="centerCrop"
                 android:src="@drawable/ic_yuz_music"
+                android:tint="@color/yuz_action"
                 android:padding="0dp" />
 
             <!-- YuzGram #98: qo'shiq yuklanayotganda markazda neon animatsiya -->
@@ -145,7 +146,7 @@
                 android:contentDescription="@string/musiqa_pl_shuffle"
                 android:padding="@dimen/yuz_space_2"
                 android:src="@drawable/ic_yuz_shuffle"
-                app:tint="@color/yuz_text" />
+                android:tint="@color/yuz_text" />
 
             <ImageButton
                 android:id="@+id/btnPlPrev"
@@ -156,7 +157,7 @@
                 android:contentDescription="@string/musiqa_pl_prev"
                 android:padding="@dimen/yuz_space_2"
                 android:src="@drawable/ic_yuz_prev"
-                app:tint="@color/yuz_text" />
+                android:tint="@color/yuz_text" />
 
             <ImageButton
                 android:id="@+id/btnPlPlay"
@@ -167,7 +168,7 @@
                 android:padding="@dimen/yuz_space_4"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_yuz_play"
-                app:tint="@color/yuz_text_on_accent" />
+                android:tint="@color/yuz_text_on_accent" />
 
             <ImageButton
                 android:id="@+id/btnPlNext"
@@ -178,7 +179,7 @@
                 android:contentDescription="@string/musiqa_pl_next"
                 android:padding="@dimen/yuz_space_2"
                 android:src="@drawable/ic_yuz_next"
-                app:tint="@color/yuz_text" />
+                android:tint="@color/yuz_text" />
 
             <ImageButton
                 android:id="@+id/btnPlRepeat"
@@ -188,7 +189,7 @@
                 android:contentDescription="@string/musiqa_pl_repeat"
                 android:padding="@dimen/yuz_space_2"
                 android:src="@drawable/ic_yuz_loop"
-                app:tint="@color/yuz_text" />
+                android:tint="@color/yuz_text" />
         </LinearLayout>
 
         <!-- Ikkilamchi qator -->
@@ -212,7 +213,7 @@
                     android:layout_height="@dimen/yuz_icon"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_yuz_speed"
-                    app:tint="@color/yuz_text" />
+                    android:tint="@color/yuz_text" />
 
                 <TextView
                     android:id="@+id/tvPlSpeedLabel"
@@ -238,7 +239,7 @@
                     android:layout_height="@dimen/yuz_icon"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_yuz_queue"
-                    app:tint="@color/yuz_text" />
+                    android:tint="@color/yuz_text" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -264,7 +265,7 @@
                     android:layout_height="@dimen/yuz_icon"
                     android:contentDescription="@string/yuz_a11y_favorite"
                     android:src="@drawable/ic_yuz_heart"
-                    app:tint="@color/yuz_text" />
+                    android:tint="@color/yuz_text" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -290,7 +291,7 @@
                     android:layout_height="@dimen/yuz_icon"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_yuz_download"
-                    app:tint="@color/yuz_text" />
+                    android:tint="@color/yuz_text" />
 
                 <TextView
                     android:id="@+id/tvPlDlLabel"
@@ -316,7 +317,7 @@
                     android:layout_height="@dimen/yuz_icon"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_yuz_eq"
-                    app:tint="@color/yuz_text" />
+                    android:tint="@color/yuz_text" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -341,7 +342,7 @@
                     android:layout_height="@dimen/yuz_icon"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_yuz_timer"
-                    app:tint="@color/yuz_text" />
+                    android:tint="@color/yuz_text" />
 
                 <TextView
                     android:id="@+id/tvPlSleepLabel"
@@ -424,7 +425,7 @@
                 android:contentDescription="@string/musiqa_pl_queue_close"
                 android:padding="@dimen/yuz_space_2"
                 android:src="@drawable/ic_yuz_close"
-                app:tint="@color/yuz_text" />
+                android:tint="@color/yuz_text" />
         </LinearLayout>
 
         <TextView

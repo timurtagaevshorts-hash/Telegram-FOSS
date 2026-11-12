@@ -93,7 +93,7 @@
                             android:layout_gravity="center"
                             android:contentDescription="@null"
                             android:src="@drawable/ic_yuz_gallery"
-                            app:tint="@color/yuz_action" />
+                            android:tint="@color/yuz_action" />
                     </FrameLayout>
 
                     <TextView
@@ -162,7 +162,7 @@
                         android:layout_gravity="center"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_yuz_gallery"
-                        app:tint="@color/yuz_action" />
+                        android:tint="@color/yuz_action" />
                 </FrameLayout>
 
                 <ProgressBar
@@ -307,7 +307,7 @@
                 android:layout_height="18dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_yuz_timer"
-                app:tint="@color/yuz_action" />
+                android:tint="@color/yuz_action" />
 
             <TextView
                 android:id="@+id/tvQuotaInfo"

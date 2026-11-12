@@ -48,7 +48,7 @@
                         android:layout_gravity="center"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_add_photo"
-                        app:tint="@color/yuz_text" />
+                        android:tint="@color/yuz_text" />
                 </FrameLayout>
 
                 <TextView

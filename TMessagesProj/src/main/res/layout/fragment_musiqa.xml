@@ -28,7 +28,7 @@
             android:layout_height="20dp"
             android:layout_marginStart="@dimen/yuz_space_2"
             android:src="@drawable/ic_yuz_music"
-            app:tint="@color/yuz_action" />
+            android:tint="@color/yuz_action" />
 
         <TextView
             android:layout_width="0dp"
@@ -46,7 +46,7 @@
             style="@style/YuzIconButton"
             android:contentDescription="@string/musiqa_collections"
             android:src="@drawable/ic_yuz_box"
-            app:tint="@color/yuz_text_secondary" />
+            android:tint="@color/yuz_text_secondary" />
     </LinearLayout>
 
     <!-- Qidiruv qatori -->
@@ -64,8 +64,10 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:background="@drawable/taksi_addr_bg"
+            android:background="@drawable/bg_yuz_search_field"
+            android:gravity="center_vertical"
             android:hint="@string/musiqa_search_hint"
+            android:minHeight="@dimen/yuz_field_height"
             android:imeOptions="actionSearch"
             android:inputType="text"
             android:maxLines="1"

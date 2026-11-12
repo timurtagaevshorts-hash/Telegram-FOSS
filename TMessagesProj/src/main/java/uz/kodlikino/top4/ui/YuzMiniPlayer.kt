@@ -12,6 +12,7 @@ import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import com.bumptech.glide.Glide
 import org.telegram.messenger.AndroidUtilities
@@ -82,7 +83,8 @@ object YuzMiniPlayer : Application.ActivityLifecycleCallbacks, YuzMusicEngine.Ob
         val v = LayoutInflater.from(YuzTheme.wrap(a))
             .inflate(R.layout.view_yuz_mini_player, content, false)
         ivCover = v.findViewById(R.id.ivMiniCover)
-        ivCover?.imageTintList = null
+        // XML tint'i o'rin egallovchi ikonka uchun qoladi; update() muqova
+        // yuklanganda uni o'chiradi (aks holda Glide bitmapi bo'yaladi).
         tvTitle = v.findViewById(R.id.tvMiniTitle)
         tvArtist = v.findViewById(R.id.tvMiniArtist)
         progress = v.findViewById(R.id.miniProgress)
@@ -168,8 +170,17 @@ object YuzMiniPlayer : Application.ActivityLifecycleCallbacks, YuzMusicEngine.Ob
         }
         tvTitle?.text = track!!.title
         tvArtist?.text = YuzMusicEngine.lastStatusText() ?: track.artist
-        if (track.coverUrl.isNotBlank()) {
-            ivCover?.let { Glide.with(it).load(track.coverUrl).into(it) }
+        // Muqova tayinlash: tint faqat o'rin egallovchi ikonkada qoladi —
+        // Glide bitmapiga tint qo'llansa, rasm butunlay accent rangga bo'yaladi.
+        ivCover?.let { iv ->
+            if (track.coverUrl.isNotBlank()) {
+                iv.imageTintList = null
+                Glide.with(iv).load(track.coverUrl).into(iv)
+            } else {
+                Glide.with(iv).clear(iv)
+                iv.setImageResource(R.drawable.ic_yuz_music)
+                iv.imageTintList = ContextCompat.getColorStateList(iv.context, R.color.yuz_action)
+            }
         }
         if (b.visibility != View.VISIBLE) {
             b.alpha = 0f

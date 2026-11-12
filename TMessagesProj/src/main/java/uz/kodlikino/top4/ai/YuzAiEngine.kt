@@ -88,8 +88,11 @@ object YuzAiEngine {
     // #134: "musiqa qo'y", "Ummon — sokin tun qo'shig'ini top" kabi buyruqlar
     // endi bo'limga o'tish emas — darhol qidiruv + ijro. Atamalar norm()dan
     // o'tkaziladi (apostrof, kirill, registr).
+    // #287: o'zbekcha qo'shimchalar ildizni o'zgartiradi ("qo'shiq" ->
+    // "qo'shig'ini" -> norm("qoshigini")). Shu sabab ildiz variantlari
+    // ham qo'shilgan: "qoshig", "musiq", "ashul".
     private val MUSIC_WORDS_RAW = listOf(
-        "musiqa", "muzika", "qo'shiq", "qoshiq", "ashula", "trek", "song", "music", "audio"
+        "musiq", "muzik", "qoshiq", "qoshig", "ashul", "trek", "song", "music", "audio"
     )
     private val PLAY_WORDS_RAW = listOf(
         "qo'y", "qoy", "chal", "ijro", "top", "izla", "qidir", "yoq", "yondir", "boshlab",
@@ -99,7 +102,14 @@ object YuzAiEngine {
         "menga", "meni", "uchun", "iltimos", "deb", "des", "desa", "de", "deyish",
         "aytsa", "aytish", "ayt", "ayting", "aytib", "bir", "ozgina",
         "yaxshi", "yaxshiroq", "hozir", "endi", "keyin", "qilib", "ber", "bering",
-        "mumkin", "mumkinmi", "please", "och", "ochib", "ochish", "bo'limini", "bolimini"
+        "mumkin", "mumkinmi", "please", "och", "ochib", "ochish", "bo'limini", "bolimini",
+        "bolimi", "bolim", "bolimlar", "bo'limi", "bo'lim",
+        // #287: alohida turgan kelishik/bog'lovchi bo'laklari qidiruvni buzadi:
+        // "Massa ni soqqa" -> "massa soqqa".
+        "ni", "ning", "ga", "ka", "da", "dan", "dagi", "dek", "kabi",
+        "bilan", "va", "ham", "yana",
+        // "Musiqa ijro et" — "et" yordamchi fe'l, qidiruvga kirmasin.
+        "et", "etib", "etadi", "etsin", "etilsin", "eting"
     )
 
     private val SEND_WORDS: List<String> = SEND_WORDS_RAW.map { norm(it) }
@@ -307,6 +317,9 @@ object YuzAiEngine {
         val normalized = raw.lowercase(Locale.getDefault())
             .replace(",", " ")
             .replace("’", "'")
+            .replace("‘", "'")
+            .replace("`", "'")
+            .replace("ʼ", "'")
             .trim()
         if (normalized.isBlank()) return Intent.Ask(raw)
         val tokens = normalized.split(Regex("\\s+")).filter { it.isNotBlank() }
@@ -437,6 +450,10 @@ object YuzAiEngine {
                 .trim()
                 .trim('.', ',', '!', '?', '"', '“', '”', '«', '»', ':')
                 .replace("xaqida", "haqida")
+                .replace("’", "'")
+                .replace("‘", "'")
+                .replace("`", "'")
+                .replace("ʼ", "'")
             if (raw.isBlank()) continue
             out.add(stripUzSuffix(raw))
         }

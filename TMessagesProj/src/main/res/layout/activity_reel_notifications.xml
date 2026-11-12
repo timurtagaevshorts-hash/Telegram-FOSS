@@ -33,7 +33,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/yuz_notif_title"
                 android:src="@drawable/ic_back"
-                app:tint="@color/yuz_text" />
+                android:tint="@color/yuz_text" />
 
             <TextView
                 android:layout_width="0dp"
@@ -53,7 +53,7 @@
                 android:contentDescription="@string/yuz_notif_delete_all"
                 android:padding="@dimen/yuz_space_3"
                 android:src="@drawable/ic_delete"
-                app:tint="@color/yuz_text_secondary" />
+                android:tint="@color/yuz_text_secondary" />
         </LinearLayout>
 
         <LinearLayout

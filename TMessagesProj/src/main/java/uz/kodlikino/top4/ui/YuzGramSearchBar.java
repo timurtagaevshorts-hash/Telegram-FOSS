@@ -11,6 +11,7 @@ import android.view.View;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.R;
+import org.telegram.ui.ActionBar.Theme;
 
 /**
  * YuzGram #85/#93: chat sarlavhasidagi qidiruv satri — maketdagi "Qidirish"
@@ -34,14 +35,30 @@ public class YuzGramSearchBar extends View {
     private static final float BTN_ZONE_DP = 46f;
     private static final float BTN_R_DP = 15f;
 
-    private static final int FILL_TOP = 0xCC1E3352;
-    private static final int FILL_BOTTOM = 0xCC14263F;
-    private static final int STROKE = 0x4D6FA8E0;
-    private static final int STROKE_PRESSED = 0x998FC4F0;
-    private static final int HINT_TEXT = 0xFFA9C0D8;
-    private static final int LENS = 0xFF7FA6C8;
-    private static final int SLIDER = 0xFF9FC4E8;
-    private static final int KNOB_FILL = 0xFF0E1B2E;
+    private static final int FILL_TOP_DARK = 0xCC1E3352;
+    private static final int FILL_BOTTOM_DARK = 0xCC14263F;
+    private static final int STROKE_DARK = 0x4D6FA8E0;
+    private static final int STROKE_PRESSED_DARK = 0x998FC4F0;
+    private static final int HINT_DARK = 0xFFA9C0D8;
+    private static final int LENS_DARK = 0xFF7FA6C8;
+    private static final int SLIDER_DARK = 0xFF9FC4E8;
+    private static final int KNOB_FILL_DARK = 0xFF0E1B2E;
+    private static final int PRESS_DARK = 0x1FFFFFFF;
+    private static final int SEPARATOR_DARK = 0x336FA8E0;
+    private static final int SEPARATOR_ACTIVE_DARK = 0x668FC4F0;
+
+    // Kunduzgi mavzu: oq-sovuq shisha pill, to'q matn va brend aksenti.
+    private static final int FILL_TOP_LIGHT = 0xF2FFFFFF;
+    private static final int FILL_BOTTOM_LIGHT = 0xFFF1F6FD;
+    private static final int STROKE_LIGHT = 0x4D5B6CF9;
+    private static final int STROKE_PRESSED_LIGHT = 0x995B6CF9;
+    private static final int HINT_LIGHT = 0xFF5B6878;
+    private static final int LENS_LIGHT = 0xFF5B6878;
+    private static final int SLIDER_LIGHT = 0xFF2AABEE;
+    private static final int KNOB_FILL_LIGHT = 0xFFFFFFFF;
+    private static final int PRESS_LIGHT = 0x14000000;
+    private static final int SEPARATOR_LIGHT = 0x335B6CF9;
+    private static final int SEPARATOR_ACTIVE_LIGHT = 0x665B6CF9;
 
     private static final int ZONE_NONE = 0;
     private static final int ZONE_SEARCH = 1;
@@ -59,6 +76,19 @@ public class YuzGramSearchBar extends View {
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF glassRect = new RectF();
     private final String hintText;
+
+    private int fillTopColor;
+    private int fillBottomColor;
+    private int strokeColor;
+    private int strokePressedColor;
+    private int hintColor;
+    private int lensColor;
+    private int sliderColor;
+    private int knobFillColor;
+    private int pressColor;
+    private int separatorColor;
+    private int separatorActiveColor;
+    private int hintIdleAlpha;
 
     private Listener listener;
     private int pressedZone = ZONE_NONE;
@@ -79,7 +109,54 @@ public class YuzGramSearchBar extends View {
         glyphPaint.setStrokeWidth(dp(1.7f));
         glyphPaint.setStrokeCap(Paint.Cap.ROUND);
         textPaint.setTextSize(dp(14f));
-        textPaint.setColor(HINT_TEXT);
+        applyThemeColors();
+    }
+
+    /**
+     * Kunduzgi mavzuda shisha pill oq fonda ko'rinmay ketmasligi uchun
+     * ranglar juftligi joriy Telegram mavzusidan tanlanadi.
+     */
+    private void applyThemeColors() {
+        if (Theme.isCurrentThemeDark()) {
+            fillTopColor = FILL_TOP_DARK;
+            fillBottomColor = FILL_BOTTOM_DARK;
+            strokeColor = STROKE_DARK;
+            strokePressedColor = STROKE_PRESSED_DARK;
+            hintColor = HINT_DARK;
+            lensColor = LENS_DARK;
+            sliderColor = SLIDER_DARK;
+            knobFillColor = KNOB_FILL_DARK;
+            pressColor = PRESS_DARK;
+            separatorColor = SEPARATOR_DARK;
+            separatorActiveColor = SEPARATOR_ACTIVE_DARK;
+            hintIdleAlpha = 236;
+        } else {
+            fillTopColor = FILL_TOP_LIGHT;
+            fillBottomColor = FILL_BOTTOM_LIGHT;
+            strokeColor = STROKE_LIGHT;
+            strokePressedColor = STROKE_PRESSED_LIGHT;
+            hintColor = HINT_LIGHT;
+            lensColor = LENS_LIGHT;
+            sliderColor = SLIDER_LIGHT;
+            knobFillColor = KNOB_FILL_LIGHT;
+            pressColor = PRESS_LIGHT;
+            separatorColor = SEPARATOR_LIGHT;
+            separatorActiveColor = SEPARATOR_ACTIVE_LIGHT;
+            hintIdleAlpha = 255;
+        }
+        textPaint.setColor(hintColor);
+        buildGlassShader();
+        invalidate();
+    }
+
+    private void buildGlassShader() {
+        int w = getWidth(), h = getHeight();
+        float half = dp(PILL_H_DP) / 2f;
+        float cy = h / 2f;
+        glassShader = w > 0 && h > 0
+                ? new LinearGradient(0, cy - half, 0, cy + half,
+                fillTopColor, fillBottomColor, Shader.TileMode.CLAMP)
+                : null;
     }
 
     public static int height() {
@@ -100,12 +177,7 @@ public class YuzGramSearchBar extends View {
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-        float half = dp(PILL_H_DP) / 2f;
-        float cy = h / 2f;
-        glassShader = w > 0 && h > 0
-                ? new LinearGradient(0, cy - half, 0, cy + half,
-                FILL_TOP, FILL_BOTTOM, Shader.TileMode.CLAMP)
-                : null;
+        buildGlassShader();
     }
 
     @Override
@@ -127,26 +199,27 @@ public class YuzGramSearchBar extends View {
         drawLens(canvas, lensCx, cy, lensR);
 
         Paint.FontMetrics fm = textPaint.getFontMetrics();
-        textPaint.setAlpha(pressedZone == ZONE_SEARCH ? 255 : 236);
+        textPaint.setAlpha(pressedZone == ZONE_SEARCH ? 255 : hintIdleAlpha);
         canvas.drawText(hintText, lensCx + lensR + dp(9f),
                 cy - (fm.ascent + fm.descent) / 2f, textPaint);
         textPaint.setAlpha(255);
 
         // Sliders — pill ichida; bosilganda orqasida nozik yorug'lik doira.
         if (pressedZone == ZONE_FILTER) {
-            fillPaint.setColor(0x26FFFFFF);
+            fillPaint.setColor(pressColor);
             canvas.drawCircle(btnCx, cy, btnR + dp(4f), fillPaint);
             fillPaint.setColor(0);
         }
         // Ikonka bilan pill o'ng chekkasi orasidagi ingichka ajratgich.
         float sepX = btnCx - btnR - dp(6f);
-        strokePaint.setColor(pressedZone == ZONE_FILTER ? 0x668FC4F0 : 0x336FA8E0);
+        strokePaint.setColor(pressedZone == ZONE_FILTER
+                ? separatorActiveColor : separatorColor);
         canvas.drawLine(sepX, cy - pillH / 2f + dp(9f), sepX, cy + pillH / 2f - dp(9f), strokePaint);
         drawSliders(canvas, btnCx, cy, btnR);
     }
 
     private void drawLens(Canvas canvas, float cx, float cy, float r) {
-        glyphPaint.setColor(LENS);
+        glyphPaint.setColor(lensColor);
         canvas.drawCircle(cx, cy, r, glyphPaint);
         float d = r * 0.707f;
         canvas.drawLine(cx + d, cy + d, cx + r + dp(4.6f), cy + r + dp(4.6f), glyphPaint);
@@ -157,17 +230,17 @@ public class YuzGramSearchBar extends View {
         canvas.drawRoundRect(rect, radius, radius, fillPaint);
         fillPaint.setShader(null);
         if (pressed) {
-            fillPaint.setColor(0x1FFFFFFF);
+            fillPaint.setColor(pressColor);
             canvas.drawRoundRect(rect, radius, radius, fillPaint);
             fillPaint.setColor(0);
         }
-        strokePaint.setColor(pressed ? STROKE_PRESSED : STROKE);
+        strokePaint.setColor(pressed ? strokePressedColor : strokeColor);
         canvas.drawRoundRect(rect, radius, radius, strokePaint);
     }
 
     /** Uch gorizontal yo'l + har birida turli joydagi tutqich — "filtr" glyfi. */
     private void drawSliders(Canvas canvas, float cx, float cy, float r) {
-        glyphPaint.setColor(SLIDER);
+        glyphPaint.setColor(sliderColor);
         float half = r * 0.46f;
         float step = r * 0.34f;
         float[] knobAt = {-0.55f, 0.65f, -0.1f};
@@ -175,7 +248,7 @@ public class YuzGramSearchBar extends View {
             float y = cy - step + i * step;
             canvas.drawLine(cx - half, y, cx + half, y, glyphPaint);
             float kx = cx + half * knobAt[i];
-            fillPaint.setColor(KNOB_FILL);
+            fillPaint.setColor(knobFillColor);
             canvas.drawCircle(kx, y, r * 0.15f, fillPaint);
             canvas.drawCircle(kx, y, r * 0.15f, glyphPaint);
         }

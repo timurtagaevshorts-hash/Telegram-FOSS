@@ -11,8 +11,12 @@ import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.view.View;
 
+import androidx.core.content.ContextCompat;
+
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
+import org.telegram.ui.ActionBar.Theme;
 
 /**
  * YuzGram #60: chat tepasidagi brend belgisi — oddiy matnli sarlavha o'rniga.
@@ -21,20 +25,14 @@ import org.telegram.messenger.R;
  * YuzGram #101: nishon ENDI haqiqiy brend logotipi (UZ + samolyot,
  * R.drawable.yuz_logo) — launcher ikonkasi bilan bir xil rasm.
  *
- * Palavras ENDI gradient emas: "Yuz" oq, "Gram" to'q ko'k (#38B6FF). Bir xil
- * rangli sirtga gradient matn qo'yish o'qishni buzadi; vazn va rang ajratmasi
- * yetarli.
+ * Palavra ranglari endi qat'iy emas: `yuz_*` tokenlaridan joriy Telegram
+ * mavzusi bo'yicha olinadi. Aks holda kunduzgi (oq) fonda oq "Yuz" yozuvi
+ * butunlay ko'rinmay qolardi.
  *
  * Joylashuv: action bar maydonining chapida, status bar hisobga olinadi.
  * DialogsActivity yuzBrandMark orqali boshqaradi (skroll/action-mode sinxroni).
  */
 public class YuzGramBrandMark extends View {
-
-    private static final int WORD_PRIMARY = 0xFFFFFFFF;
-    private static final int WORD_ACCENT = 0xFF38B6FF;
-    private static final int TAGLINE = 0xFF93AECB;
-    // YuzGram #102: tarmoq uzilganda palavra o'rniga chiqadigan matn rangi.
-    private static final int OFFLINE_TEXT = 0xFFFFB86B;
 
     private static final String WORD_1 = "Yuz";
     private static final String WORD_2 = "Gram";
@@ -49,6 +47,22 @@ public class YuzGramBrandMark extends View {
     private final String offlineText;
     private String tagText = "";
     private boolean offline;
+
+    private int wordPrimaryColor;
+    private int wordAccentColor;
+    private int taglineColor;
+    private int offlineColor;
+
+    private final NotificationCenter.NotificationCenterDelegate themeDelegate =
+            new NotificationCenter.NotificationCenterDelegate() {
+                @Override
+                public void didReceivedNotification(int id, int account, Object... args) {
+                    if (id == NotificationCenter.didSetNewTheme) {
+                        applyThemeColors();
+                        invalidate();
+                    }
+                }
+            };
 
     private int statusBarHeight;
     private int barHeight; // action bar balandligi (status bar'siz)
@@ -69,11 +83,39 @@ public class YuzGramBrandMark extends View {
         badgeSize = AndroidUtilities.dp(30f);
         Typeface bold = Typeface.create(Typeface.DEFAULT, Typeface.BOLD);
         wordPaint.setTextSize(AndroidUtilities.dp(20f));
-        wordPaint.setColor(WORD_PRIMARY);
         wordPaint.setTypeface(bold);
         tagPaint.setTextSize(AndroidUtilities.dp(10.5f));
-        tagPaint.setColor(TAGLINE);
         tagPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        applyThemeColors();
+    }
+
+    private void applyThemeColors() {
+        Context themed = YuzTheme.themeContext(getContext());
+        Theme.ThemeInfo active = Theme.getActiveTheme();
+        boolean dark = active != null ? active.isDark() : Theme.isCurrentThemeNight();
+        wordPrimaryColor = ContextCompat.getColor(themed, R.color.yuz_text_bright);
+        // Oq fonda #2AABEE faqat 2.57:1 — "Gram" uchun chuqurroq binafsha-ko'k.
+        wordAccentColor = ContextCompat.getColor(themed,
+                dark ? R.color.yuz_action : R.color.yuz_decor);
+        taglineColor = ContextCompat.getColor(themed, R.color.yuz_text_secondary);
+        // YuzGram #102: tarmoq uzilganda palavra o'rniga chiqadigan matn rangi.
+        offlineColor = ContextCompat.getColor(themed, R.color.yuz_gold);
+        wordPaint.setColor(wordPrimaryColor);
+        tagPaint.setColor(taglineColor);
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        NotificationCenter.getGlobalInstance()
+                .addObserver(themeDelegate, NotificationCenter.didSetNewTheme);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        NotificationCenter.getGlobalInstance()
+                .removeObserver(themeDelegate, NotificationCenter.didSetNewTheme);
+        super.onDetachedFromWindow();
     }
 
     /** YuzGram #102: tarmoq uzilganda palavra o'rniga "Tarmoqqa ulanish…" chiziladi. */
@@ -162,18 +204,18 @@ public class YuzGramBrandMark extends View {
         Paint.FontMetrics wfm = wordPaint.getFontMetrics();
         float wordBaseline = blockTop + wordBand / 2f - (wfm.ascent + wfm.descent) / 2f;
         if (offline) {
-            wordPaint.setColor(OFFLINE_TEXT);
+            wordPaint.setColor(offlineColor);
             canvas.drawText(offlineText, tx, wordBaseline, wordPaint);
-            wordPaint.setColor(WORD_PRIMARY);
+            wordPaint.setColor(wordPrimaryColor);
         } else {
-            // Paint standart rangi qora — birinchi kadrdanoq "Yuz" oq bo'lishi
-            // uchun rangni har chizishdan oldin majburan o'rnatamiz.
-            wordPaint.setColor(WORD_PRIMARY);
+            // Paint standart rangi qora — har chizishdan oldin mavzu rangini
+            // majburan o'rnatamiz (mavzu almashganda ham to'g'ri qoladi).
+            wordPaint.setColor(wordPrimaryColor);
             canvas.drawText(WORD_1, tx, wordBaseline, wordPaint);
             float w1 = wordPaint.measureText(WORD_1);
-            wordPaint.setColor(WORD_ACCENT);
+            wordPaint.setColor(wordAccentColor);
             canvas.drawText(WORD_2, tx + w1, wordBaseline, wordPaint);
-            wordPaint.setColor(WORD_PRIMARY);
+            wordPaint.setColor(wordPrimaryColor);
         }
 
         // Tagline — palavrasining ostida, bir xil chap chetdan

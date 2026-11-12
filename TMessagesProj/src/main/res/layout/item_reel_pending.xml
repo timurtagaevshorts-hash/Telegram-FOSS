@@ -38,7 +38,7 @@
             android:layout_height="22dp"
             android:contentDescription="@null"
             android:src="@drawable/ic_yuz_play"
-            app:tint="@color/yuz_on_media" />
+            android:tint="@color/yuz_on_media" />
 
         <TextView
             android:id="@+id/tvPendingLabel"
@@ -76,5 +76,5 @@
         android:foreground="?attr/selectableItemBackgroundBorderless"
         android:padding="8dp"
         android:src="@drawable/ic_yuz_close"
-        app:tint="@color/yuz_on_media" />
+        android:tint="@color/yuz_on_media" />
 </FrameLayout>

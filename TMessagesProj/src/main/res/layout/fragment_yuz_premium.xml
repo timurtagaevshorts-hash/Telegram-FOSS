@@ -79,7 +79,7 @@
                             android:layout_gravity="center"
                             android:contentDescription="@string/premium_badge_desc"
                             android:src="@drawable/ic_yuz_diamond"
-                            app:tint="@color/yuz_text_on_accent" />
+                            android:tint="@color/yuz_text_on_accent" />
                     </FrameLayout>
 
                     <LinearLayout
@@ -405,7 +405,7 @@
                 android:layout_gravity="center"
                 android:contentDescription="@string/premium_badge_desc"
                 android:src="@drawable/ic_yuz_star"
-                app:tint="@color/yuz_gold" />
+                android:tint="@color/yuz_gold" />
         </FrameLayout>
 
         <TextView

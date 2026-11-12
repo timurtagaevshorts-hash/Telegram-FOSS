@@ -617,7 +617,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private ImageView yuzTabsToggle;
     private boolean yuzTabsAtTop;
     private boolean yuzTabsSwitching;
-    private boolean yuzComposeHidden;
     private static final String YUZ_TABS_TOP_PREF = "yuz_chat_tabs_top";
 
     private final static int pin = 100;
@@ -3402,17 +3401,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         Bundle args = new Bundle();
         args.putBoolean("destroyAfterSelect", true);
         presentFragment(new ContactsActivity(args));
-    }
-
-    /** Skroll holati: qalamcha gumbaz menyusi bilan birga yashirinadi. */
-    public void setYuzGramComposeHidden(boolean hidden) {
-        if (yuzComposeHidden == hidden) {
-            return;
-        }
-        yuzComposeHidden = hidden;
-        if (yuzChatRail != null) {
-            yuzChatRail.setComposeHidden(hidden);
-        }
     }
 
     @Override

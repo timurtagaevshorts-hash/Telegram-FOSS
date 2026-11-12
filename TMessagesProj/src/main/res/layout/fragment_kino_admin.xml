@@ -398,7 +398,7 @@
                         android:contentDescription="@string/kino_admin_add"
                         app:backgroundTint="@color/yuz_action"
                         app:srcCompat="@drawable/ic_add"
-                        app:tint="@color/yuz_on_action" />
+                        android:tint="@color/yuz_on_action" />
                 </FrameLayout>
 
                 <!-- ─── Reels ─── -->
@@ -710,7 +710,7 @@
                         android:contentDescription="@string/yuz_admin_ad_add"
                         app:backgroundTint="@color/yuz_action"
                         app:srcCompat="@drawable/ic_add"
-                        app:tint="@color/yuz_on_action" />
+                        android:tint="@color/yuz_on_action" />
                 </FrameLayout>
 
                 <!-- ─── E'lonlar moderatsiyasi ─── -->

@@ -64,6 +64,7 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
     private var selected = 0
 
     private val accent = ContextCompat.getColor(context, R.color.yuz_action)
+    private val dark = org.telegram.ui.ActionBar.Theme.isCurrentThemeDark()
 
     init {
         isHorizontalScrollBarEnabled = false
@@ -194,9 +195,21 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
             badge.background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = dpf(9f)
-                setColor(if (active) 0x40FFFFFF else 0x332AABEE)
+                setColor(
+                    when {
+                        active -> 0x40FFFFFF
+                        dark -> 0x332AABEE
+                        else -> 0x1F2AABEE
+                    }
+                )
             }
-            badge.setTextColor(if (active) 0xFFFFFFFF.toInt() else 0xFF7CC4F5.toInt())
+            badge.setTextColor(
+                when {
+                    active -> 0xFF06121C.toInt()
+                    dark -> 0xFF7CC4F5.toInt()
+                    else -> 0xFF2AABEE.toInt()
+                }
+            )
         }
 
         fun setActive(value: Boolean, animate: Boolean) {
@@ -224,15 +237,31 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
                 GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
                     0xFF38B6FF.toInt(), accent
                 )).apply { cornerRadius = dpf(CHIP_R_DP) }
-            } else {
+            } else if (dark) {
                 GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
                     0xCC1E3352.toInt(), 0xCC14263F.toInt()
                 )).apply {
                     cornerRadius = dpf(CHIP_R_DP)
                     setStroke(dp(1f), 0x4D6FA8E0)
                 }
+            } else {
+                // Kunduzgi fon: oq-sovuq shisha chip, brend hoshiyasi.
+                GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
+                    0xF2FFFFFF.toInt(), 0xFFF1F6FD.toInt()
+                )).apply {
+                    cornerRadius = dpf(CHIP_R_DP)
+                    setStroke(dp(1f), 0x4D5B6CF9)
+                }
             }
-            title.setTextColor(if (value) 0xFFFFFFFF.toInt() else 0xFFA9C0D8.toInt())
+            title.setTextColor(
+                when {
+                    // Faol chip brend gradientida: to'q siyoh ham kun, ham tun
+                    // mavzusida 7.3:1 kontrast beradi.
+                    value -> 0xFF06121C.toInt()
+                    dark -> 0xFFA9C0D8.toInt()
+                    else -> 0xFF5B6878.toInt()
+                }
+            )
             title.typeface = if (value) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
             applyBadge()
         }

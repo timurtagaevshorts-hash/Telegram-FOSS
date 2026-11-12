@@ -167,6 +167,23 @@ object YuzMusicEngine {
     private val seenIds = java.util.Collections.newSetFromMap(
         java.util.concurrent.ConcurrentHashMap<Long, Boolean>()
     )
+    // #287: sessiya davomida eshitilgan qo'shiq imzolari. videoId boshqa
+    // kanalda boshqacha bo'ladi, lekin imzo bir xil — shuning uchun aynan
+    // o'sha qo'shiq qaytib navbatga tushmaydi.
+    private val recentSigQueue = java.util.concurrent.ConcurrentLinkedQueue<String>()
+    private val recentSigs = java.util.Collections.newSetFromMap(
+        java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+    )
+    private fun rememberSignature(t: YuzTrack) {
+        val sig = YuzMusicRepository.titleSignature(t)
+        if (sig.isEmpty()) return
+        if (!recentSigs.add(sig)) return
+        recentSigQueue.add(sig)
+        while (recentSigQueue.size > 240) {
+            val old = recentSigQueue.poll() ?: break
+            recentSigs.remove(old)
+        }
+    }
     private var extending = false
     // #120: navbat generatsiyasi — playQueue/enqueue-swap'ida o'sadi.
     // extendQueue fon qidiruvi tugaydigacha navbat butunlay almashtirilsa,
@@ -478,14 +495,26 @@ object YuzMusicEngine {
     /** Butun ro'yxatni navbat qilib [startIndex]'dan boshlab ijro etadi. */
     fun playQueue(context: Context, list: List<YuzTrack>, startIndex: Int) {
         if (startIndex !in list.indices) return
+        // #287: bitta ro'yxatda bir xil qo'shiqning turli kanal nusxalari
+        // ketma-ket chiqmasin; ijroga yaroqsiz (videoId ham, preview ham
+        // yo'q) qatorlar navbatga tushmasin.
+        val playable = YuzMusicRepository.dedupe(
+            list.filter { it.videoId.isNotBlank() || it.previewUrl.isNotBlank() }
+        )
+        val target = list[startIndex]
+        val start = playable.indexOfFirst { it.id == target.id && it.videoId == target.videoId }
+        if (start < 0) return
         val p = ensurePlayer(context)
-        val first = (startIndex - 75).coerceAtLeast(0)
-        val bounded = list.drop(first).take(150)
-        val idx = startIndex - first
+        val first = (start - 75).coerceAtLeast(0)
+        val bounded = playable.drop(first).take(150)
+        val idx = start - first
         queueTracks = bounded
         queueGen++
         seenIds.clear()
-        for (t in bounded) seenIds.add(t.id)
+        for (t in bounded) {
+            seenIds.add(t.id)
+            rememberSignature(t)
+        }
         YuzYouTubeApi.resetRotation()
         Log.i(TAG, "playQueue n=${bounded.size} start=$idx vid=${bounded.getOrNull(idx)?.videoId}")
         setPreparing(true)
@@ -500,7 +529,10 @@ object YuzMusicEngine {
     fun enqueue(context: Context, track: YuzTrack): Boolean {
         val p = ensurePlayer(context)
         // #133: takroriy qator "qo'shildi" deb yolg'on xabar bermasin.
+        // #287: boshqa kanaldagi bir xil qo'shiq ham takror hisoblanadi.
+        if (queueTracks.any { YuzMusicRepository.sameSong(it, track) }) return false
         if (!seenIds.add(track.id)) return false
+        rememberSignature(track)
         val item = buildItem(track)
         if (p.currentMediaItem == null) {
             queueTracks = listOf(track)
@@ -852,31 +884,16 @@ object YuzMusicEngine {
 
     // ---------------------------------------------------------------- radio
 
-    private val TITLE_BRACKETS = Regex("\\([^)]*\\)|\\[[^]]*]")
-    private val TITLE_NOISE = Regex(
-        "\\b(official|video|audio|lyrics?|lyric|music|clip|premyera|premiere|hd|hq|4k|remix|cover|live|slowed|reverb)\\b"
-    )
-    private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")
-
-    /** Qo'shiq nomi kaliti — (Official Video), [lyrics], remix kabi qo'shimchalarsiz. */
-    private fun titleKey(title: String): String =
-        TITLE_NOISE.replace(TITLE_BRACKETS.replace(title.lowercase(), " "), " ")
-            .replace(NON_WORD, " ")
-            .trim()
-
-    /** Ijrochi kaliti — "Artist - Topic" kanal nomi ham bir xil kalitga tushsin. */
-    private fun artistKey(artist: String): String =
-        NON_WORD.replace(artist.lowercase().replace("- topic", " "), " ")
-            .trim()
-
     /**
-     * YuzGram #98: navbatni uzluksiz to'ldirish. Zanjir (#117):
+     * YuzGram #98: navbatni uzluksiz to'ldirish. Zanjir (#117, #287):
+     *  0) YouTube avto-radio — joriy trekka eng yaqin "keyingi" qatorlar
+     *     (janr, kayfiyat, o'xshash ijrochilar),
      *  1) ijrochining boshqa qo'shiqlari (o'xshash),
      *  2) ijrochi + qo'shiq nomi (qidiruvga eng yaqin natijalar),
-     *  3) aylanadigan hit hovuzi — o'zbekcha eng ko'p eshitilgan va
+     *  3) Deezer o'xshash ijrochilar grafi — nomlar seed bo'ladi,
+     *  4) aylanadigan hit hovuzi — o'zbekcha eng ko'p eshitilgan va
      *     rus xitlari almashinib,
-     *  4) tinglov tarixi — foydalanuvchi eng ko'p eshitgan ijrochi va
-     *     qo'shiqlar seed'lari.
+     *  5) tinglov tarixi — eng ko'p eshitgan ijrochi va qo'shiqlar.
      *
      * #223 — TAKROR BO'LMASIN: barcha seed natijalari bitta hovuzga yig'iladi,
      * keyin tanlov qatlami qo'llanadi:
@@ -898,8 +915,9 @@ object YuzMusicEngine {
         extendAttempts++
         val anchor = currentTrack() ?: queueTracks.lastOrNull()
         val artist = anchor?.artist?.trim().orEmpty()
-        val anchorArtist = artistKey(artist)
-        val anchorTitle = titleKey(anchor?.title.orEmpty())
+        val anchorArtist = YuzMusicRepository.artistKey(artist)
+        val anchorTitle = anchor?.let { YuzMusicRepository.titleSignature(it) }.orEmpty()
+        val anchorVid = anchor?.videoId.orEmpty()
         val baseSeeds = ArrayList<String>()
         if (artist.isNotEmpty()) baseSeeds.add(artist)
         if (artist.isNotEmpty() && anchor != null) baseSeeds.add((artist + " " + anchor.title).trim())
@@ -923,25 +941,50 @@ object YuzMusicEngine {
                     val s = a + " qoshiklari"
                     if (s !in seeds) seeds.add(s)
                 }
-                YuzListenStats.topTracks(appCtx, 1).firstOrNull { titleKey(it) != anchorTitle }
+                YuzListenStats.topTracks(appCtx, 1)
+                    .firstOrNull { YuzMusicRepository.titleSignature(it) != anchorTitle }
                     ?.let { if (it !in seeds) seeds.add(it) }
+            }
+
+            // #287: Deezer "o'xshash ijrochilar" grafi — nomlar seed bo'ladi.
+            // To'liq treklar baribir YouTube shlyuzidan olinadi.
+            if (artist.isNotBlank()) {
+                val related = runCatching { YuzMusicRepository.relatedArtistNames(artist, 5) }
+                    .getOrDefault(emptyList())
+                for (r in related) {
+                    if (r !in seeds) seeds.add(r)
+                }
+                if (related.isNotEmpty()) Log.i(TAG, "extendQueue related=$related")
             }
             Log.i(TAG, "extendQueue seeds=$seeds attempt=$extendAttempts")
 
-            // Oxirgi 40 qator: takrorlanmaslik mezoni shu ro'yxatga qarab.
+            // #287: takrorlanmaslik mezoni — sessiya davomida eshitilgan
+            // barcha imzolar + oxirgi 40 qator + ijrochi kalitlari.
             val recent = queueTracks.takeLast(40)
-            val usedTitles = HashSet<String>()
+            val usedTitles = HashSet<String>(recentSigs)
             val knownArtists = HashSet<String>()
             for (t in recent) {
-                titleKey(t.title).takeIf { it.isNotEmpty() }?.let { usedTitles.add(it) }
-                artistKey(t.artist).takeIf { it.isNotEmpty() }?.let { knownArtists.add(it) }
+                YuzMusicRepository.titleSignature(t).takeIf { it.isNotEmpty() }?.let { usedTitles.add(it) }
+                YuzMusicRepository.artistKey(t.artist).takeIf { it.isNotEmpty() }?.let { knownArtists.add(it) }
             }
             if (anchorTitle.isNotEmpty()) usedTitles.add(anchorTitle)
+            if (anchorArtist.isNotEmpty()) knownArtists.add(anchorArtist)
 
-            // 1) Hovuz: barcha seed natijalari (filtr keyin qo'llanadi).
-            val pool = ArrayList<YuzTrack>()
+            // 1) Hovuz: avval YouTube avto-radio (janr/kayfiyat bo'yicha eng
+            // yaqin "keyingi" qatorlar), keyin seed natijalari. Radio tartibi
+            // SAQLANADI (birinchi qatorlar eng mos), seed qismi aralashtiriladi.
+            val radioPool = ArrayList<YuzTrack>()
+            if (anchorVid.isNotBlank()) {
+                val radioList = runCatching { YuzYouTubeApi.radio(anchorVid, 40) }
+                    .getOrDefault(emptyList())
+                for (t in radioList) {
+                    if (YuzMusicRepository.longEnough(t)) radioPool.add(t)
+                }
+                Log.i(TAG, "extendQueue radio=${radioList.size}")
+            }
+            val seedPool = ArrayList<YuzTrack>()
             var i = 0
-            while (pool.size < 100 && i < seeds.size) {
+            while (radioPool.size + seedPool.size < 100 && i < seeds.size) {
                 val q = seeds[i++]
                 // #115: gateway izlanuvlisi istisno otsa butun ip crash
                 // bo'lardi — har urinish alohida qalq ostida.
@@ -951,18 +994,27 @@ object YuzMusicEngine {
                 for (t in more) {
                     if (t.videoId.isBlank() && t.previewUrl.isBlank()) continue
                     if (!YuzMusicRepository.longEnough(t)) continue
-                    pool.add(t)
+                    seedPool.add(t)
                 }
             }
-            pool.shuffle()
+            seedPool.shuffle()
+            val pool = ArrayList<YuzTrack>(radioPool.size + seedPool.size)
+            pool.addAll(radioPool)
+            pool.addAll(seedPool)
 
             // 2) Tanlov qatlami — nom takrori taqiqlangan, ijrochi cheklangan.
             val batchArtists = HashMap<String, Int>()
             fun accept(t: YuzTrack, maxPerArtist: Int, onlyNewArtist: Boolean): Boolean {
                 if (appended.size >= 10) return false
-                val k = artistKey(t.artist)
-                val tk = titleKey(t.title)
-                if (tk.isNotEmpty() && usedTitles.contains(tk)) return false
+                val k = YuzMusicRepository.artistKey(t.artist)
+                val tk = YuzMusicRepository.titleSignature(t)
+                // #287: sessiya imzolari bilan xira (fuzzy) solishtirish —
+                // boshqa kanaldagi "Sokin tun (Official Video)" o'tib ketmasin.
+                if (tk.isNotEmpty() &&
+                    usedTitles.any { YuzMusicRepository.titleSignaturesConflict(it, tk) }
+                ) return false
+                if (queueTracks.any { YuzMusicRepository.sameSong(it, t) }) return false
+                if (appended.any { YuzMusicRepository.sameSong(it, t) }) return false
                 if (onlyNewArtist && k.isNotEmpty() && knownArtists.contains(k)) return false
                 val n = if (k.isEmpty()) 0 else (batchArtists[k] ?: 0)
                 if (n >= maxPerArtist) return false
@@ -991,7 +1043,7 @@ object YuzMusicEngine {
             Log.i(
                 TAG,
                 "extendQueue picked=" + appended.size + " pool=" + pool.size +
-                    " artists=" + appended.map { artistKey(it.artist) }.distinct().size
+                    " artists=" + appended.map { YuzMusicRepository.artistKey(it.artist) }.distinct().size
             )
             ui.post {
                 // #115: post tanasidagi istisno bevosita process crash bo'ladi —
@@ -1015,6 +1067,7 @@ object YuzMusicEngine {
                     }
                     val p = player ?: return@post
                     extendAttempts = 0
+                    for (t in appended) rememberSignature(t)
                     queueTracks = queueTracks + appended
                     val startIndex = p.mediaItemCount
                     p.addMediaItems(appended.map { buildItem(it) })
