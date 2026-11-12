@@ -521,8 +521,41 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             when {
                 list == null -> setStatus(R.string.musiqa_error)
                 list.isEmpty() -> setStatus(R.string.musiqa_empty)
-                else -> setStatus(R.string.musiqa_results)
+                else -> {
+                    setStatus(R.string.musiqa_results)
+                    // #294: faqat so'ralgan qo'shiq/ijrochining qatorlari
+                    // chiqib qolmasin — ro'yxat oxiriga o'xshash qo'shiqlar
+                    // fonda qo'shiladi (YouTube avto-miks + Deezer graf).
+                    loadSimilar(list.firstOrNull { it.videoId.isNotBlank() } ?: list.first())
+                }
             }
+        }
+    }
+
+    /**
+     * #294: qidiruv natijalariga O'XSHASH qatorlar. Aniq natijalar darhol
+     * ko'rsatiladi, o'xshashlari esa fonda kelib ro'yxat oxiriga qo'shiladi —
+     * pagination (`moreRound`) va ijro navbati tegilmaydi.
+     */
+    private fun loadSimilar(anchor: YuzTrack) {
+        val generation = catalogGeneration
+        val exclude = HashSet(shownIds)
+        scope.launch {
+            val extra = try {
+                withContextIo { YuzMusicRepository.similar(anchor, exclude, 20) }
+            } catch (_: Exception) {
+                null
+            }
+            if (destroyed || generation != catalogGeneration) return@launch
+            if (extra.isNullOrEmpty()) return@launch
+            // dedupe birinchi uchraganni saqlaydi — shuning uchun mavjud
+            // ro'yxat qismi o'zgarmaydi, faqat yangi qatorlar qoladi.
+            val fresh = YuzMusicRepository.dedupe(catalogList + extra).drop(catalogList.size)
+            if (fresh.isEmpty()) return@launch
+            shownIds.addAll(fresh.map { it.id })
+            catalogList = catalogList + fresh
+            refreshDownloading()
+            setStatus(R.string.musiqa_results_similar)
         }
     }
 
@@ -664,10 +697,16 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
         val seeds = presetSeeds
         val exclude = HashSet(shownIds)
         val generation = catalogGeneration
+        // #294: qidiruvda har ikkinchi sahifa oxirgi ko'rinayotgan trekning
+        // "o'xshashlari" bilan davom etadi — ro'yxat bitta ijrochi atrofida
+        // aylanib qolmasin.
+        val chainAnchor = if (q != null && round % 2 == 1)
+            catalogList.lastOrNull { it.videoId.isNotBlank() } else null
         scope.launch {
             val more = try {
                 withContextIo {
                     when {
+                        chainAnchor != null -> YuzMusicRepository.similar(chainAnchor, exclude, 20)
                         q != null -> YuzMusicRepository.searchMore(q, exclude, round)
                         seeds != null -> YuzMusicRepository.preset(seeds, exclude, 20)
                         else -> YuzMusicRepository.chartMore(exclude)
@@ -682,7 +721,9 @@ class YuzMusicActivity(private val initialQuery: String? = null) : BaseFragment(
             updateLoadingVisibility()
             if (generation != catalogGeneration) return@launch
             if (more.isNullOrEmpty()) {
-                if (more != null) moreAvailable = false
+                // "O'xshashlar" sahifasi bo'sh chiqsa — keyingi urinishda
+                // so'rov variantlari sinaladi; to'xtatish faqat undan keyin.
+                if (more != null && !(q != null && round % 2 == 1)) moreAvailable = false
             } else {
                 shownIds.addAll(more.map { it.id })
                 catalogList = YuzMusicRepository.dedupe(catalogList + more)

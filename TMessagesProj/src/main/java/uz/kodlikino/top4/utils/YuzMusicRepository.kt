@@ -225,6 +225,38 @@ object YuzMusicRepository {
         return out.values.toList()
     }
 
+    /**
+     * #294: ANIQ qo'shiqqa o'xshash qatorlar. searchMore'dan farqi — u
+     * so'rovga " 2026"/" remix" qo'shib YANA o'sha qo'shiqni qaytaradi;
+     * bu esa YouTube watch-next avto-miksidan (janr/kayfiyat/o'xshash
+     * ijrochilar bo'yicha eng yaqin) oladi, keyin Deezer o'xshash
+     * ijrochilar grafi bilan to'ldiriladi. Ya'ni "qidirilgan odamning
+     * qo'shiqlari" doirasi buziladi.
+     */
+    fun similar(anchor: YuzTrack, exclude: Set<Long>, limit: Int = 20): List<YuzTrack> {
+        val out = LinkedHashMap<Long, YuzTrack>()
+        if (anchor.videoId.isNotBlank()) {
+            val radio = runCatching { YuzYouTubeApi.radio(anchor.videoId, limit * 2) }
+                .getOrDefault(emptyList())
+            mergeInto(out, radio, exclude)
+        }
+        if (out.isEmpty()) {
+            val artist = anchor.artist.trim()
+            if (artist.isNotEmpty()) {
+                for (name in relatedArtistNames(artist, 3)) {
+                    if (out.size >= limit) break
+                    mergeInto(out, pull(name + " qoshiklari", 10), exclude)
+                }
+                // Radio ham, o'xshash ijrochilar ham bo'sh bo'lsa, hech
+                // bo'lmasa shu ijrochining boshqa qo'shiqlari chiqsin.
+                if (out.isEmpty()) {
+                    mergeInto(out, pull(artist + " qoshiklari", 15), exclude)
+                }
+            }
+        }
+        return out.values.filter { !sameSong(anchor, it) }.take(limit)
+    }
+
     /** Bitta seedni avval worker (tez), keyin to'g'ridan-to'g'ri YouTube'dan oladi. */
     private fun pull(seed: String, limit: Int): List<YuzTrack> {
         val gw = runCatching { YuzMusicGateway.search(seed, limit) }.getOrDefault(emptyList())

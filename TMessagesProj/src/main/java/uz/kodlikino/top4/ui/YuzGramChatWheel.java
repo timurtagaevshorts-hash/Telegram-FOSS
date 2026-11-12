@@ -29,12 +29,12 @@ import org.telegram.messenger.R;
 import java.util.ArrayList;
 
 /**
- * YuzGram #93b: chat ro'yxati ustida suzuvchi PASTKI-O'NG shisha gumbaz
- * (maket bo'yicha) — filtr tugmalari doira yoyi bo'ylab teriladi, fokusdagi
- * dona kattalashib gradient ko'k bo'ladi, nomi donaning O'NG TOMONIDAGI
- * shisha pill ichida turadi. Barmoq vertikal suriladi; qo'yib yuborilganda
+ * YuzGram #93b/r59: chat ro'yxati ustida suzuvchi PASTKI-O'NG shisha
+ * kapsula — filtr tugmalari ELLIPS yoyi bo'ylab teriladi, fokusdagi dona
+ * kattalashib gradient ko'k bo'ladi, nomi donaning O'NG TOMONIDAGI shisha
+ * pill ichida turadi. Barmoq vertikal suriladi; qo'yib yuborilganda
  * inertsiya bilan eng yaqin tugmaga qonadi. Chatlar ro'yxati bilan cheklan-
- * maydi — gumbaz shaffof, qatorlar ostidan erkin o'tadi.
+ * maydi — kapsula shaffof, qatorlar ostidan erkin o'tadi.
  *
  * Kontrakt oldingidek: setFilters/setListener/setCounterProvider/
  * setActionListener/setOnAddFolder — DialogsActivity tanlash mexanizmi
@@ -42,15 +42,24 @@ import java.util.ArrayList;
  */
 public class YuzGramChatWheel extends View {
 
-    /** Gumbaz o'rnini bosuvchi ustun kengligi (doira chekkadan chiqadi). */
-    public static final int WIDTH_DP = 120;
-    /** Ustun balandligi — gumbaz diametri nafasi bilan (ixchamlashtirildi). */
-    public static final int HEIGHT_DP = 184;
-    /** Shisha gumbaz radiusi; markazi o'ng chekkadan DOME_INSET_DP ichda. */
-    private static final float DOME_R_DP = 78f;
-    private static final float DOME_INSET_DP = 10f;
-    /** Donalar yuradigan aylana radiusi va qadam (rad/dona). */
-    private static final float ARC_R_DP = 52f;
+    /** Ustun kengligi (kapsula chekkadan chiqadi). */
+    public static final int WIDTH_DP = 132;
+    /** Ustun balandligi — r59: kapsula cho'zilgan (vertikal dok). */
+    public static final int HEIGHT_DP = 232;
+    /**
+     * r59: gumbaz o'rniga CHO'ZIQ shisha kapsula — chap qirrasi o'ng
+     * chekkadan PANEL_LEFT_DP ichda, o'ng tomoni ekran chetidan chiqib
+     * ketadi (devorga yopishgan dok kabi). Donalar ellips yoyi bo'ylab.
+     */
+    private static final float PANEL_LEFT_DP = 118f;
+    private static final float PANEL_OVERFLOW_DP = 18f;
+    private static final float PANEL_TOP_DP = 10f;
+    private static final float PANEL_BOTTOM_DP = 10f;
+    /** Yoy markazi — kapsulaning gorizontal markazi. */
+    private static final float ARC_CX_DP = (PANEL_LEFT_DP - PANEL_OVERFLOW_DP) / 2f;
+    /** Donalar yuradigan ellips yarim o'qlari va qadam (rad/dona). */
+    private static final float ARC_RX_DP = 50f;
+    private static final float ARC_RY_DP = 62f;
     private static final float ARC_STEP = 0.5f;
     /** Fokusdan necha dona uzoqda dona butunlay yo'qoladi. */
     private static final float CULL_SLOTS = 3.2f;
@@ -75,9 +84,14 @@ public class YuzGramChatWheel extends View {
     private static final int COUNT_BG = 0xFF2AABEE;
     /** Son pill ustida QO'NG'IR oq emas: oq #2AABEE ustida 2.4:1, qorong'i 8:1. */
     private static final int COUNT_TEXT = 0xFF061424;
-    /** Shisha panel: o'ngdan chapga suyuvchi to'lqin. */
-    private static final int PANEL_EDGE = 0x591B3A5C;
-    private static final int PANEL_ARC = 0x4038B6FF;
+    /** r59: kapsula korpusi — chuqur navy -> indigo -> tungi ko'k shisha. */
+    private static final int PANEL_TOP = 0x99102544;
+    private static final int PANEL_MID = 0xB31C3A66;
+    private static final int PANEL_BOTTOM = 0x99102344;
+    /** r59: brend-ko'k qirra, tashqi yumshoq nur, oq shisha yorug'ligi. */
+    private static final int RIM = 0x8C38B6FF;
+    private static final int GLOW_OUT = 0x2638B6FF;
+    private static final int SHEEN = 0x3D8FD8FF;
 
     public static final int ACTION_COMPOSE = 0;
     public static final int ACTION_CAMERA = 1;
@@ -136,6 +150,11 @@ public class YuzGramChatWheel extends View {
     private LinearGradient activeShader;
     private LinearGradient bigShader;
     private LinearGradient smallShader;
+    /** r59: kapsula korpusi/qirrasi shaderlari — o'lcham o'zgarsa qayta quriladi. */
+    private LinearGradient panelShader;
+    private RadialGradient sheenShader;
+    private LinearGradient bevelShader;
+    private float panelShaderKey = Float.MIN_VALUE;
     private float shaderCx = Float.MIN_VALUE, shaderCy = Float.MIN_VALUE, shaderR = Float.MIN_VALUE;
     private float bigShaderCx = Float.MIN_VALUE, bigShaderCy = Float.MIN_VALUE;
     private float smallShaderCx = Float.MIN_VALUE, smallShaderCy = Float.MIN_VALUE;
@@ -302,8 +321,8 @@ public class YuzGramChatWheel extends View {
         return n;
     }
 
-    /** Doira yoyi: d=0 fokus — gumbazning eng chap nuqtasi; |d| ortsa dona
-     *  yoy bo'ylab tepa/pastga o'ralib, ekran chekkasiga qaytadi. */
+    /** Ellips yoyi: d=0 fokus — kapsulaning chap chekkasi; |d| ortsa dona
+     *  yoy bo'ylab tepa/pastga o'ralib, kapsula ichida qaytadi. */
     private boolean itemCenter(int slot, float[] out) {
         float d = slot - pos;
         float ad = Math.abs(d);
@@ -312,10 +331,10 @@ public class YuzGramChatWheel extends View {
         }
         float f = ad / CULL_SLOTS;
         float th = d * ARC_STEP;
-        float cx = getWidth() - dp(DOME_INSET_DP);
+        float cx = getWidth() - dp(ARC_CX_DP);
         float cy = getHeight() / 2f;
-        out[0] = cx - dp(ARC_R_DP) * (float) Math.cos(th);
-        out[1] = cy + dp(ARC_R_DP) * (float) Math.sin(th);
+        out[0] = cx - dp(ARC_RX_DP) * (float) Math.cos(th);
+        out[1] = cy + dp(ARC_RY_DP) * (float) Math.sin(th);
         out[2] = 1f - 0.30f * f;                 // masshtab
         out[3] = 1f - 0.85f * f;                 // shaffoflik
         return true;
@@ -374,25 +393,59 @@ public class YuzGramChatWheel extends View {
         canvas.restore();
     }
 
-    /** Pastki-o'ngdagi shisha gumbaz — maketdagi suzuvchi kabina: ichi tiniq,
-     *  chekkasi halqa nur bilan yozilgan; qatorlar ustidan shaffof o'tadi. */
+    /**
+     * r59: pastki-o'ngdagi CHO'ZIQ shisha kapsula — chat ro'yxati ustida
+     * suzuvchi vertikal dok. Chap tomoni yumaloq qopqoq, o'ng tomoni ekran
+     * chetidan chiqib ketadi; ichi navy->indigo gradient, qirrasi brend-ko'k
+     * nur va yuqori chapdan tushgan oq shisha yorug'ligi.
+     */
     private void drawPanel(Canvas canvas) {
-        float cx = getWidth() - dp(DOME_INSET_DP);
-        float cy = getHeight() / 2f;
-        float R = dp(DOME_R_DP);
-        RadialGradient dome = new RadialGradient(cx - R * 0.2f, cy - R * 0.2f, R * 1.25f,
-                new int[]{0x1A2A4A72, PANEL_EDGE, 0x0D0C1E33},
-                new float[]{0f, 0.72f, 1f}, Shader.TileMode.CLAMP);
-        fillPaint.setShader(dome);
-        canvas.drawCircle(cx, cy, R, fillPaint);
+        float left = getWidth() - dp(PANEL_LEFT_DP);
+        float right = getWidth() + dp(PANEL_OVERFLOW_DP);
+        float top = dp(PANEL_TOP_DP);
+        float bottom = getHeight() - dp(PANEL_BOTTOM_DP);
+        float w = right - left;
+        float h = bottom - top;
+        float rr = Math.min(w, h) / 2f;
+
+        float key = getWidth() * 1000f + getHeight();
+        if (panelShader == null || panelShaderKey != key) {
+            panelShader = new LinearGradient(left, top, left + w * 0.75f, bottom,
+                    new int[]{PANEL_TOP, PANEL_MID, PANEL_BOTTOM},
+                    new float[]{0f, 0.52f, 1f}, Shader.TileMode.CLAMP);
+            sheenShader = new RadialGradient(left + dp(34f), top + dp(46f), rr * 1.55f,
+                    new int[]{SHEEN, 0x148FD8FF, 0x008FD8FF},
+                    new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP);
+            bevelShader = new LinearGradient(0f, top, 0f, top + dp(72f),
+                    new int[]{0x59FFFFFF, 0x00FFFFFF}, null, Shader.TileMode.CLAMP);
+            panelShaderKey = key;
+        }
+
+        // tashqi yumshoq nur — kapsula shisha ichida emas, havoda turgandek
+        strokePaint.setColor(GLOW_OUT);
+        strokePaint.setStrokeWidth(dp(7f));
+        rect.set(left - dp(2f), top - dp(2f), right, bottom + dp(2f));
+        canvas.drawRoundRect(rect, rr + dp(2f), rr + dp(2f), strokePaint);
+
+        // korpus
+        rect.set(left, top, right, bottom);
+        fillPaint.setShader(panelShader);
+        canvas.drawRoundRect(rect, rr, rr, fillPaint);
+        // yuqori-chap yorug'lik qatlami
+        fillPaint.setShader(sheenShader);
+        canvas.drawRoundRect(rect, rr, rr, fillPaint);
         fillPaint.setShader(null);
-        // Halqa: ingichka ko'k qirra + tashqarida yumshoq nur.
-        strokePaint.setColor(PANEL_ARC);
-        strokePaint.setStrokeWidth(dp(1.3f));
-        canvas.drawCircle(cx, cy, R, strokePaint);
-        strokePaint.setColor(0x1438B6FF);
-        strokePaint.setStrokeWidth(dp(5f));
-        canvas.drawCircle(cx, cy, R + dp(3.5f), strokePaint);
+
+        // brend-ko'k qirra
+        strokePaint.setColor(RIM);
+        strokePaint.setStrokeWidth(dp(1.4f));
+        canvas.drawRoundRect(rect, rr, rr, strokePaint);
+        // ichki oq bevel — tepa qirrada oq shisha chizig'i
+        strokePaint.setShader(bevelShader);
+        strokePaint.setStrokeWidth(dp(1.1f));
+        rect.inset(dp(1.2f), dp(1.2f));
+        canvas.drawRoundRect(rect, Math.max(0f, rr - dp(1.2f)), Math.max(0f, rr - dp(1.2f)), strokePaint);
+        strokePaint.setShader(null);
         strokePaint.setStrokeWidth(dp(1.4f));
     }
 
@@ -935,9 +988,9 @@ public class YuzGramChatWheel extends View {
         return -1;
     }
 
-    /** Bir dona vertikal oralig'i (px) — surish koeffitsienti (yoy bo'yi). */
+    /** Bir dona vertikal oralig'i (px) — surish koeffitsienti (ellips yoyi). */
     private float spacingPx() {
-        return dp(ARC_R_DP) * ARC_STEP;
+        return dp(ARC_RY_DP) * ARC_STEP;
     }
 
     private boolean composeHit(float x, float y) {
@@ -981,12 +1034,12 @@ public class YuzGramChatWheel extends View {
                 if (topTabsMode || slotCount() == 0) {
                     return false;
                 }
-                // Gumbaz doirasi TASHQARISIDagi urishlar o'tib ketadi: ostdagi
+                // Kapsula TASHQARISidagi urishlar o'tib ketadi: ostdagi
                 // chat qatorlari to'liq kenglikda bosiladigan bo'lib qoladi.
-                float rdx = ex - (getWidth() - dp(DOME_INSET_DP));
-                float rdy = ey - getHeight() / 2f;
-                float rr = dp(DOME_R_DP + 4f);
-                if (rdx * rdx + rdy * rdy > rr * rr) {
+                float panelLeft = getWidth() - dp(PANEL_LEFT_DP) - dp(6f);
+                float panelTop = dp(PANEL_TOP_DP) - dp(6f);
+                float panelBottom = getHeight() - dp(PANEL_BOTTOM_DP) + dp(6f);
+                if (ex < panelLeft || ex > getWidth() || ey < panelTop || ey > panelBottom) {
                     return false;
                 }
                 if (getParent() != null) {

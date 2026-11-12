@@ -5,6 +5,8 @@
     <string name="musiqa_search">Qidirish</string>
     <string name="musiqa_trending">Ommabop xitlar</string>
     <string name="musiqa_results">Natijalar</string>
+    <!-- r59: qidiruv natijalariga o'xshash qo'shiqlar ham qo'shilganda -->
+    <string name="musiqa_results_similar">Natijalar + o\'xshash qo\'shiqlar</string>
     <string name="musiqa_empty">Natija topilmadi. Boshqacha yozib ko\'ring.</string>
     <string name="musiqa_loading">Qidirilmoqda…</string>
     <string name="musiqa_error">Aloqa yo\'q yoki xatolik — qayta urinib ko\'ring</string>

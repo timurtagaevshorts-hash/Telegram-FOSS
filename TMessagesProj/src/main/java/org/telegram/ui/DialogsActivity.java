@@ -604,6 +604,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     // YuzGram #85: gildirak OSTIDagi doimiy qidiruv satri ("Qidirish" pill'i +
     // filtr doirasi) va chat ro'yxati ORQASidagi nebula fon.
     private uz.kodlikino.top4.ui.YuzGramSearchBar yuzSearchBar;
+    // YuzGram r58: kun/tun almashtirgichi — qidiruv pill'i qatorining o'ng chetida.
+    private uz.kodlikino.top4.ui.YuzGramThemeToggle yuzThemeToggle;
     private uz.kodlikino.top4.ui.YuzGramNebula yuzNebula;
     // YuzGram: admin panelidan joylangan reklama banneri — qidiruv pill'i
     // ostida, chatlar ro'yxati boshlanishida turadi.
@@ -2966,6 +2968,51 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         return yuzSearchBarTopMargin() + uz.kodlikino.top4.ui.YuzGramSearchBar.height() + dp(8);
     }
 
+    /** YuzGram r58: kun/tun tugmasi qidiruv pill'i bilan vertikal markazlashadi. */
+    private int yuzThemeToggleTopMargin() {
+        return yuzSearchBarTopMargin()
+                + (uz.kodlikino.top4.ui.YuzGramSearchBar.height()
+                - dp(uz.kodlikino.top4.ui.YuzGramThemeToggle.SIZE_DP)) / 2;
+    }
+
+    /**
+     * YuzGram r58: asosiy sahifadagi kun/tun tugmasi. Telegram'ning o'z
+     * juftligi (themeconfig: lastDayTheme/lastDarkTheme) bo'yicha almashadi —
+     * xuddi drawer'dagi quyosh tugmasi kabi, lekin aylana-reveal animatsiyasisiz
+     * (pos = null → joriy ekranga darhol qo'llanadi).
+     */
+    private void toggleYuzDayNight() {
+        android.content.SharedPreferences preferences = ApplicationLoader.applicationContext
+                .getSharedPreferences("themeconfig", android.content.Context.MODE_PRIVATE);
+        String dayThemeName = preferences.getString("lastDayTheme", "Blue");
+        if (Theme.getTheme(dayThemeName) == null || Theme.getTheme(dayThemeName).isDark()) {
+            dayThemeName = "Blue";
+        }
+        String nightThemeName = preferences.getString("lastDarkTheme", "Dark Blue");
+        if (Theme.getTheme(nightThemeName) == null || !Theme.getTheme(nightThemeName).isDark()) {
+            nightThemeName = "Dark Blue";
+        }
+        Theme.ThemeInfo themeInfo = Theme.getActiveTheme();
+        if (themeInfo == null) {
+            return;
+        }
+        if (dayThemeName.equals(nightThemeName)) {
+            if (themeInfo.isDark() || dayThemeName.equals("Dark Blue") || dayThemeName.equals("Night")) {
+                dayThemeName = "Blue";
+            } else {
+                nightThemeName = "Dark Blue";
+            }
+        }
+        boolean toDark = dayThemeName.equals(themeInfo.getKey());
+        Theme.ThemeInfo target = Theme.getTheme(toDark ? nightThemeName : dayThemeName);
+        if (target == null || target == themeInfo) {
+            return;
+        }
+        Theme.turnOffAutoNight(this);
+        NotificationCenter.getGlobalInstance().postNotificationName(
+                NotificationCenter.needSetDayNightTheme, target, false, null, -1);
+    }
+
     /** Banner ko'rinadigan bo'lsa ro'yxat egallashi kerak bo'lgan qo'shimcha balandlik. */
     private int yuzChatAdHeight() {
         if (!yuzChatAdBound) {
@@ -3102,6 +3149,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (yuzSearchBar != null) {
             yuzSearchBar.setVisibility(wantVisibility);
         }
+        if (yuzThemeToggle != null) {
+            yuzThemeToggle.setVisibility(wantVisibility);
+        }
         if (yuzChatAd != null) {
             yuzChatAd.setVisibility(visible && yuzChatAdBound ? View.VISIBLE : View.GONE);
         }
@@ -3158,6 +3208,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (blp != null && blp.topMargin != barTop) {
                 blp.topMargin = barTop;
                 yuzSearchBar.setLayoutParams(blp);
+            }
+        }
+        if (yuzThemeToggle != null) {
+            FrameLayout.LayoutParams tlp = (FrameLayout.LayoutParams) yuzThemeToggle.getLayoutParams();
+            int themeTop = yuzThemeToggleTopMargin();
+            if (tlp != null && tlp.topMargin != themeTop) {
+                tlp.topMargin = themeTop;
+                yuzThemeToggle.setLayoutParams(tlp);
             }
         }
         if (yuzTopTabs != null) {
@@ -5738,7 +5796,20 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     uz.kodlikino.top4.ui.YuzGramSearchBar.height(),
                     Gravity.LEFT | Gravity.TOP);
             sbLp.topMargin = yuzSearchBarTopMargin();
+            // YuzGram r58: pill o'ng chetida kun/tun almashtirgichi turadi —
+            // pill kengligi shunga mos qisqaradi.
+            sbLp.rightMargin = dp(50);
             contentView.addView(yuzSearchBar, sbLp);
+            yuzThemeToggle = new uz.kodlikino.top4.ui.YuzGramThemeToggle(context);
+            yuzThemeToggle.setContentDescription(getString(R.string.yuz_theme_toggle));
+            yuzThemeToggle.setOnClickListener(v -> toggleYuzDayNight());
+            FrameLayout.LayoutParams themeLp = new FrameLayout.LayoutParams(
+                    dp(uz.kodlikino.top4.ui.YuzGramThemeToggle.SIZE_DP),
+                    dp(uz.kodlikino.top4.ui.YuzGramThemeToggle.SIZE_DP),
+                    Gravity.RIGHT | Gravity.TOP);
+            themeLp.rightMargin = dp(14);
+            themeLp.topMargin = yuzThemeToggleTopMargin();
+            contentView.addView(yuzThemeToggle, themeLp);
             // YuzGram: reklama banneri — qidiruv pill'i bilan chatlar orasida.
             // Balandlik ekran kengligiga qarab (YuzAdBannerView.onMeasure), shu
             // sabab ro'yxat padding'i ham yuzChatHeaderBottom() orqali moslashadi.
@@ -5820,7 +5891,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     android.content.res.ColorStateList.valueOf(0x402AABEE), toggleBg, null));
             FrameLayout.LayoutParams togLp = new FrameLayout.LayoutParams(dp(44), dp(44),
                     Gravity.RIGHT | Gravity.BOTTOM);
-            togLp.rightMargin = dp(10);
+            // r59: kapsula markazi (W - ARC_CX) ustida turadi.
+            togLp.rightMargin = dp(60);
             togLp.bottomMargin = yuzChatRailBottomMargin()
                     + uz.kodlikino.top4.ui.YuzGramChatWheel.height() - dp(6);
             yuzTabsToggle.setOnTouchListener((view, event) -> {
