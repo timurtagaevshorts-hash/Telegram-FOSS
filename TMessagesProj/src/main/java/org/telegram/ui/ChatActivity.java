@@ -853,6 +853,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     private boolean hasBotsCommands;
     private boolean hasQuickReplies;
     private boolean hasBotWebView;
+    private final HashSet<Long> requestedBotMenuButton = new HashSet<>();
     private long chatEnterTime;
     private long chatLeaveTime;
 
@@ -2711,6 +2712,10 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 
         if (chatMode == 0) {
             if (userId != 0 && currentUser.bot) {
+                TLRPC.UserFull cachedFull = getMessagesController().getUserFull(userId);
+                if (cachedFull == null || cachedFull.bot_info == null) {
+                    getMessagesController().loadFullUser(currentUser, classGuid, true);
+                }
                 AndroidUtilities.runOnUIThread(()-> getMediaDataController().loadBotInfo(userId, userId, true, classGuid));
             } else if (chatInfo instanceof TLRPC.TL_chatFull) {
                 for (int a = 0; a < chatInfo.participants.participants.size(); a++) {
@@ -21718,6 +21723,20 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                         TLRPC.User bot = getMessagesController().getUser(info.user_id);
                         hasBotWebView = bot != null && bot.bot_menu_webview;
                         chatActivityEnterView.updateBotWebView(true);
+                        if ((info.menu_button == null || info.menu_button instanceof TLRPC.TL_botMenuButtonDefault) && requestedBotMenuButton.add(info.user_id)) {
+                            TLRPC.TL_bots_getBotMenuButton req = new TLRPC.TL_bots_getBotMenuButton();
+                            req.user_id = getMessagesController().getInputUser(info.user_id);
+                            getConnectionsManager().sendRequest(req, (response, error) -> {
+                                if (response instanceof TLRPC.TL_botMenuButton) {
+                                    TLRPC.TL_botMenuButton button = (TLRPC.TL_botMenuButton) response;
+                                    AndroidUtilities.runOnUIThread(() -> {
+                                        info.menu_button = button;
+                                        getMediaDataController().putBotInfo(info.user_id, info);
+                                        getNotificationCenter().postNotificationName(NotificationCenter.botInfoDidLoad, info, classGuid);
+                                    });
+                                }
+                            });
+                        }
                     }
                 }
                 updateBotButtons();
