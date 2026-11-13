@@ -18,13 +18,13 @@ import org.telegram.ui.ActionBar.Theme;
  */
 public class YuzGramApkToggle extends View {
 
-    private static final int ON = 0xFF9738FF;
+    private static final int ON = 0xFFE0245E;
     private static final int OFF = 0xFF7A8794;
     private static final int ON_TEXT = 0xFFF3E8FF;
     private static final int OFF_TEXT = 0xFFA7B4C2;
 
     // Kunduzgi mavzu: oq-ko'k pill, to'q matn — oq fonda ko'rinadi.
-    private static final int ON_LIGHT = 0xFF852AEE;
+    private static final int ON_LIGHT = 0xFFC2185B;
     private static final int OFF_LIGHT = 0xFF7E8A99;
     private static final int ON_TEXT_LIGHT = 0xFF1E242E;
     private static final int OFF_TEXT_LIGHT = 0xFF7E8A99;
@@ -70,14 +70,14 @@ public class YuzGramApkToggle extends View {
             offIconColor = OFF;
             textColor = ON_TEXT;
             offTextColor = OFF_TEXT;
-            fillColor = 0x2E9738FF;
+            fillColor = 0x2EE0245E;
             offFillColor = 0x1A7A8794;
         } else {
             iconColor = ON_LIGHT;
             offIconColor = OFF_LIGHT;
             textColor = ON_TEXT_LIGHT;
             offTextColor = OFF_TEXT_LIGHT;
-            fillColor = 0x1F852AEE;
+            fillColor = 0x1FC2185B;
             offFillColor = 0x0D000000;
         }
     }

@@ -3,7 +3,7 @@
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <gradient
         android:startColor="@color/yuz_action"
-        android:centerColor="#BD42F5"
+        android:centerColor="#E0245E"
         android:endColor="@color/yuz_decor"
         android:angle="135" />
     <stroke android:width="@dimen/yuz_stroke" android:color="@color/yuz_stroke_gold" />

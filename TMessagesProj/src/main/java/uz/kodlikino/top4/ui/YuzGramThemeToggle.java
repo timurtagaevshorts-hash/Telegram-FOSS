@@ -26,24 +26,17 @@ public class YuzGramThemeToggle extends View {
 
     public static final int SIZE_DP = 40;
 
-    private static final int PANEL_CENTER_DARK = 0xFF3D1B56;
-    private static final int PANEL_EDGE_DARK = 0xFF14081D;
-    private static final int RING_DARK = 0x66852AEE;
-    private static final int GLOW_DARK = 0x2E9738FF;
+    private static final int PANEL_CENTER_DARK = 0xFF3A1220;
+    private static final int PANEL_EDGE_DARK = 0xFF12070C;
+    private static final int RING_DARK = 0x66C2185B;
+    private static final int GLOW_DARK = 0x2EE0245E;
     private static final int PRESS_DARK = 0x26FFFFFF;
-
-    private static final int PANEL_CENTER_LIGHT = 0xFFFFFFFF;
-    private static final int PANEL_EDGE_LIGHT = 0xFFECDCF8;
-    private static final int RING_LIGHT = 0x33CE5BF9;
-    private static final int GLOW_LIGHT = 0x26852AEE;
-    private static final int PRESS_LIGHT = 0x14000000;
 
     /** Quyosh — iliq oltin; yarim oy — sovuq kumush-ko'k. */
     private static final int SUN_CORE_TOP = 0xFFFFE6A8;
     private static final int SUN_CORE_BOTTOM = 0xFFFFA63D;
     private static final int SUN_RAY = 0xFFFFC86B;
-    private static final int MOON_DARK = 0xFFEDD6FF;
-    private static final int MOON_LIGHT = 0xFF603D78;
+    private static final int MOON_DARK = 0xFFF4E3EA;
 
     private final Paint panelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -113,23 +106,22 @@ public class YuzGramThemeToggle extends View {
         float cy = h / 2f;
         float r = Math.min(w, h) / 2f - AndroidUtilities.dp(0.5f);
 
-        // Tashqi yumshoq nur — doira "suzib turadi", tekis nishon emas.
+        // r61: ilova foni doim qora — panel doim qorong'i shisha.
         glowPaint.setShader(new RadialGradient(cx, cy, r * 1.45f,
-                dark ? GLOW_DARK : GLOW_LIGHT, 0, Shader.TileMode.CLAMP));
+                GLOW_DARK, 0, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, r * 1.45f, glowPaint);
         glowPaint.setShader(null);
 
         panelPaint.setShader(new RadialGradient(cx, cy - r * 0.35f, r * 1.55f,
-                dark ? PANEL_CENTER_DARK : PANEL_CENTER_LIGHT,
-                dark ? PANEL_EDGE_DARK : PANEL_EDGE_LIGHT, Shader.TileMode.CLAMP));
+                PANEL_CENTER_DARK, PANEL_EDGE_DARK, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, r, panelPaint);
         panelPaint.setShader(null);
 
-        ringPaint.setColor(dark ? RING_DARK : RING_LIGHT);
+        ringPaint.setColor(RING_DARK);
         canvas.drawCircle(cx, cy, r, ringPaint);
 
         if (isPressed()) {
-            pressPaint.setColor(dark ? PRESS_DARK : PRESS_LIGHT);
+            pressPaint.setColor(PRESS_DARK);
             canvas.drawCircle(cx, cy, r, pressPaint);
         }
 
@@ -172,12 +164,12 @@ public class YuzGramThemeToggle extends View {
         moonPath.op(moonCutPath, Path.Op.DIFFERENCE);
 
         glyphPaint.setStyle(Paint.Style.FILL);
-        glyphPaint.setColor(Theme.isCurrentThemeDark() ? MOON_DARK : MOON_LIGHT);
+        glyphPaint.setColor(MOON_DARK);
         canvas.drawPath(moonPath, glyphPaint);
         glyphPaint.setStyle(Paint.Style.STROKE);
 
         float starR = AndroidUtilities.dp(1.7f);
-        glyphPaint.setColor(Theme.isCurrentThemeDark() ? SUN_RAY : MOON_LIGHT);
+        glyphPaint.setColor(SUN_RAY);
         drawStar(canvas, cx + r * 0.44f, cy - r * 0.50f, starR);
         drawStar(canvas, cx + r * 0.30f, cy + r * 0.52f, starR * 0.72f);
     }

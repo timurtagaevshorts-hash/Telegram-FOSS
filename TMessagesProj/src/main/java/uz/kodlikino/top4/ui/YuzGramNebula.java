@@ -19,22 +19,22 @@ import org.telegram.ui.ActionBar.Theme;
  * Nurlar ATALADIGAN yorug'lik emas, past alfa bilan chiziladi — chat qatorlari
  * matnining kontrast (4.5:1) shu fon ustida ham saqlanishi uchun.
  *
- * Palitra joriy Telegram mavzusiga bog'langan: tungi mavzuda chuqur ko'm-ko'k,
- * kunduzgi mavzuda oq-sovuq ko'k yuvindi — baza mavzuga mos bo'ladi.
+ * r61: baza HAR IKKALA mavzuda ham to'liq qora (#000000); ustidagi nurlar
+ * esa to'q pushti brendning past alfa yuvindisi.
  */
 public class YuzGramNebula extends View implements NotificationCenter.NotificationCenterDelegate {
 
-    private static final int DARK_BASE_TOP = 0xFF230D30;
-    private static final int DARK_BASE_BOTTOM = 0xFF13071A;
-    private static final int DARK_GLOW_VIOLET = 0x33CE5BF9;
-    private static final int DARK_GLOW_CYAN = 0x2E852AEE;
-    private static final int DARK_GLOW_AZURE = 0x249738FF;
+    private static final int DARK_BASE_TOP = 0xFF000000;
+    private static final int DARK_BASE_BOTTOM = 0xFF000000;
+    private static final int DARK_GLOW_VIOLET = 0x33FF5C93;
+    private static final int DARK_GLOW_CYAN = 0x2EC2185B;
+    private static final int DARK_GLOW_AZURE = 0x24E0245E;
 
-    private static final int LIGHT_BASE_TOP = 0xFFFFFFFF;
-    private static final int LIGHT_BASE_BOTTOM = 0xFFF8EDFF;
-    private static final int LIGHT_GLOW_VIOLET = 0x1FCE5BF9;
-    private static final int LIGHT_GLOW_CYAN = 0x1C852AEE;
-    private static final int LIGHT_GLOW_AZURE = 0x179738FF;
+    private static final int LIGHT_BASE_TOP = 0xFF000000;
+    private static final int LIGHT_BASE_BOTTOM = 0xFF000000;
+    private static final int LIGHT_GLOW_VIOLET = 0x1FFF5C93;
+    private static final int LIGHT_GLOW_CYAN = 0x1CC2185B;
+    private static final int LIGHT_GLOW_AZURE = 0x17E0245E;
 
     private final Paint basePaint = new Paint();
     private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);

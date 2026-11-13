@@ -5,8 +5,8 @@
     android:shape="rectangle">
     <gradient
         android:angle="270"
-        android:endColor="#120B17"
-        android:startColor="#25182F" />
+        android:endColor="#0A0407"
+        android:startColor="#2A0F18" />
     <stroke
         android:width="@dimen/yuz_stroke"
         android:color="@color/yuz_stroke_soft" />

@@ -5,6 +5,6 @@
     <corners android:radius="@dimen/yuz_radius_card" />
     <gradient
         android:angle="225"
-        android:startColor="#26852AEE"
-        android:endColor="#001D1225" />
+        android:startColor="#26C2185B"
+        android:endColor="#001A0B12" />
 </shape>

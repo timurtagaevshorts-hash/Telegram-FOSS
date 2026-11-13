@@ -18,10 +18,9 @@ import org.telegram.messenger.MessagesController
 import org.telegram.messenger.R
 
 /**
- * YuzGram r57: chats sahifasidagi filtrlar uchun YUQORI tab qatori
- * (eski Telegram uslubi) — gumbaz o'rniga ishlatiladi. Ranglar ilovaning
- * shisha-ko'k tili bilan mos: tanlangan chip brend gradientida, qolganlari
- * qidiruv pill'i bilan bir xil shisha ohangda.
+ * YuzGram r61: chats sahifasidagi filtrlar uchun YUQORI tab qatori
+ * (Telegram uslubi). Faol chip to'q pushti gradientda oq yozuv bilan,
+ * qolganlari qora fonda shisha chip — qidiruv pill'i bilan bir tilda.
  */
 class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
 
@@ -64,7 +63,6 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
     private var selected = 0
 
     private val accent = ContextCompat.getColor(context, R.color.yuz_action)
-    private val dark = org.telegram.ui.ActionBar.Theme.isCurrentThemeDark()
 
     init {
         isHorizontalScrollBarEnabled = false
@@ -195,21 +193,9 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
             badge.background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = dpf(9f)
-                setColor(
-                    when {
-                        active -> 0x40FFFFFF
-                        dark -> 0x33852AEE
-                        else -> 0x1F852AEE
-                    }
-                )
+                setColor(if (active) 0xFF6E0E33.toInt() else 0x33C2185B)
             }
-            badge.setTextColor(
-                when {
-                    active -> 0xFF11061C.toInt()
-                    dark -> 0xFFB87CF5.toInt()
-                    else -> 0xFF852AEE.toInt()
-                }
-            )
+            badge.setTextColor(if (active) 0xFFFFFFFF.toInt() else 0xFFE38CA9.toInt())
         }
 
         fun setActive(value: Boolean, animate: Boolean) {
@@ -233,34 +219,21 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
         }
 
         private fun applyColors(value: Boolean) {
+            // r61: ilova foni doim qora — chip ham doim qorong'i shishada.
             background = if (value) {
                 GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
-                    0xFF9738FF.toInt(), accent
+                    accent, 0xFF8E0F45.toInt()
                 )).apply { cornerRadius = dpf(CHIP_R_DP) }
-            } else if (dark) {
-                GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
-                    0xCC3C1E52.toInt(), 0xCC2D143F.toInt()
-                )).apply {
-                    cornerRadius = dpf(CHIP_R_DP)
-                    setStroke(dp(1f), 0x4DAC6FE0)
-                }
             } else {
-                // Kunduzgi fon: oq-sovuq shisha chip, brend hoshiyasi.
                 GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
-                    0xF2FFFFFF.toInt(), 0xFFF8F1FD.toInt()
+                    0xCC3A1220.toInt(), 0xCC24080F.toInt()
                 )).apply {
                     cornerRadius = dpf(CHIP_R_DP)
-                    setStroke(dp(1f), 0x4DCE5BF9)
+                    setStroke(dp(1f), 0x4DCC4E7F)
                 }
             }
             title.setTextColor(
-                when {
-                    // Faol chip brend gradientida: to'q siyoh ham kun, ham tun
-                    // mavzusida 7.3:1 kontrast beradi.
-                    value -> 0xFF11061C.toInt()
-                    dark -> 0xFFC3A9D8.toInt()
-                    else -> 0xFF5B6878.toInt()
-                }
+                if (value) 0xFFFFFFFF.toInt() else 0xFFD3B7C3.toInt()
             )
             title.typeface = if (value) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
             applyBadge()

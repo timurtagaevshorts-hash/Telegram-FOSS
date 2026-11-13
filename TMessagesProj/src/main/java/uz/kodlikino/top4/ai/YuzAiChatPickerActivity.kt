@@ -471,7 +471,7 @@ class YuzAiChatPickerActivity : Activity() {
         )
         sendButton = TextView(this).apply {
             text = getString(R.string.ai_confirm_send)
-            // yuz_action (#852AEE) ustida oq matn 2.57:1 — pleyer tugmasidagi
+            // yuz_action (#C2185B) ustida oq matn 2.57:1 — pleyer tugmasidagi
             // kabi to'q siyoh 7.3:1 kontrast beradi.
             setTextColor(color(R.color.yuz_text_on_accent))
             textSize = 15f

@@ -58,7 +58,7 @@ class YuzPulseLoader @JvmOverloads constructor(
         val cx = w / 2f
         val cy = h / 2f
         sweep = if (w > 0 && h > 0) {
-            SweepGradient(cx, cy, intArrayOf(0x00852AEE, 0xFF852AEE.toInt(), 0xFFCE5BF9.toInt(), 0x00CE5BF9), null)
+            SweepGradient(cx, cy, intArrayOf(0x00C2185B, 0xFFC2185B.toInt(), 0xFFFF5C93.toInt(), 0x00FF5C93), null)
         } else null
     }
 
@@ -72,12 +72,12 @@ class YuzPulseLoader @JvmOverloads constructor(
         val breath = abs(sin((t * 2.0 * PI).toFloat()))
 
         // 1) nafas oluvchi halqa — kengayib xiralashadi
-        stroke.color = fade(0x66852AEE, 1f - breath)
+        stroke.color = fade(0x66C2185B, 1f - breath)
         stroke.strokeWidth = dp(1.4f)
         canvas.drawCircle(cx, cy, unit * (0.58f + 0.34f * breath), stroke)
 
         // 2) ekvalayzer tayoqchalari
-        fill.color = 0xFF852AEE.toInt()
+        fill.color = 0xFFC2185B.toInt()
         val bars = 5
         val barW = dp(3.2f)
         val gap = dp(2.4f)

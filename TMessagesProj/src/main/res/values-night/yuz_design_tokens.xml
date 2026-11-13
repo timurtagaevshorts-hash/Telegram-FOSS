@@ -7,26 +7,26 @@
 -->
 <resources>
 
-    <color name="yuz_action">#852AEE</color>
-    <color name="yuz_decor">#CE5BF9</color>
+    <color name="yuz_action">#C2185B</color>
+    <color name="yuz_decor">#FF5C93</color>
     <color name="yuz_on_action">#FFFFFF</color>
 
     <color name="yuz_text">#F4EDF8</color>
     <color name="yuz_text_bright">#FFFFFF</color>
-    <color name="yuz_text_secondary">#A9B6CC</color>
-    <color name="yuz_text_muted">#8C9BB2</color>
+    <color name="yuz_text_secondary">#C4AFBA</color>
+    <color name="yuz_text_muted">#9C8592</color>
     <color name="yuz_text_on_accent">#FFFFFF</color>
     <color name="yuz_text_on_accent_dim">#CCFFFFFF</color>
 
     <color name="yuz_bg">#000000</color>
-    <color name="yuz_surface">#170D1D</color>
-    <color name="yuz_surface_raised">#1D1225</color>
-    <color name="yuz_field">#1D1224</color>
-    <color name="yuz_stroke">#31203C</color>
+    <color name="yuz_surface">#12070C</color>
+    <color name="yuz_surface_raised">#1A0B12</color>
+    <color name="yuz_field">#160A0F</color>
+    <color name="yuz_stroke">#3A1220</color>
     <color name="yuz_stroke_soft">#1CFFFFFF</color>
     <color name="yuz_stroke_strong">#3DFFFFFF</color>
-    <color name="yuz_stroke_decor">#40CE5BF9</color>
-    <color name="yuz_stroke_action">#33852AEE</color>
+    <color name="yuz_stroke_decor">#40FF5C93</color>
+    <color name="yuz_stroke_action">#33C2185B</color>
 
     <color name="yuz_gold">#FFD84D</color>
     <color name="yuz_gold_deep">#F0A93B</color>
@@ -41,7 +41,7 @@
 
     <color name="yuz_scrim">#80000000</color>
     <color name="yuz_scrim_strong">#A6000000</color>
-    <color name="yuz_panel_elevated">#E61D1224</color>
+    <color name="yuz_panel_elevated">#E6160A0F</color>
     <color name="yuz_fill_ghost">#0DFFFFFF</color>
     <color name="yuz_on_media">#E6FFFFFF</color>
     <color name="yuz_on_media_dim">#CCFFFFFF</color>

@@ -104,7 +104,7 @@ object YuzPremiumGate {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = AndroidUtilities.dp(18f).toFloat()
-                colors = intArrayOf(0xFF9738FF.toInt(), 0xFFCE5BF9.toInt())
+                colors = intArrayOf(0xFFE0245E.toInt(), 0xFFFF5C93.toInt())
                 gradientType = GradientDrawable.LINEAR_GRADIENT
                 orientation = GradientDrawable.Orientation.LEFT_RIGHT
             }

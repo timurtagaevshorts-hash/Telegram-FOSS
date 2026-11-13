@@ -35,30 +35,17 @@ public class YuzGramSearchBar extends View {
     private static final float BTN_ZONE_DP = 46f;
     private static final float BTN_R_DP = 15f;
 
-    private static final int FILL_TOP_DARK = 0xCC3C1E52;
-    private static final int FILL_BOTTOM_DARK = 0xCC2D143F;
-    private static final int STROKE_DARK = 0x4DAC6FE0;
-    private static final int STROKE_PRESSED_DARK = 0x99C18FF0;
-    private static final int HINT_DARK = 0xFFC3A9D8;
-    private static final int LENS_DARK = 0xFFA57FC8;
-    private static final int SLIDER_DARK = 0xFFC69FE8;
-    private static final int KNOB_FILL_DARK = 0xFF210E2E;
+    private static final int FILL_TOP_DARK = 0xCC3A1220;
+    private static final int FILL_BOTTOM_DARK = 0xCC24080F;
+    private static final int STROKE_DARK = 0x4DCC4E7F;
+    private static final int STROKE_PRESSED_DARK = 0x99E56A92;
+    private static final int HINT_DARK = 0xFFD3B7C3;
+    private static final int LENS_DARK = 0xFFE38CA9;
+    private static final int SLIDER_DARK = 0xFFFF5C93;
+    private static final int KNOB_FILL_DARK = 0xFF2A0F18;
     private static final int PRESS_DARK = 0x1FFFFFFF;
-    private static final int SEPARATOR_DARK = 0x33AC6FE0;
-    private static final int SEPARATOR_ACTIVE_DARK = 0x66C18FF0;
-
-    // Kunduzgi mavzu: oq-sovuq shisha pill, to'q matn va brend aksenti.
-    private static final int FILL_TOP_LIGHT = 0xF2FFFFFF;
-    private static final int FILL_BOTTOM_LIGHT = 0xFFF8F1FD;
-    private static final int STROKE_LIGHT = 0x4DCE5BF9;
-    private static final int STROKE_PRESSED_LIGHT = 0x99CE5BF9;
-    private static final int HINT_LIGHT = 0xFF5B6878;
-    private static final int LENS_LIGHT = 0xFF5B6878;
-    private static final int SLIDER_LIGHT = 0xFF852AEE;
-    private static final int KNOB_FILL_LIGHT = 0xFFFFFFFF;
-    private static final int PRESS_LIGHT = 0x14000000;
-    private static final int SEPARATOR_LIGHT = 0x33CE5BF9;
-    private static final int SEPARATOR_ACTIVE_LIGHT = 0x66CE5BF9;
+    private static final int SEPARATOR_DARK = 0x33CC4E7F;
+    private static final int SEPARATOR_ACTIVE_DARK = 0x66E56A92;
 
     private static final int ZONE_NONE = 0;
     private static final int ZONE_SEARCH = 1;
@@ -112,38 +99,20 @@ public class YuzGramSearchBar extends View {
         applyThemeColors();
     }
 
-    /**
-     * Kunduzgi mavzuda shisha pill oq fonda ko'rinmay ketmasligi uchun
-     * ranglar juftligi joriy Telegram mavzusidan tanlanadi.
-     */
+    /** r61: ilova foni doim qora — shisha pill ham doim qorong'i juftlikda. */
     private void applyThemeColors() {
-        if (Theme.isCurrentThemeDark()) {
-            fillTopColor = FILL_TOP_DARK;
-            fillBottomColor = FILL_BOTTOM_DARK;
-            strokeColor = STROKE_DARK;
-            strokePressedColor = STROKE_PRESSED_DARK;
-            hintColor = HINT_DARK;
-            lensColor = LENS_DARK;
-            sliderColor = SLIDER_DARK;
-            knobFillColor = KNOB_FILL_DARK;
-            pressColor = PRESS_DARK;
-            separatorColor = SEPARATOR_DARK;
-            separatorActiveColor = SEPARATOR_ACTIVE_DARK;
-            hintIdleAlpha = 236;
-        } else {
-            fillTopColor = FILL_TOP_LIGHT;
-            fillBottomColor = FILL_BOTTOM_LIGHT;
-            strokeColor = STROKE_LIGHT;
-            strokePressedColor = STROKE_PRESSED_LIGHT;
-            hintColor = HINT_LIGHT;
-            lensColor = LENS_LIGHT;
-            sliderColor = SLIDER_LIGHT;
-            knobFillColor = KNOB_FILL_LIGHT;
-            pressColor = PRESS_LIGHT;
-            separatorColor = SEPARATOR_LIGHT;
-            separatorActiveColor = SEPARATOR_ACTIVE_LIGHT;
-            hintIdleAlpha = 255;
-        }
+        fillTopColor = FILL_TOP_DARK;
+        fillBottomColor = FILL_BOTTOM_DARK;
+        strokeColor = STROKE_DARK;
+        strokePressedColor = STROKE_PRESSED_DARK;
+        hintColor = HINT_DARK;
+        lensColor = LENS_DARK;
+        sliderColor = SLIDER_DARK;
+        knobFillColor = KNOB_FILL_DARK;
+        pressColor = PRESS_DARK;
+        separatorColor = SEPARATOR_DARK;
+        separatorActiveColor = SEPARATOR_ACTIVE_DARK;
+        hintIdleAlpha = 236;
         textPaint.setColor(hintColor);
         buildGlassShader();
         invalidate();

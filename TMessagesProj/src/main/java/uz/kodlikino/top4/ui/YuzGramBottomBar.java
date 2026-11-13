@@ -64,10 +64,10 @@ public class YuzGramBottomBar extends View {
     // lekin panel chegara bilan aniq ajralib turadi.
     private static final int GLASS_TOP = 0xD6281436;    // ~84%
     private static final int GLASS_BOTTOM = 0xF2160820; // ~95%
-    private static final int BORDER = 0x80852AEE;       // brend-ko'k neon border (#852AEE)
-    private static final int GLOW_BLUE = 0xAA852AEE;    // tashqi nur (#852AEE)
-    private static final int PILL_START = 0xFF9738FF;   // och-ko'k (rail ACTIVE_START)
-    private static final int PILL_END = 0xFFCE5BF9;     // brend indigo (rail ACTIVE_END)
+    private static final int BORDER = 0x80C2185B;       // brend-ko'k neon border (#C2185B)
+    private static final int GLOW_BLUE = 0xAAC2185B;    // tashqi nur (#C2185B)
+    private static final int PILL_START = 0xFFE0245E;   // och-ko'k (rail ACTIVE_START)
+    private static final int PILL_END = 0xFFFF5C93;     // brend indigo (rail ACTIVE_END)
     private static final int PILL_STROKE = 0x99CFA8FF; // pill ustidagi yorqin neon chet
     private static final int ICON_ACTIVE = 0xFFFFFFFF;  // faol ikon (pill ustida oq)
     private static final int ICON_IDLE = 0xFF8E9DBB;    // o'chiq ikon

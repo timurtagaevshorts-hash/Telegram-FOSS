@@ -147,8 +147,8 @@ object GamesCore {
     // ------------------------------------------------------------- avatars
 
     private val AVATAR_COLORS = intArrayOf(
-        0xFF852AEE.toInt(), // brand action
-        0xFFCE5BF9.toInt(), // brand decor
+        0xFFC2185B.toInt(), // brand action
+        0xFFFF5C93.toInt(), // brand decor
         0xFF8E38F8.toInt(),
         0xFF34D399.toInt(),
         0xFFF59E0B.toInt(),

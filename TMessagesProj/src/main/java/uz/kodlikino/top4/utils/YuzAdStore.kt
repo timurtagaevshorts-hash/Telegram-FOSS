@@ -44,7 +44,7 @@ object YuzAdStore {
     )
 
     val THEMES: List<AdTheme> = listOf(
-        AdTheme("brand", R.string.yuz_ad_theme_brand, 0xFF852AEE.toInt(), 0xFF5B1B96.toInt(), 0xFF852AEE.toInt()),
+        AdTheme("brand", R.string.yuz_ad_theme_brand, 0xFFC2185B.toInt(), 0xFF6E0E33.toInt(), 0xFFC2185B.toInt()),
         AdTheme("violet", R.string.yuz_ad_theme_violet, 0xFFEB5CF6.toInt(), 0xFF4C1D95.toInt(), 0xFFEB5CF6.toInt()),
         AdTheme("emerald", R.string.yuz_ad_theme_emerald, 0xFF10B981.toInt(), 0xFF065F46.toInt(), 0xFF10B981.toInt()),
         AdTheme("sunset", R.string.yuz_ad_theme_sunset, 0xFFFF8A3D.toInt(), 0xFFD9366B.toInt(), 0xFFFF8A3D.toInt()),

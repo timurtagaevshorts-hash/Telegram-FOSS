@@ -153,7 +153,7 @@ class YuzAdBannerView @JvmOverloads constructor(
                 AndroidUtilities.dp(14f), AndroidUtilities.dp(7f),
                 AndroidUtilities.dp(14f), AndroidUtilities.dp(7f)
             )
-            background = rounded(0xFF852AEE.toInt(), AndroidUtilities.dp(15f).toFloat())
+            background = rounded(0xFFC2185B.toInt(), AndroidUtilities.dp(15f).toFloat())
         }
         ctaRow.addView(cta, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
 

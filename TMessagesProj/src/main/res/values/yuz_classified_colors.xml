@@ -1,42 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  YuzGram "Elonlar" palitrasi — kunduzgi (Telegram light) ko'rinish.
-  Aksent bitta brend-ko'k (#852AEE, Telegram'ning o'z ko'ki = chat/Profil bilan mos),
-  ikkilamchi aksent — bitta brend indigo (#CE5BF9, ustundagi faol doiraning
-  ikkinchi yarmi), ilova bo'ylab boshqa binafsha ishlatilmaydi.
-  Qorong'i qiymatlar `values-night/yuz_classified_colors.xml` da.
+  YuzGram "Elonlar" palitrasi — r61 da butun ilova kabi TO'LIQ QORA fon.
+  Aksent bitta: to'q pushti (#C2185B); ikkilamchi bezak #FF5C93.
+  Ilova bo'ylab boshqa aksent ishlatilmaydi. Qorong'i qiymatlar
+  `values-night/yuz_classified_colors.xml` da.
 -->
 <resources>
-    <color name="text_primary">#1E242E</color>
-    <color name="text_secondary">#5B6878</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#C4AFBA</color>
 
     <!-- Brend aksentlari (bar bilan bitta) -->
-    <color name="primary">#852AEE</color>
-    <color name="home_accent">#852AEE</color>
-    <color name="home_accent_purple">#CE5BF9</color>
+    <color name="primary">#C2185B</color>
+    <color name="home_accent">#C2185B</color>
+    <color name="home_accent_purple">#FF5C93</color>
 
     <!-- Sirtlar -->
-    <color name="home_card">#FFFFFF</color>
-    <color name="modern_border">#E4E7EC</color>
-    <color name="modern_surface">#FFFFFF</color>
-    <color name="modern_surface_high">#F2F3F5</color>
-    <color name="surface_elevated">#FFFFFF</color>
+    <color name="home_card">#12070C</color>
+    <color name="modern_border">#33121F</color>
+    <color name="modern_surface">#000000</color>
+    <color name="modern_surface_high">#12070C</color>
+    <color name="surface_elevated">#1A0B12</color>
 
     <!-- Input maydonlari / kartalar -->
-    <color name="classified_field_bg">#F0F2F5</color>
-    <color name="classified_field_stroke">#1A000000</color>
-    <color name="classified_card_default_bg">#FFFFFF</color>
-    <color name="classified_card_default_stroke">#1A000000</color>
-    <color name="classified_price_gold">#C79400</color>
+    <color name="classified_field_bg">#160A0F</color>
+    <color name="classified_field_stroke">#26FFFFFF</color>
+    <color name="classified_card_default_bg">#170A11</color>
+    <color name="classified_card_default_stroke">#1CFFFFFF</color>
+    <color name="classified_price_gold">#FFD84D</color>
 
-    <color name="text_hint">#7E8A99</color>
+    <color name="text_hint">#9C8592</color>
     <color name="text_on_gold">#1A1A1A</color>
     <color name="white">#FFFFFFFF</color>
 
     <!-- Fond -->
-    <color name="home_bg">#FFFFFF</color>
-    <color name="chat_bg_top">#FFFFFF</color>
-    <color name="nav_chat_active">#CE5BF9</color>
+    <color name="home_bg">#000000</color>
+    <color name="chat_bg_top">#000000</color>
+    <color name="nav_chat_active">#FF5C93</color>
     <color name="telegram_white">#FFFFFF</color>
-    <color name="telegram_blue">#852AEE</color>
+    <color name="telegram_blue">#C2185B</color>
 </resources>
