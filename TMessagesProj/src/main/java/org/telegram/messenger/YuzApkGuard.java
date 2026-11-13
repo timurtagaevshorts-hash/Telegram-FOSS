@@ -1,31 +1,26 @@
 package org.telegram.messenger;
 
-import android.content.SharedPreferences;
 import android.text.TextUtils;
 
 import org.telegram.tgnet.TLRPC;
 
 /**
- * YuzGram #100: APK himoyasi — yangi o‘rnatishda yoqilgan holda keladi.
- * Yoqilganda chatdagi APK fayllar qizil belgilanadi va ochishdan oldin
- * tasdiq so‘raladi. Holat alohida SharedPreferences’da saqlanadi.
+ * YuzGram #100: APK himoyasi — chatdagi APK fayllar qizil belgilanadi va
+ * ochishdan oldin tasdiq so'raladi.
+ *
+ * r63: himoya DOIMIY YONIQ — foydalanuvchi o'chira olmaydi, shu sababli holat
+ * endi sozlamalarda saqlanmaydi.
  */
 public class YuzApkGuard {
 
-    private static final String FILE = "yuz_apk_guard";
-    private static final String KEY = "enabled";
     private static final String APK_MIME = "application/vnd.android.package-archive";
 
-    private static SharedPreferences prefs() {
-        return ApplicationLoader.applicationContext.getSharedPreferences(FILE, 0);
-    }
-
     public static boolean isEnabled() {
-        return prefs().getBoolean(KEY, true);
+        return true;
     }
 
+    /** Eski sozlama joylaridan chaqirilishi mumkin — endi hech narsa qilmaydi. */
     public static void setEnabled(boolean value) {
-        prefs().edit().putBoolean(KEY, value).apply();
     }
 
     public static boolean isApkFile(String fileName, String mimeType) {

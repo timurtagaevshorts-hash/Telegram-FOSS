@@ -9003,7 +9003,9 @@ public class MessagesController extends BaseController implements NotificationCe
         checkReadTasks();
 
         if (getUserConfig().isClientActivated()) {
-            if (!ignoreSetOnline && getConnectionsManager().getPauseTime() == 0 && ApplicationLoader.isScreenOn && !ApplicationLoader.mainInterfacePausedStageQueue) {
+            // r63: sharpa rejim — onlayn holat yuborilmaydi; pastdagi tarmoq
+            // tarmog'i "offline"ni bir marta yuboradi va shu holatda qoladi.
+            if (!ignoreSetOnline && !YuzGhostMode.isEnabled() && getConnectionsManager().getPauseTime() == 0 && ApplicationLoader.isScreenOn && !ApplicationLoader.mainInterfacePausedStageQueue) {
                 if (ApplicationLoader.mainInterfacePausedStageQueueTime != 0 && Math.abs(ApplicationLoader.mainInterfacePausedStageQueueTime - System.currentTimeMillis()) > 1000) {
                     if (statusSettingState != 1 && (lastStatusUpdateTime == 0 || Math.abs(System.currentTimeMillis() - lastStatusUpdateTime) >= 55000 || offlineSent)) {
                         statusSettingState = 1;
@@ -9832,6 +9834,12 @@ public class MessagesController extends BaseController implements NotificationCe
 
     public boolean sendTyping(long dialogId, long threadMsgId, int action, String emojicon, int classGuid) {
         if (action < 0 || action >= sendingTypings.length || dialogId == 0) {
+            return false;
+        }
+        // r63: sharpa rejim — "yozmoqda…" va yuklash harakatlari yuborilmaydi.
+        // Bekor qilish (action 2) o'tkaziladi, aks holda sherik tomonda abadiy
+        // "yozmoqda..." holati qolib ketadi.
+        if (action != 2 && YuzGhostMode.isEnabled()) {
             return false;
         }
         final long selfId = UserConfig.getInstance(UserConfig.selectedAccount).getClientUserId();

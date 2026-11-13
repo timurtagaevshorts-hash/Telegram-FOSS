@@ -79,12 +79,6 @@ object YuzAppUpdate {
             awaitingImmediate = false
             return
         }
-        if (available) {
-            // Yangilanish majburiy: yopilmaydigan darvoza oynasi ochiladi.
-            awaitingImmediate = false
-            YuzForceUpdate.applyPlayUpdate(activity, info.availableVersionCode())
-            return
-        }
         if (!info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
             awaitingImmediate = false
             return

@@ -15,7 +15,9 @@ import androidx.core.content.ContextCompat
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.LocaleController
 import org.telegram.messenger.MessagesController
+import org.telegram.messenger.NotificationCenter
 import org.telegram.messenger.R
+import org.telegram.ui.ActionBar.Theme
 
 /**
  * YuzGram r61: chats sahifasidagi filtrlar uchun YUQORI tab qatori
@@ -64,6 +66,11 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
 
     private val accent = ContextCompat.getColor(context, R.color.yuz_action)
 
+    /** r63: mavzu almashganda chip ranglari oq/qora juftlikka qayta bo'yaladi. */
+    private val themeObserver = NotificationCenter.NotificationCenterDelegate { id, _, _ ->
+        if (id == NotificationCenter.didSetNewTheme) chips.forEach { it.refreshTheme() }
+    }
+
     init {
         isHorizontalScrollBarEnabled = false
         overScrollMode = OVER_SCROLL_NEVER
@@ -72,6 +79,18 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
         addView(row)
         visibility = View.GONE
         isClickable = false
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        NotificationCenter.getGlobalInstance()
+            .addObserver(themeObserver, NotificationCenter.didSetNewTheme)
+    }
+
+    override fun onDetachedFromWindow() {
+        NotificationCenter.getGlobalInstance()
+            .removeObserver(themeObserver, NotificationCenter.didSetNewTheme)
+        super.onDetachedFromWindow()
     }
 
     fun bind(
@@ -181,21 +200,40 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
             applyBadge()
         }
 
+        /** Mavzu almashganda tashqi tomondan chaqiriladi — chip qayta bo'yaladi. */
+        fun refreshTheme() {
+            applyColors(active)
+        }
+
         /** Badge ranglari chip holatiga bog'liq — faol chip almashganda ham yangilanadi. */
         private fun applyBadge() {
             if (count <= 0) {
                 badge.visibility = View.GONE
                 return
             }
+            val dark = Theme.isCurrentThemeDark()
             badge.visibility = View.VISIBLE
             badge.text = if (count > 999) "999+" else count.toString()
             badge.setPadding(dp(5f), 0, dp(5f), 0)
             badge.background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = dpf(9f)
-                setColor(if (active) 0xFF6E0E33.toInt() else 0x33C2185B)
+                setColor(
+                    when {
+                        active && dark -> 0xFF6E0E33.toInt()
+                        active -> 0xFF7A0C33.toInt()
+                        dark -> 0x33C2185B
+                        else -> 0xFFFCE4F0.toInt()
+                    }
+                )
             }
-            badge.setTextColor(if (active) 0xFFFFFFFF.toInt() else 0xFFE38CA9.toInt())
+            badge.setTextColor(
+                when {
+                    active -> 0xFFFFFFFF.toInt()
+                    dark -> 0xFFE38CA9.toInt()
+                    else -> 0xFFC2185B.toInt()
+                }
+            )
         }
 
         fun setActive(value: Boolean, animate: Boolean) {
@@ -219,21 +257,33 @@ class YuzGramTopTabs(context: Context) : HorizontalScrollView(context) {
         }
 
         private fun applyColors(value: Boolean) {
-            // r61: ilova foni doim qora — chip ham doim qorong'i shishada.
+            // r63: kunduzgi mavzuda oq chip + to'q matn; tungida shisha chip.
+            val dark = Theme.isCurrentThemeDark()
             background = if (value) {
                 GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
                     accent, 0xFF8E0F45.toInt()
                 )).apply { cornerRadius = dpf(CHIP_R_DP) }
-            } else {
+            } else if (dark) {
                 GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
                     0xCC3A1220.toInt(), 0xCC24080F.toInt()
                 )).apply {
                     cornerRadius = dpf(CHIP_R_DP)
                     setStroke(dp(1f), 0x4DCC4E7F)
                 }
+            } else {
+                GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
+                    0xFFFFFFFF.toInt(), 0xFFFFF7FA.toInt()
+                )).apply {
+                    cornerRadius = dpf(CHIP_R_DP)
+                    setStroke(dp(1f), 0xFFEAD6DF.toInt())
+                }
             }
             title.setTextColor(
-                if (value) 0xFFFFFFFF.toInt() else 0xFFD3B7C3.toInt()
+                when {
+                    value -> 0xFFFFFFFF.toInt()
+                    dark -> 0xFFD3B7C3.toInt()
+                    else -> 0xFF3A2C33.toInt()
+                }
             )
             title.typeface = if (value) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
             applyBadge()

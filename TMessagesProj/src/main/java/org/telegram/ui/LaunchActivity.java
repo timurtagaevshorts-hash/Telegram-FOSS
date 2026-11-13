@@ -6217,7 +6217,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     @Override
     protected void onDestroy() {
         isActive = false;
-        uz.kodlikino.top4.utils.YuzForceUpdate.onActivityDestroyed(this);
         if (PhotoViewer.getPipInstance() != null) {
             PhotoViewer.getPipInstance().destroyPhotoViewer();
         }
@@ -6365,8 +6364,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         checkAppUpdate(false, null);
         // YuzGram: Play Market'da yangi versiya chiqqan bo'lsa yangilashni so'raymiz.
         uz.kodlikino.top4.utils.YuzAppUpdate.check(this);
-        // YuzGram: majburiy yangilash darvozasi — eski versiya ilovaga kira olmaydi.
-        uz.kodlikino.top4.utils.YuzForceUpdate.enforce(this);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             ApplicationLoader.canDrawOverlays = Settings.canDrawOverlays(this);

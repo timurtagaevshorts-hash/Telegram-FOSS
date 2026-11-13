@@ -9,6 +9,14 @@
     <string name="yuz_apk_guard_save">Saqlash</string>
     <string name="yuz_apk_guard_toggle">APK himoyasini yoqish yoki o‘chirish</string>
     <string name="yuz_apk_pill">APK himoya</string>
+    <string name="yuz_apk_guard_locked">Doimiy yoniq — o‘chirib bo‘lmaydi</string>
+    <!-- r63: sharpa (ghost) rejim -->
+    <string name="yuz_ghost_title">Xavfsizlik va maxfiylik</string>
+    <string name="yuz_ghost_label">Sharpa rejim</string>
+    <string name="yuz_ghost_desc">Sharpa rejim yoqilganda hech kim sizni onlayn ko‘rmaydi: holat va «yozmoqda…» yuborilmaydi. Xabarlar odatdagidek yetib boradi.</string>
+    <string name="yuz_ghost_on">Sharpa rejim yoqildi</string>
+    <string name="yuz_ghost_off">Sharpa rejim o‘chirildi</string>
+    <string name="yuz_ghost_toggle">Sharpa rejimni yoqish yoki o‘chirish</string>
     <string name="yuz_apk_badge">Ogoh bo‘ling</string>
     <string name="yuz_apk_badge_title">APK fayl xavfi</string>
     <string name="yuz_apk_badge_text">APK ilovani notanish manbadan yuklab olish shaxsiy ma’lumotlaringizga tahdid soladi. Iltimos, o‘z xavfsizligingizga befarq bo‘lmang.</string>

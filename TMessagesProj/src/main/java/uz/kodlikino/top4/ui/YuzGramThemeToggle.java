@@ -32,11 +32,21 @@ public class YuzGramThemeToggle extends View {
     private static final int GLOW_DARK = 0x2EE0245E;
     private static final int PRESS_DARK = 0x26FFFFFF;
 
+    // r63 kunduzgi juftlik: oq shisha panel, pushti halqa, to'q yarim oy.
+    private static final int PANEL_CENTER_LIGHT = 0xFFFFFFFF;
+    private static final int PANEL_EDGE_LIGHT = 0xFFF3E6EC;
+    private static final int RING_LIGHT = 0x66C2185B;
+    private static final int GLOW_LIGHT = 0x1FD81B60;
+    private static final int PRESS_LIGHT = 0x14000000;
+
     /** Quyosh — iliq oltin; yarim oy — sovuq kumush-ko'k. */
     private static final int SUN_CORE_TOP = 0xFFFFE6A8;
     private static final int SUN_CORE_BOTTOM = 0xFFFFA63D;
     private static final int SUN_RAY = 0xFFFFC86B;
-    private static final int MOON_DARK = 0xFFF4E3EA;
+    /** Oq panel ustidagi yarim oy — to'q, aks holda ko'rinmasdi. */
+    private static final int MOON_LIGHT = 0xFF3A2C33;
+    /** Oq panel ustidagi quyosh nurlari — to'q oltin (1.9:1 emas, o'qiladi). */
+    private static final int SUN_RAY_LIGHT = 0xFFB07300;
 
     private final Paint panelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -106,41 +116,42 @@ public class YuzGramThemeToggle extends View {
         float cy = h / 2f;
         float r = Math.min(w, h) / 2f - AndroidUtilities.dp(0.5f);
 
-        // r61: ilova foni doim qora — panel doim qorong'i shisha.
+        // r63: kunduzgi mavzuda oq shisha panel, tungida qorong'i.
         glowPaint.setShader(new RadialGradient(cx, cy, r * 1.45f,
-                GLOW_DARK, 0, Shader.TileMode.CLAMP));
+                dark ? GLOW_DARK : GLOW_LIGHT, 0, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, r * 1.45f, glowPaint);
         glowPaint.setShader(null);
 
         panelPaint.setShader(new RadialGradient(cx, cy - r * 0.35f, r * 1.55f,
-                PANEL_CENTER_DARK, PANEL_EDGE_DARK, Shader.TileMode.CLAMP));
+                dark ? PANEL_CENTER_DARK : PANEL_CENTER_LIGHT,
+                dark ? PANEL_EDGE_DARK : PANEL_EDGE_LIGHT, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, r, panelPaint);
         panelPaint.setShader(null);
 
-        ringPaint.setColor(RING_DARK);
+        ringPaint.setColor(dark ? RING_DARK : RING_LIGHT);
         canvas.drawCircle(cx, cy, r, ringPaint);
 
         if (isPressed()) {
-            pressPaint.setColor(PRESS_DARK);
+            pressPaint.setColor(dark ? PRESS_DARK : PRESS_LIGHT);
             canvas.drawCircle(cx, cy, r, pressPaint);
         }
 
         if (dark) {
-            drawSun(canvas, cx, cy);
+            drawSun(canvas, cx, cy, SUN_RAY);
         } else {
-            drawMoon(canvas, cx, cy, r);
+            drawMoon(canvas, cx, cy, r, MOON_LIGHT, SUN_RAY_LIGHT);
         }
     }
 
     /** Quyosh: iliq gradient yadro + sakkiz nur — "kunduzgi rejimga o'tish". */
-    private void drawSun(Canvas canvas, float cx, float cy) {
+    private void drawSun(Canvas canvas, float cx, float cy, int rayColor) {
         float coreR = iconR * 0.62f;
         corePaint.setShader(new RadialGradient(cx, cy - coreR * 0.5f, coreR * 1.6f,
                 SUN_CORE_TOP, SUN_CORE_BOTTOM, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, coreR, corePaint);
         corePaint.setShader(null);
 
-        glyphPaint.setColor(SUN_RAY);
+        glyphPaint.setColor(rayColor);
         float inner = iconR * 0.86f;
         float outer = iconR * 1.28f;
         for (int i = 0; i < 8; i++) {
@@ -152,7 +163,7 @@ public class YuzGramThemeToggle extends View {
     }
 
     /** Yarim oy + ikki yulduzcha — "tungi rejimga o'tish". */
-    private void drawMoon(Canvas canvas, float cx, float cy, float r) {
+    private void drawMoon(Canvas canvas, float cx, float cy, float r, int moonColor, int starColor) {
         float radius = iconR * 0.92f;
         moonOuter.set(cx - radius, cy - radius, cx + radius, cy + radius);
         moonCut.set(cx - radius * 0.30f, cy - radius * 1.34f,
@@ -164,12 +175,12 @@ public class YuzGramThemeToggle extends View {
         moonPath.op(moonCutPath, Path.Op.DIFFERENCE);
 
         glyphPaint.setStyle(Paint.Style.FILL);
-        glyphPaint.setColor(MOON_DARK);
+        glyphPaint.setColor(moonColor);
         canvas.drawPath(moonPath, glyphPaint);
         glyphPaint.setStyle(Paint.Style.STROKE);
 
         float starR = AndroidUtilities.dp(1.7f);
-        glyphPaint.setColor(SUN_RAY);
+        glyphPaint.setColor(starColor);
         drawStar(canvas, cx + r * 0.44f, cy - r * 0.50f, starR);
         drawStar(canvas, cx + r * 0.30f, cy + r * 0.52f, starR * 0.72f);
     }

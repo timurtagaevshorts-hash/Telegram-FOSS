@@ -10,6 +10,7 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.Theme;
 
@@ -25,7 +26,7 @@ import org.telegram.ui.ActionBar.Theme;
  * Nima uchun alohida View: Telegram'ning o'z qidiruvi action bar'dagi ikonkani
  * bosishni talab qiladi; bu yerda qidiruv doim ko'rinib turadigan maydon.
  */
-public class YuzGramSearchBar extends View {
+public class YuzGramSearchBar extends View implements NotificationCenter.NotificationCenterDelegate {
 
     /** Tasma balandligi: pill (38dp) + tepa/past nafasi — ixcham (maket #93b). */
     public static final int HEIGHT_DP = 46;
@@ -46,6 +47,19 @@ public class YuzGramSearchBar extends View {
     private static final int PRESS_DARK = 0x1FFFFFFF;
     private static final int SEPARATOR_DARK = 0x33CC4E7F;
     private static final int SEPARATOR_ACTIVE_DARK = 0x66E56A92;
+
+    // r63 kunduzgi juftlik: oq shisha pill, pushti ikonkalar, to'q hint.
+    private static final int FILL_TOP_LIGHT = 0xFFFFFFFF;
+    private static final int FILL_BOTTOM_LIGHT = 0xFFFDF6F9;
+    private static final int STROKE_LIGHT = 0x33C2185B;
+    private static final int STROKE_PRESSED_LIGHT = 0x99D81B60;
+    private static final int HINT_LIGHT = 0xFF6A5B62;
+    private static final int LENS_LIGHT = 0xFFC2185B;
+    private static final int SLIDER_LIGHT = 0xFFC2185B;
+    private static final int KNOB_FILL_LIGHT = 0xFFFFFFFF;
+    private static final int PRESS_LIGHT = 0x14000000;
+    private static final int SEPARATOR_LIGHT = 0x26C2185B;
+    private static final int SEPARATOR_ACTIVE_LIGHT = 0x66D81B60;
 
     private static final int ZONE_NONE = 0;
     private static final int ZONE_SEARCH = 1;
@@ -99,23 +113,57 @@ public class YuzGramSearchBar extends View {
         applyThemeColors();
     }
 
-    /** r61: ilova foni doim qora — shisha pill ham doim qorong'i juftlikda. */
+    /** r63: kunduzgi mavzuda oq shisha, tungida to'q shisha — bir xil pill. */
     private void applyThemeColors() {
-        fillTopColor = FILL_TOP_DARK;
-        fillBottomColor = FILL_BOTTOM_DARK;
-        strokeColor = STROKE_DARK;
-        strokePressedColor = STROKE_PRESSED_DARK;
-        hintColor = HINT_DARK;
-        lensColor = LENS_DARK;
-        sliderColor = SLIDER_DARK;
-        knobFillColor = KNOB_FILL_DARK;
-        pressColor = PRESS_DARK;
-        separatorColor = SEPARATOR_DARK;
-        separatorActiveColor = SEPARATOR_ACTIVE_DARK;
-        hintIdleAlpha = 236;
+        if (Theme.isCurrentThemeDark()) {
+            fillTopColor = FILL_TOP_DARK;
+            fillBottomColor = FILL_BOTTOM_DARK;
+            strokeColor = STROKE_DARK;
+            strokePressedColor = STROKE_PRESSED_DARK;
+            hintColor = HINT_DARK;
+            lensColor = LENS_DARK;
+            sliderColor = SLIDER_DARK;
+            knobFillColor = KNOB_FILL_DARK;
+            pressColor = PRESS_DARK;
+            separatorColor = SEPARATOR_DARK;
+            separatorActiveColor = SEPARATOR_ACTIVE_DARK;
+            hintIdleAlpha = 236;
+        } else {
+            fillTopColor = FILL_TOP_LIGHT;
+            fillBottomColor = FILL_BOTTOM_LIGHT;
+            strokeColor = STROKE_LIGHT;
+            strokePressedColor = STROKE_PRESSED_LIGHT;
+            hintColor = HINT_LIGHT;
+            lensColor = LENS_LIGHT;
+            sliderColor = SLIDER_LIGHT;
+            knobFillColor = KNOB_FILL_LIGHT;
+            pressColor = PRESS_LIGHT;
+            separatorColor = SEPARATOR_LIGHT;
+            separatorActiveColor = SEPARATOR_ACTIVE_LIGHT;
+            hintIdleAlpha = 255;
+        }
         textPaint.setColor(hintColor);
         buildGlassShader();
         invalidate();
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.didSetNewTheme);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.didSetNewTheme);
+        super.onDetachedFromWindow();
+    }
+
+    @Override
+    public void didReceivedNotification(int id, int account, Object... args) {
+        if (id == NotificationCenter.didSetNewTheme) {
+            applyThemeColors();
+        }
     }
 
     private void buildGlassShader() {

@@ -18,6 +18,7 @@ import android.view.animation.OvershootInterpolator;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ImageReceiver;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.UserConfig;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Components.AvatarDrawable;
@@ -62,21 +63,50 @@ public class YuzGramBottomBar extends View {
     // #286: bar endi fon bilan qo'shilib ketmaydi — ancha quyuq, to'yingan
     // tungi-ko'k shisha (taxminan 84% → 95%). Qatorlar ostidan xira ko'rinadi,
     // lekin panel chegara bilan aniq ajralib turadi.
-    private static final int GLASS_TOP = 0xD6281436;    // ~84%
-    private static final int GLASS_BOTTOM = 0xF2160820; // ~95%
-    private static final int BORDER = 0x80C2185B;       // brend-ko'k neon border (#C2185B)
-    private static final int GLOW_BLUE = 0xAAC2185B;    // tashqi nur (#C2185B)
-    private static final int PILL_START = 0xFFE0245E;   // och-ko'k (rail ACTIVE_START)
-    private static final int PILL_END = 0xFFFF5C93;     // brend indigo (rail ACTIVE_END)
-    private static final int PILL_STROKE = 0x99CFA8FF; // pill ustidagi yorqin neon chet
-    private static final int ICON_ACTIVE = 0xFFFFFFFF;  // faol ikon (pill ustida oq)
-    private static final int ICON_IDLE = 0xFF8E9DBB;    // o'chiq ikon
-    private static final int TEXT_ACTIVE = 0xFFF4E9FF;  // faol matn
-    // 10.5sp kichik matn — sirt ustida kamida 4.5:1 kerak (bu juftlikda ~6.3:1).
-    private static final int TEXT_IDLE = 0xFF8794AF;    // o'chiq matn
-    /** Profil avatari halqasi: faol — oq, aks holda xira ko'k-kul. */
+    // Tungi juftlik: to'q shisha panel + neon pushti chet.
+    private static final int GLASS_TOP_DARK = 0xD6281436;    // ~84%
+    private static final int GLASS_BOTTOM_DARK = 0xF2160820; // ~95%
+    private static final int BORDER_DARK = 0x80C2185B;
+    private static final int GLOW_DARK = 0xAAC2185B;
+    private static final int PILL_STROKE_DARK = 0x99CFA8FF;
+    private static final int ICON_IDLE_DARK = 0xFF8E9DBB;
+    private static final int TEXT_IDLE_DARK = 0xFF8794AF;
+    private static final int AVATAR_RING_IDLE_DARK = 0x4DBB9FD0;
+
+    // r63 kunduzgi juftlik: oq sutli shisha + to'q matn (matn 4.9:1).
+    private static final int GLASS_TOP_LIGHT = 0xF2FFFFFF;
+    private static final int GLASS_BOTTOM_LIGHT = 0xFFFFFFFF;
+    private static final int BORDER_LIGHT = 0x59C2185B;
+    private static final int GLOW_LIGHT = 0x4DD81B60;
+    private static final int PILL_STROKE_LIGHT = 0x66FFFFFF;
+    private static final int ICON_IDLE_LIGHT = 0xFF7C6C73;
+    private static final int TEXT_IDLE_LIGHT = 0xFF7C6C73;
+    private static final int AVATAR_RING_IDLE_LIGHT = 0x33C2185B;
+
+    // Faol pill — ikkala mavzuda bir xil brend gradienti, oq matn 8.9:1.
+    private static final int PILL_START = 0xFFC2185B;
+    private static final int PILL_END = 0xFFD81B60;
+    private static final int ICON_ACTIVE = 0xFFFFFFFF;
+    private static final int TEXT_ACTIVE = 0xFFFFFFFF;
     private static final int AVATAR_RING_ACTIVE = 0xFFFFFFFF;
-    private static final int AVATAR_RING_IDLE = 0x4DBB9FD0;
+
+    // Joriy mavzu qiymatlari — applyThemeColors() to'ldiradi.
+    private int glassTopColor;
+    private int glassBottomColor;
+    private int borderColor;
+    private int glowColor;
+    private int pillStrokeColor;
+    private int iconIdleColor;
+    private int textIdleColor;
+    private int avatarRingIdleColor;
+
+    /** Mavzu almashganda panel qayta bo'yaladi (oq <-> qora juftlik). */
+    private final NotificationCenter.NotificationCenterDelegate themeObserver =
+            (id, account, args) -> {
+                if (id == NotificationCenter.didSetNewTheme) {
+                    applyThemeColors();
+                }
+            };
 
     private final Paint surfacePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -176,6 +206,22 @@ public class YuzGramBottomBar extends View {
         setLayerType(LAYER_TYPE_SOFTWARE, null); // glow (setShadowLayer) uchun
         indicatorPos = activeTab;
         avatarReceiver.setDelegate((receiver, set, thumb, memCache) -> invalidate());
+        applyThemeColors();
+    }
+
+    private void applyThemeColors() {
+        boolean dark = org.telegram.ui.ActionBar.Theme.isCurrentThemeDark();
+        glassTopColor = dark ? GLASS_TOP_DARK : GLASS_TOP_LIGHT;
+        glassBottomColor = dark ? GLASS_BOTTOM_DARK : GLASS_BOTTOM_LIGHT;
+        borderColor = dark ? BORDER_DARK : BORDER_LIGHT;
+        glowColor = dark ? GLOW_DARK : GLOW_LIGHT;
+        pillStrokeColor = dark ? PILL_STROKE_DARK : PILL_STROKE_LIGHT;
+        iconIdleColor = dark ? ICON_IDLE_DARK : ICON_IDLE_LIGHT;
+        textIdleColor = dark ? TEXT_IDLE_DARK : TEXT_IDLE_LIGHT;
+        avatarRingIdleColor = dark ? AVATAR_RING_IDLE_DARK : AVATAR_RING_IDLE_LIGHT;
+        // Shisha gradienti mavzuga bog'liq — keshni tashlaymiz.
+        glassGrad = null;
+        invalidate();
     }
 
     /**
@@ -211,11 +257,15 @@ public class YuzGramBottomBar extends View {
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         avatarReceiver.onAttachedToWindow();
+        NotificationCenter.getGlobalInstance()
+                .addObserver(themeObserver, NotificationCenter.didSetNewTheme);
         updateAvatar();
     }
 
     @Override
     protected void onDetachedFromWindow() {
+        NotificationCenter.getGlobalInstance()
+                .removeObserver(themeObserver, NotificationCenter.didSetNewTheme);
         avatarReceiver.onDetachedFromWindow();
         super.onDetachedFromWindow();
     }
@@ -428,13 +478,13 @@ public class YuzGramBottomBar extends View {
                 panelRight + AndroidUtilities.dp(20), panelBottom + AndroidUtilities.dp(20), null);
 
         surfacePaint.setShader(glassGradient(panelTop, panelBottom));
-        surfacePaint.setShadowLayer(AndroidUtilities.dp(15), 0, AndroidUtilities.dp(2), GLOW_BLUE);
+        surfacePaint.setShadowLayer(AndroidUtilities.dp(15), 0, AndroidUtilities.dp(2), glowColor);
         canvas.drawRoundRect(panelRect, corner, corner, surfacePaint);
         surfacePaint.clearShadowLayer();
         surfacePaint.setShader(null);
 
         // border + tepadagi nozik yorug' chiziq (sirt "ustidagi" neon chiroyi)
-        borderPaint.setColor(BORDER);
+        borderPaint.setColor(borderColor);
         canvas.drawRoundRect(panelRect, corner, corner, borderPaint);
         highlightPaint.setColor(0x22FFFFFF);
         tmpRect.set(panelLeft + AndroidUtilities.dp(16), panelTop + AndroidUtilities.dp(0.6f),
@@ -460,7 +510,7 @@ public class YuzGramBottomBar extends View {
         canvas.drawRoundRect(pillRect, pillHalfH, pillHalfH, pillPaint);
         pillPaint.clearShadowLayer();
         pillPaint.setShader(null);
-        pillStrokePaint.setColor(PILL_STROKE);
+        pillStrokePaint.setColor(pillStrokeColor);
         canvas.drawRoundRect(pillRect, pillHalfH, pillHalfH, pillStrokePaint);
 
         // --- "pop" halqasi: tanlangan ikon atrofidan tarqaydi ---
@@ -478,8 +528,8 @@ public class YuzGramBottomBar extends View {
             float cx = slotCx[i];
 
             boolean bold = prox > 0.5f;
-            int iconColor = lerpColor(ICON_IDLE, ICON_ACTIVE, easeOut(prox));
-            int textColor = lerpColor(TEXT_IDLE, TEXT_ACTIVE, easeOut(prox));
+            int iconColor = lerpColor(iconIdleColor, ICON_ACTIVE, easeOut(prox));
+            int textColor = lerpColor(textIdleColor, TEXT_ACTIVE, easeOut(prox));
 
             float scale = (1f + 0.1f * prox) * squeeze;
             if (popTab == i && popAmount > 0.01f) {
@@ -501,7 +551,7 @@ public class YuzGramBottomBar extends View {
     private LinearGradient glassGradient(float top, float bottom) {
         if (glassGrad == null || glassTop != top || glassBottom != bottom || bottom <= top) {
             glassGrad = new LinearGradient(0f, top, 0f, bottom,
-                    GLASS_TOP, GLASS_BOTTOM, Shader.TileMode.CLAMP);
+                    glassTopColor, glassBottomColor, Shader.TileMode.CLAMP);
             glassTop = top;
             glassBottom = bottom;
         }
@@ -628,7 +678,7 @@ public class YuzGramBottomBar extends View {
                 avatarReceiver.draw(canvas);
                 iconPaint.setStyle(Paint.Style.STROKE);
                 iconPaint.setStrokeWidth(AndroidUtilities.dp(active ? 1.7f : 1.3f) * k);
-                iconPaint.setColor(active ? AVATAR_RING_ACTIVE : AVATAR_RING_IDLE);
+                iconPaint.setColor(active ? AVATAR_RING_ACTIVE : avatarRingIdleColor);
                 canvas.drawCircle(cx, cy, r - iconPaint.getStrokeWidth() / 2f, iconPaint);
                 break;
             }

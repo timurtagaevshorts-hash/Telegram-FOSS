@@ -7,6 +7,7 @@ import android.graphics.Path;
 import android.view.View;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.YuzApkGuard;
 import org.telegram.ui.ActionBar.Theme;
@@ -16,7 +17,7 @@ import org.telegram.ui.ActionBar.Theme;
  * palavrasi yonida. Qalqon + yozuv: ko‘k = himoya YOQILGAN, kulrang = O‘CHIQ.
  * Bosish holatni [org.telegram.ui.DialogsActivity]da dialog orqali boshqaradi.
  */
-public class YuzGramApkToggle extends View {
+public class YuzGramApkToggle extends View implements NotificationCenter.NotificationCenterDelegate {
 
     private static final int ON = 0xFFE0245E;
     private static final int OFF = 0xFF7A8794;
@@ -50,6 +51,7 @@ public class YuzGramApkToggle extends View {
 
     private boolean enabled = YuzApkGuard.isEnabled();
     private int width;
+    private int checkColor = 0xFF13061F;
 
     public YuzGramApkToggle(Context context) {
         super(context);
@@ -72,6 +74,7 @@ public class YuzGramApkToggle extends View {
             offTextColor = OFF_TEXT;
             fillColor = 0x2EE0245E;
             offFillColor = 0x1A7A8794;
+            checkColor = 0xFF13061F;
         } else {
             iconColor = ON_LIGHT;
             offIconColor = OFF_LIGHT;
@@ -79,6 +82,30 @@ public class YuzGramApkToggle extends View {
             offTextColor = OFF_TEXT_LIGHT;
             fillColor = 0x1FC2185B;
             offFillColor = 0x0D000000;
+            // Oq panelda qalqon #C2185B bilan to'ldiriladi — belgi OQ bo'lishi shart.
+            checkColor = 0xFFFFFFFF;
+        }
+        invalidate();
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        NotificationCenter.getGlobalInstance()
+                .addObserver(this, NotificationCenter.didSetNewTheme);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        NotificationCenter.getGlobalInstance()
+                .removeObserver(this, NotificationCenter.didSetNewTheme);
+        super.onDetachedFromWindow();
+    }
+
+    @Override
+    public void didReceivedNotification(int id, int account, Object... args) {
+        if (id == NotificationCenter.didSetNewTheme) {
+            applyThemeColors();
         }
     }
 
@@ -140,7 +167,7 @@ public class YuzGramApkToggle extends View {
         stroke.setStrokeWidth(AndroidUtilities.dp(1.4f) / scale);
         canvas.drawPath(shield, stroke);
         if (enabled) {
-            check.setColor(0xFF13061F);
+            check.setColor(checkColor);
             check.setStrokeWidth(AndroidUtilities.dp(2.6f) / scale);
             canvas.drawLine(0.3f, 0.52f, 0.45f, 0.67f, check);
             canvas.drawLine(0.45f, 0.67f, 0.72f, 0.36f, check);

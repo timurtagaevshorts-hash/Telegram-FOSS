@@ -67,6 +67,8 @@ public class YuzGramBrandMark extends View {
     private int statusBarHeight;
     private int barHeight; // action bar balandligi (status bar'siz)
     private float badgeSize = 30f;
+    /** r63: 0 — to'liq o'lcham, 1 — eng kichik. Skroll bilan DialogsActivity boshqaradi. */
+    private float shrink;
     /** Tor ekranlarda tagline action bar tugmalari bilan urishadi — shunda chizilmaydi. */
     private boolean showTagline = true;
     // Nur har kadrda yaratilmaydi: markaz (status bar + bar balandligi)
@@ -127,6 +129,20 @@ public class YuzGramBrandMark extends View {
         }
     }
 
+    /**
+     * r63: pin qilingan sarlavhada ro'yxat aylantirilganda wordmark kichrayadi
+     * (Telegram'ning collapsing title'i kabi) — 0 to'liq, 1 eng ixcham holat.
+     * View o'lchami o'zgarmaydi: faqat canvas masshtabi, shu sababli layout
+     * sakramaydi.
+     */
+    public void setShrink(float value) {
+        float k = Math.max(0f, Math.min(1f, value));
+        if (Math.abs(k - shrink) > 0.004f) {
+            shrink = k;
+            invalidate();
+        }
+    }
+
     public boolean isOffline() {
         return offline;
     }
@@ -178,6 +194,14 @@ public class YuzGramBrandMark extends View {
         float bx = AndroidUtilities.dp(16);
         float by = cx - badgeSize / 2f;
 
+        canvas.save();
+        // r63: siqilish nishon markazi atrofida — chap chekka joyida qoladi,
+        // o'ng tomondagi matn esa ixchamlashadi.
+        if (shrink > 0f) {
+            float s = 1f - 0.20f * shrink;
+            canvas.scale(s, s, bx + badgeSize / 2f, cx);
+        }
+
         if (shaderCy != cx) {
             shaderCy = cx;
             haloShader = new RadialGradient(bx + badgeSize / 2f, by + badgeSize * 0.62f,
@@ -218,11 +242,14 @@ public class YuzGramBrandMark extends View {
             wordPaint.setColor(wordPrimaryColor);
         }
 
-        // Tagline — palavrasining ostida, bir xil chap chetdan
+        // Tagline — palavrasining ostida, bir xil chap chetdan; siqilganda so'nadi
         if (showTagline) {
             Paint.FontMetrics tfm = tagPaint.getFontMetrics();
+            tagPaint.setAlpha((int) (255 * (1f - shrink)));
             float tagBaseline = blockTop + wordBand + tagBand / 2f - (tfm.ascent + tfm.descent) / 2f;
             canvas.drawText(tagText, tx, tagBaseline, tagPaint);
+            tagPaint.setAlpha(255);
         }
+        canvas.restore();
     }
 }

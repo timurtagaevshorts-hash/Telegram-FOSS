@@ -597,6 +597,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private uz.kodlikino.top4.ui.YuzGramBrandMark yuzBrandMark;
     // #100: APK himoyasi tugmasi — brend yonida, faqat asosiy chat ildizida.
     private uz.kodlikino.top4.ui.YuzGramApkToggle yuzApkToggle;
+    // r63: sharpa (ghost) rejim tugmasi — APK himoya pill'i chapida.
+    private uz.kodlikino.top4.ui.YuzGramGhostToggle yuzGhostToggle;
     // YuzGram #85: gildirak OSTIDagi doimiy qidiruv satri ("Qidirish" pill'i +
     // filtr doirasi) va chat ro'yxati ORQASidagi nebula fon.
     private uz.kodlikino.top4.ui.YuzGramSearchBar yuzSearchBar;
@@ -661,6 +663,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private float storiesYOffset;
     private float tabsYOffset;
     private float scrollAdditionalOffset;
+
+    /** r63: sarlavha pin qilingan — bu qiymat faqat wordmark siqilishini boshqaradi. */
+    private float yuzPinScroll;
+    private static final float YUZ_BRAND_SHRINK_DP = 34f;
 
     private int debugLastUpdateAction = -1;
     private boolean slowedReloadAfterDialogClick;
@@ -1824,39 +1830,83 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     lp.rightMargin = rightMargin;
                     yuzApkToggle.setLayoutParams(lp);
                 }
+                // r63: sharpa rejim tugmasi APK pill'i chapida turadi — pill
+                // kengligi o'lchangach joylashadi, shuning uchun har sync'da.
+                if (yuzGhostToggle != null) {
+                    boolean ghostOn = org.telegram.messenger.YuzGhostMode.isEnabled();
+                    if (yuzGhostToggle.isGhostEnabled() != ghostOn) {
+                        yuzGhostToggle.setGhostEnabled(ghostOn);
+                    }
+                    yuzGhostToggle.setTranslationY(actionBar.getTranslationY());
+                    yuzGhostToggle.setAlpha(a);
+                    yuzGhostToggle.setClickable(a > 0.5f);
+                    FrameLayout.LayoutParams glp = (FrameLayout.LayoutParams) yuzGhostToggle.getLayoutParams();
+                    if (glp != null) {
+                        int apkW = Math.max(yuzApkToggle.getMeasuredWidth(), dp(86));
+                        int ghostRight = rightMargin + apkW + dp(6);
+                        if (glp.rightMargin != ghostRight) {
+                            glp.rightMargin = ghostRight;
+                            yuzGhostToggle.setLayoutParams(glp);
+                        }
+                    }
+                }
             }
         }
     }
 
     /**
-     * #100: APK himoyasi dialogi — Yoqish/O'chirish tugmalari bilan.
-     * Holat YuzApkGuard'da (alohida prefs), ochish to'sig'i
-     * [AndroidUtilities.openForView]da tekshiriladi.
+     * #100 / r63: xavfsizlik dialogi. APK himoyasi endi DOIMIY yoniq va
+     * o'chirilmaydi — shuning uchun qulflangan holatda ko'rsatiladi; yonida
+     * "sharpa rejim" (ghost) almashtirgichi turadi: yoqilganda hech kim
+     * foydalanuvchini onlayn ko'rmaydi.
      */
     private void showYuzApkGuardDialog() {
-        android.widget.LinearLayout row = new android.widget.LinearLayout(getParentActivity());
-        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(22), dp(10), dp(22), dp(4));
-        android.widget.Switch guardSwitch = new android.widget.Switch(getParentActivity());
-        guardSwitch.setChecked(org.telegram.messenger.YuzApkGuard.isEnabled());
+        android.widget.LinearLayout column = new android.widget.LinearLayout(getParentActivity());
+        column.setOrientation(android.widget.LinearLayout.VERTICAL);
+        column.setPadding(dp(22), dp(12), dp(22), dp(4));
+
         TextView guardLabel = new TextView(getParentActivity());
         guardLabel.setText(getString(R.string.yuz_apk_guard_title));
         guardLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 16);
         guardLabel.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
-        row.addView(guardLabel, new android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        row.addView(guardSwitch, new android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
+        column.addView(guardLabel, new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView guardState = new TextView(getParentActivity());
+        guardState.setText(getString(R.string.yuz_apk_guard_locked));
+        guardState.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 13);
+        guardState.setTextColor(getThemedColor(Theme.key_dialogTextGray2));
+        column.addView(guardState, new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        android.widget.LinearLayout ghostRow = new android.widget.LinearLayout(getParentActivity());
+        ghostRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        ghostRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        ghostRow.setPadding(0, dp(16), 0, 0);
+        android.widget.Switch ghostSwitch = new android.widget.Switch(getParentActivity());
+        ghostSwitch.setChecked(org.telegram.messenger.YuzGhostMode.isEnabled());
+        TextView ghostLabel = new TextView(getParentActivity());
+        ghostLabel.setText(getString(R.string.yuz_ghost_label));
+        ghostLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 16);
+        ghostLabel.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
+        ghostRow.addView(ghostLabel, new android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        ghostRow.addView(ghostSwitch, new android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
+        column.addView(ghostRow);
+
         AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-        builder.setTitle(getString(R.string.yuz_apk_guard_title));
-        builder.setMessage(getString(R.string.yuz_apk_guard_desc));
-        builder.setView(row);
+        builder.setTitle(getString(R.string.yuz_ghost_title));
+        builder.setMessage(getString(R.string.yuz_ghost_desc));
+        builder.setView(column);
         builder.setPositiveButton(getString(R.string.yuz_apk_guard_save), (dialog, which) -> {
-            boolean on = guardSwitch.isChecked();
-            org.telegram.messenger.YuzApkGuard.setEnabled(on);
-            if (yuzApkToggle != null) {
-                yuzApkToggle.setEnabled(on);
+            boolean ghostOn = ghostSwitch.isChecked();
+            boolean changed = ghostOn != org.telegram.messenger.YuzGhostMode.isEnabled();
+            org.telegram.messenger.YuzGhostMode.setEnabled(ghostOn);
+            if (yuzGhostToggle != null) {
+                yuzGhostToggle.setGhostEnabled(ghostOn);
             }
-            Toast.makeText(getParentActivity(), getString(on ? R.string.yuz_apk_guard_on : R.string.yuz_apk_guard_off), Toast.LENGTH_SHORT).show();
+            if (changed) {
+                Toast.makeText(getParentActivity(), getString(ghostOn ? R.string.yuz_ghost_on : R.string.yuz_ghost_off), Toast.LENGTH_SHORT).show();
+            }
         });
         builder.setNegativeButton(getString(android.R.string.cancel), null);
         showDialog(builder.create());
@@ -2269,9 +2319,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 // YuzGram #93b: gumbaz reyka ENDI suzuvchi — chatlar ro'yxati
                 // butun kenglikda (maketdagi kabi), shisha gumbaz ostidan o'tadi.
                 if (yuzHeaderVisible()) {
-                    // YuzGram #95: header yashirilganda (scrollYOffset < 0) padding
-                    // ham shu qadar qisqaradi — pill bilan birga yuqoriga suriladi.
-                    int headerBottom = Math.max(0, yuzChatHeaderBottom() + (int) scrollYOffset);
+                    // r63: sarlavha pin qilingan — padding skrollga bog'lanmaydi,
+                    // qatorlar doim header chetidan boshlanadi va uning ortidan o'tadi.
+                    int headerBottom = yuzChatHeaderBottom();
                     if (headerBottom > t) {
                         t = headerBottom;
                     }
@@ -3019,13 +3069,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
      * YuzGram #102: qidiruv pill'ining HAQIQIY (skroll bilan surilgan) pastki
      * chetini beradi — dispatchDraw har kadrda shu qiymat bilan kesadi, shuning
      * uchun qatorlar pill ortiga bir kadrlik kechikish bilan ham chiqmaydi.
+     * r63: sarlavha pin qilingan — kesim endi doimiy (skrollga bog'lanmaydi),
+     * chat qatorlari shu chet ortidan sirg'alib o'tadi.
      */
     private int yuzLiveHeaderClip() {
         if (!isYuzGramMainRoot() || !yuzHeaderVisible()) {
             return 0;
         }
-        int header = Math.max(0, yuzChatHeaderBottom() + (int) scrollYOffset);
-        return Math.max(yuzListTopBase(), header);
+        return Math.max(yuzListTopBase(), yuzChatHeaderBottom());
     }
 
     /**
@@ -4993,7 +5044,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                             }
                         }
                     }
-                    if (!hasStories && (filterTabsView != null && filterTabsView.getVisibility() == View.VISIBLE && filterTabsViewIsVisible) && recyclerView == viewPages[0].listView && !searching && !actionBar.isActionModeShowed() && !disableActionBarScrolling && !rightSlidingDialogContainer.hasFragment()) {
+                    // r63: asosiy ildizda sarlavha pin qilingan — eski collapse
+                    // drayveri ishlamaydi, aks holda u setScrollY orqali wordmark
+                    // siqilishini har skrollda nolga qaytarib yuboradi.
+                    if (!isYuzGramMainRoot() && !hasStories && (filterTabsView != null && filterTabsView.getVisibility() == View.VISIBLE && filterTabsViewIsVisible) && recyclerView == viewPages[0].listView && !searching && !actionBar.isActionModeShowed() && !disableActionBarScrolling && !rightSlidingDialogContainer.hasFragment()) {
                         if (dy > 0 && hasHiddenArchive() && viewPages[0].dialogsType == DIALOGS_TYPE_DEFAULT) {
                             View child = recyclerView.getChildAt(0);
                             if (child != null) {
@@ -6244,6 +6298,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             tgLp.topMargin = AndroidUtilities.statusBarHeight + dp(14);
             tgLp.rightMargin = dp(80);
             contentView.addView(yuzApkToggle, tgLp);
+            yuzGhostToggle = new uz.kodlikino.top4.ui.YuzGramGhostToggle(context);
+            yuzGhostToggle.setContentDescription(getString(R.string.yuz_ghost_toggle));
+            yuzGhostToggle.setGhostEnabled(org.telegram.messenger.YuzGhostMode.isEnabled());
+            yuzGhostToggle.setOnClickListener(v -> showYuzApkGuardDialog());
+            FrameLayout.LayoutParams ghostLp = new FrameLayout.LayoutParams(
+                    LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.RIGHT);
+            ghostLp.topMargin = AndroidUtilities.statusBarHeight + dp(13);
+            ghostLp.rightMargin = dp(80) + dp(96);
+            contentView.addView(yuzGhostToggle, ghostLp);
         }
         updateStoriesVisibility(false);
         return fragmentView;
@@ -9632,6 +9695,19 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 || actionBar != null && actionBar.isActionModeShowed()) {
             return false;
         }
+        // r63: asosiy ildizda sarlavha PIN qilingan — hech qachon yuqoriga
+        // siljimaydi. Skroll faqat "YuzGram" palavrasini siqadi (Telegram'ning
+        // collapsing title'i kabi): pastga skroll — kichrayadi, tepaga — kattalashadi.
+        // Tablar, qidiruv pill'i va brend joyida qoladi, chatlar ular ortidan o'tadi.
+        if (yuzMainHeader && !hasStories) {
+            float max = dp(YUZ_BRAND_SHRINK_DP);
+            float next = Utilities.clamp(yuzPinScroll + dy, 0f, max);
+            if (next != yuzPinScroll) {
+                yuzPinScroll = next;
+                applyYuzBrandShrink();
+            }
+            return true;
+        }
         // YuzGram #61: yashirinish yo'nalishida ketayotgan bo'lsak, tepaga-qaytarish
         // animatsiyasi bilan kurashmaslik uchun uni bekor qilamiz.
         if (dy > 0 && yuzRestoreAnim != null) {
@@ -9660,6 +9736,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     private AnimatorSet yuzRestoreAnim;
 
+    /** r63: pin holatidagi wordmark siqilishini rasmga uzatadi. */
+    private void applyYuzBrandShrink() {
+        if (yuzBrandMark != null) {
+            yuzBrandMark.setShrink(yuzPinScroll / dp(YUZ_BRAND_SHRINK_DP));
+        }
+    }
+
     /**
      * YuzGram #61: ro'yxat tepasiga yetganda header'ni (storylar + sarlavha +
      * brend) majburan to'liq ko'rsatish holatiga animatsiya qiladi.
@@ -9685,6 +9768,17 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     private void setScrollY(float value) {
+        // r63: asosiy ildizda sarlavha pin qilingan — collapse butunlay o'chirilgan.
+        // Barcha translatsiyalar 0 bo'lib qoladi; skroll faqat yuzHeaderScroll'dagi
+        // wordmark siqilishi orqali ishlaydi. Bu yerga kelgan "reset" chaqiruvlari
+        // wordmark'ni ham to'liq o'lchamga qaytaradi.
+        if (isYuzGramMainRoot() && yuzHeaderVisible() && progressToActionMode == 0f) {
+            value = 0f;
+            if (yuzPinScroll != 0f) {
+                yuzPinScroll = 0f;
+                applyYuzBrandShrink();
+            }
+        }
         if (viewPages != null) {
             int glowOffset = viewPages[0].listView.getPaddingTop() + (int) value;
             for (int a = 0; a < viewPages.length; a++) {

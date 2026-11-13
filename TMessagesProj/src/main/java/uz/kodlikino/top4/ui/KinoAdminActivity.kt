@@ -55,7 +55,6 @@ import uz.kodlikino.top4.utils.ReelsRepository
 import uz.kodlikino.top4.utils.YuzAdminStats
 import uz.kodlikino.top4.utils.YuzAdModeration
 import uz.kodlikino.top4.utils.YuzAdStore
-import uz.kodlikino.top4.utils.YuzForceUpdate
 import uz.kodlikino.top4.utils.YuzReelQuota
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -135,13 +134,6 @@ class KinoAdminActivity : BaseFragment() {
     private var btnSaveLimits: MaterialButton? = null
     private var limitsLoadedOnce = false
     private var limitsBusy = false
-
-    private var swForceUpdate: SwitchMaterial? = null
-    private var etForceUpdateMin: TextInputEditText? = null
-    private var etForceUpdateNote: TextInputEditText? = null
-    private var btnSaveForceUpdate: MaterialButton? = null
-    private var forceUpdateLoadedOnce = false
-    private var forceUpdateBusy = false
 
     private var rvAds: RecyclerView? = null
     private var adsAdapter: AdsAdminAdapter? = null
@@ -235,10 +227,6 @@ class KinoAdminActivity : BaseFragment() {
         progressLimits = root.findViewById(R.id.progressLimits)
         tvLimitsUpdated = root.findViewById(R.id.tvLimitsUpdated)
         btnSaveLimits = root.findViewById(R.id.btnSaveLimits)
-        swForceUpdate = root.findViewById(R.id.swAdminForceUpdate)
-        etForceUpdateMin = root.findViewById(R.id.etAdminForceUpdateMin)
-        etForceUpdateNote = root.findViewById(R.id.etAdminForceUpdateNote)
-        btnSaveForceUpdate = root.findViewById(R.id.btnSaveForceUpdate)
 
         rvAds = root.findViewById(R.id.rvAdminAds)
         adsEmpty = root.findViewById(R.id.tvAdminAdsEmpty)
@@ -287,7 +275,6 @@ class KinoAdminActivity : BaseFragment() {
             showAdDialog(null)
         }
         btnSaveLimits?.setOnClickListener { saveLimits() }
-        btnSaveForceUpdate?.setOnClickListener { saveForceUpdate() }
         btnTabDash?.setOnClickListener { showTab(TAB_DASH) }
         btnTabMovies?.setOnClickListener { showTab(TAB_MOVIES) }
         btnTabReels?.setOnClickListener { showTab(TAB_REELS) }
@@ -361,7 +348,6 @@ class KinoAdminActivity : BaseFragment() {
         if (tab == TAB_REELS && !reelsLoadedOnce) loadReels()
         if (tab == TAB_LIMITS) {
             if (!limitsLoadedOnce) loadLimits()
-            if (!forceUpdateLoadedOnce) loadForceUpdate()
         }
         if (tab == TAB_ADS && !adsLoadedOnce) loadAds()
         if (tab == TAB_MODERATION && !moderationLoadedOnce) loadModeration()
@@ -886,80 +872,6 @@ class KinoAdminActivity : BaseFragment() {
                         R.string.yuz_admin_limits_save_failed,
                         result.exceptionOrNull()?.message ?: "xato"
                     )
-                )
-            }
-        }
-    }
-
-    // ── Majburiy yangilash ───────────────────────────────────────────────
-
-    private fun loadForceUpdate() {
-        val s = scope ?: return
-        if (forceUpdateBusy) return
-        forceUpdateBusy = true
-        btnSaveForceUpdate?.isEnabled = false
-        s.launch {
-            val result = YuzForceUpdate.adminLoad()
-            forceUpdateBusy = false
-            btnSaveForceUpdate?.isEnabled = true
-            if (fragmentView == null) return@launch
-            val req = result.getOrNull()
-            if (req == null) {
-                forceUpdateLoadedOnce = false
-                toast(R.string.yuz_admin_update_load_failed)
-            } else {
-                forceUpdateLoadedOnce = true
-                fillForceUpdate(req)
-            }
-        }
-    }
-
-    private fun fillForceUpdate(req: YuzForceUpdate.Requirement) {
-        swForceUpdate?.isChecked = req.enabled
-        etForceUpdateMin?.setText(req.minVersionCode.toString())
-        etForceUpdateNote?.setText(req.note)
-    }
-
-    private fun saveForceUpdate() {
-        if (forceUpdateBusy) return
-        val raw = etForceUpdateMin?.text?.toString()?.trim().orEmpty()
-        val minCode = if (raw.isEmpty()) 0 else raw.toIntOrNull()
-        if (minCode == null || minCode < 0) {
-            toast(R.string.yuz_admin_update_invalid)
-            return
-        }
-        val req = YuzForceUpdate.Requirement(
-            enabled = swForceUpdate?.isChecked ?: true,
-            minVersionCode = minCode,
-            note = etForceUpdateNote?.text?.toString()?.trim().orEmpty()
-        )
-        val s = scope ?: return
-        forceUpdateBusy = true
-        btnSaveForceUpdate?.isEnabled = false
-        s.launch {
-            val result = YuzForceUpdate.save(req)
-            forceUpdateBusy = false
-            btnSaveForceUpdate?.isEnabled = true
-            if (fragmentView == null) return@launch
-            val saved = result.getOrNull()
-            if (saved == null) {
-                toast(
-                    getString(
-                        R.string.yuz_admin_limits_save_failed,
-                        result.exceptionOrNull()?.message ?: "xato"
-                    )
-                )
-            } else {
-                fillForceUpdate(saved)
-                toast(
-                    if (saved.enabled && saved.minVersionCode > 0) {
-                        R.string.yuz_admin_update_saved
-                    } else {
-                        R.string.yuz_admin_update_saved_off
-                    }
-                )
-                tvLimitsUpdated?.text = getString(
-                    R.string.yuz_admin_limits_updated, timeFormat.format(Date())
                 )
             }
         }
