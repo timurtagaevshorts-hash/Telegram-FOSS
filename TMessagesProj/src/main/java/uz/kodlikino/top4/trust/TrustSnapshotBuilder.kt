@@ -167,9 +167,14 @@ object TrustSnapshotBuilder {
             if (args.size < 11) return@NotificationCenterDelegate
             if ((args[10] as? Int) != guid) return@NotificationCenterDelegate
             val dialogId = args[0] as? Long ?: return@NotificationCenterDelegate
-            if (!pending.remove(dialogId)) return@NotificationCenterDelegate
+            if (dialogId !in pending) return@NotificationCenterDelegate
             @Suppress("UNCHECKED_CAST")
             val objects = args[2] as? ArrayList<MessageObject>
+            if (objects.isNullOrEmpty() && args[3] == true) {
+                // Bo'sh kesh javobi — tarmoqdan haqiqiy javobni kutamiz.
+                return@NotificationCenterDelegate
+            }
+            pending.remove(dialogId)
             result[dialogId] = toHistory(account, objects.orEmpty())
             if (pending.isEmpty() && !done.isCompleted) done.complete(Unit)
         }
