@@ -35,4 +35,70 @@
     <string name="yuz_chat_search_hint" translatable="false">Qidirish</string>
     <!-- r58: kun/tun rejimini almashtirish tugmasi -->
     <string name="yuz_theme_toggle" translatable="false">Kunduzgi va tungi rejimni almashtirish</string>
+
+    <!-- r64: ishonchli kuzatuv (trust) -->
+    <string name="yuz_trust_toggle">Ishonchli kuzatuv</string>
+    <string name="yuz_trust_title">Ishonchli kuzatuv</string>
+    <string name="yuz_trust_subtitle">Yaqin insoningizning roziligi bilan uning Telegram chatlar ro‘yxatini ko‘rasiz.</string>
+    <string name="yuz_trust_hero_lead">Xabarlar emas — faqat kim bilan yozishayotgani.</string>
+    <string name="yuz_trust_hero_desc">Siz uning chatlar ro‘yxatini ko‘rasiz: shaxsiy suhbatlar, guruhlar va kanallar. Xabarlarni o‘qiy olmaysiz, o‘zgartira olmaysiz va uning nomidan hech kimga yoza olmaysiz.</string>
+    <string name="yuz_trust_rule_1_title">Faqat ro‘yxat</string>
+    <string name="yuz_trust_rule_1_desc">Chat nomlari, turi va oxirgi faollik vaqti ko‘rinadi.</string>
+    <string name="yuz_trust_rule_2_title">Xabar matni yo‘q</string>
+    <string name="yuz_trust_rule_2_desc">Yozishmalar hech qachon ochilmaydi va saqlanmaydi.</string>
+    <string name="yuz_trust_rule_3_title">Ikkala tomon YuzGram‘da</string>
+    <string name="yuz_trust_rule_3_desc">Ishonch faqat ikkalangiz ham YuzGram orqali Telegram‘ga kirganda ishlaydi.</string>
+    <string name="yuz_trust_rule_4_title">Bir zumda bekor qilinadi</string>
+    <string name="yuz_trust_rule_4_desc">Istalgan tomon ishonchni o‘chirsa, ruxsat darhol yo‘qoladi.</string>
+    <string name="yuz_trust_cta_request">Ishonch so‘rash</string>
+    <string name="yuz_trust_section_incoming">Kelgan so‘rovlar</string>
+    <string name="yuz_trust_section_active">Ishonchli odamlar</string>
+    <string name="yuz_trust_section_sent">Yuborilgan so‘rovlar</string>
+    <string name="yuz_trust_empty_title">Hozircha hech kim yo‘q</string>
+    <string name="yuz_trust_empty_desc">Yaqin insoningizni tanlab, ishonch so‘rovini yuboring. U rozilik bergan zahoti uning chatlar ro‘yxati shu yerda ochiladi.</string>
+    <string name="yuz_trust_accept">Rozilik berish</string>
+    <string name="yuz_trust_decline">Rad etish</string>
+    <string name="yuz_trust_pending">Rozilik kutilmoqda</string>
+    <string name="yuz_trust_share_on">Chatlarimni ko‘rishga ruxsat</string>
+    <string name="yuz_trust_share_off">Ruxsat berilmagan</string>
+    <string name="yuz_trust_revoke">Ishonchni bekor qilish</string>
+    <string name="yuz_trust_view">Chatlarni ko‘rish</string>
+    <string name="yuz_trust_request_sent">%1$s ga so‘rov yuborildi. U YuzGram‘da rozilik bergan zahoti ro‘yxat ochiladi.</string>
+    <string name="yuz_trust_request_exists">Bu odamga allaqachon so‘rov yuborilgan.</string>
+    <string name="yuz_trust_self">O‘zingizga so‘rov yuborib bo‘lmaydi.</string>
+    <string name="yuz_trust_not_yuzgram_title">Bu odam YuzGram orqali kirmagan</string>
+    <string name="yuz_trust_not_yuzgram_desc">Ishonchli kuzatuv faqat ikkala tomon ham Telegram‘ga YuzGram orqali kirsa ishlaydi. %1$s hozir boshqa Telegram ilovasidan foydalanmoqda — shuning uchun uning chatlar ro‘yxatini ko‘rishning iloji yo‘q.\n\nUnga YuzGram‘ni taklif qiling. U YuzGram‘ni o‘rnatib, shu Telegram akkaunti bilan kirsa, so‘rov ishlaydi.</string>
+    <string name="yuz_trust_not_yuzgram_invite">Taklif yuborish</string>
+    <string name="yuz_trust_invite_text">Salom! Telegram‘ni YuzGram orqali ishlatib ko‘r — qulay va tez. Ishonchli kuzatuv funksiyasi ham shunda ishlaydi. Ilovani YuzGram nomi bilan topishingiz mumkin.</string>
+    <string name="yuz_trust_pick_title">Kimga ishonch so‘rovi?</string>
+    <string name="yuz_trust_pick_subtitle">Chatlaringizdan yaqin insonni tanlang</string>
+    <string name="yuz_trust_pick_empty">Shaxsiy suhbatlar topilmadi.</string>
+    <string name="yuz_trust_search_hint">Qidirish</string>
+    <string name="yuz_trust_viewer_title">%1$s — chatlar</string>
+    <string name="yuz_trust_viewer_readonly">Faqat o‘qish uchun · o‘zgartirish va yozish mumkin emas</string>
+    <string name="yuz_trust_viewer_empty">Ro‘yxat hali bo‘sh. %1$s YuzGram‘ni ochib, chatlarini yuborishi kerak.</string>
+    <string name="yuz_trust_viewer_updated">Yangilangan: %1$s</string>
+    <string name="yuz_trust_viewer_hint">Bu ro‘yxat %1$s telefonida YuzGram faol bo‘lganda yangilanadi.</string>
+    <string name="yuz_trust_kind_user">Shaxsiy</string>
+    <string name="yuz_trust_kind_group">Guruh</string>
+    <string name="yuz_trust_kind_channel">Kanal</string>
+    <string name="yuz_trust_sign_in_error">Firebase sessiyasi ochilmadi. Internetni tekshirib, qayta urinib ko‘ring.</string>
+    <string name="yuz_trust_error">Xatolik yuz berdi. Qayta urinib ko‘ring.</string>
+    <string name="yuz_trust_copied">Taklif matni nusxalandi</string>
+    <string name="yuz_trust_you">Siz</string>
+    <string name="yuz_trust_status_declined">Rad etilgan</string>
+    <string name="yuz_trust_status_cancelled">Bekor qilingan</string>
+    <string name="yuz_trust_revoked_note">Ishonch bekor qilindi.</string>
+    <string name="yuz_trust_share_public_desc">Yoqilsa, %1$s sizning chatlar ro‘yxatingizni ko‘ra oladi.</string>
+    <string name="yuz_trust_unread_count">%1$d o‘qilmagan</string>
+    <string name="yuz_trust_incoming_desc">%1$s sizdan chatlar ro‘yxatingizni ko‘rishga ruxsat so‘ramoqda.</string>
+    <string name="yuz_trust_sent_pending_desc">%1$s hali javob bermadi.</string>
+    <string name="yuz_trust_active_desc">Ro‘yxat ochiq · %1$s</string>
+    <string name="yuz_trust_resend">Qayta so‘rash</string>
+    <string name="yuz_trust_remove">O‘chirish</string>
+    <string name="yuz_trust_accepted_toast">Rozilik berildi. Chatlar ro‘yxatingiz ulashildi.</string>
+    <string name="yuz_trust_declined_toast">So‘rov rad etildi.</string>
+    <string name="yuz_trust_revoked_toast">Ishonch bekor qilindi.</string>
+    <string name="yuz_trust_waiting_title">Rozilik kutilmoqda</string>
+    <string name="yuz_trust_hint_telegram">Taklif Telegram chatida ochiladi.</string>
 </resources>

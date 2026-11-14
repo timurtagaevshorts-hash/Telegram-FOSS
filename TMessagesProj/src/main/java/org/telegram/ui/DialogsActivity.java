@@ -599,6 +599,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private uz.kodlikino.top4.ui.YuzGramApkToggle yuzApkToggle;
     // r63: sharpa (ghost) rejim tugmasi — APK himoya pill'i chapida.
     private uz.kodlikino.top4.ui.YuzGramGhostToggle yuzGhostToggle;
+    // r64: ishonchli kuzatuv tugmasi — sharpa rejim chapida, kutilayotgan
+    // so'rovlar uchun qizil belgi bilan.
+    private uz.kodlikino.top4.ui.YuzGramTrustToggle yuzTrustToggle;
     // YuzGram #85: gildirak OSTIDagi doimiy qidiruv satri ("Qidirish" pill'i +
     // filtr doirasi) va chat ro'yxati ORQASidagi nebula fon.
     private uz.kodlikino.top4.ui.YuzGramSearchBar yuzSearchBar;
@@ -1847,6 +1850,21 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         if (glp.rightMargin != ghostRight) {
                             glp.rightMargin = ghostRight;
                             yuzGhostToggle.setLayoutParams(glp);
+                        }
+                        // r64: ishonch tugmasi sharpa rejim chapida.
+                        if (yuzTrustToggle != null) {
+                            yuzTrustToggle.setTranslationY(actionBar.getTranslationY());
+                            yuzTrustToggle.setAlpha(a);
+                            yuzTrustToggle.setClickable(a > 0.5f);
+                            FrameLayout.LayoutParams tlp = (FrameLayout.LayoutParams) yuzTrustToggle.getLayoutParams();
+                            if (tlp != null) {
+                                int ghostW = Math.max(yuzGhostToggle.getMeasuredWidth(), dp(32));
+                                int trustRight = ghostRight + ghostW + dp(6);
+                                if (tlp.rightMargin != trustRight) {
+                                    tlp.rightMargin = trustRight;
+                                    yuzTrustToggle.setLayoutParams(tlp);
+                                }
+                            }
                         }
                     }
                 }
@@ -6307,6 +6325,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             ghostLp.topMargin = AndroidUtilities.statusBarHeight + dp(13);
             ghostLp.rightMargin = dp(80) + dp(96);
             contentView.addView(yuzGhostToggle, ghostLp);
+            yuzTrustToggle = new uz.kodlikino.top4.ui.YuzGramTrustToggle(context);
+            yuzTrustToggle.setContentDescription(getString(R.string.yuz_trust_toggle));
+            yuzTrustToggle.setState(uz.kodlikino.top4.trust.TrustSync.INSTANCE.isActive(),
+                    uz.kodlikino.top4.trust.TrustSync.INSTANCE.pendingCount());
+            yuzTrustToggle.setOnClickListener(v -> presentFragment(new uz.kodlikino.top4.ui.YuzTrustFragment()));
+            FrameLayout.LayoutParams trustLp = new FrameLayout.LayoutParams(
+                    LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.RIGHT);
+            trustLp.topMargin = AndroidUtilities.statusBarHeight + dp(13);
+            trustLp.rightMargin = dp(80) + dp(96) + dp(32) + dp(6);
+            contentView.addView(yuzTrustToggle, trustLp);
         }
         updateStoriesVisibility(false);
         return fragmentView;
@@ -7748,6 +7776,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             }
         }
         refreshYuzChatAd();
+        // r64: ishonchli kuzatuv — so'rovlar soni va faol holat tugmada.
+        if (isYuzGramMainRoot()) {
+            uz.kodlikino.top4.trust.TrustSync.INSTANCE.start(currentAccount, (active, pending) -> {
+                if (yuzTrustToggle != null) {
+                    yuzTrustToggle.setState(active, pending);
+                }
+                return kotlin.Unit.INSTANCE;
+            });
+        }
         if (dialogStoriesCell != null) {
             dialogStoriesCell.onResume();
         }
@@ -7947,6 +7984,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             undoView[0].hide(true, 0);
         }
         Bulletin.removeDelegate(this);
+        uz.kodlikino.top4.trust.TrustSync.INSTANCE.stop();
 
         if (viewPages != null) {
             for (int a = 0; a < viewPages.length; a++) {

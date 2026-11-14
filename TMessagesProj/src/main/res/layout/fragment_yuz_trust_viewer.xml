@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/yuz_bg"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/viewerTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/yuz_space_1"
+        android:paddingTop="@dimen/yuz_space_2"
+        android:paddingEnd="@dimen/yuz_space_1"
+        android:paddingBottom="@dimen/yuz_space_2">
+
+        <ImageButton
+            android:id="@+id/btnViewerBack"
+            style="@style/YuzIconButton"
+            android:contentDescription="@string/yuz_trust_view"
+            android:src="@drawable/ic_back" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/yuz_space_1"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/viewerTitle"
+                style="@style/YuzScreenTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1" />
+
+            <TextView
+                android:id="@+id/viewerSubtitle"
+                style="@style/YuzScreenSubtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/yuz_trust_viewer_readonly" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/btnViewerRefresh"
+            style="@style/YuzIconButton"
+            android:contentDescription="@string/yuz_trust_view"
+            android:src="@drawable/ic_refresh" />
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/viewerProgress"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="@dimen/yuz_space_6"
+        android:indeterminateTint="@color/yuz_action" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/yuz_gutter"
+            android:paddingTop="@dimen/yuz_space_1"
+            android:paddingEnd="@dimen/yuz_gutter"
+            android:paddingBottom="@dimen/yuz_space_8">
+
+            <LinearLayout
+                android:id="@+id/viewerBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/yuz_space_3"
+                android:background="@drawable/bg_yuz_trust_hero"
+                android:orientation="horizontal"
+                android:padding="@dimen/yuz_space_3">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center_vertical"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_yuz_trust_shield"
+                    android:tint="@color/yuz_action" />
+
+                <TextView
+                    android:id="@+id/viewerBannerText"
+                    style="@style/YuzCaption"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/yuz_space_2"
+                    android:layout_weight="1" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/viewerList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <TextView
+                android:id="@+id/viewerEmpty"
+                style="@style/YuzEmptyHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_6"
+                android:gravity="center"
+                android:lineSpacingExtra="2dp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
