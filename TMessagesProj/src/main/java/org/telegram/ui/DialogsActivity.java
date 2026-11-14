@@ -1818,58 +1818,91 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (yuzApkToggle.isGuardEnabled() != guardOn) {
                 yuzApkToggle.setEnabled(guardOn);
             }
-            yuzApkToggle.setTranslationY(actionBar.getTranslationY());
-            yuzApkToggle.setAlpha(a);
-            yuzApkToggle.setClickable(a > 0.5f);
-            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) yuzApkToggle.getLayoutParams();
-            int width = yuzApkToggle.getParent() instanceof View ? ((View) yuzApkToggle.getParent()).getWidth() : 0;
-            if (width > 0) {
-                int afterBrand = yuzBrandMark.getRight() + dp(6);
-                int minLeft = width - dp(112);
-                int maxLeft = width - dp(30) - yuzApkToggle.getMeasuredWidth() - dp(12);
-                int left = Math.min(Math.max(afterBrand, minLeft), maxLeft);
-                int rightMargin = Math.max(0, width - left - yuzApkToggle.getMeasuredWidth());
-                if (lp.rightMargin != rightMargin) {
-                    lp.rightMargin = rightMargin;
-                    yuzApkToggle.setLayoutParams(lp);
-                }
-                // r63: sharpa rejim tugmasi APK pill'i chapida turadi — pill
-                // kengligi o'lchangach joylashadi, shuning uchun har sync'da.
-                if (yuzGhostToggle != null) {
-                    boolean ghostOn = org.telegram.messenger.YuzGhostMode.isEnabled();
-                    if (yuzGhostToggle.isGhostEnabled() != ghostOn) {
-                        yuzGhostToggle.setGhostEnabled(ghostOn);
-                    }
-                    yuzGhostToggle.setTranslationY(actionBar.getTranslationY());
-                    yuzGhostToggle.setAlpha(a);
-                    yuzGhostToggle.setClickable(a > 0.5f);
-                    FrameLayout.LayoutParams glp = (FrameLayout.LayoutParams) yuzGhostToggle.getLayoutParams();
-                    if (glp != null) {
-                        int apkW = Math.max(yuzApkToggle.getMeasuredWidth(), dp(86));
-                        int ghostRight = rightMargin + apkW + dp(6);
-                        if (glp.rightMargin != ghostRight) {
-                            glp.rightMargin = ghostRight;
-                            yuzGhostToggle.setLayoutParams(glp);
-                        }
-                        // r64: ishonch tugmasi sharpa rejim chapida.
-                        if (yuzTrustToggle != null) {
-                            yuzTrustToggle.setTranslationY(actionBar.getTranslationY());
-                            yuzTrustToggle.setAlpha(a);
-                            yuzTrustToggle.setClickable(a > 0.5f);
-                            FrameLayout.LayoutParams tlp = (FrameLayout.LayoutParams) yuzTrustToggle.getLayoutParams();
-                            if (tlp != null) {
-                                int ghostW = Math.max(yuzGhostToggle.getMeasuredWidth(), dp(32));
-                                int trustRight = ghostRight + ghostW + dp(6);
-                                if (tlp.rightMargin != trustRight) {
-                                    tlp.rightMargin = trustRight;
-                                    yuzTrustToggle.setLayoutParams(tlp);
-                                }
-                            }
-                        }
-                    }
+            if (yuzGhostToggle != null) {
+                boolean ghostOn = org.telegram.messenger.YuzGhostMode.isEnabled();
+                if (yuzGhostToggle.isGhostEnabled() != ghostOn) {
+                    yuzGhostToggle.setGhostEnabled(ghostOn);
                 }
             }
+            layoutYuzHeaderControls(a);
         }
+    }
+
+    /**
+     * r65: sarlavhadagi uchta boshqaruv — bitta o'ngga bog'langan guruh.
+     * Chapdan o'ngga: [APK himoya pill] [sharpa] [ishonch]; ishonch eng
+     * o'ngda, kun/tun tugmasi bilan bir chetga tekislanadi. Guruh kengligi
+     * pill o'lchamiga bog'liq, shuning uchun har sinxronizatsiyada hisoblanadi.
+     */
+    private void layoutYuzHeaderControls(float alpha) {
+        if (yuzApkToggle == null) {
+            return;
+        }
+        View parent = yuzApkToggle.getParent() instanceof View ? (View) yuzApkToggle.getParent() : null;
+        int width = parent != null ? parent.getWidth() : 0;
+        if (width <= 0) {
+            return;
+        }
+        boolean narrow = width < dp(350);
+        int gap = dp(narrow ? 4 : 6);
+        int edge = dp(narrow ? 10 : 14);
+        int trustW = yuzTrustToggle != null && yuzTrustToggle.getMeasuredWidth() > 0
+                ? yuzTrustToggle.getMeasuredWidth() : dp(32);
+        int ghostW = yuzGhostToggle != null && yuzGhostToggle.getMeasuredWidth() > 0
+                ? yuzGhostToggle.getMeasuredWidth() : dp(32);
+
+        int trustRight = edge;
+        int ghostRight = trustRight + trustW + gap;
+        int pillRight = ghostRight + ghostW + gap;
+
+        float ty = actionBar.getTranslationY();
+        boolean interactive = alpha > 0.5f;
+
+        yuzApkToggle.setTranslationY(ty);
+        yuzApkToggle.setAlpha(alpha);
+        yuzApkToggle.setClickable(interactive);
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) yuzApkToggle.getLayoutParams();
+        if (lp != null && lp.rightMargin != pillRight) {
+            lp.rightMargin = pillRight;
+            yuzApkToggle.setLayoutParams(lp);
+        }
+
+        if (yuzGhostToggle != null) {
+            yuzGhostToggle.setTranslationY(ty);
+            yuzGhostToggle.setAlpha(alpha);
+            yuzGhostToggle.setClickable(interactive);
+            FrameLayout.LayoutParams glp = (FrameLayout.LayoutParams) yuzGhostToggle.getLayoutParams();
+            if (glp != null && glp.rightMargin != ghostRight) {
+                glp.rightMargin = ghostRight;
+                yuzGhostToggle.setLayoutParams(glp);
+            }
+        }
+
+        if (yuzTrustToggle != null) {
+            yuzTrustToggle.setTranslationY(ty);
+            yuzTrustToggle.setAlpha(alpha);
+            yuzTrustToggle.setClickable(interactive);
+            FrameLayout.LayoutParams tlp = (FrameLayout.LayoutParams) yuzTrustToggle.getLayoutParams();
+            if (tlp != null && tlp.rightMargin != trustRight) {
+                tlp.rightMargin = trustRight;
+                yuzTrustToggle.setLayoutParams(tlp);
+            }
+        }
+    }
+
+    /**
+     * r65: sharpa (ghost) tugmasi — bir bosishda yoqiladi, yana bir bosishda
+     * o'chadi. Shu zahoti hech kim onlayn holatni va "yozmoqda…"ni ko'rmaydi.
+     */
+    private void toggleYuzGhostMode() {
+        boolean enable = !org.telegram.messenger.YuzGhostMode.isEnabled();
+        org.telegram.messenger.YuzGhostMode.setEnabled(enable);
+        if (yuzGhostToggle != null) {
+            yuzGhostToggle.setGhostEnabled(enable);
+        }
+        Toast.makeText(getParentActivity(),
+                getString(enable ? R.string.yuz_ghost_on : R.string.yuz_ghost_off),
+                Toast.LENGTH_SHORT).show();
     }
 
     /**
@@ -6313,17 +6346,22 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             yuzApkToggle.setOnClickListener(v -> showYuzApkGuardDialog());
             FrameLayout.LayoutParams tgLp = new FrameLayout.LayoutParams(
                     LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.RIGHT);
+            // r65: uchta boshqaruv bitta guruh bo'lib o'ng chetga bog'lanadi —
+            // chapdan o'ngga: [APK himoya pill] [sharpa] [ishonch]. Aniq
+            // joylashuvni syncYuzBrandMark ichidagi layoutYuzHeaderControls
+            // har o'lchovdan keyin qayta hisoblaydi (bu yerdagilar faqat
+            // birinchi chizishgacha bo'lgan boshlang'ich qiymat).
             tgLp.topMargin = AndroidUtilities.statusBarHeight + dp(14);
-            tgLp.rightMargin = dp(80);
+            tgLp.rightMargin = dp(90);
             contentView.addView(yuzApkToggle, tgLp);
             yuzGhostToggle = new uz.kodlikino.top4.ui.YuzGramGhostToggle(context);
             yuzGhostToggle.setContentDescription(getString(R.string.yuz_ghost_toggle));
             yuzGhostToggle.setGhostEnabled(org.telegram.messenger.YuzGhostMode.isEnabled());
-            yuzGhostToggle.setOnClickListener(v -> showYuzApkGuardDialog());
+            yuzGhostToggle.setOnClickListener(v -> toggleYuzGhostMode());
             FrameLayout.LayoutParams ghostLp = new FrameLayout.LayoutParams(
                     LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.RIGHT);
             ghostLp.topMargin = AndroidUtilities.statusBarHeight + dp(13);
-            ghostLp.rightMargin = dp(80) + dp(96);
+            ghostLp.rightMargin = dp(52);
             contentView.addView(yuzGhostToggle, ghostLp);
             yuzTrustToggle = new uz.kodlikino.top4.ui.YuzGramTrustToggle(context);
             yuzTrustToggle.setContentDescription(getString(R.string.yuz_trust_toggle));
@@ -6333,7 +6371,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             FrameLayout.LayoutParams trustLp = new FrameLayout.LayoutParams(
                     LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.RIGHT);
             trustLp.topMargin = AndroidUtilities.statusBarHeight + dp(13);
-            trustLp.rightMargin = dp(80) + dp(96) + dp(32) + dp(6);
+            trustLp.rightMargin = dp(14);
             contentView.addView(yuzTrustToggle, trustLp);
         }
         updateStoriesVisibility(false);

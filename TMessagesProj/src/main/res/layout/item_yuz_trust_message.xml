@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ishonch tarixi: bitta xabar (faqat o'qish, gravitatsiya kodda). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/msgRow"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="@dimen/yuz_space_2"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/msgSender"
+        style="@style/YuzCaption"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/yuz_space_1"
+        android:layout_marginBottom="2dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/yuz_action"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:id="@+id/msgBubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_yuz_trust_msg_in"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/yuz_space_3"
+        android:paddingTop="@dimen/yuz_space_2"
+        android:paddingEnd="@dimen/yuz_space_3"
+        android:paddingBottom="@dimen/yuz_space_2">
+
+        <TextView
+            android:id="@+id/msgText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:autoLink="none"
+            android:lineSpacingExtra="2dp"
+            android:textColor="@color/yuz_text"
+            android:textIsSelectable="true"
+            android:textSize="@dimen/yuz_text_body" />
+
+        <TextView
+            android:id="@+id/msgTime"
+            style="@style/YuzCaption"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:layout_marginStart="@dimen/yuz_space_2"
+            android:textColor="@color/yuz_text_muted" />
+    </LinearLayout>
+</LinearLayout>

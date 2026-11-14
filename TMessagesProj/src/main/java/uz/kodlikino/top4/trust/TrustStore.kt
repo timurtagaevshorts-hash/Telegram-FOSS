@@ -18,12 +18,13 @@ import kotlinx.coroutines.withContext
  *    ruxsat berganini bildiradi.
  *  - `yuz_trust/{requester}/sent/{approver}` — requester tomonidagi nusxa
  *    (ro'yxat uchun). Holat approver hujjatidan tinglanib yangilanadi.
- *  - `yuz_trust/{owner}/snapshot/main` — owner chatlar ro'yxati metama'lumoti;
- *    `readers` massivida faqat owner ruxsat bergan odamlar bo'ladi, o'qish
- *    qoidasi shu massivga tayanadi.
+ *  - `yuz_trust/{owner}/snapshot/main` — owner chatlar ro'yxati va har bir
+ *    suhbatdagi oxirgi xabarlar; `readers` massivida faqat owner ruxsat
+ *    bergan odamlar bo'ladi, o'qish qoidasi shu massivga tayanadi.
  *
- * Xabar matni hech qachon saqlanmaydi — faqat sarlavha, tur, o'qilmagan
- * soni, oxirgi faollik vaqti.
+ * Snapshot faqat owner rozilik bergan odamlar uchun yoziladi (readers bo'sh
+ * bo'lsa nashr umuman bo'lmaydi) va har doim faqat-o'qish oynasida ko'riladi:
+ * hech kim chatga yoza olmaydi, o'chira olmaydi yoki o'zgartira olmaydi.
  */
 object TrustStore {
 
@@ -62,13 +63,23 @@ object TrustStore {
         val isActive: Boolean get() = status == STATUS_ACCEPTED
     }
 
+    /** Bitta suhbatdagi bitta xabar — faqat o'qish uchun ko'rsatiladi. */
+    data class MsgMeta(
+        val id: String,
+        val from: String,
+        val text: String,
+        val date: Long,
+        val out: Boolean
+    )
+
     data class ChatMeta(
         val id: String,
         val title: String,
         val kind: Int,
         val unread: Int,
         val time: Long,
-        val pinned: Boolean
+        val pinned: Boolean,
+        val history: List<MsgMeta> = emptyList()
     )
 
     data class Snapshot(
@@ -313,7 +324,7 @@ object TrustStore {
                     "updatedAt" to System.currentTimeMillis(),
                     "readers" to readers,
                     "chats" to chats.map { c ->
-                        hashMapOf(
+                        val row = hashMapOf<String, Any>(
                             "id" to c.id,
                             "t" to c.title,
                             "k" to c.kind,
@@ -321,6 +332,18 @@ object TrustStore {
                             "d" to c.time,
                             "p" to c.pinned
                         )
+                        if (c.history.isNotEmpty()) {
+                            row["h"] = c.history.map { m ->
+                                hashMapOf(
+                                    "m" to m.id,
+                                    "s" to m.from,
+                                    "x" to m.text,
+                                    "d" to m.date,
+                                    "o" to m.out
+                                )
+                            }
+                        }
+                        row
                     }
                 )
                 snapshotDoc(meUid).set(payload).await()
@@ -339,13 +362,26 @@ object TrustStore {
             val rows = snap.get("chats") as? List<*> ?: emptyList<Any>()
             val chats = rows.mapNotNull { row ->
                 val m = row as? Map<*, *> ?: return@mapNotNull null
+                val history = (m["h"] as? List<*>).orEmpty().mapNotNull { h ->
+                    val hm = h as? Map<*, *> ?: return@mapNotNull null
+                    val text = hm["x"] as? String ?: return@mapNotNull null
+                    if (text.isBlank()) return@mapNotNull null
+                    MsgMeta(
+                        id = hm["m"] as? String ?: "",
+                        from = hm["s"] as? String ?: "",
+                        text = text,
+                        date = (hm["d"] as? Number)?.toLong() ?: 0L,
+                        out = hm["o"] as? Boolean ?: false
+                    )
+                }
                 ChatMeta(
                     id = m["id"] as? String ?: return@mapNotNull null,
                     title = m["t"] as? String ?: "",
                     kind = (m["k"] as? Number)?.toInt() ?: 0,
                     unread = (m["u"] as? Number)?.toInt() ?: 0,
                     time = (m["d"] as? Number)?.toLong() ?: 0L,
-                    pinned = m["p"] as? Boolean ?: false
+                    pinned = m["p"] as? Boolean ?: false,
+                    history = history
                 )
             }
             Snapshot(

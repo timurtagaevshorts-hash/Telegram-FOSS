@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ishonch tarixi: kiruvchi xabar pufakchasi (neytral sirt). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/yuz_surface" />
+    <corners android:radius="@dimen/yuz_radius_field" />
+    <stroke
+        android:width="@dimen/yuz_stroke"
+        android:color="@color/yuz_stroke" />
+</shape>

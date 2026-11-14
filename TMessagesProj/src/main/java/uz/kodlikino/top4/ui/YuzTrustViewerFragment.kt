@@ -23,6 +23,8 @@ import uz.kodlikino.top4.trust.TrustStore
  *
  * Ro'yxat egasining o'zi nashr qilgan metama'lumotdan olinadi. Bu ekranda
  * hech qanday amal yo'q: chat ochilmaydi, xabar yozilmaydi, o'zgartirilmaydi.
+ * Xabarlari nashr qilingan suhbat qatorini bosib, tarixni faqat o'qish
+ * rejimida ko'rish mumkin ([YuzTrustHistoryFragment]).
  */
 class YuzTrustViewerFragment(
     private val ownerUid: String,
@@ -94,6 +96,10 @@ class YuzTrustViewerFragment(
                 append("\n")
                 append(ctx().getString(R.string.yuz_trust_viewer_updated, updatedText))
             }
+            if (snapshot?.chats.orEmpty().any { it.history.isNotEmpty() }) {
+                append("\n")
+                append(ctx().getString(R.string.yuz_trust_viewer_open_hint))
+            }
         }
 
         val chats = snapshot?.chats.orEmpty()
@@ -101,12 +107,21 @@ class YuzTrustViewerFragment(
         for (chat in chats) {
             val row = LayoutInflater.from(themed)
                 .inflate(R.layout.item_yuz_trust_chat, list, false)
-            row.isClickable = false
-            row.foreground = null
             row.findViewById<TextView>(R.id.chatInitials).text = initials(chat.title)
             row.findViewById<TextView>(R.id.chatTitle).text = chat.title
             row.findViewById<TextView>(R.id.chatMeta).text = metaText(chat)
             row.findViewById<TextView>(R.id.chatTime).text = timeText(chat.time)
+            if (chat.history.isEmpty()) {
+                row.isClickable = false
+                row.foreground = null
+            } else {
+                row.setOnClickListener {
+                    presentFragment(
+                        YuzTrustHistoryFragment(ownerUid, ownerName, chat.id, chat.title),
+                        false
+                    )
+                }
+            }
             list?.addView(row)
         }
 
@@ -121,11 +136,15 @@ class YuzTrustViewerFragment(
             TrustSnapshotBuilder.KIND_GROUP -> ctx().getString(R.string.yuz_trust_kind_group)
             else -> ctx().getString(R.string.yuz_trust_kind_user)
         }
-        return if (chat.unread > 0) {
-            kind + " · " + ctx().getString(R.string.yuz_trust_unread_count, chat.unread)
-        } else {
-            kind
+        val parts = ArrayList<String>(3)
+        parts.add(kind)
+        if (chat.unread > 0) {
+            parts.add(ctx().getString(R.string.yuz_trust_unread_count, chat.unread))
         }
+        if (chat.history.isNotEmpty()) {
+            parts.add(ctx().getString(R.string.yuz_trust_history_count, chat.history.size))
+        }
+        return parts.joinToString(" · ")
     }
 
     private fun timeText(time: Long): String =
