@@ -362,10 +362,10 @@ object TrustStore {
             val rows = snap.get("chats") as? List<*> ?: emptyList<Any>()
             val chats = rows.mapNotNull { row ->
                 val m = row as? Map<*, *> ?: return@mapNotNull null
-                val history = (m["h"] as? List<*>).orEmpty().mapNotNull { h ->
-                    val hm = h as? Map<*, *> ?: return@mapNotNull null
-                    val text = hm["x"] as? String ?: return@mapNotNull null
-                    if (text.isBlank()) return@mapNotNull null
+                val history = (m["h"] as? List<*>).orEmpty().mapNotNull msg@{ h ->
+                    val hm = h as? Map<*, *> ?: return@msg null
+                    val text = hm["x"] as? String ?: return@msg null
+                    if (text.isBlank()) return@msg null
                     MsgMeta(
                         id = hm["m"] as? String ?: "",
                         from = hm["s"] as? String ?: "",
