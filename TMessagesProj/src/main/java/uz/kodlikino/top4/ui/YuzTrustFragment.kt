@@ -1,25 +1,36 @@
 package uz.kodlikino.top4.ui
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import org.telegram.messenger.ApplicationLoader
+import org.telegram.messenger.MessagesController
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.AlertDialog
 import org.telegram.ui.ActionBar.BaseFragment
+import org.telegram.ui.Components.AvatarDrawable
+import org.telegram.ui.Components.BackupImageView
 import uz.kodlikino.top4.trust.TrustSnapshotBuilder
 import uz.kodlikino.top4.trust.TrustStore
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
+
+private const val TAG = "YuzTrustFragment"
 
 /**
  * Ishonchli kuzatuv — asosiy ekran.
@@ -91,11 +102,15 @@ class YuzTrustFragment : BaseFragment() {
 
         fillRules(root.findViewById(R.id.trustRules))
         root.findViewById<View>(R.id.btnTrustRequest).setOnClickListener { openPicker() }
-        root.findViewById<View>(R.id.btnTrustPremium).setOnClickListener {
-            presentFragment(YuzPremiumActivity(), false)
-        }
 
-        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        scope = CoroutineScope(
+            SupervisorJob() + Dispatchers.Main + CoroutineExceptionHandler { _, e ->
+                // Ekran ichidagi har qanday kutilmagan xato ilovani yiqitmasin.
+                Log.e(TAG, "trust coroutine", e)
+                hideChecking()
+                toast(R.string.yuz_trust_error)
+            }
+        )
         render()
         start()
         return root
@@ -144,20 +159,28 @@ class YuzTrustFragment : BaseFragment() {
                 inboxListener = TrustStore.listenInbox(uid) { list ->
                     incoming = list
                     loading = false
-                    render()
-                    onInboxUpdate(list)
+                    safeRender()
+                    try {
+                        onInboxUpdate(list)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "inbox update", e)
+                    }
                 }
             }
             if (sentListener == null) {
                 sentListener = TrustStore.listenSent(uid) { list ->
                     sent = list
                     loading = false
-                    render()
+                    safeRender()
                 }
             }
             // Rozilik berilgan bo'lsa, o'z ro'yxatimni darhol nashr qilaman —
             // TrustSync davriy tickerini kutmasdan.
-            TrustSnapshotBuilder.publish(currentAccount)
+            try {
+                TrustSnapshotBuilder.publish(currentAccount)
+            } catch (e: Exception) {
+                Log.e(TAG, "publish", e)
+            }
         }
     }
 
@@ -172,9 +195,13 @@ class YuzTrustFragment : BaseFragment() {
 
     override fun onFragmentDestroy() {
         stopListeners()
-        requestDialog?.dismiss()
+        try {
+            requestDialog?.dismiss()
+            unlockDialog?.dismiss()
+        } catch (e: Exception) {
+            Log.w(TAG, "dismiss dialogs: ${e.message}")
+        }
         requestDialog = null
-        unlockDialog?.dismiss()
         unlockDialog = null
         hideChecking()
         scope?.cancel()
@@ -226,6 +253,15 @@ class YuzTrustFragment : BaseFragment() {
         )
     }
 
+    /** Firestore listener'lari main thread'da ishlaydi — render xatosi app'ni yiqitmasin. */
+    private fun safeRender() {
+        try {
+            render()
+        } catch (e: Exception) {
+            Log.e(TAG, "render", e)
+        }
+    }
+
     private fun setHeader(view: TextView?, titleRes: Int, count: Int) {
         if (count <= 0) {
             view?.visibility = View.GONE
@@ -258,32 +294,46 @@ class YuzTrustFragment : BaseFragment() {
 
     private fun showRequestDialog(item: TrustStore.Incoming) {
         if (requestDialog?.isShowing == true) return
-        val themed = themedContext ?: parentActivity ?: return
+        val themed = dialogContext() ?: return
         val name = item.peerName.ifBlank { str(R.string.yuz_trust_you) }
-        val dialog = AlertDialog.Builder(themed)
-            .setTitle(str(R.string.yuz_trust_request_dialog_title))
-            .setMessage(str(R.string.yuz_trust_request_dialog_desc, name))
-            .setPositiveButton(str(R.string.yuz_trust_accept)) { _, _ -> accept(item.peerUid) }
-            .setNegativeButton(str(R.string.yuz_trust_decline)) { _, _ -> decline(item.peerUid) }
-            .create()
-        dialog.setOnDismissListener { if (requestDialog === dialog) requestDialog = null }
-        requestDialog = dialog
-        dialog.show()
+        try {
+            val dialog = AlertDialog.Builder(themed)
+                .setTitle(str(R.string.yuz_trust_request_dialog_title))
+                .setMessage(str(R.string.yuz_trust_request_dialog_desc, name))
+                .setPositiveButton(str(R.string.yuz_trust_accept)) { _, _ -> accept(item.peerUid) }
+                .setNegativeButton(str(R.string.yuz_trust_decline)) { _, _ -> decline(item.peerUid) }
+                .create()
+            dialog.setOnDismissListener { if (requestDialog === dialog) requestDialog = null }
+            requestDialog = dialog
+            dialog.show()
+        } catch (e: Exception) {
+            Log.e(TAG, "request dialog", e)
+        }
     }
 
     private fun showChecking() {
-        val themed = themedContext ?: return
-        val dialog = AlertDialog.Builder(themed)
-            .setMessage(str(R.string.yuz_trust_checking))
-            .create()
-        dialog.setCancelable(false)
-        checkingDialog = dialog
-        dialog.show()
+        if (checkingDialog?.isShowing == true) return
+        val themed = dialogContext() ?: return
+        try {
+            val dialog = AlertDialog.Builder(themed)
+                .setMessage(str(R.string.yuz_trust_checking))
+                .create()
+            dialog.setCancelable(false)
+            checkingDialog = dialog
+            dialog.show()
+        } catch (e: Exception) {
+            Log.e(TAG, "checking dialog", e)
+        }
     }
 
     private fun hideChecking() {
-        checkingDialog?.dismiss()
+        val dialog = checkingDialog ?: return
         checkingDialog = null
+        try {
+            if (dialog.isShowing) dialog.dismiss()
+        } catch (e: Exception) {
+            Log.w(TAG, "hideChecking: ${e.message}")
+        }
     }
 
     private fun syncApprovalWatchers() {
@@ -310,6 +360,7 @@ class YuzTrustFragment : BaseFragment() {
         val name = item.peerName.ifBlank { str(R.string.yuz_trust_you) }
         row.findViewById<TextView>(R.id.personInitials).text = initials(name)
         row.findViewById<TextView>(R.id.personName).text = name
+        bindAvatar(row, item.peerUid)
         val sub = row.findViewById<TextView>(R.id.personSub)
         val primary = row.findViewById<TextView>(R.id.personPrimary)
         val secondary = row.findViewById<TextView>(R.id.personSecondary)
@@ -373,6 +424,7 @@ class YuzTrustFragment : BaseFragment() {
         val name = item.peerName.ifBlank { str(R.string.yuz_trust_you) }
         row.findViewById<TextView>(R.id.personInitials).text = initials(name)
         row.findViewById<TextView>(R.id.personName).text = name
+        bindAvatar(row, item.peerUid)
         val sub = row.findViewById<TextView>(R.id.personSub)
         val primary = row.findViewById<TextView>(R.id.personPrimary)
         val secondary = row.findViewById<TextView>(R.id.personSecondary)
@@ -388,10 +440,10 @@ class YuzTrustFragment : BaseFragment() {
                     item.locked -> str(R.string.yuz_trust_locked_desc, name)
                     else -> str(R.string.yuz_trust_active_desc, name)
                 }
-                // "Ko'rish" — asosiy va aniq ko'rinadigan amal.
+                // "Kuzatish" — asosiy va aniq ko'rinadigan amal.
                 primary.visibility = View.VISIBLE
                 primary.isEnabled = true
-                primary.text = str(R.string.yuz_trust_view)
+                primary.text = str(R.string.yuz_trust_watch)
                 primary.setPadding(dp(16), dp(6), dp(16), dp(6))
                 primary.minHeight = dp(40)
                 primary.textSize = 14f
@@ -431,12 +483,24 @@ class YuzTrustFragment : BaseFragment() {
 
     // ---------------------------------------------------------------- actions
 
+    private suspend fun publishNow() {
+        try {
+            TrustSnapshotBuilder.publish(currentAccount)
+        } catch (e: Exception) {
+            Log.e(TAG, "publish", e)
+        }
+    }
+
     private fun accept(peerUid: String) {
         if (busy || uid.isBlank()) return
         busy = true
         scope?.launch {
-            TrustStore.accept(uid, peerUid, share = true)
-            TrustSnapshotBuilder.publish(currentAccount)
+            try {
+                TrustStore.accept(uid, peerUid, share = true)
+                publishNow()
+            } catch (e: Exception) {
+                Log.e(TAG, "accept", e)
+            }
             busy = false
             toast(R.string.yuz_trust_accepted_toast)
         }
@@ -446,8 +510,12 @@ class YuzTrustFragment : BaseFragment() {
         if (busy || uid.isBlank()) return
         busy = true
         scope?.launch {
-            TrustStore.decline(uid, peerUid)
-            TrustSnapshotBuilder.publish(currentAccount)
+            try {
+                TrustStore.decline(uid, peerUid)
+                publishNow()
+            } catch (e: Exception) {
+                Log.e(TAG, "decline", e)
+            }
             busy = false
             toast(R.string.yuz_trust_declined_toast)
         }
@@ -457,8 +525,12 @@ class YuzTrustFragment : BaseFragment() {
         if (busy || uid.isBlank()) return
         busy = true
         scope?.launch {
-            TrustStore.revokeIncoming(uid, peerUid)
-            TrustSnapshotBuilder.publish(currentAccount)
+            try {
+                TrustStore.revokeIncoming(uid, peerUid)
+                publishNow()
+            } catch (e: Exception) {
+                Log.e(TAG, "revoke", e)
+            }
             busy = false
             toast(R.string.yuz_trust_revoked_toast)
         }
@@ -467,8 +539,12 @@ class YuzTrustFragment : BaseFragment() {
     private fun setShare(peerUid: String, share: Boolean) {
         if (uid.isBlank()) return
         scope?.launch {
-            TrustStore.setShare(uid, peerUid, share)
-            TrustSnapshotBuilder.publish(currentAccount)
+            try {
+                TrustStore.setShare(uid, peerUid, share)
+                publishNow()
+            } catch (e: Exception) {
+                Log.e(TAG, "setShare", e)
+            }
         }
     }
 
@@ -487,46 +563,62 @@ class YuzTrustFragment : BaseFragment() {
     /** Approver: mustahkamlangan ulanishni ochish uchun ruxsat so'raydi. */
     private fun askUnlockPermission(peerUid: String, name: String) {
         if (busy || uid.isBlank()) return
-        val themed = themedContext ?: return
-        AlertDialog.Builder(themed)
-            .setTitle(str(R.string.yuz_trust_unlock_dialog_title))
-            .setMessage(str(R.string.yuz_trust_unlock_request_desc, name))
-            .setPositiveButton(str(R.string.yuz_trust_unlock_request)) { _, _ ->
-                busy = true
-                scope?.launch {
-                    TrustStore.requestUnlock(uid, peerUid)
-                    busy = false
-                    toast(R.string.yuz_trust_unlock_request_toast, name)
+        val themed = dialogContext() ?: return
+        try {
+            AlertDialog.Builder(themed)
+                .setTitle(str(R.string.yuz_trust_unlock_dialog_title))
+                .setMessage(str(R.string.yuz_trust_unlock_request_desc, name))
+                .setPositiveButton(str(R.string.yuz_trust_unlock_request)) { _, _ ->
+                    busy = true
+                    scope?.launch {
+                        try {
+                            TrustStore.requestUnlock(uid, peerUid)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "requestUnlock", e)
+                        }
+                        busy = false
+                        toast(R.string.yuz_trust_unlock_request_toast, name)
+                    }
                 }
-            }
-            .setNegativeButton(str(android.R.string.cancel), null)
-            .show()
+                .setNegativeButton(str(android.R.string.cancel), null)
+                .show()
+        } catch (e: Exception) {
+            Log.e(TAG, "unlock dialog", e)
+        }
     }
 
     /** Requester: approverning ochish so'rovini hal qiladi. */
     private fun showResolveUnlock(item: TrustStore.Outgoing, name: String) {
         if (unlockDialog?.isShowing == true) return
-        val themed = themedContext ?: return
-        val dialog = AlertDialog.Builder(themed)
-            .setTitle(str(R.string.yuz_trust_unlock_dialog_title))
-            .setMessage(str(R.string.yuz_trust_unlock_dialog_desc, name))
-            .setPositiveButton(str(R.string.yuz_trust_unlock_allow)) { _, _ ->
-                resolveUnlock(item.peerUid, true)
-            }
-            .setNegativeButton(str(R.string.yuz_trust_unlock_deny)) { _, _ ->
-                resolveUnlock(item.peerUid, false)
-            }
-            .create()
-        dialog.setOnDismissListener { if (unlockDialog === dialog) unlockDialog = null }
-        unlockDialog = dialog
-        dialog.show()
+        val themed = dialogContext() ?: return
+        try {
+            val dialog = AlertDialog.Builder(themed)
+                .setTitle(str(R.string.yuz_trust_unlock_dialog_title))
+                .setMessage(str(R.string.yuz_trust_unlock_dialog_desc, name))
+                .setPositiveButton(str(R.string.yuz_trust_unlock_allow)) { _, _ ->
+                    resolveUnlock(item.peerUid, true)
+                }
+                .setNegativeButton(str(R.string.yuz_trust_unlock_deny)) { _, _ ->
+                    resolveUnlock(item.peerUid, false)
+                }
+                .create()
+            dialog.setOnDismissListener { if (unlockDialog === dialog) unlockDialog = null }
+            unlockDialog = dialog
+            dialog.show()
+        } catch (e: Exception) {
+            Log.e(TAG, "resolve unlock dialog", e)
+        }
     }
 
     private fun resolveUnlock(peerUid: String, allow: Boolean) {
         if (busy || uid.isBlank()) return
         busy = true
         scope?.launch {
-            TrustStore.resolveUnlock(uid, peerUid, allow)
+            try {
+                TrustStore.resolveUnlock(uid, peerUid, allow)
+            } catch (e: Exception) {
+                Log.e(TAG, "resolveUnlock", e)
+            }
             busy = false
             toast(
                 if (allow) R.string.yuz_trust_unlock_allowed_toast
@@ -535,80 +627,87 @@ class YuzTrustFragment : BaseFragment() {
         }
     }
 
-    /** Vertikal ⋮ menyusi — bekor qilish va qulf faqat shu yerda. */
+    /** Vertikal ⋮ menyusi — o'chirish va doimo ruxsatsiz kuzatish. */
     private fun showOverflow(item: TrustStore.Outgoing, name: String) {
-        val themed = themedContext ?: return
-        val labels = ArrayList<String>(4)
-        val actions = ArrayList<() -> Unit>(4)
-        labels.add(str(R.string.yuz_trust_more_view))
-        actions.add { presentFragment(YuzTrustViewerFragment(item.peerUid, name), false) }
-        if (item.isActive) {
-            when {
-                item.unlockRequested -> {
-                    labels.add(str(R.string.yuz_trust_unlock_request))
-                    actions.add { showResolveUnlock(item, name) }
-                }
-                item.locked -> {
-                    labels.add(str(R.string.yuz_trust_unlock))
-                    actions.add { confirmSetLock(item.peerUid, name, false) }
-                }
-                else -> {
-                    labels.add(str(R.string.yuz_trust_lock))
-                    actions.add { confirmSetLock(item.peerUid, name, true) }
-                }
-            }
-            labels.add(str(R.string.yuz_trust_revoke))
-            actions.add { confirmUnlink(item.peerUid, name) }
-        } else {
-            labels.add(str(R.string.yuz_trust_remove))
-            actions.add { cancelSent(item.peerUid) }
+        val themed = dialogContext() ?: return
+        val labels = ArrayList<String>(3)
+        val actions = ArrayList<() -> Unit>(3)
+        labels.add(str(R.string.yuz_trust_remove))
+        actions.add {
+            if (item.isActive) confirmUnlink(item.peerUid, name) else cancelSent(item.peerUid)
         }
-        AlertDialog.Builder(themed)
-            .setTitle(name)
-            .setItems(labels.toTypedArray()) { dialog, which ->
-                dialog.dismiss()
-                actions.getOrNull(which)?.invoke()
+        if (item.isActive) {
+            if (item.locked) {
+                labels.add(str(R.string.yuz_trust_watch_free_on))
+                actions.add { toast(R.string.yuz_trust_watch_free_active_toast) }
+            } else {
+                labels.add(str(R.string.yuz_trust_watch_free))
+                actions.add { openWatchFree(item.peerUid, name) }
             }
-            .setNegativeButton(str(android.R.string.cancel), null)
-            .show()
+            // Kuzatilayotgan odam qulfni ochishni so'rasa, javob berish yo'li.
+            if (item.unlockRequested) {
+                labels.add(str(R.string.yuz_trust_unlock_dialog_title))
+                actions.add { showResolveUnlock(item, name) }
+            }
+        }
+        try {
+            AlertDialog.Builder(themed)
+                .setTitle(name)
+                .setItems(labels.toTypedArray()) { dialog, which ->
+                    dialog.dismiss()
+                    actions.getOrNull(which)?.invoke()
+                }
+                .setNegativeButton(str(android.R.string.cancel), null)
+                .show()
+        } catch (e: Exception) {
+            Log.e(TAG, "overflow dialog", e)
+        }
     }
 
-    private fun confirmSetLock(peerUid: String, name: String, locked: Boolean) {
-        val themed = themedContext ?: return
-        AlertDialog.Builder(themed)
-            .setTitle(str(if (locked) R.string.yuz_trust_lock_dialog_title else R.string.yuz_trust_unlock))
-            .setMessage(
-                if (locked) str(R.string.yuz_trust_lock_dialog_desc, name)
-                else str(R.string.yuz_trust_unlock_confirm_desc, name)
-            )
-            .setPositiveButton(str(if (locked) R.string.yuz_trust_lock else R.string.yuz_trust_unlock)) { _, _ ->
-                setLock(peerUid, locked)
-            }
-            .setNegativeButton(str(android.R.string.cancel), null)
-            .show()
-    }
-
-    private fun setLock(peerUid: String, locked: Boolean) {
+    /** "Doimo ruxsatsiz kuzatish" — faqat YuzGram Premium uchun. */
+    private fun openWatchFree(peerUid: String, name: String) {
         if (busy || uid.isBlank()) return
-        busy = true
+        if (!YuzPremiumGate.isPremium(currentAccount, ctx())) {
+            YuzPremiumGate.showWatchFreeRequired(this)
+            return
+        }
+        val themed = dialogContext() ?: return
+        try {
+            AlertDialog.Builder(themed)
+                .setTitle(str(R.string.yuz_trust_watch_free))
+                .setMessage(str(R.string.yuz_trust_watch_free_confirm_desc, name))
+                .setPositiveButton(str(R.string.yuz_trust_watch_free)) { _, _ -> enableWatchFree(peerUid) }
+                .setNegativeButton(str(android.R.string.cancel), null)
+                .show()
+        } catch (e: Exception) {
+            Log.e(TAG, "watch-free dialog", e)
+        }
+    }
+
+    private fun enableWatchFree(peerUid: String) {
+        if (uid.isBlank()) return
         scope?.launch {
-            TrustStore.setLocked(uid, peerUid, locked)
-            busy = false
-            toast(
-                if (locked) R.string.yuz_trust_lock_on_toast
-                else R.string.yuz_trust_lock_off_toast
-            )
+            try {
+                TrustStore.setLocked(uid, peerUid, true)
+            } catch (e: Exception) {
+                Log.e(TAG, "setLocked", e)
+            }
+            toast(R.string.yuz_trust_watch_free_toast)
         }
     }
 
     private fun confirmUnlink(peerUid: String, name: String) {
-        val themed = themedContext ?: return
-        AlertDialog.Builder(themed)
-            .setTitle(str(R.string.yuz_trust_revoke))
-            .setMessage(str(R.string.yuz_trust_unlink_confirm_desc, name))
-            .setPositiveButton(str(R.string.yuz_trust_revoke)) { _, _ -> cancelSent(peerUid) }
-            .setNegativeButton(str(android.R.string.cancel), null)
-            .show()
+        val themed = dialogContext() ?: return
+        try {
+            AlertDialog.Builder(themed)
+                .setTitle(str(R.string.yuz_trust_remove))
+                .setMessage(str(R.string.yuz_trust_unlink_confirm_desc, name))
+                .setPositiveButton(str(R.string.yuz_trust_remove)) { _, _ -> cancelSent(peerUid) }
+                .setNegativeButton(str(android.R.string.cancel), null)
+                .show()
+        } catch (e: Exception) {
+            Log.e(TAG, "unlink dialog", e)
+        }
     }
 
     // ---------------------------------------------------------------- picker
@@ -636,46 +735,61 @@ class YuzTrustFragment : BaseFragment() {
             return
         }
         scope?.launch {
-            showChecking()
-            val result = try {
-                TrustStore.usesYuzGram(peerUid)
-            } catch (e: Exception) {
-                null
-            }
-            hideChecking()
-            when (result) {
-                null -> toast(R.string.yuz_trust_error)
-                false -> showNotYuzGram(peerName, telegramId)
-                true -> {
-                    val ok = TrustStore.sendRequest(uid, myName, peerUid, peerName)
-                    if (ok) toast(R.string.yuz_trust_request_sent, peerName)
-                    else toast(R.string.yuz_trust_error)
+            try {
+                showChecking()
+                val result = try {
+                    TrustStore.usesYuzGram(peerUid)
+                } catch (e: Exception) {
+                    Log.e(TAG, "usesYuzGram", e)
+                    null
                 }
+                hideChecking()
+                when (result) {
+                    null -> toast(R.string.yuz_trust_error)
+                    false -> showNotYuzGram(peerName, telegramId)
+                    true -> {
+                        val ok = try {
+                            TrustStore.sendRequest(uid, myName, peerUid, peerName)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "sendRequest", e)
+                            false
+                        }
+                        if (ok) toast(R.string.yuz_trust_request_sent, peerName)
+                        else toast(R.string.yuz_trust_error)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "picked", e)
+                hideChecking()
+                toast(R.string.yuz_trust_error)
             }
         }
     }
 
     private fun showNotYuzGram(peerName: String, telegramId: Long) {
-        val activity = parentActivity ?: return
+        val themed = dialogContext() ?: return
         val name = peerName.ifBlank { str(R.string.yuz_trust_you) }
-        val themed = themedContext ?: activity
-        AlertDialog.Builder(themed)
-            .setTitle(str(R.string.yuz_trust_not_yuzgram_title))
-            .setMessage(str(R.string.yuz_trust_not_yuzgram_desc, name))
-            .setPositiveButton(str(R.string.yuz_trust_not_yuzgram_invite)) { _, _ ->
-                org.telegram.messenger.AndroidUtilities.addToClipboard(
-                    str(R.string.yuz_trust_invite_text)
-                )
-                toast(R.string.yuz_trust_copied)
-                if (telegramId > 0L) {
-                    presentFragment(
-                        org.telegram.ui.ChatActivity.of(telegramId),
-                        false
+        try {
+            AlertDialog.Builder(themed)
+                .setTitle(str(R.string.yuz_trust_not_yuzgram_title))
+                .setMessage(str(R.string.yuz_trust_not_yuzgram_desc, name))
+                .setPositiveButton(str(R.string.yuz_trust_not_yuzgram_invite)) { _, _ ->
+                    org.telegram.messenger.AndroidUtilities.addToClipboard(
+                        str(R.string.yuz_trust_invite_text)
                     )
+                    toast(R.string.yuz_trust_copied)
+                    if (telegramId > 0L) {
+                        presentFragment(
+                            org.telegram.ui.ChatActivity.of(telegramId),
+                            false
+                        )
+                    }
                 }
-            }
-            .setNegativeButton(str(android.R.string.cancel), null)
-            .show()
+                .setNegativeButton(str(android.R.string.cancel), null)
+                .show()
+        } catch (e: Exception) {
+            Log.e(TAG, "not-yuzgram dialog", e)
+        }
     }
 
     // ---------------------------------------------------------------- helpers
@@ -686,20 +800,65 @@ class YuzTrustFragment : BaseFragment() {
         return if (letters.isEmpty()) "?" else letters.joinToString("")
     }
 
+    /** Ro'yxat qatoridagi avatar: Telegram profil surati, bo'lmasa bosh harflar. */
+    private fun bindAvatar(row: View, peerUid: String) {
+        val host = row.findViewById<FrameLayout>(R.id.personAvatarHost) ?: return
+        val tgId = peerUid.removePrefix("tg_").toLongOrNull() ?: return
+        try {
+            val user = MessagesController.getInstance(currentAccount).getUser(tgId) ?: return
+            val avatar = BackupImageView(row.context)
+            avatar.setRoundRadius(dp(22))
+            avatar.setForUserOrChat(user, AvatarDrawable(user))
+            host.addView(avatar, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
+            row.findViewById<TextView>(R.id.personInitials).visibility = View.GONE
+        } catch (e: Exception) {
+            Log.e(TAG, "avatar", e)
+        }
+    }
+
     private fun dp(value: Int): Int =
         org.telegram.messenger.AndroidUtilities.dp(value.toFloat())
 
-    private fun ctx(): Context = themedContext ?: context ?: throw IllegalStateException()
+    /**
+     * Dialoglar faqat faol Activity oynasiga tayangan kontekstda ochiladi —
+     * `createConfigurationContext` asosli konteksda `show()` BadTokenException
+     * beradi.
+     */
+    private fun dialogContext(): Context? {
+        val activity = parentActivity ?: return null
+        if (activity.isFinishing) return null
+        val themed = themedContext ?: return activity
+        var c: Context? = themed
+        while (c is ContextWrapper) {
+            if (c is Activity) return themed
+            c = c.baseContext
+        }
+        return activity
+    }
+
+    private fun ctx(): Context =
+        themedContext ?: context ?: ApplicationLoader.applicationContext
 
     private fun str(resId: Int): String = ctx().getString(resId)
 
     private fun str(resId: Int, vararg args: Any): String = ctx().getString(resId, *args)
 
     private fun toast(resId: Int) {
-        Toast.makeText(ctx(), str(resId), Toast.LENGTH_SHORT).show()
+        try {
+            Toast.makeText(ctx(), str(resId), Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.w(TAG, "toast: ${e.message}")
+        }
     }
 
     private fun toast(resId: Int, vararg args: Any) {
-        Toast.makeText(ctx(), str(resId, *args), Toast.LENGTH_LONG).show()
+        try {
+            Toast.makeText(ctx(), str(resId, *args), Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Log.w(TAG, "toast: ${e.message}")
+        }
     }
 }

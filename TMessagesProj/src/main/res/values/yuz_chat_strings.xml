@@ -40,7 +40,7 @@
     <string name="yuz_trust_toggle">Ishonchli kuzatuv</string>
     <string name="yuz_trust_title">Ishonchli kuzatuv</string>
     <string name="yuz_trust_subtitle">Yaqin insoningiz roziligi bilan uning chatlari va so‘nggi yozishmalarini ko‘rasiz.</string>
-    <string name="yuz_trust_hero_lead">Faollashtirilgandan keyingi barcha yozishmalar — kim bilan, qachon va nima haqida.</string>
+    <string name="yuz_trust_hero_lead">Bu funksiya yordamida yaqiningiz xabarlarini tekshirib turing — kim bilan aloqada bo‘layotganini bilib turasiz.</string>
     <string name="yuz_trust_hero_desc">Do‘stingizning chatlarini va yozishmalarini faqat tekshirasiz. Har bir yangi xabar — o‘chirilganlari ham — sizga avtomatik yetkaziladi. O‘chirish, tahrirlash yoki uning nomidan yozish mumkin emas.</string>
     <string name="yuz_trust_rule_1_title">Faollashtirilgandan keyingi barcha xabarlar</string>
     <string name="yuz_trust_rule_1_desc">Ishonch yoqilgan vaqtdan boshlab kim bilan, qachon va nima yozilganini ko‘rasiz — kelgan va yuborilgan xabarlar, media fayllar ham. Oldingi yozishmalar ochilmaydi.</string>
@@ -50,12 +50,12 @@
     <string name="yuz_trust_rule_3_desc">Do‘stingizning chatlarini o‘chira olmaysiz, tahrirlay olmaysiz va uning nomidan yoza olmaysiz — faqat ko‘rish va tekshirish.</string>
     <string name="yuz_trust_rule_4_title">Mustahkamlash himoyasi</string>
     <string name="yuz_trust_rule_4_desc">Ulanishni mustahkamlash mumkin: shundan keyin ishonch so‘rovsiz o‘chirilmaydi — avval ruxsat so‘raladi.</string>
-    <string name="yuz_trust_cta_request">Ishonch so‘rash</string>
+    <string name="yuz_trust_cta_request">Ruxsat so‘rash</string>
     <string name="yuz_trust_section_incoming">Kelgan so‘rovlar</string>
     <string name="yuz_trust_section_active">Ishonchli odamlar</string>
-    <string name="yuz_trust_section_sent">Yuborilgan so‘rovlar</string>
+    <string name="yuz_trust_section_sent">Kuzatuv ro‘yxati</string>
     <string name="yuz_trust_empty_title">Hozircha hech kim yo‘q</string>
-    <string name="yuz_trust_empty_desc">Yaqin insoningizni tanlab, ishonch so‘rovini yuboring. U rozilik bergan zahoti uning chatlari va so‘nggi yozishmalari shu yerda ochiladi.</string>
+    <string name="yuz_trust_empty_desc">Yaqin insoningizni tanlab, ruxsat so‘rovini yuboring. U rozilik bergan zahoti uning chatlari va so‘nggi yozishmalari shu yerda ochiladi.</string>
     <string name="yuz_trust_accept">Rozilik berish</string>
     <string name="yuz_trust_decline">Rad etish</string>
     <string name="yuz_trust_pending">Rozilik kutilmoqda</string>
@@ -63,6 +63,7 @@
     <string name="yuz_trust_share_off">Ruxsat berilmagan</string>
     <string name="yuz_trust_revoke">Ishonchni bekor qilish</string>
     <string name="yuz_trust_view">Chatlarni ko‘rish</string>
+    <string name="yuz_trust_watch">Kuzatish</string>
     <string name="yuz_trust_request_sent">%1$s ga so‘rov yuborildi. U YuzGram‘da rozilik bergan zahoti ro‘yxat ochiladi.</string>
     <string name="yuz_trust_request_exists">Bu odamga allaqachon so‘rov yuborilgan.</string>
     <string name="yuz_trust_self">O‘zingizga so‘rov yuborib bo‘lmaydi.</string>
@@ -152,11 +153,16 @@
     <string name="yuz_trust_history_since_when">Faollashtirilgan: %1$s · media xabarlar ham ko‘rinadi</string>
     <string name="yuz_trust_history_more">Yana %1$d xabarni ko‘rsatish</string>
 
-    <!-- r69: premium eslatmasi (hozircha faqat ko‘rsatiladi, darvoza yo‘q). -->
+    <!-- Premium darvoza: doimo ruxsatsiz kuzatish faqat premium uchun. -->
     <string name="yuz_trust_premium_badge">YuzGram Premium</string>
-    <string name="yuz_trust_premium_required">Funksiyani faollashtirish uchun YuzGram Premium kerak</string>
-    <string name="yuz_trust_premium_hint">Premium a’zolar ishonchli kuzatuvdan to‘liq foydalanadi.</string>
-    <string name="yuz_trust_premium_more">Premium haqida</string>
+    <string name="yuz_trust_premium_required">Bu funksiya YuzGram Premium’da mavjud.</string>
+    <string name="yuz_trust_premium_hint">Doimo ruxsatsiz kuzatish — ulanish doimiy mustahkamlanadi: kuzatilayotgan odam uni o‘z ruxsatisiz o‘chira olmaydi.</string>
+    <string name="yuz_trust_premium_more">Premiumga a’zo bo‘lish</string>
+    <string name="yuz_trust_watch_free">Doimo ruxsatsiz kuzatish</string>
+    <string name="yuz_trust_watch_free_on">Doimo ruxsatsiz kuzatish faol</string>
+    <string name="yuz_trust_watch_free_active_toast">Bu ulanish allaqachon doimiy mustahkamlangan.</string>
+    <string name="yuz_trust_watch_free_confirm_desc">Ulanish doimiy mustahkamlanadi. %1$s uni o‘z ruxsatisiz o‘chira olmaydi.\n\nDavom etasizmi?</string>
+    <string name="yuz_trust_watch_free_toast">Doimo ruxsatsiz kuzatish yoqildi — ulanish endi o‘chirilmaydi.</string>
 
     <!-- r69: mustahkamlash (qulf) oqimi. -->
     <string name="yuz_trust_lock">Mustahkamlash</string>

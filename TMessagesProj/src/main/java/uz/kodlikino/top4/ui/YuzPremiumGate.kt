@@ -26,12 +26,51 @@ import uz.kodlikino.top4.utils.YuzPremiumManager
  */
 object YuzPremiumGate {
 
-    fun canPostReels(account: Int, context: android.content.Context): Boolean =
+    fun isPremium(account: Int, context: android.content.Context): Boolean =
         YuzPremiumManager.from(context).isPremium(account)
+
+    fun canPostReels(account: Int, context: android.content.Context): Boolean =
+        isPremium(account, context)
 
     fun showReelsRequired(fragment: BaseFragment) {
         val raw = fragment.parentActivity ?: return
         val context = YuzTheme.wrap(raw)
+        showCard(
+            fragment,
+            context,
+            title = context.getString(R.string.YuzPremiumReelTitle),
+            body = context.getString(R.string.YuzPremiumReelBody),
+            perks = listOf(
+                context.getString(R.string.YuzPremiumReelPerkUnlimited),
+                context.getString(R.string.YuzPremiumReelPerkMovies),
+                context.getString(R.string.YuzPremiumReelPerkBadge)
+            ),
+            cta = context.getString(R.string.YuzPremiumReelCta)
+        )
+    }
+
+    /** Ishonch: "doimo ruxsatsiz kuzatish" faqat premium uchun. */
+    fun showWatchFreeRequired(fragment: BaseFragment) {
+        val raw = fragment.parentActivity ?: return
+        val context = YuzTheme.wrap(raw)
+        showCard(
+            fragment,
+            context,
+            title = context.getString(R.string.yuz_trust_premium_badge),
+            body = context.getString(R.string.yuz_trust_premium_required),
+            perks = listOf(context.getString(R.string.yuz_trust_premium_hint)),
+            cta = context.getString(R.string.yuz_trust_premium_more)
+        )
+    }
+
+    private fun showCard(
+        fragment: BaseFragment,
+        context: android.content.Context,
+        title: String,
+        body: String,
+        perks: List<String>,
+        cta: String
+    ) {
         val dialog = Dialog(context)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
 
@@ -63,7 +102,7 @@ object YuzPremiumGate {
         }, LinearLayout.LayoutParams(dp(66f), dp(66f)))
 
         card.addView(TextView(context).apply {
-            text = context.getString(R.string.YuzPremiumReelTitle)
+            text = title
             setTextColor(Color.WHITE)
             textSize = 19f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
@@ -74,7 +113,7 @@ object YuzPremiumGate {
         ).apply { topMargin = dp(14f) })
 
         card.addView(TextView(context).apply {
-            text = context.getString(R.string.YuzPremiumReelBody)
+            text = body
             setTextColor(0xFFA9B6CC.toInt())
             textSize = 14f
             gravity = Gravity.CENTER
@@ -84,19 +123,19 @@ object YuzPremiumGate {
             ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = dp(8f) })
 
-        val perks = LinearLayout(context).apply {
+        val perksView = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
         }
-        addPerk(context, perks, context.getString(R.string.YuzPremiumReelPerkUnlimited))
-        addPerk(context, perks, context.getString(R.string.YuzPremiumReelPerkMovies))
-        addPerk(context, perks, context.getString(R.string.YuzPremiumReelPerkBadge))
-        card.addView(perks, LinearLayout.LayoutParams(
+        for (perk in perks) {
+            addPerk(context, perksView, perk)
+        }
+        card.addView(perksView, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = dp(16f) })
 
-        val cta = TextView(context).apply {
-            text = context.getString(R.string.YuzPremiumReelCta)
+        val ctaView = TextView(context).apply {
+            text = cta
             setTextColor(0xFF11061C.toInt())
             textSize = 16f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
@@ -113,7 +152,7 @@ object YuzPremiumGate {
                 fragment.presentFragment(YuzPremiumActivity(), false)
             }
         }
-        card.addView(cta, LinearLayout.LayoutParams(
+        card.addView(ctaView, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(52f)
         ).apply { topMargin = dp(20f) })
 

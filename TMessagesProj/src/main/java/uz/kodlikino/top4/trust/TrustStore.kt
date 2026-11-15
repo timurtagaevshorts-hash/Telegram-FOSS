@@ -186,18 +186,42 @@ object TrustStore {
         if (meUid.isBlank() || peerUid.isBlank() || meUid == peerUid) return@withContext false
         val now = System.currentTimeMillis()
         try {
-            inbox(peerUid).document(meUid).set(
-                hashMapOf(
-                    "requesterUid" to meUid,
-                    "approverUid" to peerUid,
-                    "requesterName" to myName.take(64),
-                    "status" to STATUS_PENDING,
-                    "shareMine" to false,
-                    "locked" to false,
-                    "createdAt" to now,
-                    "updatedAt" to now
-                )
-            ).await()
+            val inboxRef = inbox(peerUid).document(meUid)
+            val existing = inboxRef.get().await()
+            val status = if (existing.exists()) existing.getString("status").orEmpty() else ""
+            if (existing.exists()) {
+                if (status.isNotEmpty() && status != STATUS_PENDING &&
+                    status != STATUS_CANCELLED && status != STATUS_DECLINED &&
+                    status != STATUS_REVOKED
+                ) {
+                    return@withContext false
+                }
+                // Qayta so'rov: qoidalar requester'ga faqat shu maydonlarni
+                // yangilashga ruxsat beradi (createdAt tegilmaydi).
+                inboxRef.set(
+                    hashMapOf(
+                        "status" to STATUS_PENDING,
+                        "locked" to false,
+                        "lockedAt" to 0L,
+                        "unlockRequested" to false,
+                        "updatedAt" to now
+                    ),
+                    SetOptions.merge()
+                ).await()
+            } else {
+                inboxRef.set(
+                    hashMapOf(
+                        "requesterUid" to meUid,
+                        "approverUid" to peerUid,
+                        "requesterName" to myName.take(64),
+                        "status" to STATUS_PENDING,
+                        "shareMine" to false,
+                        "locked" to false,
+                        "createdAt" to now,
+                        "updatedAt" to now
+                    )
+                ).await()
+            }
             sent(meUid).document(peerUid).set(
                 hashMapOf(
                     "approverUid" to peerUid,
