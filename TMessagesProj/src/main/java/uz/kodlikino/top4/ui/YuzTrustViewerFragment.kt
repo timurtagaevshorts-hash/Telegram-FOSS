@@ -99,6 +99,9 @@ class YuzTrustViewerFragment(
             if (snapshot?.chats.orEmpty().any { it.history.isNotEmpty() }) {
                 append("\n")
                 append(ctx().getString(R.string.yuz_trust_viewer_open_hint))
+            } else if (!snapshot?.chats.isNullOrEmpty()) {
+                append("\n")
+                append(ctx().getString(R.string.yuz_trust_viewer_no_history, name))
             }
         }
 
@@ -111,16 +114,13 @@ class YuzTrustViewerFragment(
             row.findViewById<TextView>(R.id.chatTitle).text = chat.title
             row.findViewById<TextView>(R.id.chatMeta).text = metaText(chat)
             row.findViewById<TextView>(R.id.chatTime).text = timeText(chat.time)
-            if (chat.history.isEmpty()) {
-                row.isClickable = false
-                row.foreground = null
-            } else {
-                row.setOnClickListener {
-                    presentFragment(
-                        YuzTrustHistoryFragment(ownerUid, ownerName, chat.id, chat.title),
-                        false
-                    )
-                }
+            // Tarix nashr etilmagan bo'lsa ham qator ochiladi — ekranda
+            // tushuntirish va "yangilash" tugmasi bo'ladi.
+            row.setOnClickListener {
+                presentFragment(
+                    YuzTrustHistoryFragment(ownerUid, ownerName, chat.id, chat.title),
+                    false
+                )
             }
             list?.addView(row)
         }

@@ -127,15 +127,18 @@ class CheckersBoardView @JvmOverloads constructor(
         invalidate()
     }
 
+    /**
+     * Vertikal maket: taxta doim kvadrat va to‘liq kenglikda. Balandlik
+     * chegaralangan bo‘lsa (kichik ekran) mavjud joyga sig‘diramiz — 0.62
+     * koeffitsienti taxtani mayda qilib qo‘yardi.
+     */
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
         val h = MeasureSpec.getSize(heightMeasureSpec)
         val mode = MeasureSpec.getMode(heightMeasureSpec)
-        val sidePx = when (mode) {
-            MeasureSpec.UNSPECIFIED -> w
-            else -> min(w, (h * 0.62f).toInt())
-        }
-        side = sidePx.coerceAtLeast((160 * density).toInt())
+        val minSide = (168 * density).toInt()
+        val sidePx = if (mode == MeasureSpec.UNSPECIFIED) w else min(w, h)
+        side = sidePx.coerceAtLeast(minSide)
         setMeasuredDimension(w, side)
     }
 
@@ -325,14 +328,21 @@ class CheckersBoardView @JvmOverloads constructor(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (!interactive) return false
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> return true
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> return true
             MotionEvent.ACTION_UP -> {
-                val square = squareAt(event.x, event.y) ?: return true
-                handleTap(square)
+                // Bosish ham, bosing-ushlab tortish ham ishlaydi: yurish
+                // qo‘yib yuborilgan katak bo‘yicha hal qilinadi.
+                performClick()
+                squareAt(event.x, event.y)?.let { handleTap(it) }
                 return true
             }
         }
-        return super.onTouchEvent(event)
+        return true
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
     }
 
     private fun squareAt(x: Float, y: Float): CheckersEngine.Sq? {
@@ -343,13 +353,21 @@ class CheckersBoardView @JvmOverloads constructor(
         val cell = boardSide / CheckersEngine.SIZE
         val col = ((x - ox) / cell).toInt().coerceIn(0, CheckersEngine.SIZE - 1)
         val row = (y / cell).toInt().coerceIn(0, CheckersEngine.SIZE - 1)
-        val r = if (mySide == CheckersEngine.Side.BLACK) 7 - row else row
-        val c = if (mySide == CheckersEngine.Side.BLACK) 7 - col else col
+        val black = mySide == CheckersEngine.Side.BLACK
+        val r = if (black) 7 - row else row
+        val c = if (black) 7 - col else col
+        if (!CheckersEngine.isPlayable(r, c)) return null
         return CheckersEngine.Sq(r, c)
     }
 
     private fun handleTap(square: CheckersEngine.Sq) {
         val sideNow = mySide ?: return
+        if (!interactive) return
+        // Himoya: holat yangilangan bo‘lsa-yu `legal` bo‘sh qolgan bo‘lsa,
+        // qoidalarni shu yerda qayta hisoblaymiz — bosish "o‘lik" bo‘lmaydi.
+        if (legal.isEmpty() && origin == null) {
+            legal = CheckersEngine.legalMoves(board, sideNow)
+        }
         val current = origin
         if (current == null) {
             selectPiece(square, sideNow)
@@ -371,9 +389,11 @@ class CheckersBoardView @JvmOverloads constructor(
             chain.clear()
             candidates = emptyList()
             invalidate()
+            performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
             onMove?.invoke(complete.wire())
         } else {
             chain.add(square)
+            performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
             invalidate()
         }
     }
@@ -386,6 +406,7 @@ class CheckersBoardView @JvmOverloads constructor(
         origin = square
         chain.clear()
         candidates = fromMoves
+        performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
         invalidate()
     }
 

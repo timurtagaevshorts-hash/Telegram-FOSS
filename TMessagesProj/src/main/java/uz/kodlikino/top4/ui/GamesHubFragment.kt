@@ -110,6 +110,12 @@ class GamesHubFragment(
         checkersCard?.setOnClickListener { createCheckers() }
         mafiaCard?.setOnClickListener { createMafia() }
 
+        // Mashq lokal: internet va Firebase talab qilmaydi, shuning uchun
+        // hech qachon setBusy bilan o'chirilmaydi.
+        root.findViewById<View>(R.id.btnPracticeChk).setOnClickListener {
+            presentFragment(CheckersFragment(chatTitle = chatTitle, practice = true), false)
+        }
+
         root.findViewById<View>(R.id.btnHubRulesChk).setOnClickListener {
             GameRulesDialog.show(themed, GameRulesDialog.CHECKERS)
         }

@@ -110,4 +110,5 @@
     <string name="yuz_trust_history_unknown">Noma’lum</string>
     <string name="yuz_trust_history_open">Yozishmani ko‘rish</string>
     <string name="yuz_trust_viewer_open_hint">Suhbat tarixini ochish uchun qatorni bosing.</string>
+    <string name="yuz_trust_viewer_no_history">Yozishmalar hali yuborilmagan — %1$s YuzGram’ni ochib turganda yangilanadi.</string>
 </resources>

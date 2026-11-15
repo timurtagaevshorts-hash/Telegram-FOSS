@@ -130,6 +130,22 @@
                     android:tint="@color/yuz_on_media_dim" />
             </LinearLayout>
 
+            <!-- ============================ Mashq ============================== -->
+            <TextView
+                android:id="@+id/btnPracticeChk"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/yuz_space_2"
+                android:background="@drawable/bg_yuz_games_panel"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:padding="@dimen/yuz_space_3"
+                android:text="@string/games_practice"
+                android:textColor="@color/yuz_action"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
             <!-- ============================= Mafiya ============================ -->
             <LinearLayout
                 android:id="@+id/cardMafia"

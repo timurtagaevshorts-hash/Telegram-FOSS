@@ -25,6 +25,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.BaseFragment
+import uz.kodlikino.top4.games.CheckersBot
 import uz.kodlikino.top4.games.CheckersEngine
 import uz.kodlikino.top4.games.CheckersRoom
 import uz.kodlikino.top4.games.GameSfx
@@ -40,7 +41,8 @@ import java.util.Locale
  */
 class CheckersFragment(
     private val roomId: String = "",
-    private val chatTitle: String = ""
+    private val chatTitle: String = "",
+    private val practice: Boolean = false
 ) : BaseFragment() {
 
     private enum class FinishAction { NONE, REMATCH, TIMEOUT }
@@ -53,6 +55,18 @@ class CheckersFragment(
     private var busy = false
     private var liveActive = false
     private var finishAction = FinishAction.NONE
+
+    /** Optimistik yurish — server javobigacha taxtada shu holat turadi. */
+    private var pendingLocal: CheckersRoom.Game? = null
+    private var pendingBase: CheckersRoom.Game? = null
+    private var pendingWire: String? = null
+    private var pendingAt = 0L
+    private var fetching = false
+    private var listenerWarned = false
+
+    /** Mashq rejimi: lokal partiya, bot qora donalarda. */
+    private var practiceMeUid = ""
+    private var botThinking = false
 
     private var content: View? = null
     private var waitingPanel: View? = null
@@ -88,6 +102,7 @@ class CheckersFragment(
     private var prevFinished = false
     private var prevPieces = -1
     private var lastAutoClaimAt = 0L
+    private var lastSnapshotAt = 0L
 
     private val clockHandler = Handler(Looper.getMainLooper())
     private val clockTick = object : Runnable {
@@ -98,6 +113,30 @@ class CheckersFragment(
             clockHandler.postDelayed(this, if (GameVoice.isRecording()) 200L else 1000L)
         }
     }
+
+    /**
+     * Tinglovchi jim qolsa yoki optimistik yurish juda uzoq tasdiqlanmasa —
+     * holatni to‘g‘ridan-to‘g‘ri so‘rab olamiz. Har 2.5 soniyada faqat shart
+     * bajarilganda o‘qiydi, shuning uchun ortiqcha so‘rov yubormaydi.
+     */
+    private val syncTick = object : Runnable {
+        override fun run() {
+            if (!practice && liveActive) {
+                val now = GamesCore.now()
+                val never = lastSnapshotAt == 0L
+                val stuck = pendingWire != null && now - pendingAt > 6_000L
+                if (never || stuck) syncFromServer()
+                if (pendingWire != null && !busy && now - pendingAt > 12_000L) {
+                    pendingWire = null
+                    pendingLocal = null
+                    pendingBase = null
+                }
+            }
+            clockHandler.postDelayed(this, 2_500L)
+        }
+    }
+
+    private val botMove = Runnable { runBotMove() }
 
     override fun createView(context: Context): View {
         val themed = YuzTheme.wrap(context)
@@ -112,7 +151,9 @@ class CheckersFragment(
 
         root.findViewById<ImageButton>(R.id.btnChkBack)
             .setOnClickListener { removeSelfFromStack() }
-        root.findViewById<TextView>(R.id.tvChkSubtitle).text = chatTitle
+        root.findViewById<TextView>(R.id.tvChkSubtitle).text =
+            if (practice) str(R.string.chk_practice_subtitle)
+            else chatTitle
 
         content = root.findViewById(R.id.chkContent)
         waitingPanel = root.findViewById(R.id.chkWaitingPanel)
@@ -133,6 +174,15 @@ class CheckersFragment(
         btnRules = root.findViewById(R.id.btnChkRules)
         voiceToggle = root.findViewById(R.id.btnChkVoiceToggle)
         reactionOverlay = root.findViewById(R.id.chkReactionOverlay)
+
+        if (practice) {
+            // Mashq lokal: onlayn reaksiya, ovoz va soatlar keraksiz.
+            root.findViewById<View>(R.id.chkReactionBar).visibility = View.GONE
+            mic?.visibility = View.GONE
+            voiceView?.visibility = View.GONE
+            oppClock?.visibility = View.GONE
+            myClock?.visibility = View.GONE
+        }
 
         voiceEnabled = GameVoice.isEnabled(themed)
         GameReactionView.buildChips(root.findViewById(R.id.chkReactionRow)) { sendReaction(it) }
@@ -168,20 +218,34 @@ class CheckersFragment(
         super.onResume()
         actionBar?.visibility = View.GONE
         if (fragmentView == null) return
-        liveActive = true
-        scope?.launch {
-            try {
-                GamesCore.signIn(currentAccount)
-            } catch (_: Exception) {
-                liveActive = false
-                toast(R.string.games_sign_in_error)
-                return@launch
+        if (practice) {
+            startPractice()
+        } else {
+            liveActive = true
+            scope?.launch {
+                try {
+                    GamesCore.signIn(currentAccount)
+                } catch (_: Exception) {
+                    // Sessiya ochilmasa ham oflayn kesh bilan davom etamiz.
+                    toast(R.string.games_sign_in_error)
+                }
+                if (!liveActive || listener != null) return@launch
+                listener = CheckersRoom.listen(
+                    roomId,
+                    onUpdate = { g -> onGame(g) },
+                    onError = { onListenerError() }
+                )
+                syncFromServer()
             }
-            if (!liveActive || listener != null) return@launch
-            listener = CheckersRoom.listen(roomId) { g -> onGame(g) }
+            clockHandler.removeCallbacks(syncTick)
+            clockHandler.post(syncTick)
         }
         clockHandler.removeCallbacks(clockTick)
         clockHandler.post(clockTick)
+        if (practice && game?.turn == CheckersEngine.Side.BLACK) {
+            clockHandler.removeCallbacks(botMove)
+            clockHandler.postDelayed(botMove, 500L)
+        }
     }
 
     override fun onPause() {
@@ -189,6 +253,9 @@ class CheckersFragment(
         listener?.remove()
         listener = null
         clockHandler.removeCallbacks(clockTick)
+        clockHandler.removeCallbacks(syncTick)
+        clockHandler.removeCallbacks(botMove)
+        botThinking = false
         GameVoice.cancel()
         GameVoice.stopPlayback()
         playingVoiceAt = 0L
@@ -201,6 +268,8 @@ class CheckersFragment(
         listener?.remove()
         listener = null
         clockHandler.removeCallbacks(clockTick)
+        clockHandler.removeCallbacks(syncTick)
+        clockHandler.removeCallbacks(botMove)
         GameVoice.release()
         GameSfx.release()
         scope?.cancel()
@@ -226,23 +295,79 @@ class CheckersFragment(
     // ----------------------------------------------------------------- state
 
     private fun onGame(g: CheckersRoom.Game?) {
+        if (practice) return
         if (g == null) {
             toast(R.string.chk_popped)
             removeSelfFromStack()
             return
         }
+        lastSnapshotAt = GamesCore.now()
+        val wire = pendingWire
+        if (wire != null) {
+            val resolved = g.lastMove == wire || g.board == pendingLocal?.board
+            // Yurishdan oldingi surat kelsa — optimistik doskani saqlab turamiz.
+            if (!resolved) return
+        }
+        pendingWire = null
+        pendingLocal = null
+        pendingBase = null
         game = g
         render(g)
         updateClocks()
     }
 
+    /** Tinglovchi xatosi — bir marta ogohlantiramiz va holatni so'rab olamiz. */
+    private fun onListenerError() {
+        if (listenerWarned) return
+        listenerWarned = true
+        toast(R.string.chk_sync_retry)
+        syncFromServer()
+    }
+
+    /** Snapshot kelmasa yoki yurish tasdiqlanmasa — holatni to'g'ridan-to'g'ri o'qiymiz. */
+    private fun syncFromServer() {
+        if (practice || roomId.isBlank() || fetching || !liveActive) return
+        fetching = true
+        scope?.launch {
+            val fresh = try {
+                CheckersRoom.fetch(roomId)
+            } catch (e: Exception) {
+                null
+            }
+            fetching = false
+            if (fresh != null) {
+                lastSnapshotAt = GamesCore.now()
+                onGame(fresh)
+            }
+        }
+    }
+
+    private fun myUid(): String =
+        if (practice) practiceMeUid else GamesCore.uidOf(currentAccount)
+
+    /**
+     * Doskada qaysi tomondaman. Uid mos kelmasa (masalan, hisob qayta
+     * ulangan bo'lsa) Telegram ID bo'yicha qo'shimcha urinamiz — shunda
+     * o'yin "o'lik" bo'lib qolmaydi.
+     */
+    private fun sideOf(g: CheckersRoom.Game): CheckersEngine.Side? {
+        g.sideOf(myUid())?.let { return it }
+        if (practice) return null
+        val tgId = GamesCore.telegramId(currentAccount)
+        if (tgId <= 0L) return null
+        val player = g.players.firstOrNull { it.tgId == tgId } ?: return null
+        return if (player.seat == 0) CheckersEngine.Side.WHITE else CheckersEngine.Side.BLACK
+    }
+
     private fun render(g: CheckersRoom.Game) {
-        val me = GamesCore.uidOf(currentAccount)
-        val mySide = g.sideOf(me)
+        val me = myUid()
+        val mySide = sideOf(g)
         val waiting = g.status == GamesCore.STATUS_INVITE
 
-        syncVoice(g, me)
-        syncReaction(g)
+        if (!practice) {
+            syncVoice(g, me)
+            syncReaction(g)
+        }
 
         waitingPanel?.visibility = if (waiting) View.VISIBLE else View.GONE
         content?.visibility = if (waiting) View.GONE else View.VISIBLE
@@ -269,7 +394,7 @@ class CheckersFragment(
             turn = g.turn,
             lastFrom = g.lastFrom,
             lastTo = g.lastTo,
-            interactive = g.status == GamesCore.STATUS_ACTIVE && !busy
+            interactive = g.status == GamesCore.STATUS_ACTIVE
         )
 
         status?.text = statusText(g, me, mySide)
@@ -298,7 +423,7 @@ class CheckersFragment(
         meta: TextView?,
         game: CheckersRoom.Game
     ) {
-        val me = GamesCore.uidOf(currentAccount)
+        val me = myUid()
         val avatarView = avatar ?: return
         if (player == null) {
             avatarView.text = "?"
@@ -364,8 +489,8 @@ class CheckersFragment(
 
     private fun updateClocks() {
         val g = game ?: return
-        val me = GamesCore.uidOf(currentAccount)
-        val mySide = g.sideOf(me)
+        if (practice) return
+        val mySide = sideOf(g)
         if (g.status != GamesCore.STATUS_ACTIVE || g.deadlineAt <= 0L) {
             paintClock(myClock, null, false)
             paintClock(oppClock, null, false)
@@ -403,9 +528,42 @@ class CheckersFragment(
     // --------------------------------------------------------------- actions
 
     private fun submitMove(wire: String) {
-        if (busy || wire.isBlank()) return
+        if (wire.isBlank()) return
+        if (practice) {
+            submitPracticeMove(wire)
+            return
+        }
+        if (busy) return
+        val current = game ?: return
+        val side = sideOf(current) ?: return
+        if (current.status != GamesCore.STATUS_ACTIVE || current.turn != side) return
+
+        val move = CheckersEngine.moveFromWire(current.board, side, wire)
+        val applied = move?.let { CheckersEngine.apply(current.board, it, side, current.idlePlies) }
+        if (move == null || applied == null) {
+            board?.clearSelection()
+            toast(R.string.chk_illegal)
+            return
+        }
+
+        // Lokal-first: doska darhol yangilanadi, saqlash fonda ketadi.
+        val optimistic = current.copy(
+            board = applied.board,
+            turn = applied.nextTurn,
+            idlePlies = applied.idlePlies,
+            lastMove = move.wire(),
+            lastFrom = move.from.key(),
+            lastTo = move.to.key()
+        )
+        pendingBase = current
+        pendingLocal = optimistic
+        pendingWire = move.wire()
+        pendingAt = GamesCore.now()
+        game = optimistic
+        render(optimistic)
+        updateClocks()
+
         busy = true
-        game?.let { render(it) }
         scope?.launch {
             val result = try {
                 CheckersRoom.move(currentAccount, roomId, wire)
@@ -414,18 +572,192 @@ class CheckersFragment(
             }
             busy = false
             when (result) {
-                CheckersRoom.MoveResult.OK -> Unit
+                CheckersRoom.MoveResult.OK -> pendingAt = GamesCore.now()
                 CheckersRoom.MoveResult.ILLEGAL,
                 CheckersRoom.MoveResult.NOT_TURN,
                 CheckersRoom.MoveResult.NOT_PLAYER -> {
+                    rollbackMove()
                     board?.clearSelection()
                     toast(R.string.chk_illegal)
                 }
-                CheckersRoom.MoveResult.TIMEOUT -> toast(R.string.chk_timeout_claim)
-                else -> toast(R.string.games_error)
+                CheckersRoom.MoveResult.TIMEOUT -> {
+                    rollbackMove()
+                    toast(R.string.chk_timeout_claim)
+                }
+                else -> {
+                    rollbackMove()
+                    toast(R.string.games_error)
+                }
             }
-            game?.let { render(it) }
         }
+    }
+
+    /** Saqlash rad etildi — doskani tasdiqlangan holatga qaytaramiz. */
+    private fun rollbackMove() {
+        val base = pendingBase
+        pendingLocal = null
+        pendingBase = null
+        pendingWire = null
+        if (base != null) {
+            game = base
+            render(base)
+            updateClocks()
+        }
+        syncFromServer()
+    }
+
+    // -------------------------------------------------------------- practice
+
+    private fun startPractice() {
+        if (practiceMeUid.isBlank()) {
+            practiceMeUid = GamesCore.uidOf(currentAccount).ifBlank { "practice_me" }
+        }
+        if (game != null) return
+        val fresh = buildPractice(
+            CheckersEngine.initialBoard(),
+            CheckersEngine.Side.WHITE,
+            0
+        )
+        game = fresh
+        render(fresh)
+        updateClocks()
+    }
+
+    private fun applyPractice(next: CheckersRoom.Game) {
+        game = next
+        render(next)
+        updateClocks()
+    }
+
+    private fun submitPracticeMove(wire: String) {
+        val g = game ?: return
+        if (g.status != GamesCore.STATUS_ACTIVE) return
+        if (g.turn != CheckersEngine.Side.WHITE) return
+        val move = CheckersEngine.moveFromWire(g.board, CheckersEngine.Side.WHITE, wire)
+        val applied = move?.let {
+            CheckersEngine.apply(g.board, it, CheckersEngine.Side.WHITE, g.idlePlies)
+        }
+        if (move == null || applied == null) {
+            board?.clearSelection()
+            toast(R.string.chk_illegal)
+            return
+        }
+        applyPractice(
+            buildPractice(
+                board = applied.board,
+                turn = applied.nextTurn,
+                idlePlies = applied.idlePlies,
+                lastMove = move.wire(),
+                lastFrom = move.from.key(),
+                lastTo = move.to.key(),
+                end = applied.end
+            )
+        )
+        if (applied.end == null) {
+            clockHandler.removeCallbacks(botMove)
+            clockHandler.postDelayed(botMove, 600L)
+        }
+    }
+
+    private fun runBotMove() {
+        if (!practice) return
+        val g = game ?: return
+        if (g.status != GamesCore.STATUS_ACTIVE) return
+        if (g.turn != CheckersEngine.Side.BLACK) return
+        if (botThinking) return
+        botThinking = true
+
+        val ended = CheckersEngine.evaluateEnd(g.board, g.turn, g.idlePlies)
+        if (ended != null) {
+            botThinking = false
+            applyPractice(buildPractice(g.board, g.turn, g.idlePlies, end = ended))
+            return
+        }
+        val move = try {
+            CheckersBot.chooseMove(g.board, CheckersEngine.Side.BLACK, g.idlePlies)
+        } catch (e: Exception) {
+            null
+        }
+        val applied = move?.let {
+            CheckersEngine.apply(g.board, it, CheckersEngine.Side.BLACK, g.idlePlies)
+        }
+        botThinking = false
+        if (move == null || applied == null) return
+        applyPractice(
+            buildPractice(
+                board = applied.board,
+                turn = applied.nextTurn,
+                idlePlies = applied.idlePlies,
+                lastMove = move.wire(),
+                lastFrom = move.from.key(),
+                lastTo = move.to.key(),
+                end = applied.end
+            )
+        )
+    }
+
+    /** Mashq uchun lokal `Game` — Firestore'ga tegmaydi, bot qora donalarda. */
+    private fun buildPractice(
+        board: String,
+        turn: CheckersEngine.Side,
+        idlePlies: Int,
+        lastMove: String = "",
+        lastFrom: String = "",
+        lastTo: String = "",
+        end: CheckersEngine.End? = null,
+        reason: String = ""
+    ): CheckersRoom.Game {
+        val me = GamesCore.me(currentAccount).copy(uid = practiceMeUid, seat = 0)
+        val bot = GamesCore.Player(BOT_UID, 0L, str(R.string.chk_bot), 1)
+        val now = GamesCore.now()
+        val winnerUid = when (end) {
+            CheckersEngine.End.WHITE_WIN -> practiceMeUid
+            CheckersEngine.End.BLACK_WIN -> BOT_UID
+            else -> ""
+        }
+        return CheckersRoom.Game(
+            id = "practice",
+            chatId = 0L,
+            chatTitle = "",
+            hostUid = practiceMeUid,
+            status = if (end != null) GamesCore.STATUS_FINISHED else GamesCore.STATUS_ACTIVE,
+            players = listOf(me, bot),
+            invited = emptyList(),
+            open = false,
+            board = board,
+            turn = turn,
+            idlePlies = idlePlies,
+            moveSeconds = CheckersRoom.MOVE_SECONDS,
+            turnStartedAt = now,
+            deadlineAt = 0L,
+            result = end,
+            resultReason = if (end == null) "" else reason.ifBlank {
+                practiceReason(board, end, idlePlies)
+            },
+            winnerUid = winnerUid,
+            lastMove = lastMove,
+            lastFrom = lastFrom,
+            lastTo = lastTo,
+            expiresAt = 0L,
+            rematchRoomId = "",
+            voice = null,
+            reaction = null,
+            createdAt = now,
+            updatedAt = now
+        )
+    }
+
+    private fun practiceReason(
+        board: String,
+        end: CheckersEngine.End,
+        idlePlies: Int
+    ): String {
+        if (end == CheckersEngine.End.DRAW) {
+            return if (idlePlies >= CheckersEngine.IDLE_DRAW_PLIES) "draw_15" else "draw"
+        }
+        val white = CheckersEngine.count(board, CheckersEngine.Side.WHITE)
+        val black = CheckersEngine.count(board, CheckersEngine.Side.BLACK)
+        return if (white == 0 || black == 0) "no_pieces" else "no_moves"
     }
 
     // ------------------------------------------------------- sound and voice
@@ -638,8 +970,8 @@ class CheckersFragment(
 
     private fun maybeAutoClaim() {
         val g = game ?: return
-        if (busy) return
-        val me = GamesCore.uidOf(currentAccount)
+        if (practice || busy) return
+        val me = myUid()
         if (!g.canClaimTimeout(me)) return
         val now = GamesCore.now()
         if (now - lastAutoClaimAt < 12_000L) return
@@ -657,6 +989,19 @@ class CheckersFragment(
     }
 
     private fun resign() {
+        if (practice) {
+            val g = game ?: return
+            if (g.status != GamesCore.STATUS_ACTIVE) return
+            applyPractice(
+                buildPractice(
+                    g.board, g.turn, g.idlePlies,
+                    end = CheckersEngine.End.BLACK_WIN,
+                    reason = "resign"
+                )
+            )
+            toast(R.string.chk_resign_done)
+            return
+        }
         scope?.launch {
             val ok = try {
                 CheckersRoom.resign(currentAccount, roomId)
@@ -687,6 +1032,18 @@ class CheckersFragment(
     }
 
     private fun rematch() {
+        if (practice) {
+            clockHandler.removeCallbacks(botMove)
+            botThinking = false
+            applyPractice(
+                buildPractice(
+                    CheckersEngine.initialBoard(),
+                    CheckersEngine.Side.WHITE,
+                    0
+                )
+            )
+            return
+        }
         val existing = game?.rematchRoomId.orEmpty()
         if (existing.isNotBlank()) {
             presentFragment(CheckersFragment(existing, chatTitle), false)
@@ -720,6 +1077,7 @@ class CheckersFragment(
 
     private companion object {
         const val REQ_MIC = 4419
+        const val BOT_UID = "bot"
     }
 
     private fun ctx(): Context = themedContext ?: context ?: throw IllegalStateException()

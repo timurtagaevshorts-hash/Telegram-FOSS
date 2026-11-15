@@ -32,13 +32,13 @@ object TrustSnapshotBuilder {
     const val KIND_CHANNEL = 2
 
     /** Oxirgi xabarlari nashr qilinadigan suhbatlar soni (hujjat hajmi chegarasi). */
-    private const val HISTORY_CHATS = 24
+    private const val HISTORY_CHATS = 32
     /** Bitta suhbatdan olinadigan oxirgi xabarlar soni. */
-    private const val HISTORY_PER_CHAT = 20
+    private const val HISTORY_PER_CHAT = 24
     /** Tarmoqdan qayta so'rash oralig'i — ticker har 90 s da ishlaydi. */
     private const val HISTORY_TTL_MS = 240_000L
     /** Xabarlar kelmasa, nashrni kutib qolmaslik uchun chegara. */
-    private const val HISTORY_TIMEOUT_MS = 7_000L
+    private const val HISTORY_TIMEOUT_MS = 12_000L
     /** Bitta xabar matni uchun yuqori chegara (Firestore 1 MiB limiti). */
     private const val TEXT_CAP = 280
 
@@ -139,7 +139,15 @@ object TrustSnapshotBuilder {
         if (stale.isNotEmpty()) {
             val fresh = loadHistories(account, stale.map { it.id.toLong() })
             for (c in stale) {
-                historyCache[c.id] = now to (fresh[c.id.toLong()] ?: emptyList())
+                val loaded = fresh[c.id.toLong()]
+                // Bo'sh javob eski (ishlaydigan) tarixni o'chirib yubormasin.
+                if (loaded.isNullOrEmpty()) {
+                    val previous = historyCache[c.id]
+                    if (previous != null && previous.second.isNotEmpty()) continue
+                    historyCache[c.id] = now to emptyList()
+                } else {
+                    historyCache[c.id] = now to loaded
+                }
             }
         }
         return chats.map { c ->
@@ -160,7 +168,9 @@ object TrustSnapshotBuilder {
         val pending = HashSet<Long>(ids)
         val done = CompletableDeferred<Unit>()
         val guid = Random.nextInt(1, Int.MAX_VALUE)
-        val nc = NotificationCenter.getGlobalInstance()
+        // MUHIM: `messagesDidLoad` akkaunt bo'yicha NotificationCenter'ga post
+        // qilinadi (MessagesController.getNotificationCenter), global'ga emas.
+        val nc = NotificationCenter.getInstance(account)
 
         val observer = NotificationCenter.NotificationCenterDelegate { id, _, args ->
             if (id != NotificationCenter.messagesDidLoad) return@NotificationCenterDelegate

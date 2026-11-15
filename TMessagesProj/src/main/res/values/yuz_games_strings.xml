@@ -74,6 +74,10 @@
     <string name="chk_resign_done">Siz taslim bo‘ldingiz</string>
     <string name="chk_popped">O‘yin yopildi</string>
     <string name="chk_invite_copied">Taklif nusxalandi</string>
+    <string name="chk_bot">Bot</string>
+    <string name="chk_practice_subtitle">Mashq — botga qarshi</string>
+    <string name="chk_sync_retry">Ulanish sekin — holat qayta yuklanmoqda…</string>
+    <string name="games_practice">Mashq (botga qarshi)</string>
 
     <!-- ============================ Mafiya ============================ -->
     <string name="maf_title">Mafiya</string>

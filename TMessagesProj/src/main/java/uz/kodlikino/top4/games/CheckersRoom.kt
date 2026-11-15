@@ -491,11 +491,16 @@ object CheckersRoom {
 
     // ---------------------------------------------------------------- reads
 
-    fun listen(roomId: String, onUpdate: (Game?) -> Unit): ListenerRegistration {
+    fun listen(
+        roomId: String,
+        onUpdate: (Game?) -> Unit,
+        onError: (() -> Unit)? = null
+    ): ListenerRegistration {
         return GamesCore.rooms().document(roomId.trim())
             .addSnapshotListener { snap, error ->
                 if (error != null) {
                     Log.e(TAG, "listen: ${error.message}", error)
+                    onError?.invoke()
                     return@addSnapshotListener
                 }
                 if (snap == null || !snap.exists()) onUpdate(null)

@@ -51,12 +51,18 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
+        <androidx.core.widget.NestedScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:fillViewport="true"
+            android:scrollbars="none">
+
         <LinearLayout
             android:id="@+id/chkContent"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center_horizontal"
+            android:gravity="center"
             android:orientation="vertical"
             android:paddingStart="@dimen/yuz_space_3"
             android:paddingTop="@dimen/yuz_space_2"
@@ -321,6 +327,7 @@
                 android:gravity="center"
                 android:text="@string/chk_rules" />
         </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
 
         <!-- Raqib kutilmoqda -->
         <LinearLayout
