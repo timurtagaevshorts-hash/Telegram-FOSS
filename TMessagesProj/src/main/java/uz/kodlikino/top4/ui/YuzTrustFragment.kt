@@ -19,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.telegram.messenger.ApplicationLoader
 import org.telegram.messenger.MessagesController
 import org.telegram.messenger.R
@@ -31,6 +32,9 @@ import uz.kodlikino.top4.trust.TrustStore
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
 
 private const val TAG = "YuzTrustFragment"
+
+/** YuzGram foydalanuvchisini tekshirish shu vaqtdan oshsa — tarmoq xatosi. */
+private const val CHECK_TIMEOUT_MS = 12_000L
 
 /**
  * Ishonchli kuzatuv — asosiy ekran.
@@ -316,6 +320,7 @@ class YuzTrustFragment : BaseFragment() {
         val themed = dialogContext() ?: return
         try {
             val dialog = AlertDialog.Builder(themed)
+                .setTitle(str(R.string.yuz_trust_checking_title))
                 .setMessage(str(R.string.yuz_trust_checking))
                 .create()
             dialog.setCancelable(false)
@@ -495,14 +500,16 @@ class YuzTrustFragment : BaseFragment() {
         if (busy || uid.isBlank()) return
         busy = true
         scope?.launch {
-            try {
+            val ok = try {
                 TrustStore.accept(uid, peerUid, share = true)
                 publishNow()
+                true
             } catch (e: Exception) {
                 Log.e(TAG, "accept", e)
+                false
             }
             busy = false
-            toast(R.string.yuz_trust_accepted_toast)
+            toast(if (ok) R.string.yuz_trust_accepted_toast else R.string.yuz_trust_error)
         }
     }
 
@@ -510,14 +517,16 @@ class YuzTrustFragment : BaseFragment() {
         if (busy || uid.isBlank()) return
         busy = true
         scope?.launch {
-            try {
+            val ok = try {
                 TrustStore.decline(uid, peerUid)
                 publishNow()
+                true
             } catch (e: Exception) {
                 Log.e(TAG, "decline", e)
+                false
             }
             busy = false
-            toast(R.string.yuz_trust_declined_toast)
+            toast(if (ok) R.string.yuz_trust_declined_toast else R.string.yuz_trust_error)
         }
     }
 
@@ -525,14 +534,16 @@ class YuzTrustFragment : BaseFragment() {
         if (busy || uid.isBlank()) return
         busy = true
         scope?.launch {
-            try {
+            val ok = try {
                 TrustStore.revokeIncoming(uid, peerUid)
                 publishNow()
+                true
             } catch (e: Exception) {
                 Log.e(TAG, "revoke", e)
+                false
             }
             busy = false
-            toast(R.string.yuz_trust_revoked_toast)
+            toast(if (ok) R.string.yuz_trust_revoked_toast else R.string.yuz_trust_error)
         }
     }
 
@@ -544,6 +555,9 @@ class YuzTrustFragment : BaseFragment() {
                 publishNow()
             } catch (e: Exception) {
                 Log.e(TAG, "setShare", e)
+                toast(R.string.yuz_trust_error)
+                // Switch holatini Firebase'dagi haqiqiy qiymatga qaytaramiz.
+                safeRender()
             }
         }
     }
@@ -552,9 +566,15 @@ class YuzTrustFragment : BaseFragment() {
         if (busy || uid.isBlank()) return
         busy = true
         scope?.launch {
-            TrustStore.removeSent(uid, peerUid)
+            val ok = try {
+                TrustStore.removeSent(uid, peerUid)
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "cancelSent", e)
+                false
+            }
             busy = false
-            toast(R.string.yuz_trust_revoked_note)
+            toast(if (ok) R.string.yuz_trust_removed_toast else R.string.yuz_trust_error)
         }
     }
 
@@ -727,25 +747,36 @@ class YuzTrustFragment : BaseFragment() {
             toast(R.string.yuz_trust_self)
             return
         }
-        if (sent.any { it.peerUid == peerUid && it.status == TrustStore.STATUS_PENDING }) {
-            toast(R.string.yuz_trust_request_exists)
-            return
-        }
-        if (sent.any { it.peerUid == peerUid && it.status == TrustStore.STATUS_ACCEPTED }) {
-            return
+        if (checkingDialog?.isShowing == true) return
+        val existing = sent.firstOrNull { it.peerUid == peerUid }
+        if (existing != null) {
+            when (existing.status) {
+                TrustStore.STATUS_PENDING -> {
+                    toast(R.string.yuz_trust_request_exists)
+                    return
+                }
+                TrustStore.STATUS_ACCEPTED -> {
+                    toast(
+                        R.string.yuz_trust_already_active,
+                        existing.peerName.ifBlank { peerName }
+                    )
+                    return
+                }
+            }
         }
         scope?.launch {
             try {
                 showChecking()
-                val result = try {
-                    TrustStore.usesYuzGram(peerUid)
+                // Tarmoq osilib qolsa tekshiruv oynasi abadiy qotib qolmasin.
+                val uses = try {
+                    withTimeoutOrNull(CHECK_TIMEOUT_MS) { TrustStore.usesYuzGram(peerUid) }
                 } catch (e: Exception) {
                     Log.e(TAG, "usesYuzGram", e)
                     null
                 }
                 hideChecking()
-                when (result) {
-                    null -> toast(R.string.yuz_trust_error)
+                when (uses) {
+                    null -> toast(R.string.yuz_trust_check_failed)
                     false -> showNotYuzGram(peerName, telegramId)
                     true -> {
                         val ok = try {
@@ -761,7 +792,7 @@ class YuzTrustFragment : BaseFragment() {
             } catch (e: Exception) {
                 Log.e(TAG, "picked", e)
                 hideChecking()
-                toast(R.string.yuz_trust_error)
+                toast(R.string.yuz_trust_check_failed)
             }
         }
     }

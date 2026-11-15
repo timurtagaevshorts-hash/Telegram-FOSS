@@ -5,6 +5,7 @@ import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -868,6 +869,9 @@ object TrustStore {
         if (clean.isEmpty() || !clean.startsWith("tg_")) return@withContext null
         try {
             db.collection("comment_profiles").document(clean).get().await().exists()
+        } catch (e: CancellationException) {
+            // Timeout bekor qilishi yuqoriga uzatiladi — "topilmadi" deb talqin qilinmaydi.
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "usesYuzGram($clean): ${e.message}")
             null

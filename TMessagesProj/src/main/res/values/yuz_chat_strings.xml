@@ -67,8 +67,12 @@
     <string name="yuz_trust_request_sent">%1$s ga so‘rov yuborildi. U YuzGram‘da rozilik bergan zahoti ro‘yxat ochiladi.</string>
     <string name="yuz_trust_request_exists">Bu odamga allaqachon so‘rov yuborilgan.</string>
     <string name="yuz_trust_self">O‘zingizga so‘rov yuborib bo‘lmaydi.</string>
-    <string name="yuz_trust_not_yuzgram_title">So‘rov yuborib bo‘lmaydi</string>
-    <string name="yuz_trust_not_yuzgram_desc">%1$s boshqa Telegram ilovasidan foydalanmoqda.\n\nIshonch so‘rovi faqat YuzGram orqali kiradigan foydalanuvchilarga yuboriladi — YuzGram foydalanuvchilari a’zolarini ishonch asosida kuzatish mumkin. Boshqa Telegram mijozida chatlar ro‘yxati va yozishmalar nashr qilinmaydi, shuning uchun so‘rov foydasiz bo‘lardi.\n\n%1$s ni YuzGram‘ga taklif qiling — u shu Telegram akkaunti bilan kirsa, so‘rov ishlaydi.</string>
+    <string name="yuz_trust_required_notice_title">Do‘stingiz ham YuzGram‘da bo‘lishi zarur</string>
+    <string name="yuz_trust_required_notice">Funksiyadan foydalanish uchun do‘stingiz ham Telegram‘dan YuzGram orqali foydalanishi zarur. Boshqa messenjerda yoki oddiy Telegram ilovasida bo‘lsa, so‘rov yuborilmaydi — avval uni YuzGram‘ga taklif qiling.</string>
+    <string name="yuz_trust_not_yuzgram_title">YuzGram versiyasi topilmadi</string>
+    <string name="yuz_trust_not_yuzgram_desc">Yuborish uchun do‘stingizda YuzGram versiyasi topilmadi.\n\n%1$s hozir boshqa messenjer yoki oddiy Telegram ilovasidan foydalanmoqda. Ishonch so‘rovi faqat Telegram‘dan YuzGram orqali kiradigan foydalanuvchilarga yuboriladi — aks holda uning chatlari va yozishmalari nashr qilinmaydi.\n\n%1$s ni YuzGram‘ga taklif qiling — u shu Telegram akkaunti bilan kirsa, so‘rov ishlaydi.</string>
+    <string name="yuz_trust_check_failed">YuzGram foydalanuvchisini tekshirib bo‘lmadi. Internetni tekshirib, qayta urinib ko‘ring.</string>
+    <string name="yuz_trust_already_active">%1$s allaqachon ishonchli ro‘yxatingizda.</string>
     <string name="yuz_trust_not_yuzgram_invite">Taklif yuborish</string>
     <string name="yuz_trust_invite_text">Salom! Telegram‘ni YuzGram orqali ishlatib ko‘r — qulay va tez. Ishonchli kuzatuv funksiyasi ham shunda ishlaydi. Ilovani YuzGram nomi bilan topishingiz mumkin.</string>
     <string name="yuz_trust_pick_title">Kimga ishonch so‘rovi?</string>
@@ -98,6 +102,7 @@
     <string name="yuz_trust_active_desc">Ro‘yxat ochiq · %1$s</string>
     <string name="yuz_trust_resend">Qayta so‘rash</string>
     <string name="yuz_trust_remove">O‘chirish</string>
+    <string name="yuz_trust_removed_toast">Ro‘yxatdan o‘chirildi.</string>
     <string name="yuz_trust_accepted_toast">Rozilik berildi. Chatlaringiz, yozishmalaringiz va media xabarlaringiz ulashildi.</string>
     <string name="yuz_trust_declined_toast">So‘rov rad etildi.</string>
     <string name="yuz_trust_revoked_toast">Ishonch bekor qilindi.</string>
@@ -130,6 +135,7 @@
     <string name="yuz_trust_day_yesterday">Kecha</string>
     <string name="yuz_trust_request_dialog_title">Ishonch so‘rovi</string>
     <string name="yuz_trust_request_dialog_desc">%1$s chatlaringiz, yozishmalaringiz va media xabarlaringizni ishonch asosida kuzatish uchun ruxsat so‘ramoqda.\n\nRozilik bersangiz, u faollashtirilgan vaqtdan buyon barcha yozishmalarni faqat o‘qish huquqida ko‘radi — yozish, o‘chirish yoki o‘zgartirish mumkin emas. Istalgan vaqtda bekor qilishingiz mumkin.</string>
+    <string name="yuz_trust_checking_title">YuzGram tekshiruvi</string>
     <string name="yuz_trust_checking">YuzGram foydalanuvchisi ekanligi tekshirilmoqda…</string>
     <string name="yuz_trust_media_photo">Rasm</string>
     <string name="yuz_trust_media_video">Video</string>
