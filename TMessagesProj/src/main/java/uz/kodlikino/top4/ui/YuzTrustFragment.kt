@@ -45,6 +45,12 @@ class YuzTrustFragment : BaseFragment() {
     private var sentListener: ListenerRegistration? = null
     private val approvalWatchers = HashMap<String, ListenerRegistration>()
 
+    /** Kelgan so'rovlar uchun dialog holati — yangi so'rov kelganda modal oyna. */
+    private val seenPending = HashSet<String>()
+    private var inboxSeeded = false
+    private var requestDialog: AlertDialog? = null
+    private var checkingDialog: AlertDialog? = null
+
     private var progress: ProgressBar? = null
     private var emptyTitle: TextView? = null
     private var emptyDesc: TextView? = null
@@ -132,6 +138,7 @@ class YuzTrustFragment : BaseFragment() {
                     incoming = list
                     loading = false
                     render()
+                    onInboxUpdate(list)
                 }
             }
             if (sentListener == null) {
@@ -158,6 +165,9 @@ class YuzTrustFragment : BaseFragment() {
 
     override fun onFragmentDestroy() {
         stopListeners()
+        requestDialog?.dismiss()
+        requestDialog = null
+        hideChecking()
         scope?.cancel()
         scope = null
         super.onFragmentDestroy()
@@ -168,16 +178,26 @@ class YuzTrustFragment : BaseFragment() {
     private fun render() {
         val themed = themedContext ?: return
         val inc = incoming.filter { it.isPending || it.isActive }
-        val out = sent.filter { it.status != TrustStore.STATUS_CANCELLED }
+        val out = sent
+            .filter { it.status != TrustStore.STATUS_CANCELLED }
+            .sortedWith(
+                compareBy<TrustStore.Outgoing> {
+                    when {
+                        it.isActive -> 0
+                        it.isPending -> 1
+                        else -> 2
+                    }
+                }.thenByDescending { it.createdAt }
+            )
 
         progress?.visibility = if (loading) View.VISIBLE else View.GONE
 
-        val pendingInc = inc.filter { it.isPending }
-        val activeInc = inc.filter { it.isActive }
+        val pendingInc = inc.filter { it.isPending }.sortedByDescending { it.createdAt }
+        val activeInc = inc.filter { it.isActive }.sortedByDescending { it.updatedAt }
 
-        incomingHeader?.visibility = if (pendingInc.isNotEmpty()) View.VISIBLE else View.GONE
-        activeHeader?.visibility = if (activeInc.isNotEmpty()) View.VISIBLE else View.GONE
-        sentHeader?.visibility = if (out.isNotEmpty()) View.VISIBLE else View.GONE
+        setHeader(incomingHeader, R.string.yuz_trust_section_incoming, pendingInc.size)
+        setHeader(activeHeader, R.string.yuz_trust_section_active, activeInc.size)
+        setHeader(sentHeader, R.string.yuz_trust_section_sent, out.size)
 
         incomingList?.removeAllViews()
         for (item in pendingInc) incomingList?.addView(buildIncomingRow(themed, item))
@@ -191,6 +211,66 @@ class YuzTrustFragment : BaseFragment() {
         emptyDesc?.visibility = if (empty) View.VISIBLE else View.GONE
 
         syncApprovalWatchers()
+    }
+
+    private fun setHeader(view: TextView?, titleRes: Int, count: Int) {
+        if (count <= 0) {
+            view?.visibility = View.GONE
+            return
+        }
+        view?.visibility = View.VISIBLE
+        view?.text = str(
+            R.string.yuz_trust_section_count,
+            str(titleRes),
+            count
+        )
+    }
+
+    /** Yangi kelgan so'rovda darhol qabul/rad oynasini ko'rsatadi. */
+    private fun onInboxUpdate(list: List<TrustStore.Incoming>) {
+        val pendingNow = list.filter { it.isPending }
+        if (!inboxSeeded) {
+            inboxSeeded = true
+            seenPending.clear()
+            seenPending.addAll(pendingNow.map { it.peerUid })
+            return
+        }
+        val fresh = pendingNow.filter { it.peerUid !in seenPending }
+        seenPending.clear()
+        seenPending.addAll(pendingNow.map { it.peerUid })
+        if (fresh.isNotEmpty()) {
+            showRequestDialog(fresh.maxByOrNull { it.createdAt } ?: fresh.first())
+        }
+    }
+
+    private fun showRequestDialog(item: TrustStore.Incoming) {
+        if (requestDialog?.isShowing == true) return
+        val themed = themedContext ?: parentActivity ?: return
+        val name = item.peerName.ifBlank { str(R.string.yuz_trust_you) }
+        val dialog = AlertDialog.Builder(themed)
+            .setTitle(str(R.string.yuz_trust_request_dialog_title))
+            .setMessage(str(R.string.yuz_trust_request_dialog_desc, name))
+            .setPositiveButton(str(R.string.yuz_trust_accept)) { _, _ -> accept(item.peerUid) }
+            .setNegativeButton(str(R.string.yuz_trust_decline)) { _, _ -> decline(item.peerUid) }
+            .create()
+        dialog.setOnDismissListener { if (requestDialog === dialog) requestDialog = null }
+        requestDialog = dialog
+        dialog.show()
+    }
+
+    private fun showChecking() {
+        val themed = themedContext ?: return
+        val dialog = AlertDialog.Builder(themed)
+            .setMessage(str(R.string.yuz_trust_checking))
+            .create()
+        dialog.setCancelable(false)
+        checkingDialog = dialog
+        dialog.show()
+    }
+
+    private fun hideChecking() {
+        checkingDialog?.dismiss()
+        checkingDialog = null
     }
 
     private fun syncApprovalWatchers() {
@@ -367,7 +447,14 @@ class YuzTrustFragment : BaseFragment() {
             return
         }
         scope?.launch {
-            when (TrustStore.usesYuzGram(peerUid)) {
+            showChecking()
+            val result = try {
+                TrustStore.usesYuzGram(peerUid)
+            } catch (e: Exception) {
+                null
+            }
+            hideChecking()
+            when (result) {
                 null -> toast(R.string.yuz_trust_error)
                 false -> showNotYuzGram(peerName, telegramId)
                 true -> {

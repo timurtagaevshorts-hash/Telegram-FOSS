@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ishonch tarixi: kun ajratgichi (markazda, yumshoq pill fonida). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_horizontal"
+    android:orientation="horizontal"
+    android:paddingTop="@dimen/yuz_space_3"
+    android:paddingBottom="@dimen/yuz_space_1">
+
+    <TextView
+        android:id="@+id/dayLabel"
+        style="@style/YuzCaption"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_yuz_games_panel"
+        android:paddingStart="@dimen/yuz_space_3"
+        android:paddingTop="@dimen/yuz_space_1"
+        android:paddingEnd="@dimen/yuz_space_3"
+        android:paddingBottom="@dimen/yuz_space_1"
+        android:textAllCaps="true"
+        android:textColor="@color/yuz_text_secondary"
+        android:textStyle="bold" />
+</LinearLayout>

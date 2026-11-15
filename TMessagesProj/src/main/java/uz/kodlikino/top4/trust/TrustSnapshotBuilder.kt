@@ -4,11 +4,13 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.telegram.messenger.ApplicationLoader
 import org.telegram.messenger.ChatObject
 import org.telegram.messenger.DialogObject
 import org.telegram.messenger.MessageObject
 import org.telegram.messenger.MessagesController
 import org.telegram.messenger.NotificationCenter
+import org.telegram.messenger.R
 import org.telegram.messenger.UserConfig
 import org.telegram.messenger.UserObject
 import org.telegram.tgnet.TLRPC
@@ -30,11 +32,12 @@ object TrustSnapshotBuilder {
     const val KIND_USER = 0
     const val KIND_GROUP = 1
     const val KIND_CHANNEL = 2
+    const val KIND_BOT = 3
 
     /** Oxirgi xabarlari nashr qilinadigan suhbatlar soni (hujjat hajmi chegarasi). */
-    private const val HISTORY_CHATS = 32
+    private const val HISTORY_CHATS = 36
     /** Bitta suhbatdan olinadigan oxirgi xabarlar soni. */
-    private const val HISTORY_PER_CHAT = 24
+    private const val HISTORY_PER_CHAT = 40
     /** Tarmoqdan qayta so'rash oralig'i — ticker har 90 s da ishlaydi. */
     private const val HISTORY_TTL_MS = 240_000L
     /** Xabarlar kelmasa, nashrni kutib qolmaslik uchun chegara. */
@@ -76,7 +79,7 @@ object TrustSnapshotBuilder {
                     val user = mc.getUser(dialog.id) ?: continue
                     if (user.self || user.deleted) continue
                     title = UserObject.getUserName(user)
-                    kind = KIND_USER
+                    kind = if (user.bot) KIND_BOT else KIND_USER
                 } else {
                     val chat = mc.getChat(-dialog.id) ?: continue
                     if (ChatObject.isNotInChat(chat)) continue
@@ -222,14 +225,27 @@ object TrustSnapshotBuilder {
         for (obj in objects) {
             val owner = obj.messageOwner ?: continue
             if (owner.action != null) continue
-            val raw = obj.messageText?.toString()?.trim().orEmpty()
+            val label = mediaLabel(obj)
+            val caption = obj.caption?.toString()
+                ?.replace('\n', ' ')?.replace('\r', ' ')?.trim().orEmpty()
+            val plain = if (label.isEmpty()) {
+                obj.messageText?.toString()
+                    ?.replace('\n', ' ')?.replace('\r', ' ')?.trim().orEmpty()
+            } else {
+                ""
+            }
+            val raw = when {
+                label.isNotEmpty() && caption.isNotEmpty() -> "$label · $caption"
+                label.isNotEmpty() -> label
+                else -> plain
+            }
             if (raw.isEmpty()) continue
             val text = if (raw.length > TEXT_CAP) raw.substring(0, TEXT_CAP) + "…" else raw
             out.add(
                 TrustStore.MsgMeta(
                     id = owner.id.toString(),
                     from = if (owner.out) "" else senderName(account, owner.from_id),
-                    text = text.replace('\n', ' ').replace('\r', ' '),
+                    text = text,
                     date = owner.date.toLong(),
                     out = owner.out
                 )
@@ -237,6 +253,105 @@ object TrustSnapshotBuilder {
         }
         out.sortBy { it.date }
         return out
+    }
+
+    /**
+     * Matnsiz xabar ham tarixda ko'rinsin: har bir media turi uchun qisqa
+     * yorliq (davomi bilan). Matn/caption bo'lsa, yorliq uning oldiga qo'shiladi.
+     */
+    private fun mediaLabel(obj: MessageObject): String {
+        val owner = obj.messageOwner ?: return ""
+        val media = owner.media ?: return ""
+        return when {
+            MessageObject.isPhoto(owner) -> res(R.string.yuz_trust_media_photo)
+            MessageObject.isRoundVideoMessage(owner) ->
+                withDuration(res(R.string.yuz_trust_media_round), docDuration(media.document))
+            MessageObject.isVideoMessage(owner) ->
+                withDuration(res(R.string.yuz_trust_media_video), docDuration(media.document))
+            MessageObject.isVoiceMessage(owner) ->
+                withDuration(res(R.string.yuz_trust_media_voice), docDuration(media.document))
+            MessageObject.isStickerMessage(owner) -> res(R.string.yuz_trust_media_sticker)
+            MessageObject.isGifMessage(owner) -> res(R.string.yuz_trust_media_gif)
+            MessageObject.isMusicMessage(owner) ->
+                joinLabel(res(R.string.yuz_trust_media_music), musicTitle(media.document), 80)
+            MessageObject.isGameMessage(owner) -> res(R.string.yuz_trust_media_game)
+            media is TLRPC.TL_messageMediaPoll ->
+                joinLabel(res(R.string.yuz_trust_media_poll), media.poll?.question?.text.orEmpty(), 70)
+            media is TLRPC.TL_messageMediaContact ->
+                joinLabel(
+                    res(R.string.yuz_trust_media_contact),
+                    listOfNotNull(
+                        media.first_name?.trim()?.takeIf { it.isNotEmpty() },
+                        media.last_name?.trim()?.takeIf { it.isNotEmpty() }
+                    ).joinToString(" "),
+                    50
+                )
+            media is TLRPC.TL_messageMediaGeo ||
+                media is TLRPC.TL_messageMediaGeoLive ||
+                media is TLRPC.TL_messageMediaVenue ->
+                joinLabel(
+                    res(R.string.yuz_trust_media_location),
+                    (media as? TLRPC.TL_messageMediaVenue)?.title.orEmpty(),
+                    50
+                )
+            media is TLRPC.TL_messageMediaDice -> res(R.string.yuz_trust_media_dice)
+            media is TLRPC.TL_messageMediaDocument ->
+                joinLabel(res(R.string.yuz_trust_media_file), fileName(media.document), 60)
+            else -> ""
+        }
+    }
+
+    private fun docDuration(doc: TLRPC.Document?): Int {
+        for (attr in doc?.attributes.orEmpty()) {
+            if (attr is TLRPC.TL_documentAttributeVideo || attr is TLRPC.TL_documentAttributeAudio) {
+                val seconds = attr.duration.toInt()
+                if (seconds > 0) return seconds
+            }
+        }
+        return 0
+    }
+
+    private fun withDuration(label: String, seconds: Int): String {
+        if (seconds <= 0) return label
+        val m = seconds / 60
+        val s = seconds % 60
+        return "$label · $m:${s.toString().padStart(2, '0')}"
+    }
+
+    private fun joinLabel(label: String, detail: String, cap: Int): String {
+        val clean = detail.trim().take(cap)
+        return if (clean.isEmpty()) label else "$label · $clean"
+    }
+
+    private fun musicTitle(doc: TLRPC.Document?): String {
+        for (attr in doc?.attributes.orEmpty()) {
+            if (attr is TLRPC.TL_documentAttributeAudio) {
+                val title = attr.title.orEmpty().trim()
+                val performer = attr.performer.orEmpty().trim()
+                return when {
+                    title.isNotEmpty() && performer.isNotEmpty() -> "$performer — $title"
+                    title.isNotEmpty() -> title
+                    performer.isNotEmpty() -> performer
+                    else -> ""
+                }
+            }
+        }
+        return ""
+    }
+
+    private fun fileName(doc: TLRPC.Document?): String {
+        for (attr in doc?.attributes.orEmpty()) {
+            if (attr is TLRPC.TL_documentAttributeFilename) {
+                return attr.file_name.orEmpty().trim()
+            }
+        }
+        return ""
+    }
+
+    private fun res(resId: Int): String = try {
+        ApplicationLoader.applicationContext?.getString(resId).orEmpty()
+    } catch (e: Exception) {
+        ""
     }
 
     private fun senderName(account: Int, peer: TLRPC.Peer?): String {

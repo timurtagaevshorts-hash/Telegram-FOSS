@@ -66,12 +66,12 @@
     <string name="yuz_trust_request_sent">%1$s ga so‘rov yuborildi. U YuzGram‘da rozilik bergan zahoti ro‘yxat ochiladi.</string>
     <string name="yuz_trust_request_exists">Bu odamga allaqachon so‘rov yuborilgan.</string>
     <string name="yuz_trust_self">O‘zingizga so‘rov yuborib bo‘lmaydi.</string>
-    <string name="yuz_trust_not_yuzgram_title">Bu odam YuzGram orqali kirmagan</string>
-    <string name="yuz_trust_not_yuzgram_desc">Ishonchli kuzatuv faqat ikkala tomon ham Telegram‘ga YuzGram orqali kirsa ishlaydi. %1$s hozir boshqa Telegram ilovasidan foydalanmoqda — shuning uchun uning chatlar ro‘yxatini ko‘rishning iloji yo‘q.\n\nUnga YuzGram‘ni taklif qiling. U YuzGram‘ni o‘rnatib, shu Telegram akkaunti bilan kirsa, so‘rov ishlaydi.</string>
+    <string name="yuz_trust_not_yuzgram_title">So‘rov yuborib bo‘lmaydi</string>
+    <string name="yuz_trust_not_yuzgram_desc">%1$s boshqa Telegram ilovasidan foydalanmoqda.\n\nIshonch so‘rovi faqat YuzGram orqali kiradigan foydalanuvchilarga yuboriladi — YuzGram foydalanuvchilari a’zolarini ishonch asosida kuzatish mumkin. Boshqa Telegram mijozida chatlar ro‘yxati va yozishmalar nashr qilinmaydi, shuning uchun so‘rov foydasiz bo‘lardi.\n\n%1$s ni YuzGram‘ga taklif qiling — u shu Telegram akkaunti bilan kirsa, so‘rov ishlaydi.</string>
     <string name="yuz_trust_not_yuzgram_invite">Taklif yuborish</string>
     <string name="yuz_trust_invite_text">Salom! Telegram‘ni YuzGram orqali ishlatib ko‘r — qulay va tez. Ishonchli kuzatuv funksiyasi ham shunda ishlaydi. Ilovani YuzGram nomi bilan topishingiz mumkin.</string>
     <string name="yuz_trust_pick_title">Kimga ishonch so‘rovi?</string>
-    <string name="yuz_trust_pick_subtitle">Chatlaringizdan yaqin insonni tanlang</string>
+    <string name="yuz_trust_pick_subtitle">Chatlaringizdan tanlang — so‘rov faqat YuzGram foydalanuvchilariga yuboriladi</string>
     <string name="yuz_trust_pick_empty">Shaxsiy suhbatlar topilmadi.</string>
     <string name="yuz_trust_search_hint">Qidirish</string>
     <string name="yuz_trust_viewer_title">%1$s — chatlar</string>
@@ -82,6 +82,7 @@
     <string name="yuz_trust_kind_user">Shaxsiy</string>
     <string name="yuz_trust_kind_group">Guruh</string>
     <string name="yuz_trust_kind_channel">Kanal</string>
+    <string name="yuz_trust_kind_bot">Bot</string>
     <string name="yuz_trust_sign_in_error">Firebase sessiyasi ochilmadi. Internetni tekshirib, qayta urinib ko‘ring.</string>
     <string name="yuz_trust_error">Xatolik yuz berdi. Qayta urinib ko‘ring.</string>
     <string name="yuz_trust_copied">Taklif matni nusxalandi</string>
@@ -111,4 +112,35 @@
     <string name="yuz_trust_history_open">Yozishmani ko‘rish</string>
     <string name="yuz_trust_viewer_open_hint">Suhbat tarixini ochish uchun qatorni bosing.</string>
     <string name="yuz_trust_viewer_no_history">Yozishmalar hali yuborilmagan — %1$s YuzGram’ni ochib turganda yangilanadi.</string>
+
+    <!-- r67: ishonch — bo‘limlar, xabar turlari, so‘rov oynalari -->
+    <string name="yuz_trust_section_count">%1$s · %2$d</string>
+    <string name="yuz_trust_group_people">Shaxsiy chatlar</string>
+    <string name="yuz_trust_group_groups">Guruhlar</string>
+    <string name="yuz_trust_group_channels">Kanallar</string>
+    <string name="yuz_trust_group_bots">Botlar</string>
+    <string name="yuz_trust_viewer_summary">%1$d suhbat · %2$d shaxsiy · %3$d guruh · %4$d kanal · %5$d bot</string>
+    <string name="yuz_trust_viewer_preview_you">Siz: %1$s</string>
+    <string name="yuz_trust_viewer_preview_none">Xabarlar hali yuborilmagan</string>
+    <string name="yuz_trust_chat_pinned">Qadalgan</string>
+    <string name="yuz_trust_message_copied">Xabar nusxalandi</string>
+    <string name="yuz_trust_history_copy_hint">Nusxalash uchun xabar ustiga bosing.</string>
+    <string name="yuz_trust_day_today">Bugun</string>
+    <string name="yuz_trust_day_yesterday">Kecha</string>
+    <string name="yuz_trust_request_dialog_title">Ishonch so‘rovi</string>
+    <string name="yuz_trust_request_dialog_desc">%1$s chatlaringiz ro‘yxati va so‘nggi yozishmalarni ishonch asosida kuzatish uchun ruxsat so‘ramoqda.\n\nRozilik bersangiz, u faqat o‘qish huquqida ko‘radi — yozish, o‘chirish yoki o‘zgartirish mumkin emas. Istalgan vaqtda bekor qilishingiz mumkin.</string>
+    <string name="yuz_trust_checking">YuzGram foydalanuvchisi ekanligi tekshirilmoqda…</string>
+    <string name="yuz_trust_media_photo">Rasm</string>
+    <string name="yuz_trust_media_video">Video</string>
+    <string name="yuz_trust_media_round">Dumaloq video</string>
+    <string name="yuz_trust_media_voice">Ovozli xabar</string>
+    <string name="yuz_trust_media_sticker">Stiker</string>
+    <string name="yuz_trust_media_gif">GIF</string>
+    <string name="yuz_trust_media_music">Musiqa</string>
+    <string name="yuz_trust_media_file">Fayl</string>
+    <string name="yuz_trust_media_poll">So‘rovnoma</string>
+    <string name="yuz_trust_media_location">Joylashuv</string>
+    <string name="yuz_trust_media_contact">Kontakt</string>
+    <string name="yuz_trust_media_game">O‘yin</string>
+    <string name="yuz_trust_media_dice">O‘yin</string>
 </resources>

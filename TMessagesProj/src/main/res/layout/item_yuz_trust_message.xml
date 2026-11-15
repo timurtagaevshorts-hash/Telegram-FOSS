@@ -5,48 +5,76 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="@dimen/yuz_space_2"
-    android:orientation="vertical">
+    android:orientation="horizontal">
 
-    <TextView
-        android:id="@+id/msgSender"
-        style="@style/YuzCaption"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="@dimen/yuz_space_1"
-        android:layout_marginBottom="2dp"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textColor="@color/yuz_action"
-        android:textStyle="bold" />
-
-    <LinearLayout
-        android:id="@+id/msgBubble"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@drawable/bg_yuz_trust_msg_in"
-        android:orientation="horizontal"
-        android:paddingStart="@dimen/yuz_space_3"
-        android:paddingTop="@dimen/yuz_space_2"
-        android:paddingEnd="@dimen/yuz_space_3"
-        android:paddingBottom="@dimen/yuz_space_2">
+    <FrameLayout
+        android:id="@+id/msgAvatar"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_gravity="bottom"
+        android:layout_marginEnd="@dimen/yuz_space_1"
+        android:background="@drawable/bg_yuz_trust_avatar"
+        android:visibility="gone">
 
         <TextView
-            android:id="@+id/msgText"
+            android:id="@+id/msgInitials"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:autoLink="none"
-            android:lineSpacingExtra="2dp"
-            android:textColor="@color/yuz_text"
-            android:textIsSelectable="true"
-            android:textSize="@dimen/yuz_text_body" />
+            android:layout_gravity="center"
+            android:textColor="@color/yuz_action"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/msgColumn"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
 
         <TextView
-            android:id="@+id/msgTime"
+            android:id="@+id/msgSender"
             style="@style/YuzCaption"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:layout_marginStart="@dimen/yuz_space_2"
-            android:textColor="@color/yuz_text_muted" />
+            android:layout_marginStart="@dimen/yuz_space_1"
+            android:layout_marginBottom="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/yuz_action"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/msgBubble"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_yuz_trust_msg_in"
+            android:clickable="true"
+            android:focusable="true"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/yuz_space_3"
+            android:paddingTop="@dimen/yuz_space_2"
+            android:paddingEnd="@dimen/yuz_space_3"
+            android:paddingBottom="@dimen/yuz_space_2">
+
+            <TextView
+                android:id="@+id/msgText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:autoLink="none"
+                android:lineSpacingExtra="2dp"
+                android:textColor="@color/yuz_text"
+                android:textSize="@dimen/yuz_text_body" />
+
+            <TextView
+                android:id="@+id/msgTime"
+                style="@style/YuzCaption"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:layout_marginStart="@dimen/yuz_space_2"
+                android:textColor="@color/yuz_text_muted" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

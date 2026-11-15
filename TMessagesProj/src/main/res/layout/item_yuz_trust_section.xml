@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ishonch ro'yxati: tur bo'yicha bo'lim sarlavhasi (nom + son). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/yuz_space_1"
+    android:paddingTop="@dimen/yuz_space_3"
+    android:paddingEnd="@dimen/yuz_space_1"
+    android:paddingBottom="@dimen/yuz_space_1">
+
+    <TextView
+        android:id="@+id/sectionTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:letterSpacing="0.04"
+        android:maxLines="1"
+        android:textAllCaps="true"
+        android:textColor="@color/yuz_action"
+        android:textSize="@dimen/yuz_text_caption"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/sectionCount"
+        style="@style/YuzCaption"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/yuz_space_2" />
+</LinearLayout>
