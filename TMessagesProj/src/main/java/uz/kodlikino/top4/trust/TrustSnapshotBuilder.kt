@@ -134,33 +134,37 @@ object TrustSnapshotBuilder {
         try {
             val uid = meUid(account)
             if (uid.isBlank()) return false
+            accessCache = null
             val viewers = TrustStore.readersForMe(uid)
             if (viewers.isEmpty()) {
-                // Ruxsat yo'q — nashr qilingan hammasi o'chiriladi.
+                // Ruxsat yo'q — nashr qilingan hammasi va jonli arxiv o'chiriladi.
                 clearCaches()
+                TrustLiveCapture.setSharing(account, false, 0L)
                 TrustStore.prunePublished(uid)
                 return false
             }
             val since = TrustStore.activationSince(uid)
             if (since <= 0L) return false
+            TrustLiveCapture.install(account)
+            TrustLiveCapture.setSharing(account, true, since)
             val chats = withContext(Dispatchers.Main) { build(account) }
             val withHistory = attachHistory(account, uid, chats, since, viewers)
 
-            val previousIds = TrustStore.publishedChatIds(uid)
-            val removed = lastReaders.filter { it !in viewers }
             lastReaders = viewers
-            if (removed.isNotEmpty()) {
-                // Ruxsat qisqardi — faol ro'yxatga kirmagan suhbat hujjatlari
-                // eskisi kabi eski `readers` bilan qolib ketmasin.
-                val topIds = chats.take(HISTORY_CHATS).mapTo(HashSet()) { it.id }
-                for (id in previousIds) {
-                    if (id in topIds) continue
-                    TrustStore.deleteHistory(uid, id)
-                    lastWriteSig.remove(id)
-                }
+            val historyIds = withHistory.filter { it.count > 0 }.map { it.id }
+            val keep = historyIds.toHashSet()
+            // Ro'yxatdan chiqqan suhbatlarning Firebase'dagi eski nusxalari
+            // tozalanadi — "hid" ro'yxati cheksiz o'smaydi.
+            for (id in TrustStore.publishedChatIds(uid)) {
+                if (id in keep) continue
+                TrustStore.deleteHistory(uid, id)
+                lastWriteSig.remove(id)
+                historyCache.remove(id)
+                mergedHistory.remove(id)
+                storeLoaded.remove(id)
+                knownCount.remove(id)
             }
-            val historyIds = (previousIds + withHistory.filter { it.count > 0 }.map { it.id })
-                .distinct()
+            TrustLiveCapture.retainChats(account, chats.mapTo(HashSet()) { it.id })
             return TrustStore.publishSnapshot(uid, withHistory, since, historyIds)
         } finally {
             publishing = false
@@ -224,16 +228,22 @@ object TrustSnapshotBuilder {
         // 3) Ko'rinish + o'zgargan yozishmani nashr qilish.
         val result = ArrayList<TrustStore.ChatMeta>(chats.size)
         for (c in chats) {
-            val merged = mergedHistory[c.id]
-            if (merged.isNullOrEmpty()) {
+            var merged = mergedHistory[c.id]
+            if (merged == null && TrustLiveCapture.archive(account, c.id).isNotEmpty()) {
+                merged = ArrayList()
+                mergedHistory[c.id] = merged
+            }
+            val history = merged
+            if (history != null) mergeArchive(account, c.id, history, since)
+            if (history.isNullOrEmpty()) {
                 result.add(c.copy(count = knownCount[c.id] ?: 0, history = emptyList()))
                 continue
             }
-            if (c.id in topIds) writeIfChanged(uid, c.id, merged, viewers, since)
+            if (c.id in topIds) writeIfChanged(uid, c.id, history, viewers, since)
             result.add(
                 c.copy(
-                    count = merged.size,
-                    history = merged.takeLast(PREVIEW_PER_CHAT)
+                    count = history.size,
+                    history = history.takeLast(PREVIEW_PER_CHAT)
                 )
             )
         }
@@ -259,7 +269,8 @@ object TrustSnapshotBuilder {
         msgs: List<TrustStore.MsgMeta>,
         viewers: List<String>,
         since: Long
-    ) {
+    ): Boolean {
+        val deletedCount = msgs.count { it.deleted }
         val sig = buildString {
             append(viewers.sorted().joinToString(","))
             append('|')
@@ -268,11 +279,79 @@ object TrustSnapshotBuilder {
             append(msgs.firstOrNull()?.id)
             append('|')
             append(msgs.lastOrNull()?.id)
+            append('|')
+            append(deletedCount)
+            append('|')
+            append(msgs.lastOrNull { it.deleted }?.id)
         }
-        if (lastWriteSig[chatId] == sig) return
-        if (TrustStore.publishChatHistory(uid, chatId, msgs, viewers, since)) {
+        if (lastWriteSig[chatId] == sig) return false
+        return if (TrustStore.publishChatHistory(uid, chatId, msgs, viewers, since)) {
             lastWriteSig[chatId] = sig
+            true
+        } else {
+            false
         }
+    }
+
+    /**
+     * Jonli arxivni yig'ilgan tarixga qo'shadi: o'chirilgan xabar ham,
+     * tarmoqdan bu safar qaytmagan eski xabar ham yo'qolmaydi.
+     */
+    private fun mergeArchive(
+        account: Int,
+        chatId: String,
+        merged: ArrayList<TrustStore.MsgMeta>,
+        since: Long
+    ) {
+        val archived = TrustLiveCapture.archive(account, chatId)
+        if (archived.isEmpty()) return
+        val byId = HashMap<String, TrustStore.MsgMeta>(merged.size + archived.size)
+        for (m in merged) byId[m.id] = m
+        for (m in archived) {
+            if (m.date * 1000L < since) continue
+            val current = byId[m.id]
+            byId[m.id] = if (m.deleted) {
+                m.copy(from = current?.from ?: m.from)
+            } else {
+                current ?: m
+            }
+        }
+        merged.clear()
+        merged.addAll(byId.values.sortedBy { it.date })
+        trim(merged)
+    }
+
+    /**
+     * Bitta suhbatni darhol nashr qiladi — yangi xabar kelganda to'liq
+     * ticker'ni kutmaslik uchun. `readersForMe`/`activationSince` 60 s kesh.
+     */
+    suspend fun publishChat(account: Int, chatId: String): Boolean {
+        val dialogId = chatId.toLongOrNull() ?: return false
+        val uid = meUid(account)
+        if (uid.isBlank()) return false
+        val (viewers, since) = accessInfo(uid)
+        if (viewers.isEmpty() || since <= 0L) return false
+        TrustLiveCapture.install(account)
+        val loaded = loadHistories(account, listOf(dialogId))[dialogId].orEmpty()
+        historyCache[chatId] = System.currentTimeMillis() to loaded
+        storeLoaded.add(chatId)
+        val merged = ArrayList<TrustStore.MsgMeta>(loaded.size)
+        merged.addAll(loaded.filter { it.date * 1000L >= since })
+        mergeArchive(account, chatId, merged, since)
+        mergedHistory[chatId] = merged
+        return writeIfChanged(uid, chatId, merged, viewers, since)
+    }
+
+    private var accessCache: Pair<Long, Pair<List<String>, Long>>? = null
+
+    private suspend fun accessInfo(uid: String): Pair<List<String>, Long> {
+        val now = System.currentTimeMillis()
+        accessCache?.let { if (now - it.first < 60_000L) return it.second }
+        val viewers = TrustStore.readersForMe(uid)
+        val since = if (viewers.isEmpty()) 0L else TrustStore.activationSince(uid)
+        val value = viewers to since
+        accessCache = now to value
+        return value
     }
 
     private fun trim(list: ArrayList<TrustStore.MsgMeta>) {
@@ -353,36 +432,39 @@ object TrustSnapshotBuilder {
     ): List<TrustStore.MsgMeta> {
         val out = ArrayList<TrustStore.MsgMeta>(objects.size)
         for (obj in objects) {
-            val owner = obj.messageOwner ?: continue
-            if (owner.action != null) continue
-            val label = mediaLabel(obj)
-            val caption = obj.caption?.toString()
-                ?.replace('\n', ' ')?.replace('\r', ' ')?.trim().orEmpty()
-            val plain = if (label.isEmpty()) {
-                obj.messageText?.toString()
-                    ?.replace('\n', ' ')?.replace('\r', ' ')?.trim().orEmpty()
-            } else {
-                ""
-            }
-            val raw = when {
-                label.isNotEmpty() && caption.isNotEmpty() -> "$label · $caption"
-                label.isNotEmpty() -> label
-                else -> plain
-            }
-            if (raw.isEmpty()) continue
-            val text = if (raw.length > TEXT_CAP) raw.substring(0, TEXT_CAP) + "…" else raw
-            out.add(
-                TrustStore.MsgMeta(
-                    id = owner.id.toString(),
-                    from = if (owner.out) "" else senderName(account, owner.from_id),
-                    text = text,
-                    date = owner.date.toLong(),
-                    out = owner.out
-                )
-            )
+            out.add(metaFor(account, obj) ?: continue)
         }
         out.sortBy { it.date }
         return out
+    }
+
+    /** Bitta xabarni ko'rinadigan metaga aylantiradi (jonli ushlash ham ishlatadi). */
+    internal fun metaFor(account: Int, obj: MessageObject): TrustStore.MsgMeta? {
+        val owner = obj.messageOwner ?: return null
+        if (owner.action != null) return null
+        val label = mediaLabel(obj)
+        val caption = obj.caption?.toString()
+            ?.replace('\n', ' ')?.replace('\r', ' ')?.trim().orEmpty()
+        val plain = if (label.isEmpty()) {
+            obj.messageText?.toString()
+                ?.replace('\n', ' ')?.replace('\r', ' ')?.trim().orEmpty()
+        } else {
+            ""
+        }
+        val raw = when {
+            label.isNotEmpty() && caption.isNotEmpty() -> "$label · $caption"
+            label.isNotEmpty() -> label
+            else -> plain
+        }
+        if (raw.isEmpty()) return null
+        val text = if (raw.length > TEXT_CAP) raw.substring(0, TEXT_CAP) + "…" else raw
+        return TrustStore.MsgMeta(
+            id = owner.id.toString(),
+            from = if (owner.out) "" else senderName(account, owner.from_id),
+            text = text,
+            date = owner.date.toLong(),
+            out = owner.out
+        )
     }
 
     /**

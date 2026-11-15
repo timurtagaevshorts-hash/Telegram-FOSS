@@ -40,16 +40,16 @@
     <string name="yuz_trust_toggle">Ishonchli kuzatuv</string>
     <string name="yuz_trust_title">Ishonchli kuzatuv</string>
     <string name="yuz_trust_subtitle">Yaqin insoningiz roziligi bilan uning chatlari va so‘nggi yozishmalarini ko‘rasiz.</string>
-    <string name="yuz_trust_hero_lead">Kim bilan va nima haqida yozishgani — rozilik asosida.</string>
-    <string name="yuz_trust_hero_desc">Siz uning chatlari ro‘yxatini, yozishmalarini va media xabarlarini ko‘rasiz — ishonch faollashtirilgandan buyon barchasini. Faqat o‘qish: o‘zgartira olmaysiz va uning nomidan hech kimga yoza olmaysiz.</string>
-    <string name="yuz_trust_rule_1_title">Chatlar, yozishmalar va media</string>
-    <string name="yuz_trust_rule_1_desc">Shaxsiy chatlar, guruhlar, kanallar va botlar alohida bo‘limlarda; oxirgi yozishmalar tepada. Har bir suhbatda oxirgi xabarlar va faollashtirilgandan buyon barcha yozishmalar (matn, rasm, video, ovoz va boshqa media) ko‘rinadi.</string>
-    <string name="yuz_trust_rule_2_title">Faqat o‘qish</string>
-    <string name="yuz_trust_rule_2_desc">Yozishmalarni o‘zgartirish, yozish yoki yuborish mumkin emas.</string>
-    <string name="yuz_trust_rule_3_title">Ikkala tomon YuzGram‘da</string>
-    <string name="yuz_trust_rule_3_desc">Ishonch faqat ikkalangiz ham YuzGram orqali Telegram‘ga kirganda ishlaydi.</string>
-    <string name="yuz_trust_rule_4_title">Bir zumda bekor qilinadi</string>
-    <string name="yuz_trust_rule_4_desc">Istalgan tomon ishonchni o‘chirsa, ruxsat darhol yo‘qoladi.</string>
+    <string name="yuz_trust_hero_lead">Faollashtirilgandan keyingi barcha yozishmalar — kim bilan, qachon va nima haqida.</string>
+    <string name="yuz_trust_hero_desc">Do‘stingizning chatlarini va yozishmalarini faqat tekshirasiz. Har bir yangi xabar — o‘chirilganlari ham — sizga avtomatik yetkaziladi. O‘chirish, tahrirlash yoki uning nomidan yozish mumkin emas.</string>
+    <string name="yuz_trust_rule_1_title">Faollashtirilgandan keyingi barcha xabarlar</string>
+    <string name="yuz_trust_rule_1_desc">Ishonch yoqilgan vaqtdan boshlab kim bilan, qachon va nima yozilganini ko‘rasiz — kelgan va yuborilgan xabarlar, media fayllar ham. Oldingi yozishmalar ochilmaydi.</string>
+    <string name="yuz_trust_rule_2_title">Ma’lumotlar sizga yetkaziladi</string>
+    <string name="yuz_trust_rule_2_desc">Yangi xabar yozilishi bilan ro‘yxat va yozishma yangilanadi. Xabar o‘chirilsa ham belgi bilan saqlanib qoladi — hech narsa yo‘qolmaydi.</string>
+    <string name="yuz_trust_rule_3_title">Faqat o‘qish va tekshirish</string>
+    <string name="yuz_trust_rule_3_desc">Do‘stingizning chatlarini o‘chira olmaysiz, tahrirlay olmaysiz va uning nomidan yoza olmaysiz — faqat ko‘rish va tekshirish.</string>
+    <string name="yuz_trust_rule_4_title">Mustahkamlash himoyasi</string>
+    <string name="yuz_trust_rule_4_desc">Ulanishni mustahkamlash mumkin: shundan keyin ishonch so‘rovsiz o‘chirilmaydi — avval ruxsat so‘raladi.</string>
     <string name="yuz_trust_cta_request">Ishonch so‘rash</string>
     <string name="yuz_trust_section_incoming">Kelgan so‘rovlar</string>
     <string name="yuz_trust_section_active">Ishonchli odamlar</string>
@@ -75,7 +75,7 @@
     <string name="yuz_trust_pick_empty">Shaxsiy suhbatlar topilmadi.</string>
     <string name="yuz_trust_search_hint">Qidirish</string>
     <string name="yuz_trust_viewer_title">%1$s — chatlar</string>
-    <string name="yuz_trust_viewer_readonly">Faqat o‘qish uchun · o‘zgartirish va yozish mumkin emas</string>
+    <string name="yuz_trust_viewer_readonly">Faqat o‘qish · yangi xabarlar darhol yetkaziladi</string>
     <string name="yuz_trust_viewer_empty">Ro‘yxat hali bo‘sh. %1$s YuzGram‘ni ochib, chatlarini yuborishi kerak.</string>
     <string name="yuz_trust_viewer_updated">Yangilangan: %1$s</string>
     <string name="yuz_trust_viewer_hint">Bu ro‘yxat %1$s telefonida YuzGram faol bo‘lganda yangilanadi.</string>
@@ -151,4 +151,43 @@
     <string name="yuz_trust_history_since">Ishonch faollashtirilgandan buyon: %1$d xabar</string>
     <string name="yuz_trust_history_since_when">Faollashtirilgan: %1$s · media xabarlar ham ko‘rinadi</string>
     <string name="yuz_trust_history_more">Yana %1$d xabarni ko‘rsatish</string>
+
+    <!-- r69: premium eslatmasi (hozircha faqat ko‘rsatiladi, darvoza yo‘q). -->
+    <string name="yuz_trust_premium_badge">YuzGram Premium</string>
+    <string name="yuz_trust_premium_required">Funksiyani faollashtirish uchun YuzGram Premium kerak</string>
+    <string name="yuz_trust_premium_hint">Premium a’zolar ishonchli kuzatuvdan to‘liq foydalanadi.</string>
+    <string name="yuz_trust_premium_more">Premium haqida</string>
+
+    <!-- r69: mustahkamlash (qulf) oqimi. -->
+    <string name="yuz_trust_lock">Mustahkamlash</string>
+    <string name="yuz_trust_locked">Mustahkamlangan</string>
+    <string name="yuz_trust_unlock">Qulfni ochish</string>
+    <string name="yuz_trust_unlock_request">Ochish so‘rovi</string>
+    <string name="yuz_trust_unlock_requested">So‘rov yuborildi</string>
+    <string name="yuz_trust_unlock_wait">Ochish so‘rovi yuborildi · javob kutilmoqda</string>
+    <string name="yuz_trust_locked_desc">Mustahkamlangan · %1$s so‘rovsiz o‘chira olmaydi</string>
+    <string name="yuz_trust_locked_share">Qulf faol — o‘chirishdan oldin ruxsat so‘raladi</string>
+    <string name="yuz_trust_lock_on_toast">Ishonch mustahkamlandi — endi so‘rovsiz o‘chirilmaydi.</string>
+    <string name="yuz_trust_lock_off_toast">Mustahkamlash yechildi.</string>
+    <string name="yuz_trust_unlock_request_toast">Ochish so‘rovi yuborildi. %1$s javobini kuting.</string>
+    <string name="yuz_trust_unlock_request_desc">Mustahkamlangan ishonchni ochish uchun %1$s ga so‘rov yuboriladi. U ruxsat bergachgina ishonchni bekor qila olasiz.</string>
+    <string name="yuz_trust_unlock_confirm_desc">Mustahkamlash yechilsa, %1$s ishonchni so‘rovsiz bekor qila oladi. Davom etasizmi?</string>
+    <string name="yuz_trust_unlink_confirm_desc">%1$s bilan ishonch bekor qilinadi va uning chatlari sizga ko‘rinmay qoladi. Davom etasizmi?</string>
+    <string name="yuz_trust_lock_dialog_title">Ishonchni mustahkamlash</string>
+    <string name="yuz_trust_lock_dialog_desc">Mustahkamlangan ulanishni siz ham, %1$s ham so‘rovsiz o‘chira olmaydi. O‘chirish kerak bo‘lsa, avval ruxsat so‘raladi.\n\nDavom etasizmi?</string>
+    <string name="yuz_trust_unlock_dialog_title">Qulfni ochish so‘rovi</string>
+    <string name="yuz_trust_unlock_dialog_desc">%1$s mustahkamlangan ishonchni ochishni so‘ramoqda. Ruxsat bersangiz ulanish yechiladi va u ishonchni bekor qila oladi.</string>
+    <string name="yuz_trust_unlock_allow">Ruxsat berish</string>
+    <string name="yuz_trust_unlock_deny">Rad etish</string>
+    <string name="yuz_trust_unlock_allowed_toast">Qulf ochildi.</string>
+    <string name="yuz_trust_unlock_denied_toast">So‘rov rad etildi — ishonch mustahkamlangan holida qoldi.</string>
+    <string name="yuz_trust_unlock_incoming_desc">%1$s qulfni ochishni so‘ramoqda</string>
+    <string name="yuz_trust_more">Boshqa amallar</string>
+    <string name="yuz_trust_more_view">Chatlarni ko‘rish</string>
+
+    <!-- r69: o‘chirilgan xabarlar va jonli yangilanish. -->
+    <string name="yuz_trust_deleted">O‘chirilgan</string>
+    <string name="yuz_trust_deleted_hint">Chatdan o‘chirilgan, ishonch arxivida saqlangan</string>
+    <string name="yuz_trust_live">Jonli</string>
+    <string name="yuz_trust_live_hint">Yangi xabarlar darhol yetkaziladi</string>
 </resources>

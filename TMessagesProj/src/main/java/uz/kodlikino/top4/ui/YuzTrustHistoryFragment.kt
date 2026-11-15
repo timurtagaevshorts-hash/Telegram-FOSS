@@ -10,6 +10,7 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -59,6 +60,7 @@ class YuzTrustHistoryFragment(
     private var since = 0L
     private var visibleCount = PAGE
     private var scrollOnRender = false
+    private var historyListener: ListenerRegistration? = null
 
     override fun createView(context: Context): View {
         val themed = YuzTheme.wrap(context)
@@ -93,7 +95,28 @@ class YuzTrustHistoryFragment(
     private fun load() {
         progress?.visibility = View.VISIBLE
         empty?.visibility = View.GONE
+        // Keshdagi yozishma darhol ko'rinadi; keyin jonli yangilanadi.
+        val cached = TrustStore.cachedHistory(ownerUid, chatId)
+        if (!cached.isNullOrEmpty()) {
+            val cachedSnap = TrustStore.cachedSnapshot(ownerUid)
+            kind = cachedSnap?.chats?.firstOrNull { it.id == chatId }?.kind
+                ?: TrustSnapshotBuilder.KIND_USER
+            since = cachedSnap?.since ?: 0L
+            messages = cached
+            progress?.visibility = View.GONE
+            scrollOnRender = true
+            render()
+        }
         scope?.launch {
+            if (historyListener == null) {
+                historyListener = TrustStore.listenHistory(ownerUid, chatId) { rows ->
+                    val previous = messages.size
+                    messages = rows.orEmpty()
+                    if (messages.size > previous) scrollOnRender = true
+                    progress?.visibility = View.GONE
+                    render()
+                }
+            }
             val snapshot = TrustStore.loadSnapshot(ownerUid)
             val chat = snapshot?.chats?.firstOrNull { it.id == chatId }
             val full = TrustStore.loadHistory(ownerUid, chatId)
@@ -103,6 +126,7 @@ class YuzTrustHistoryFragment(
             since = snapshot?.since ?: 0L
             visibleCount = PAGE
             scrollOnRender = true
+            progress?.visibility = View.GONE
             render()
         }
     }
@@ -125,6 +149,10 @@ class YuzTrustHistoryFragment(
             if (messages.isNotEmpty()) {
                 append("\n")
                 append(ctx().getString(R.string.yuz_trust_history_copy_hint))
+            }
+            if (messages.any { it.deleted }) {
+                append("\n")
+                append(ctx().getString(R.string.yuz_trust_deleted_hint))
             }
         }
 
@@ -213,7 +241,10 @@ class YuzTrustHistoryFragment(
             if (msg.out) R.drawable.bg_yuz_trust_msg_out
             else R.drawable.bg_yuz_trust_msg_in
         )
+        bubble.alpha = if (msg.deleted) 0.72f else 1f
         bubble.setOnClickListener { copy(msg.text) }
+        row.findViewById<View>(R.id.msgDeleted).visibility =
+            if (msg.deleted) View.VISIBLE else View.GONE
 
         val text = row.findViewById<TextView>(R.id.msgText)
         text.text = msg.text
@@ -283,6 +314,8 @@ class YuzTrustHistoryFragment(
     private fun ctx(): Context = themedContext ?: context ?: throw IllegalStateException()
 
     override fun onFragmentDestroy() {
+        historyListener?.remove()
+        historyListener = null
         scope?.cancel()
         scope = null
         super.onFragmentDestroy()

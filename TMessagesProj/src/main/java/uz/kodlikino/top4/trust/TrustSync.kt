@@ -60,6 +60,7 @@ object TrustSync {
         }
         running = true
         onStateChanged = onState
+        TrustLiveCapture.installAll()
         val s = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         scope = s
         s.launch {
@@ -72,7 +73,14 @@ object TrustSync {
             if (uid.isNullOrBlank()) return@launch
             inboxListener = TrustStore.listenInbox(uid) { list ->
                 pending = list.count { it.isPending }
-                incomingActive = list.any { it.isActive && it.shareMine }
+                val sharing = list.filter { it.isActive && it.shareMine }
+                incomingActive = sharing.isNotEmpty()
+                // Jonli ushlash faqat ruxsat bor paytda ishlaydi; watermark
+                // eng erta rozilik vaqtidan olinadi.
+                val since = sharing
+                    .mapNotNull { it.updatedAt.takeIf { t -> t > 0L } }
+                    .minOrNull() ?: 0L
+                TrustLiveCapture.setSharing(account, incomingActive, since)
                 main.post { onStateChanged?.invoke(isActive(), pending) }
             }
             sentListener = TrustStore.listenSent(uid) { list ->

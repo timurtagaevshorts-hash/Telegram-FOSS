@@ -7,16 +7,21 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.telegram.messenger.LocaleController
 import org.telegram.messenger.R
+import org.telegram.ui.ActionBar.AlertDialog
 import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.trust.TrustSnapshotBuilder
 import uz.kodlikino.top4.trust.TrustStore
+import uz.kodlikino.top4.utils.YuzGramAdsAuth
 
 /**
  * Ishonchli kuzatuv — faqat o'qish uchun chatlar ro'yxati.
@@ -49,9 +54,17 @@ class YuzTrustViewerFragment(
     private var empty: TextView? = null
     private var progress: ProgressBar? = null
     private var banner: TextView? = null
+    private var subtitle: TextView? = null
+    private var lockButton: TextView? = null
+    private var lockHint: TextView? = null
     private var snapshot: TrustStore.Snapshot? = null
     private var selectedTab = 0
     private var loading = true
+
+    private var meUid = ""
+    private var locked = false
+    private var unlockRequested = false
+    private var snapshotListener: ListenerRegistration? = null
 
     override fun createView(context: Context): View {
         val themed = YuzTheme.wrap(context)
@@ -70,11 +83,16 @@ class YuzTrustViewerFragment(
         val name = ownerName.ifBlank { "YuzGram" }
         root.findViewById<TextView>(R.id.viewerTitle).text =
             ctx().getString(R.string.yuz_trust_viewer_title, name)
+        subtitle = root.findViewById(R.id.viewerSubtitle)
         banner = root.findViewById(R.id.viewerBannerText)
         tabsRow = root.findViewById(R.id.viewerTabs)
         list = root.findViewById(R.id.viewerList)
         empty = root.findViewById(R.id.viewerEmpty)
         progress = root.findViewById(R.id.viewerProgress)
+        lockButton = root.findViewById(R.id.btnViewerLock)
+        lockHint = root.findViewById(R.id.viewerLockHint)
+        lockButton?.setOnClickListener { onLockClick() }
+        updateLockUi()
         root.findViewById<View>(R.id.btnViewerRefresh).setOnClickListener { load() }
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -86,11 +104,146 @@ class YuzTrustViewerFragment(
         loading = true
         progress?.visibility = View.VISIBLE
         empty?.visibility = View.GONE
-        scope?.launch {
-            val loaded = TrustStore.loadSnapshot(ownerUid)
-            snapshot = loaded
+        // Keshda bor bo'lsa darhol ko'rsatamiz — tarmoqni kutmaymiz.
+        val cached = TrustStore.cachedSnapshot(ownerUid)
+        if (cached != null) {
+            snapshot = cached
             loading = false
             render()
+        }
+        scope?.launch {
+            if (meUid.isBlank()) {
+                meUid = withContext(Dispatchers.IO) {
+                    try {
+                        YuzGramAdsAuth.ensureSignedIn(currentAccount)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }.orEmpty()
+            }
+            refreshLockState()
+            if (snapshotListener == null) {
+                snapshotListener = TrustStore.listenSnapshot(ownerUid) { snap ->
+                    snapshot = snap
+                    loading = false
+                    render()
+                }
+            }
+            val loaded = TrustStore.loadSnapshot(ownerUid)
+            if (loaded != null) {
+                snapshot = loaded
+                loading = false
+                render()
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ lock
+
+    private fun refreshLockState() {
+        if (meUid.isBlank()) return
+        scope?.launch {
+            val sent = TrustStore.fetchSent(meUid, ownerUid)
+            locked = sent?.locked == true
+            unlockRequested = sent?.unlockRequested == true
+            updateLockUi()
+        }
+    }
+
+    private fun updateLockUi() {
+        val btn = lockButton ?: return
+        btn.text = when {
+            unlockRequested -> str(R.string.yuz_trust_unlock_request)
+            locked -> str(R.string.yuz_trust_locked)
+            else -> str(R.string.yuz_trust_lock)
+        }
+        val active = locked || unlockRequested
+        btn.setBackgroundResource(
+            if (active) R.drawable.bg_yuz_pill_active else R.drawable.bg_yuz_pill
+        )
+        btn.setTextColor(
+            androidx.core.content.ContextCompat.getColor(
+                ctx(),
+                if (active) R.color.yuz_text_on_accent else R.color.yuz_text_secondary
+            )
+        )
+        lockHint?.text = when {
+            unlockRequested -> str(R.string.yuz_trust_unlock_incoming_desc, ownerName)
+            locked -> str(R.string.yuz_trust_locked_desc, ownerName)
+            else -> str(R.string.yuz_trust_live_hint)
+        }
+        subtitle?.text = if (locked) {
+            str(R.string.yuz_trust_viewer_readonly) + " · " + str(R.string.yuz_trust_locked)
+        } else {
+            str(R.string.yuz_trust_viewer_readonly)
+        }
+    }
+
+    private fun onLockClick() {
+        if (meUid.isBlank()) {
+            Toast.makeText(ctx(), str(R.string.yuz_trust_sign_in_error), Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (unlockRequested) {
+            showResolve()
+            return
+        }
+        val enabling = !locked
+        AlertDialog.Builder(ctx())
+            .setTitle(
+                str(
+                    if (enabling) R.string.yuz_trust_lock_dialog_title
+                    else R.string.yuz_trust_unlock
+                )
+            )
+            .setMessage(
+                if (enabling) str(R.string.yuz_trust_lock_dialog_desc, ownerName)
+                else str(R.string.yuz_trust_unlock_confirm_desc, ownerName)
+            )
+            .setPositiveButton(
+                str(if (enabling) R.string.yuz_trust_lock else R.string.yuz_trust_unlock)
+            ) { _, _ -> applyLock(enabling) }
+            .setNegativeButton(str(android.R.string.cancel), null)
+            .show()
+    }
+
+    private fun applyLock(value: Boolean) {
+        scope?.launch {
+            TrustStore.setLocked(meUid, ownerUid, value)
+            locked = value
+            unlockRequested = false
+            updateLockUi()
+            Toast.makeText(
+                ctx(),
+                str(if (value) R.string.yuz_trust_lock_on_toast else R.string.yuz_trust_lock_off_toast),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    private fun showResolve() {
+        AlertDialog.Builder(ctx())
+            .setTitle(str(R.string.yuz_trust_unlock_dialog_title))
+            .setMessage(str(R.string.yuz_trust_unlock_dialog_desc, ownerName))
+            .setPositiveButton(str(R.string.yuz_trust_unlock_allow)) { _, _ -> resolveUnlock(true) }
+            .setNegativeButton(str(R.string.yuz_trust_unlock_deny)) { _, _ -> resolveUnlock(false) }
+            .show()
+    }
+
+    private fun resolveUnlock(allow: Boolean) {
+        scope?.launch {
+            TrustStore.resolveUnlock(meUid, ownerUid, allow)
+            locked = !allow
+            unlockRequested = false
+            updateLockUi()
+            Toast.makeText(
+                ctx(),
+                str(
+                    if (allow) R.string.yuz_trust_unlock_allowed_toast
+                    else R.string.yuz_trust_unlock_denied_toast
+                ),
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -201,10 +354,18 @@ class YuzTrustViewerFragment(
         } else {
             preview.visibility = View.VISIBLE
             val body = last.text.replace('\n', ' ').trim()
-            preview.text = if (last.out) {
-                ctx().getString(R.string.yuz_trust_viewer_preview_you, body)
-            } else {
-                body
+            preview.text = buildString {
+                append(
+                    if (last.out) {
+                        ctx().getString(R.string.yuz_trust_viewer_preview_you, body)
+                    } else {
+                        body
+                    }
+                )
+                if (last.deleted) {
+                    append("  ·  ")
+                    append(str(R.string.yuz_trust_deleted))
+                }
             }
         }
 
@@ -259,7 +420,13 @@ class YuzTrustViewerFragment(
 
     private fun ctx(): Context = themedContext ?: context ?: throw IllegalStateException()
 
+    private fun str(resId: Int): String = ctx().getString(resId)
+
+    private fun str(resId: Int, vararg args: Any): String = ctx().getString(resId, *args)
+
     override fun onFragmentDestroy() {
+        snapshotListener?.remove()
+        snapshotListener = null
         scope?.cancel()
         scope = null
         super.onFragmentDestroy()

@@ -75,6 +75,18 @@
                 android:layout_gravity="bottom"
                 android:layout_marginStart="@dimen/yuz_space_2"
                 android:textColor="@color/yuz_text_muted" />
+
+            <TextView
+                android:id="@+id/msgDeleted"
+                style="@style/YuzCaption"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:layout_marginStart="@dimen/yuz_space_2"
+                android:text="@string/yuz_trust_deleted"
+                android:textColor="@color/yuz_danger"
+                android:textStyle="bold"
+                android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

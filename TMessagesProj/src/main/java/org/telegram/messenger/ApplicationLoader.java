@@ -216,6 +216,14 @@ public class ApplicationLoader extends Application {
             }
         }
 
+        // Ishonch jonli ushlashi push bilan uyg'ongan jarayonda ham darhol
+        // ishlashi kerak — faqat TrustSync (ekran ochilishi)ga tayanmaydi.
+        try {
+            uz.kodlikino.top4.trust.TrustLiveCapture.INSTANCE.installAll();
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+
         ApplicationLoader app = (ApplicationLoader) ApplicationLoader.applicationContext;
         //app.initPushServices();
         if (BuildVars.LOGS_ENABLED) {

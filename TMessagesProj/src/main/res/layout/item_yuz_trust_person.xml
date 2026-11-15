@@ -72,6 +72,18 @@
             android:layout_marginStart="@dimen/yuz_space_1"
             android:clickable="true"
             android:focusable="true" />
+
+        <ImageButton
+            android:id="@+id/personMore"
+            style="@style/YuzIconButton"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="@dimen/yuz_space_1"
+            android:contentDescription="@string/yuz_trust_more"
+            android:padding="@dimen/yuz_space_1"
+            android:src="@drawable/ic_yuz_more"
+            android:tint="@color/yuz_text_secondary"
+            android:visibility="gone" />
     </LinearLayout>
 
     <LinearLayout

@@ -1,5 +1,6 @@
 package uz.kodlikino.top4.trust
 
+import android.content.SharedPreferences
 import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -7,6 +8,9 @@ import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import org.telegram.messenger.ApplicationLoader
 
 /**
  * Ishonchli kuzatuv (trust) — Firestore transporti.
@@ -49,7 +53,9 @@ object TrustStore {
         val status: String,
         val shareMine: Boolean,
         val createdAt: Long,
-        val updatedAt: Long
+        val updatedAt: Long,
+        val locked: Boolean = false,
+        val unlockRequested: Boolean = false
     ) {
         val isPending: Boolean get() = status == STATUS_PENDING
         val isActive: Boolean get() = status == STATUS_ACCEPTED
@@ -60,7 +66,9 @@ object TrustStore {
         val peerUid: String,
         val peerName: String,
         val status: String,
-        val createdAt: Long
+        val createdAt: Long,
+        val locked: Boolean = false,
+        val unlockRequested: Boolean = false
     ) {
         val isPending: Boolean get() = status == STATUS_PENDING
         val isActive: Boolean get() = status == STATUS_ACCEPTED
@@ -72,7 +80,9 @@ object TrustStore {
         val from: String,
         val text: String,
         val date: Long,
-        val out: Boolean
+        val out: Boolean,
+        /** O'chirilgan, lekin arxivda saqlanib qolgan xabar. */
+        val deleted: Boolean = false
     )
 
     data class ChatMeta(
@@ -118,7 +128,9 @@ object TrustStore {
                         status = doc.getString("status") ?: STATUS_PENDING,
                         shareMine = doc.getBoolean("shareMine") ?: false,
                         createdAt = doc.getLong("createdAt") ?: 0L,
-                        updatedAt = doc.getLong("updatedAt") ?: 0L
+                        updatedAt = doc.getLong("updatedAt") ?: 0L,
+                        locked = doc.getBoolean("locked") ?: false,
+                        unlockRequested = doc.getBoolean("unlockRequested") ?: false
                     )
                 } catch (e: Exception) {
                     null
@@ -139,7 +151,9 @@ object TrustStore {
                         peerUid = doc.id,
                         peerName = doc.getString("approverName").orEmpty(),
                         status = doc.getString("status") ?: STATUS_PENDING,
-                        createdAt = doc.getLong("createdAt") ?: 0L
+                        createdAt = doc.getLong("createdAt") ?: 0L,
+                        locked = doc.getBoolean("locked") ?: false,
+                        unlockRequested = doc.getBoolean("unlockRequested") ?: false
                     )
                 } catch (e: Exception) {
                     null
@@ -179,6 +193,7 @@ object TrustStore {
                     "requesterName" to myName.take(64),
                     "status" to STATUS_PENDING,
                     "shareMine" to false,
+                    "locked" to false,
                     "createdAt" to now,
                     "updatedAt" to now
                 )
@@ -188,6 +203,7 @@ object TrustStore {
                     "approverUid" to peerUid,
                     "approverName" to peerName.take(64),
                     "status" to STATUS_PENDING,
+                    "locked" to false,
                     "createdAt" to now,
                     "updatedAt" to now
                 )
@@ -299,6 +315,88 @@ object TrustStore {
                 ).await()
             } catch (e: Exception) {
                 Log.w(TAG, "markSentStatus: ${e.message}")
+            }
+        }
+
+    // ------------------------------------------------------------------ lock
+
+    /**
+     * Requester ulanishni mustahkamlaydi. Mustahkamlangan ulanishni approver
+     * so'rovsiz bekor qila olmaydi — avval [requestUnlock] yuboriladi.
+     */
+    suspend fun setLocked(meUid: String, peerUid: String, locked: Boolean) =
+        withContext(Dispatchers.IO) {
+            if (meUid.isBlank() || peerUid.isBlank()) return@withContext
+            val now = System.currentTimeMillis()
+            try {
+                inbox(peerUid).document(meUid).set(
+                    hashMapOf("locked" to locked, "lockedAt" to now),
+                    SetOptions.merge()
+                ).await()
+                sent(meUid).document(peerUid).set(
+                    hashMapOf("locked" to locked, "lockedAt" to now),
+                    SetOptions.merge()
+                ).await()
+            } catch (e: Exception) {
+                Log.w(TAG, "setLocked: ${e.message}")
+            }
+        }
+
+    /** Approver, mustahkamlangan ulanishni bekor qilishdan oldin ruxsat so'raydi. */
+    suspend fun requestUnlock(meUid: String, requesterUid: String) =
+        withContext(Dispatchers.IO) {
+            try {
+                inbox(meUid).document(requesterUid).set(
+                    hashMapOf(
+                        "unlockRequested" to true,
+                        "updatedAt" to System.currentTimeMillis()
+                    ),
+                    SetOptions.merge()
+                ).await()
+            } catch (e: Exception) {
+                Log.w(TAG, "requestUnlock: ${e.message}")
+            }
+        }
+
+    /** Requester ochish so'rovini hal qiladi: `allow` = qulf yechiladi. */
+    suspend fun resolveUnlock(meUid: String, peerUid: String, allow: Boolean) =
+        withContext(Dispatchers.IO) {
+            if (meUid.isBlank() || peerUid.isBlank()) return@withContext
+            try {
+                inbox(peerUid).document(meUid).set(
+                    hashMapOf(
+                        "locked" to !allow,
+                        "unlockRequested" to false,
+                        "lockedAt" to System.currentTimeMillis()
+                    ),
+                    SetOptions.merge()
+                ).await()
+                sent(meUid).document(peerUid).set(
+                    hashMapOf("locked" to !allow, "unlockRequested" to false),
+                    SetOptions.merge()
+                ).await()
+            } catch (e: Exception) {
+                Log.w(TAG, "resolveUnlock: ${e.message}")
+            }
+        }
+
+    /** Chiquvchi so'rovning joriy holati (viewer'dagi qulf tugmasi uchun). */
+    suspend fun fetchSent(meUid: String, peerUid: String): Outgoing? =
+        withContext(Dispatchers.IO) {
+            try {
+                val doc = sent(meUid).document(peerUid).get().await()
+                if (!doc.exists()) return@withContext null
+                Outgoing(
+                    peerUid = peerUid,
+                    peerName = doc.getString("approverName").orEmpty(),
+                    status = doc.getString("status") ?: STATUS_PENDING,
+                    createdAt = doc.getLong("createdAt") ?: 0L,
+                    locked = doc.getBoolean("locked") ?: false,
+                    unlockRequested = doc.getBoolean("unlockRequested") ?: false
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "fetchSent: ${e.message}")
+                null
             }
         }
 
@@ -419,29 +517,18 @@ object TrustStore {
         try {
             val snap = snapshotDoc(ownerUid).get().await()
             if (!snap.exists()) return@withContext null
-            val rows = snap.get("chats") as? List<*> ?: emptyList<Any>()
-            val chats = rows.mapNotNull { row ->
-                val m = row as? Map<*, *> ?: return@mapNotNull null
-                ChatMeta(
-                    id = m["id"] as? String ?: return@mapNotNull null,
-                    title = m["t"] as? String ?: "",
-                    kind = (m["k"] as? Number)?.toInt() ?: 0,
-                    unread = (m["u"] as? Number)?.toInt() ?: 0,
-                    time = (m["d"] as? Number)?.toLong() ?: 0L,
-                    pinned = m["p"] as? Boolean ?: false,
-                    count = (m["c"] as? Number)?.toInt() ?: 0,
-                    history = parseMsgs(m["h"] as? List<*>)
-                )
-            }
-            Snapshot(
-                ownerUid = ownerUid,
-                updatedAt = snap.getLong("updatedAt") ?: 0L,
-                since = snap.getLong("since") ?: 0L,
-                chats = chats
-            )
+            val parsed = parseSnapshotDoc(ownerUid, snap)
+            putCache(cacheKey(ownerUid), snapshotJson(parsed))
+            parsed
         } catch (e: Exception) {
             Log.w(TAG, "loadSnapshot($ownerUid): ${e.message}")
-            null
+            if (denied(e)) {
+                // Ruxsat olib tashlangan — eski nusxa ham qolmasin.
+                putCache(cacheKey(ownerUid), null)
+                null
+            } else {
+                cachedSnapshot(ownerUid)
+            }
         }
     }
 
@@ -451,12 +538,227 @@ object TrustStore {
             try {
                 val snap = historyDoc(ownerUid, chatId).get().await()
                 if (!snap.exists()) return@withContext null
-                parseMsgs(snap.get("msgs") as? List<*>)
+                val msgs = parseMsgs(snap.get("msgs") as? List<*>)
+                putCache(cacheKey(ownerUid, chatId), msgsJson(msgs))
+                msgs
             } catch (e: Exception) {
                 Log.w(TAG, "loadHistory($ownerUid/$chatId): ${e.message}")
-                null
+                if (denied(e)) {
+                    putCache(cacheKey(ownerUid, chatId), null)
+                    null
+                } else {
+                    cachedHistory(ownerUid, chatId)
+                }
             }
         }
+
+    /**
+     * Snapshot'ni jonli kuzatadi — yangi xabar nashr etilishi bilan ekran
+     * o'zi yangilanadi. Ruxsat olib tashlansa, kesh tozalanib `null` keladi.
+     */
+    fun listenSnapshot(ownerUid: String, onChange: (Snapshot?) -> Unit): ListenerRegistration =
+        snapshotDoc(ownerUid).addSnapshotListener { snap, err ->
+            if (err != null) {
+                Log.w(TAG, "listenSnapshot: ${err.message}")
+                if (denied(err)) putCache(cacheKey(ownerUid), null)
+                onChange(null)
+                return@addSnapshotListener
+            }
+            if (snap == null || !snap.exists()) return@addSnapshotListener
+            val parsed = parseSnapshotDoc(ownerUid, snap)
+            putCache(cacheKey(ownerUid), snapshotJson(parsed))
+            onChange(parsed)
+        }
+
+    /** Bitta suhbat yozishmasini jonli kuzatadi. */
+    fun listenHistory(
+        ownerUid: String,
+        chatId: String,
+        onChange: (List<MsgMeta>?) -> Unit
+    ): ListenerRegistration = historyDoc(ownerUid, chatId)
+        .addSnapshotListener { snap, err ->
+            if (err != null) {
+                Log.w(TAG, "listenHistory: ${err.message}")
+                if (denied(err)) putCache(cacheKey(ownerUid, chatId), null)
+                onChange(null)
+                return@addSnapshotListener
+            }
+            if (snap == null || !snap.exists()) return@addSnapshotListener
+            val msgs = parseMsgs(snap.get("msgs") as? List<*>)
+            putCache(cacheKey(ownerUid, chatId), msgsJson(msgs))
+            onChange(msgs)
+        }
+
+    // ------------------------------------------------------------ offline cache
+
+    private val cachePrefs: SharedPreferences? by lazy {
+        try {
+            ApplicationLoader.applicationContext
+                ?.getSharedPreferences("yuz_trust_cache", android.content.Context.MODE_PRIVATE)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun cacheKey(ownerUid: String, chatId: String? = null): String =
+        if (chatId == null) "snap_$ownerUid" else "h_${ownerUid}_$chatId"
+
+    fun cachedSnapshot(ownerUid: String): Snapshot? = try {
+        cachePrefs?.getString(cacheKey(ownerUid), null)
+            ?.let { parseSnapshotJson(ownerUid, JSONObject(it)) }
+    } catch (e: Exception) {
+        null
+    }
+
+    fun cachedHistory(ownerUid: String, chatId: String): List<MsgMeta>? = try {
+        cachePrefs?.getString(cacheKey(ownerUid, chatId), null)
+            ?.let { parseMsgsJson(JSONArray(it)) }
+    } catch (e: Exception) {
+        null
+    }
+
+    /** Ruxsat bekor qilinganda ko'ruvchi tomondagi nusxalarni ham o'chiradi. */
+    fun clearOwnerCache(ownerUid: String) {
+        val prefs = cachePrefs ?: return
+        try {
+            val prefix = "h_${ownerUid}_"
+            val edit = prefs.edit().remove(cacheKey(ownerUid))
+            for (key in prefs.all.keys) {
+                if (key.startsWith(prefix)) edit.remove(key)
+            }
+            edit.apply()
+        } catch (e: Exception) {
+            Log.w(TAG, "clearOwnerCache: ${e.message}")
+        }
+    }
+
+    private fun putCache(key: String, value: String?) {
+        val prefs = cachePrefs ?: return
+        try {
+            if (value == null) prefs.edit().remove(key).apply()
+            else prefs.edit().putString(key, value).apply()
+        } catch (e: Exception) {
+            Log.w(TAG, "cache write: ${e.message}")
+        }
+    }
+
+    private fun denied(e: Exception): Boolean =
+        e is com.google.firebase.firestore.FirebaseFirestoreException &&
+            e.code == com.google.firebase.firestore.FirebaseFirestoreException.Code.PERMISSION_DENIED
+
+    private fun parseSnapshotDoc(
+        ownerUid: String,
+        snap: com.google.firebase.firestore.DocumentSnapshot
+    ): Snapshot {
+        val rows = snap.get("chats") as? List<*> ?: emptyList<Any>()
+        val chats = rows.mapNotNull { row ->
+            val m = row as? Map<*, *> ?: return@mapNotNull null
+            ChatMeta(
+                id = m["id"] as? String ?: return@mapNotNull null,
+                title = m["t"] as? String ?: "",
+                kind = (m["k"] as? Number)?.toInt() ?: 0,
+                unread = (m["u"] as? Number)?.toInt() ?: 0,
+                time = (m["d"] as? Number)?.toLong() ?: 0L,
+                pinned = m["p"] as? Boolean ?: false,
+                count = (m["c"] as? Number)?.toInt() ?: 0,
+                history = parseMsgs(m["h"] as? List<*>)
+            )
+        }
+        return Snapshot(
+            ownerUid = ownerUid,
+            updatedAt = snap.getLong("updatedAt") ?: 0L,
+            since = snap.getLong("since") ?: 0L,
+            chats = chats
+        )
+    }
+
+    private fun snapshotJson(s: Snapshot): String {
+        val chats = JSONArray()
+        for (c in s.chats) {
+            val o = JSONObject()
+            o.put("id", c.id)
+            o.put("t", c.title)
+            o.put("k", c.kind)
+            o.put("u", c.unread)
+            o.put("d", c.time)
+            o.put("p", c.pinned)
+            o.put("c", c.count)
+            if (c.history.isNotEmpty()) {
+                val rows = JSONArray()
+                for (m in c.history) rows.put(msgJson(m))
+                o.put("h", rows)
+            }
+            chats.put(o)
+        }
+        return JSONObject().apply {
+            put("uid", s.ownerUid)
+            put("updatedAt", s.updatedAt)
+            put("since", s.since)
+            put("chats", chats)
+        }.toString()
+    }
+
+    private fun parseSnapshotJson(ownerUid: String, root: JSONObject): Snapshot {
+        val rows = root.optJSONArray("chats")
+        val chats = ArrayList<ChatMeta>(rows?.length() ?: 0)
+        for (i in 0 until (rows?.length() ?: 0)) {
+            val o = rows?.optJSONObject(i) ?: continue
+            chats.add(
+                ChatMeta(
+                    id = o.optString("id"),
+                    title = o.optString("t"),
+                    kind = o.optInt("k"),
+                    unread = o.optInt("u"),
+                    time = o.optLong("d"),
+                    pinned = o.optBoolean("p"),
+                    count = o.optInt("c"),
+                    history = parseMsgsJson(o.optJSONArray("h"))
+                )
+            )
+        }
+        return Snapshot(
+            ownerUid = ownerUid,
+            updatedAt = root.optLong("updatedAt"),
+            since = root.optLong("since"),
+            chats = chats
+        )
+    }
+
+    private fun msgJson(m: MsgMeta): JSONObject = JSONObject().apply {
+        put("m", m.id)
+        put("s", m.from)
+        put("x", m.text)
+        put("d", m.date)
+        put("o", m.out)
+        put("del", m.deleted)
+    }
+
+    private fun msgsJson(msgs: List<MsgMeta>): String {
+        val rows = JSONArray()
+        for (m in msgs) rows.put(msgJson(m))
+        return rows.toString()
+    }
+
+    private fun parseMsgsJson(rows: JSONArray?): List<MsgMeta> {
+        if (rows == null) return emptyList()
+        val out = ArrayList<MsgMeta>(rows.length())
+        for (i in 0 until rows.length()) {
+            val o = rows.optJSONObject(i) ?: continue
+            val text = o.optString("x")
+            if (text.isBlank()) continue
+            out.add(
+                MsgMeta(
+                    id = o.optString("m"),
+                    from = o.optString("s"),
+                    text = text,
+                    date = o.optLong("d"),
+                    out = o.optBoolean("o"),
+                    deleted = o.optBoolean("del")
+                )
+            )
+        }
+        return out
+    }
 
     /**
      * Ruxsat butunlay olib tashlanganda: barcha tarix hujjatlarini o'chirib,
@@ -512,7 +814,8 @@ object TrustStore {
         "s" to m.from,
         "x" to m.text,
         "d" to m.date,
-        "o" to m.out
+        "o" to m.out,
+        "del" to m.deleted
     )
 
     private fun parseMsgs(rows: List<*>?): List<MsgMeta> =
@@ -525,7 +828,8 @@ object TrustStore {
                 from = hm["s"] as? String ?: "",
                 text = text,
                 date = (hm["d"] as? Number)?.toLong() ?: 0L,
-                out = hm["o"] as? Boolean ?: false
+                out = hm["o"] as? Boolean ?: false,
+                deleted = hm["del"] as? Boolean ?: false
             )
         }
 
