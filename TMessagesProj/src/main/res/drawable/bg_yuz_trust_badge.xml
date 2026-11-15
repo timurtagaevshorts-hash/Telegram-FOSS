@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ishonch ro'yxati: o'qilmagan xabarlar belgisi. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/yuz_action" />
+    <corners android:radius="@dimen/yuz_radius_pill" />
+</shape>

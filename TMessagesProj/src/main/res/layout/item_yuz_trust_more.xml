@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ishonch tarixi: eskiroq xabarlarni ochish tugmasi. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingTop="@dimen/yuz_space_2"
+    android:paddingBottom="@dimen/yuz_space_3">
+
+    <TextView
+        android:id="@+id/btnMore"
+        style="@style/YuzPill"
+        android:layout_gravity="center"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground" />
+</FrameLayout>

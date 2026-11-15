@@ -27,10 +27,11 @@ import java.util.Date
 /**
  * Ishonch orqali ochilgan suhbat tarixi — faqat o'qish.
  *
- * Xabarlar egasining o'zi nashr qilgan snapshot hujjatidan olinadi; bu ekran
- * hech narsa yozmaydi, o'zgartirmaydi va Telegram bilan to'g'ridan-to'g'ri
- * bog'lanmaydi. Kunlar ajratgichi, guruhlarda jo'natuvchi avatari va bosib
- * nusxalash mavjud.
+ * Ishonch faollashtirilgandan buyon yig'ilgan to'liq yozishma ko'rsatiladi
+ * (`snapshot/h_{chatId}` hujjati); hujjat hali yozilmagan bo'lsa, asosiy
+ * hujjatdagi oxirgi 10 xabar ko'rsatiladi. Eng yangi xabarlar pastda; yuqorida
+ * "yana ko'rsatish" tugmasi eskiroqlarini ochadi. Kunlar ajratgichi, guruhlarda
+ * jo'natuvchi avatari va bosib nusxalash mavjud.
  */
 class YuzTrustHistoryFragment(
     private val ownerUid: String,
@@ -38,6 +39,10 @@ class YuzTrustHistoryFragment(
     private val chatId: String,
     private val chatTitle: String
 ) : BaseFragment() {
+
+    companion object {
+        private const val PAGE = 150
+    }
 
     private var scope: CoroutineScope? = null
     private var themedContext: Context? = null
@@ -48,6 +53,12 @@ class YuzTrustHistoryFragment(
     private var banner: TextView? = null
     private var scroll: ScrollView? = null
     private var bubbleMaxWidth = 0
+
+    private var messages: List<TrustStore.MsgMeta> = emptyList()
+    private var kind = TrustSnapshotBuilder.KIND_USER
+    private var since = 0L
+    private var visibleCount = PAGE
+    private var scrollOnRender = false
 
     override fun createView(context: Context): View {
         val themed = YuzTheme.wrap(context)
@@ -84,49 +95,80 @@ class YuzTrustHistoryFragment(
         empty?.visibility = View.GONE
         scope?.launch {
             val snapshot = TrustStore.loadSnapshot(ownerUid)
-            render(snapshot)
+            val chat = snapshot?.chats?.firstOrNull { it.id == chatId }
+            val full = TrustStore.loadHistory(ownerUid, chatId)
+            // To'liq hujjat bo'lmasa — asosiy hujjatdagi oxirgi 10 xabar.
+            messages = (full ?: chat?.history).orEmpty()
+            kind = chat?.kind ?: TrustSnapshotBuilder.KIND_USER
+            since = snapshot?.since ?: 0L
+            visibleCount = PAGE
+            scrollOnRender = true
+            render()
         }
     }
 
-    private fun render(snapshot: TrustStore.Snapshot?) {
+    private fun render() {
         val themed = themedContext ?: return
         progress?.visibility = View.GONE
 
-        val chat = snapshot?.chats?.firstOrNull { it.id == chatId }
-        val messages = chat?.history.orEmpty()
-        val kind = chat?.kind ?: TrustSnapshotBuilder.KIND_USER
-
         banner?.text = buildString {
-            append(
-                ctx().getString(
-                    R.string.yuz_trust_history_hint,
-                    messages.size,
-                    ownerName.ifBlank { "YuzGram" }
+            append(ctx().getString(R.string.yuz_trust_history_since, messages.size))
+            if (since > 0L) {
+                append("\n")
+                append(
+                    ctx().getString(
+                        R.string.yuz_trust_history_since_when,
+                        LocaleController.getInstance().formatterStats.format(since)
+                    )
                 )
-            )
+            }
             if (messages.isNotEmpty()) {
                 append("\n")
                 append(ctx().getString(R.string.yuz_trust_history_copy_hint))
             }
         }
 
+        val shown = if (messages.size > visibleCount) {
+            messages.takeLast(visibleCount)
+        } else {
+            messages
+        }
+        val hidden = messages.size - shown.size
+
         list?.removeAllViews()
+        if (hidden > 0) {
+            list?.addView(buildMoreRow(themed, hidden))
+        }
         var lastDay = Long.MIN_VALUE
-        for (msg in messages) {
+        for (msg in shown) {
             val day = dayStart(msg.date * 1000L)
             if (day != lastDay) {
                 list?.addView(buildDayRow(themed, msg.date))
                 lastDay = day
             }
-            list?.addView(buildRow(themed, msg, kind))
+            list?.addView(buildRow(themed, msg))
         }
 
         empty?.visibility = if (messages.isEmpty()) View.VISIBLE else View.GONE
         empty?.text = ctx().getString(R.string.yuz_trust_history_empty)
 
-        if (messages.isNotEmpty()) {
+        if (scrollOnRender && messages.isNotEmpty()) {
+            scrollOnRender = false
             scroll?.post { scroll?.fullScroll(View.FOCUS_DOWN) }
         }
+    }
+
+    private fun buildMoreRow(themed: Context, hidden: Int): View {
+        val row = LayoutInflater.from(themed)
+            .inflate(R.layout.item_yuz_trust_more, list, false)
+        row.findViewById<TextView>(R.id.btnMore).apply {
+            text = ctx().getString(R.string.yuz_trust_history_more, hidden)
+            setOnClickListener {
+                visibleCount += PAGE
+                render()
+            }
+        }
+        return row
     }
 
     private fun buildDayRow(themed: Context, seconds: Long): View {
@@ -138,11 +180,11 @@ class YuzTrustHistoryFragment(
 
     private fun buildRow(
         themed: Context,
-        msg: TrustStore.MsgMeta,
-        kind: Int
+        msg: TrustStore.MsgMeta
     ): View {
         val row = LayoutInflater.from(themed)
             .inflate(R.layout.item_yuz_trust_message, list, false) as LinearLayout
+        row.tag = msg.id
         row.gravity = if (msg.out) Gravity.END else Gravity.START
         val column = row.findViewById<LinearLayout>(R.id.msgColumn)
         column.gravity = if (msg.out) Gravity.END else Gravity.START

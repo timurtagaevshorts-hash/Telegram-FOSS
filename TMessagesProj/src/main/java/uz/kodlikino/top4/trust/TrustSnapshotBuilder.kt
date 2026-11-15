@@ -17,13 +17,17 @@ import org.telegram.tgnet.TLRPC
 import kotlin.random.Random
 
 /**
- * Chatlar ro'yxatini va eng so'nggi suhbatlarning oxirgi xabarlarini yig'adi.
+ * Chatlar ro'yxatini va suhbat yozishmalarini yig'adi.
  *
- * Ro'yxat har doim metama'lumot bilan cheklanadi; xabar matni esa FAQAT
- * [HISTORY_CHATS] ta eng faol suhbat uchun va FAQAT ruxsat bergan
- * foydalanuvchilar o'qiy oladigan snapshot hujjatiga yoziladi. Ruxsat
- * olib tashlansa, keyingi nashr hujjatni bo'sh `readers` bilan yozadi va
- * qoidalar uni hech kimga o'qitmaydi.
+ * Ro'yxat HAR DOIM vaqt bo'yicha kamayish tartibida nashr qilinadi (oxirgi
+ * yozishmalar tepada). Har bir suhbat uchun:
+ *  - asosiy hujjatda oxirgi [PREVIEW_PER_CHAT] xabar (ro'yxat ko'rinishi),
+ *  - alohida `snapshot/h_{chatId}` hujjatida ishonch faollashgandan buyon
+ *    to'liq yozishma ([MAX_STORED] tagacha) saqlanadi.
+ *
+ * Matn va media FAQAT ruxsat bergan foydalanuvchilar o'qiy oladigan
+ * hujjatlarga yoziladi. Ruxsat olib tashlansa, keyingi nashr barcha tarix
+ * hujjatlarini o'chiradi ([TrustStore.prunePublished]).
  */
 object TrustSnapshotBuilder {
 
@@ -34,19 +38,33 @@ object TrustSnapshotBuilder {
     const val KIND_CHANNEL = 2
     const val KIND_BOT = 3
 
-    /** Oxirgi xabarlari nashr qilinadigan suhbatlar soni (hujjat hajmi chegarasi). */
-    private const val HISTORY_CHATS = 36
-    /** Bitta suhbatdan olinadigan oxirgi xabarlar soni. */
-    private const val HISTORY_PER_CHAT = 40
+    /** Yozishmasi nashr qilinadigan eng faol suhbatlar soni. */
+    private const val HISTORY_CHATS = 48
+    /** Har safar tarmoqdan olinadigan oxirgi xabarlar soni. */
+    private const val FETCH_PER_CHAT = 80
+    /** Bitta suhbat uchun saqlanadigan eng ko'p xabar (Firestore hujjat chegarasi). */
+    private const val MAX_STORED = 400
+    /** Asosiy hujjatdagi (ro'yxat uchun) xabar ko'rinishi. */
+    private const val PREVIEW_PER_CHAT = 10
     /** Tarmoqdan qayta so'rash oralig'i — ticker har 90 s da ishlaydi. */
-    private const val HISTORY_TTL_MS = 240_000L
+    private const val HISTORY_TTL_MS = 120_000L
     /** Xabarlar kelmasa, nashrni kutib qolmaslik uchun chegara. */
-    private const val HISTORY_TIMEOUT_MS = 12_000L
-    /** Bitta xabar matni uchun yuqori chegara (Firestore 1 MiB limiti). */
+    private const val HISTORY_TIMEOUT_MS = 18_000L
+    /** Bitta xabar matni uchun yuqori chegara. */
     private const val TEXT_CAP = 280
 
-    /** chatId -> (yozilgan vaqt, xabarlar). Faqat oxirgi nashr holatini saqlaydi. */
+    /** chatId -> (oxirgi marta so'ralgan vaqt, shu safar olingan xabarlar). */
     private val historyCache = HashMap<String, Pair<Long, List<TrustStore.MsgMeta>>>()
+    /** chatId -> faollashgandan buyon yig'ilgan to'liq yozishma. */
+    private val mergedHistory = HashMap<String, ArrayList<TrustStore.MsgMeta>>()
+    /** Tarixi doimiy hujjatdan bir marta o'qilgan suhbatlar. */
+    private val storeLoaded = HashSet<String>()
+    /** chatId -> oxirgi yozilgan holat imzosi (keraksiz yozuvlarni oldini oladi). */
+    private val lastWriteSig = HashMap<String, String>()
+    /** Faol ro'yxatdan chiqib ketgan suhbatlar uchun oxirgi ma'lum xabar soni. */
+    private val knownCount = HashMap<String, Int>()
+    /** Oxirgi nashrdagi ruxsat egalari — o'zgarishni aniqlash uchun. */
+    private var lastReaders: List<String> = emptyList()
 
     @Volatile
     private var publishing = false
@@ -64,6 +82,7 @@ object TrustSnapshotBuilder {
             .ifBlank { "YuzGram" }
     }
 
+    /** Chatlar ro'yxati — vaqt bo'yicha kamayish tartibida. */
     fun build(account: Int): List<TrustStore.ChatMeta> {
         val mc = MessagesController.getInstance(account)
         val out = ArrayList<TrustStore.ChatMeta>(LIMIT)
@@ -102,25 +121,47 @@ object TrustSnapshotBuilder {
                         pinned = dialog.pinned
                     )
                 )
-                if (out.size >= LIMIT) return out
             }
         }
-        return out
+        out.sortByDescending { it.time }
+        return if (out.size > LIMIT) ArrayList(out.subList(0, LIMIT)) else out
     }
 
-    /** Bir marta nashr qilish: ro'yxat + oxirgi xabarlar, ruxsat egalari bilan. */
+    /** Bir marta nashr qilish: ro'yxat + yozishmalar, ruxsat egalari bilan. */
     suspend fun publish(account: Int): Boolean {
         if (publishing) return false
         publishing = true
         try {
             val uid = meUid(account)
             if (uid.isBlank()) return false
-            val readers = TrustStore.readersForMe(uid)
-            if (readers.isEmpty()) return false
-            // Dialoglar ro'yxati main thread'dagi keshdan o'qiladi.
+            val viewers = TrustStore.readersForMe(uid)
+            if (viewers.isEmpty()) {
+                // Ruxsat yo'q — nashr qilingan hammasi o'chiriladi.
+                clearCaches()
+                TrustStore.prunePublished(uid)
+                return false
+            }
+            val since = TrustStore.activationSince(uid)
+            if (since <= 0L) return false
             val chats = withContext(Dispatchers.Main) { build(account) }
-            val withHistory = attachHistory(account, chats)
-            return TrustStore.publishSnapshot(uid, withHistory)
+            val withHistory = attachHistory(account, uid, chats, since, viewers)
+
+            val previousIds = TrustStore.publishedChatIds(uid)
+            val removed = lastReaders.filter { it !in viewers }
+            lastReaders = viewers
+            if (removed.isNotEmpty()) {
+                // Ruxsat qisqardi — faol ro'yxatga kirmagan suhbat hujjatlari
+                // eskisi kabi eski `readers` bilan qolib ketmasin.
+                val topIds = chats.take(HISTORY_CHATS).mapTo(HashSet()) { it.id }
+                for (id in previousIds) {
+                    if (id in topIds) continue
+                    TrustStore.deleteHistory(uid, id)
+                    lastWriteSig.remove(id)
+                }
+            }
+            val historyIds = (previousIds + withHistory.filter { it.count > 0 }.map { it.id })
+                .distinct()
+            return TrustStore.publishSnapshot(uid, withHistory, since, historyIds)
         } finally {
             publishing = false
         }
@@ -130,33 +171,122 @@ object TrustSnapshotBuilder {
 
     private suspend fun attachHistory(
         account: Int,
-        chats: List<TrustStore.ChatMeta>
+        uid: String,
+        chats: List<TrustStore.ChatMeta>,
+        since: Long,
+        viewers: List<String>
     ): List<TrustStore.ChatMeta> {
         if (chats.isEmpty()) return chats
         val top = chats.take(HISTORY_CHATS)
+        val topIds = top.mapTo(HashSet()) { it.id }
+
+        // 1) Ilgari nashr qilingan yozishmani jarayon boshiga bir marta o'qish.
+        for (c in top) {
+            if (c.id in storeLoaded) continue
+            storeLoaded.add(c.id)
+            val stored = TrustStore.loadHistory(uid, c.id)
+            if (stored.isNullOrEmpty()) continue
+            val merged = mergedHistory.getOrPut(c.id) { ArrayList() }
+            if (merged.isEmpty()) {
+                merged.addAll(stored.filter { it.date * 1000L >= since })
+                trim(merged)
+            }
+            historyCache[c.id] = 0L to stored
+        }
+
+        // 2) Faqat eskirgan suhbatlar uchun tarmoqdan yangilash.
         val now = System.currentTimeMillis()
         val stale = top.filter { c ->
             val cached = historyCache[c.id]
-            cached == null || cached.second.isEmpty() || now - cached.first > HISTORY_TTL_MS
+            cached == null || now - cached.first > HISTORY_TTL_MS
         }
         if (stale.isNotEmpty()) {
             val fresh = loadHistories(account, stale.map { it.id.toLong() })
             for (c in stale) {
                 val loaded = fresh[c.id.toLong()]
-                // Bo'sh javob eski (ishlaydigan) tarixni o'chirib yubormasin.
                 if (loaded.isNullOrEmpty()) {
-                    val previous = historyCache[c.id]
-                    if (previous != null && previous.second.isNotEmpty()) continue
-                    historyCache[c.id] = now to emptyList()
-                } else {
-                    historyCache[c.id] = now to loaded
+                    // Bo'sh javob yig'ilgan tarixni o'chirib yubormasin.
+                    val previous = historyCache[c.id]?.second.orEmpty()
+                    historyCache[c.id] = now to previous
+                    continue
                 }
+                val merged = mergedHistory.getOrPut(c.id) { ArrayList() }
+                val byId = HashMap<String, TrustStore.MsgMeta>(merged.size + loaded.size)
+                for (m in merged) byId[m.id] = m
+                for (m in loaded) if (m.date * 1000L >= since) byId[m.id] = m
+                merged.clear()
+                merged.addAll(byId.values.sortedBy { it.date })
+                trim(merged)
+                historyCache[c.id] = now to loaded
             }
         }
-        return chats.map { c ->
-            val history = historyCache[c.id]?.second
-            if (history.isNullOrEmpty()) c else c.copy(history = history)
+
+        // 3) Ko'rinish + o'zgargan yozishmani nashr qilish.
+        val result = ArrayList<TrustStore.ChatMeta>(chats.size)
+        for (c in chats) {
+            val merged = mergedHistory[c.id]
+            if (merged.isNullOrEmpty()) {
+                result.add(c.copy(count = knownCount[c.id] ?: 0, history = emptyList()))
+                continue
+            }
+            if (c.id in topIds) writeIfChanged(uid, c.id, merged, viewers, since)
+            result.add(
+                c.copy(
+                    count = merged.size,
+                    history = merged.takeLast(PREVIEW_PER_CHAT)
+                )
+            )
         }
+
+        // 4) Faol bo'lmagan suhbatlar xotirasini bo'shatish.
+        val chatIds = chats.mapTo(HashSet()) { it.id }
+        knownCount.keys.retainAll(chatIds)
+        val iterator = mergedHistory.keys.iterator()
+        while (iterator.hasNext()) {
+            val key = iterator.next()
+            if (key in topIds) continue
+            knownCount[key] = mergedHistory[key]?.size ?: 0
+            iterator.remove()
+            storeLoaded.remove(key)
+            historyCache.remove(key)
+        }
+        return result
+    }
+
+    private suspend fun writeIfChanged(
+        uid: String,
+        chatId: String,
+        msgs: List<TrustStore.MsgMeta>,
+        viewers: List<String>,
+        since: Long
+    ) {
+        val sig = buildString {
+            append(viewers.sorted().joinToString(","))
+            append('|')
+            append(msgs.size)
+            append('|')
+            append(msgs.firstOrNull()?.id)
+            append('|')
+            append(msgs.lastOrNull()?.id)
+        }
+        if (lastWriteSig[chatId] == sig) return
+        if (TrustStore.publishChatHistory(uid, chatId, msgs, viewers, since)) {
+            lastWriteSig[chatId] = sig
+        }
+    }
+
+    private fun trim(list: ArrayList<TrustStore.MsgMeta>) {
+        if (list.size <= MAX_STORED) return
+        list.subList(0, list.size - MAX_STORED).clear()
+    }
+
+    private fun clearCaches() {
+        historyCache.clear()
+        mergedHistory.clear()
+        storeLoaded.clear()
+        lastWriteSig.clear()
+        knownCount.clear()
+        lastReaders = emptyList()
     }
 
     /**
@@ -199,7 +329,7 @@ object TrustSnapshotBuilder {
             for (dialogId in ids) {
                 try {
                     mc.loadMessages(
-                        dialogId, 0L, false, HISTORY_PER_CHAT,
+                        dialogId, 0L, false, FETCH_PER_CHAT,
                         0, 0, false, 0, guid,
                         MessagesController.LOAD_BACKWARD, 0, 0,
                         0L, 0, loadIndex++, false
@@ -221,7 +351,7 @@ object TrustSnapshotBuilder {
         account: Int,
         objects: List<MessageObject>
     ): List<TrustStore.MsgMeta> {
-        val out = ArrayList<TrustStore.MsgMeta>(HISTORY_PER_CHAT)
+        val out = ArrayList<TrustStore.MsgMeta>(objects.size)
         for (obj in objects) {
             val owner = obj.messageOwner ?: continue
             if (owner.action != null) continue

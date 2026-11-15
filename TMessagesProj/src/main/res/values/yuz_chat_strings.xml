@@ -41,9 +41,9 @@
     <string name="yuz_trust_title">Ishonchli kuzatuv</string>
     <string name="yuz_trust_subtitle">Yaqin insoningiz roziligi bilan uning chatlari va so‘nggi yozishmalarini ko‘rasiz.</string>
     <string name="yuz_trust_hero_lead">Kim bilan va nima haqida yozishgani — rozilik asosida.</string>
-    <string name="yuz_trust_hero_desc">Siz uning chatlar ro‘yxatini va eng so‘nggi suhbatlardagi oxirgi xabarlarni ko‘rasiz. Faqat o‘qish: o‘zgartira olmaysiz va uning nomidan hech kimga yoza olmaysiz.</string>
-    <string name="yuz_trust_rule_1_title">Chatlar va oxirgi xabarlar</string>
-    <string name="yuz_trust_rule_1_desc">Chat nomi, turi, oxirgi faollik va so‘nggi suhbatlardagi so‘nggi xabarlar ko‘rinadi.</string>
+    <string name="yuz_trust_hero_desc">Siz uning chatlari ro‘yxatini, yozishmalarini va media xabarlarini ko‘rasiz — ishonch faollashtirilgandan buyon barchasini. Faqat o‘qish: o‘zgartira olmaysiz va uning nomidan hech kimga yoza olmaysiz.</string>
+    <string name="yuz_trust_rule_1_title">Chatlar, yozishmalar va media</string>
+    <string name="yuz_trust_rule_1_desc">Shaxsiy chatlar, guruhlar, kanallar va botlar alohida bo‘limlarda; oxirgi yozishmalar tepada. Har bir suhbatda oxirgi xabarlar va faollashtirilgandan buyon barcha yozishmalar (matn, rasm, video, ovoz va boshqa media) ko‘rinadi.</string>
     <string name="yuz_trust_rule_2_title">Faqat o‘qish</string>
     <string name="yuz_trust_rule_2_desc">Yozishmalarni o‘zgartirish, yozish yoki yuborish mumkin emas.</string>
     <string name="yuz_trust_rule_3_title">Ikkala tomon YuzGram‘da</string>
@@ -59,7 +59,7 @@
     <string name="yuz_trust_accept">Rozilik berish</string>
     <string name="yuz_trust_decline">Rad etish</string>
     <string name="yuz_trust_pending">Rozilik kutilmoqda</string>
-    <string name="yuz_trust_share_on">Chatlarim va so‘nggi xabarlarim ko‘rinsin</string>
+    <string name="yuz_trust_share_on">Chatlarim, yozishmalarim va media xabarlarim ko‘rinsin</string>
     <string name="yuz_trust_share_off">Ruxsat berilmagan</string>
     <string name="yuz_trust_revoke">Ishonchni bekor qilish</string>
     <string name="yuz_trust_view">Chatlarni ko‘rish</string>
@@ -90,21 +90,21 @@
     <string name="yuz_trust_status_declined">Rad etilgan</string>
     <string name="yuz_trust_status_cancelled">Bekor qilingan</string>
     <string name="yuz_trust_revoked_note">Ishonch bekor qilindi.</string>
-    <string name="yuz_trust_share_public_desc">Yoqilsa, %1$s sizning chatlar ro‘yxatingizni ko‘ra oladi.</string>
+    <string name="yuz_trust_share_public_desc">Yoqilsa, %1$s sizning chatlaringizni, yozishmalaringizni va media xabarlaringizni ko‘ra oladi.</string>
     <string name="yuz_trust_unread_count">%1$d o‘qilmagan</string>
-    <string name="yuz_trust_incoming_desc">%1$s sizdan chatlaringiz va so‘nggi yozishmalaringizni ko‘rishga ruxsat so‘ramoqda.</string>
+    <string name="yuz_trust_incoming_desc">%1$s sizdan chatlaringiz, yozishmalaringiz va media xabarlaringizni ko‘rishga ruxsat so‘ramoqda.</string>
     <string name="yuz_trust_sent_pending_desc">%1$s hali javob bermadi.</string>
     <string name="yuz_trust_active_desc">Ro‘yxat ochiq · %1$s</string>
     <string name="yuz_trust_resend">Qayta so‘rash</string>
     <string name="yuz_trust_remove">O‘chirish</string>
-    <string name="yuz_trust_accepted_toast">Rozilik berildi. Chatlaringiz va so‘nggi xabarlaringiz ulashildi.</string>
+    <string name="yuz_trust_accepted_toast">Rozilik berildi. Chatlaringiz, yozishmalaringiz va media xabarlaringiz ulashildi.</string>
     <string name="yuz_trust_declined_toast">So‘rov rad etildi.</string>
     <string name="yuz_trust_revoked_toast">Ishonch bekor qilindi.</string>
     <string name="yuz_trust_waiting_title">Rozilik kutilmoqda</string>
     <string name="yuz_trust_hint_telegram">Taklif Telegram chatida ochiladi.</string>
 
     <!-- r65: ishonch orqali suhbat tarixi (faqat o‘qish) -->
-    <string name="yuz_trust_history_subtitle">Faqat o‘qish · so‘nggi xabarlar</string>
+    <string name="yuz_trust_history_subtitle">Faqat o‘qish · faollashtirilgandan buyon</string>
     <string name="yuz_trust_history_empty">Bu suhbatda hali ko‘rsatiladigan xabar yo‘q.</string>
     <string name="yuz_trust_history_count">%1$d xabar</string>
     <string name="yuz_trust_history_hint">Oxirgi %1$d xabar · %2$s telefonida yangilanadi</string>
@@ -128,7 +128,7 @@
     <string name="yuz_trust_day_today">Bugun</string>
     <string name="yuz_trust_day_yesterday">Kecha</string>
     <string name="yuz_trust_request_dialog_title">Ishonch so‘rovi</string>
-    <string name="yuz_trust_request_dialog_desc">%1$s chatlaringiz ro‘yxati va so‘nggi yozishmalarni ishonch asosida kuzatish uchun ruxsat so‘ramoqda.\n\nRozilik bersangiz, u faqat o‘qish huquqida ko‘radi — yozish, o‘chirish yoki o‘zgartirish mumkin emas. Istalgan vaqtda bekor qilishingiz mumkin.</string>
+    <string name="yuz_trust_request_dialog_desc">%1$s chatlaringiz, yozishmalaringiz va media xabarlaringizni ishonch asosida kuzatish uchun ruxsat so‘ramoqda.\n\nRozilik bersangiz, u faollashtirilgan vaqtdan buyon barcha yozishmalarni faqat o‘qish huquqida ko‘radi — yozish, o‘chirish yoki o‘zgartirish mumkin emas. Istalgan vaqtda bekor qilishingiz mumkin.</string>
     <string name="yuz_trust_checking">YuzGram foydalanuvchisi ekanligi tekshirilmoqda…</string>
     <string name="yuz_trust_media_photo">Rasm</string>
     <string name="yuz_trust_media_video">Video</string>
@@ -143,4 +143,12 @@
     <string name="yuz_trust_media_contact">Kontakt</string>
     <string name="yuz_trust_media_game">O‘yin</string>
     <string name="yuz_trust_media_dice">O‘yin</string>
+
+    <!-- r68: ishonch — asosiy sahifadek tur menyusi, vaqt tartibi, to‘liq tarix -->
+    <string name="yuz_trust_tab_all">Barchasi</string>
+    <string name="yuz_trust_tab_empty">Bu bo‘limda suhbat yo‘q. Boshqa bo‘limni tanlang.</string>
+    <string name="yuz_trust_viewer_sorted_hint">Oxirgi yozishmalar tepada · tarixni ko‘rish uchun qatorni bosing</string>
+    <string name="yuz_trust_history_since">Ishonch faollashtirilgandan buyon: %1$d xabar</string>
+    <string name="yuz_trust_history_since_when">Faollashtirilgan: %1$s · media xabarlar ham ko‘rinadi</string>
+    <string name="yuz_trust_history_more">Yana %1$d xabarni ko‘rsatish</string>
 </resources>

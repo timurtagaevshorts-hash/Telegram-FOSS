@@ -53,6 +53,26 @@
             android:src="@drawable/ic_refresh" />
     </LinearLayout>
 
+    <!-- r68: asosiy sahifadagidek tur filtri (Barchasi/Shaxsiy/Guruhlar/Kanallar/Botlar). -->
+    <HorizontalScrollView
+        android:id="@+id/viewerTabsScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipToPadding="false"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/viewerTabs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/yuz_gutter"
+            android:paddingTop="@dimen/yuz_space_1"
+            android:paddingEnd="@dimen/yuz_gutter"
+            android:paddingBottom="@dimen/yuz_space_2" />
+    </HorizontalScrollView>
+
     <ProgressBar
         android:id="@+id/viewerProgress"
         android:layout_width="32dp"
