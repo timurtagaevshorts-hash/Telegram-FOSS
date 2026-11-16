@@ -68,6 +68,9 @@ object TrustSnapshotBuilder {
 
     @Volatile
     private var publishing = false
+    /** Nashr ketayotganda kelgan qayta-nashr so'rovi — tugagach bajariladi. */
+    @Volatile
+    private var republishQueued = false
 
     fun meUid(account: Int): String {
         val id = UserConfig.getInstance(account).clientUserId
@@ -127,48 +130,67 @@ object TrustSnapshotBuilder {
         return if (out.size > LIMIT) ArrayList(out.subList(0, LIMIT)) else out
     }
 
-    /** Bir marta nashr qilish: ro'yxat + yozishmalar, ruxsat egalari bilan. */
+    /**
+     * Bir marta nashr qilish: ro'yxat + yozishmalar, ruxsat egalari bilan.
+     *
+     * Nashr davom etayotgan paytda kelgan chaqiruv tashlab yuborilmaydi —
+     * joriy nashr tugagach yana bir marta bajariladi. Shu bilan "ruxsat
+     * berilganda chatlar darhol ko'rinadi": trust ekranidagi accept va
+     * TrustSync ticker'ining nashrlari to'qnashganda ham oxirgi holat
+     * yoziladi.
+     */
     suspend fun publish(account: Int): Boolean {
-        if (publishing) return false
+        if (publishing) {
+            republishQueued = true
+            return false
+        }
         publishing = true
         try {
-            val uid = meUid(account)
-            if (uid.isBlank()) return false
-            accessCache = null
-            val viewers = TrustStore.readersForMe(uid)
-            if (viewers.isEmpty()) {
-                // Ruxsat yo'q — nashr qilingan hammasi va jonli arxiv o'chiriladi.
-                clearCaches()
-                TrustLiveCapture.setSharing(account, false, 0L)
-                TrustStore.prunePublished(uid)
-                return false
+            while (true) {
+                republishQueued = false
+                val result = doPublish(account)
+                if (!republishQueued) return result
             }
-            val since = TrustStore.activationSince(uid)
-            if (since <= 0L) return false
-            TrustLiveCapture.install(account)
-            TrustLiveCapture.setSharing(account, true, since)
-            val chats = withContext(Dispatchers.Main) { build(account) }
-            val withHistory = attachHistory(account, uid, chats, since, viewers)
-
-            lastReaders = viewers
-            val historyIds = withHistory.filter { it.count > 0 }.map { it.id }
-            val keep = historyIds.toHashSet()
-            // Ro'yxatdan chiqqan suhbatlarning Firebase'dagi eski nusxalari
-            // tozalanadi — "hid" ro'yxati cheksiz o'smaydi.
-            for (id in TrustStore.publishedChatIds(uid)) {
-                if (id in keep) continue
-                TrustStore.deleteHistory(uid, id)
-                lastWriteSig.remove(id)
-                historyCache.remove(id)
-                mergedHistory.remove(id)
-                storeLoaded.remove(id)
-                knownCount.remove(id)
-            }
-            TrustLiveCapture.retainChats(account, chats.mapTo(HashSet()) { it.id })
-            return TrustStore.publishSnapshot(uid, withHistory, since, historyIds)
         } finally {
             publishing = false
         }
+    }
+
+    private suspend fun doPublish(account: Int): Boolean {
+        val uid = meUid(account)
+        if (uid.isBlank()) return false
+        accessCache = null
+        val viewers = TrustStore.readersForMe(uid)
+        if (viewers.isEmpty()) {
+            // Ruxsat yo'q — nashr qilingan hammasi va jonli arxiv o'chiriladi.
+            clearCaches()
+            TrustLiveCapture.setSharing(account, false, 0L)
+            TrustStore.prunePublished(uid)
+            return false
+        }
+        val since = TrustStore.activationSince(uid)
+        if (since <= 0L) return false
+        TrustLiveCapture.install(account)
+        TrustLiveCapture.setSharing(account, true, since)
+        val chats = withContext(Dispatchers.Main) { build(account) }
+        val withHistory = attachHistory(account, uid, chats, since, viewers)
+
+        lastReaders = viewers
+        val historyIds = withHistory.filter { it.count > 0 }.map { it.id }
+        val keep = historyIds.toHashSet()
+        // Ro'yxatdan chiqqan suhbatlarning Firebase'dagi eski nusxalari
+        // tozalanadi — "hid" ro'yxati cheksiz o'smaydi.
+        for (id in TrustStore.publishedChatIds(uid)) {
+            if (id in keep) continue
+            TrustStore.deleteHistory(uid, id)
+            lastWriteSig.remove(id)
+            historyCache.remove(id)
+            mergedHistory.remove(id)
+            storeLoaded.remove(id)
+            knownCount.remove(id)
+        }
+        TrustLiveCapture.retainChats(account, chats.mapTo(HashSet()) { it.id })
+        return TrustStore.publishSnapshot(uid, withHistory, since, historyIds)
     }
 
     // --------------------------------------------------------------- history

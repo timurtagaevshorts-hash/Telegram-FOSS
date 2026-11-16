@@ -1,6 +1,9 @@
 package uz.kodlikino.top4.ui
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -9,12 +12,14 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.telegram.messenger.ApplicationLoader
 import org.telegram.messenger.LocaleController
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.AlertDialog
@@ -22,6 +27,8 @@ import org.telegram.ui.ActionBar.BaseFragment
 import uz.kodlikino.top4.trust.TrustSnapshotBuilder
 import uz.kodlikino.top4.trust.TrustStore
 import uz.kodlikino.top4.utils.YuzGramAdsAuth
+
+private const val TAG = "YuzTrustViewerFragment"
 
 /**
  * Ishonchli kuzatuv — faqat o'qish uchun chatlar ro'yxati.
@@ -60,6 +67,8 @@ class YuzTrustViewerFragment(
     private var snapshot: TrustStore.Snapshot? = null
     private var selectedTab = 0
     private var loading = true
+    /** Yangilash bosilgandan keyin ham bo'sh bo'lsa — qayta ochish tavsiyasi. */
+    private var refreshPressed = false
 
     private var meUid = ""
     private var locked = false
@@ -93,9 +102,17 @@ class YuzTrustViewerFragment(
         lockHint = root.findViewById(R.id.viewerLockHint)
         lockButton?.setOnClickListener { onLockClick() }
         updateLockUi()
-        root.findViewById<View>(R.id.btnViewerRefresh).setOnClickListener { load() }
+        root.findViewById<View>(R.id.btnViewerRefresh).setOnClickListener {
+            refreshPressed = true
+            load()
+        }
 
-        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        scope = CoroutineScope(
+            SupervisorJob() + Dispatchers.Main + CoroutineExceptionHandler { _, e ->
+                // Ekran ichidagi har qanday kutilmagan xato ilovani yiqitmasin.
+                Log.e(TAG, "viewer coroutine", e)
+            }
+        )
         load()
         return root
     }
@@ -181,77 +198,101 @@ class YuzTrustViewerFragment(
 
     private fun onLockClick() {
         if (meUid.isBlank()) {
-            Toast.makeText(ctx(), str(R.string.yuz_trust_sign_in_error), Toast.LENGTH_SHORT).show()
+            toast(str(R.string.yuz_trust_sign_in_error))
             return
         }
         if (unlockRequested) {
             showResolve()
             return
         }
-        val enabling = !locked
-        AlertDialog.Builder(ctx())
-            .setTitle(
-                str(
-                    if (enabling) R.string.yuz_trust_lock_dialog_title
-                    else R.string.yuz_trust_unlock
+        showLockDialog(!locked)
+    }
+
+    private fun showLockDialog(enabling: Boolean) {
+        val themed = dialogContext() ?: return
+        try {
+            AlertDialog.Builder(themed)
+                .setTitle(
+                    str(
+                        if (enabling) R.string.yuz_trust_lock_dialog_title
+                        else R.string.yuz_trust_unlock
+                    )
                 )
-            )
-            .setMessage(
-                if (enabling) str(R.string.yuz_trust_lock_dialog_desc, ownerName)
-                else str(R.string.yuz_trust_unlock_confirm_desc, ownerName)
-            )
-            .setPositiveButton(
-                str(if (enabling) R.string.yuz_trust_lock else R.string.yuz_trust_unlock)
-            ) { _, _ -> applyLock(enabling) }
-            .setNegativeButton(str(android.R.string.cancel), null)
-            .show()
+                .setMessage(
+                    if (enabling) str(R.string.yuz_trust_lock_dialog_desc, ownerName)
+                    else str(R.string.yuz_trust_unlock_confirm_desc, ownerName)
+                )
+                .setPositiveButton(
+                    str(if (enabling) R.string.yuz_trust_lock else R.string.yuz_trust_unlock)
+                ) { _, _ -> applyLock(enabling) }
+                .setNegativeButton(str(android.R.string.cancel), null)
+                .show()
+        } catch (e: Exception) {
+            Log.e(TAG, "lock dialog", e)
+        }
     }
 
     private fun applyLock(value: Boolean) {
         scope?.launch {
-            TrustStore.setLocked(meUid, ownerUid, value)
+            try {
+                TrustStore.setLocked(meUid, ownerUid, value)
+            } catch (e: Exception) {
+                Log.w(TAG, "setLocked: ${e.message}")
+            }
             locked = value
             unlockRequested = false
             updateLockUi()
-            Toast.makeText(
-                ctx(),
-                str(if (value) R.string.yuz_trust_lock_on_toast else R.string.yuz_trust_lock_off_toast),
-                Toast.LENGTH_SHORT
-            ).show()
+            toast(
+                str(
+                    if (value) R.string.yuz_trust_lock_on_toast
+                    else R.string.yuz_trust_lock_off_toast
+                )
+            )
         }
     }
 
     private fun showResolve() {
-        AlertDialog.Builder(ctx())
-            .setTitle(str(R.string.yuz_trust_unlock_dialog_title))
-            .setMessage(str(R.string.yuz_trust_unlock_dialog_desc, ownerName))
-            .setPositiveButton(str(R.string.yuz_trust_unlock_allow)) { _, _ -> resolveUnlock(true) }
-            .setNegativeButton(str(R.string.yuz_trust_unlock_deny)) { _, _ -> resolveUnlock(false) }
-            .show()
+        val themed = dialogContext() ?: return
+        try {
+            AlertDialog.Builder(themed)
+                .setTitle(str(R.string.yuz_trust_unlock_dialog_title))
+                .setMessage(str(R.string.yuz_trust_unlock_dialog_desc, ownerName))
+                .setPositiveButton(str(R.string.yuz_trust_unlock_allow)) { _, _ ->
+                    resolveUnlock(true)
+                }
+                .setNegativeButton(str(R.string.yuz_trust_unlock_deny)) { _, _ ->
+                    resolveUnlock(false)
+                }
+                .show()
+        } catch (e: Exception) {
+            Log.e(TAG, "resolve dialog", e)
+        }
     }
 
     private fun resolveUnlock(allow: Boolean) {
         scope?.launch {
-            TrustStore.resolveUnlock(meUid, ownerUid, allow)
+            try {
+                TrustStore.resolveUnlock(meUid, ownerUid, allow)
+            } catch (e: Exception) {
+                Log.w(TAG, "resolveUnlock: ${e.message}")
+            }
             locked = !allow
             unlockRequested = false
             updateLockUi()
-            Toast.makeText(
-                ctx(),
+            toast(
                 str(
                     if (allow) R.string.yuz_trust_unlock_allowed_toast
                     else R.string.yuz_trust_unlock_denied_toast
-                ),
-                Toast.LENGTH_SHORT
-            ).show()
+                )
+            )
         }
     }
 
     private fun render() {
         val themed = themedContext ?: return
         progress?.visibility = if (loading) View.VISIBLE else View.GONE
-        val name = ownerName.ifBlank { "YuzGram" }
         val chats = snapshot?.chats.orEmpty()
+        if (chats.isNotEmpty()) refreshPressed = false
 
         val updated = snapshot?.updatedAt ?: 0L
         val updatedText = if (updated > 0L) {
@@ -281,7 +322,7 @@ class YuzTrustViewerFragment(
         }
 
         renderTabs(themed)
-        renderRows(themed, chats, name)
+        renderRows(themed, chats)
     }
 
     private fun renderTabs(themed: Context) {
@@ -304,8 +345,7 @@ class YuzTrustViewerFragment(
 
     private fun renderRows(
         themed: Context,
-        all: List<TrustStore.ChatMeta>,
-        name: String
+        all: List<TrustStore.ChatMeta>
     ) {
         val kind = tabs.getOrNull(selectedTab)?.kind ?: -1
         // Qat'iy vaqt tartibi — qadalganlar ham vaqt bo'yicha joylashadi.
@@ -318,7 +358,11 @@ class YuzTrustViewerFragment(
         list?.removeAllViews()
         if (all.isEmpty()) {
             empty?.visibility = View.VISIBLE
-            empty?.text = ctx().getString(R.string.yuz_trust_viewer_empty, name)
+            // Yangilash bosilgan bo'lsa — endi kutish emas, qayta ochish tavsiyasi.
+            empty?.text = ctx().getString(
+                if (refreshPressed) R.string.yuz_trust_viewer_restart
+                else R.string.yuz_trust_viewer_waiting
+            )
             return
         }
         if (chats.isEmpty()) {
@@ -418,7 +462,32 @@ class YuzTrustViewerFragment(
         return if (letters.isEmpty()) "?" else letters.joinToString("")
     }
 
-    private fun ctx(): Context = themedContext ?: context ?: throw IllegalStateException()
+    /**
+     * Dialog ko'rsatish uchun yaroqli kontekst: oyna tokeni haqiqiy va tirik
+     * Activity'ga tegishli bo'lishi kerak, aks holda BadTokenException.
+     */
+    private fun dialogContext(): Context? {
+        val activity = parentActivity ?: return null
+        if (activity.isFinishing) return null
+        val themed = themedContext ?: return activity
+        var c: Context? = themed
+        while (c is ContextWrapper) {
+            if (c is Activity) return themed
+            c = c.baseContext
+        }
+        return activity
+    }
+
+    private fun toast(text: String) {
+        try {
+            Toast.makeText(ctx(), text, Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.w(TAG, "toast: ${e.message}")
+        }
+    }
+
+    private fun ctx(): Context =
+        themedContext ?: context ?: ApplicationLoader.applicationContext
 
     private fun str(resId: Int): String = ctx().getString(resId)
 

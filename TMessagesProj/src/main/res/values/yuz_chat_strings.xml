@@ -81,7 +81,8 @@
     <string name="yuz_trust_search_hint">Qidirish</string>
     <string name="yuz_trust_viewer_title">%1$s — chatlar</string>
     <string name="yuz_trust_viewer_readonly">Faqat o‘qish · yangi xabarlar darhol yetkaziladi</string>
-    <string name="yuz_trust_viewer_empty">Ro‘yxat hali bo‘sh. %1$s YuzGram‘ni ochib, chatlarini yuborishi kerak.</string>
+    <string name="yuz_trust_viewer_waiting">Kuting — chatlar tez orada ko‘rsatiladi…</string>
+    <string name="yuz_trust_viewer_restart">Chatlar hali bo‘sh. Ilovani qayta oching.</string>
     <string name="yuz_trust_viewer_updated">Yangilangan: %1$s</string>
     <string name="yuz_trust_viewer_hint">Bu ro‘yxat %1$s telefonida YuzGram faol bo‘lganda yangilanadi.</string>
     <string name="yuz_trust_kind_user">Shaxsiy</string>
