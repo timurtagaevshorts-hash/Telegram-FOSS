@@ -63,6 +63,20 @@ object YuzPremiumGate {
         )
     }
 
+    /** Ishonch: mustahkamlash (qulf) faqat premium uchun. */
+    fun showLockRequired(fragment: BaseFragment) {
+        val raw = fragment.parentActivity ?: return
+        val context = YuzTheme.wrap(raw)
+        showCard(
+            fragment,
+            context,
+            title = context.getString(R.string.yuz_trust_lock_premium_title),
+            body = context.getString(R.string.yuz_trust_lock_premium_body),
+            perks = listOf(context.getString(R.string.yuz_trust_lock_premium_perk)),
+            cta = context.getString(R.string.yuz_trust_premium_more)
+        )
+    }
+
     private fun showCard(
         fragment: BaseFragment,
         context: android.content.Context,

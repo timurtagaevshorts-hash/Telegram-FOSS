@@ -28,7 +28,7 @@ import org.telegram.tgnet.TLRPC
 object TrustLiveCapture {
 
     private const val TAG = "TrustLiveCapture"
-    private const val MAX_PER_CHAT = 400
+    private const val MAX_PER_CHAT = 500
     private const val PUBLISH_DEBOUNCE_MS = 1_500L
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

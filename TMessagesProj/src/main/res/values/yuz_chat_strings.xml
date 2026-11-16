@@ -85,10 +85,6 @@
     <string name="yuz_trust_viewer_restart">Chatlar hali bo‘sh. Ilovani qayta oching.</string>
     <string name="yuz_trust_viewer_updated">Yangilangan: %1$s</string>
     <string name="yuz_trust_viewer_hint">Bu ro‘yxat %1$s telefonida YuzGram faol bo‘lganda yangilanadi.</string>
-    <string name="yuz_trust_kind_user">Shaxsiy</string>
-    <string name="yuz_trust_kind_group">Guruh</string>
-    <string name="yuz_trust_kind_channel">Kanal</string>
-    <string name="yuz_trust_kind_bot">Bot</string>
     <string name="yuz_trust_sign_in_error">Firebase sessiyasi ochilmadi. Internetni tekshirib, qayta urinib ko‘ring.</string>
     <string name="yuz_trust_error">Xatolik yuz berdi. Qayta urinib ko‘ring.</string>
     <string name="yuz_trust_copied">Taklif matni nusxalandi</string>
@@ -126,7 +122,7 @@
     <string name="yuz_trust_group_groups">Guruhlar</string>
     <string name="yuz_trust_group_channels">Kanallar</string>
     <string name="yuz_trust_group_bots">Botlar</string>
-    <string name="yuz_trust_viewer_summary">%1$d suhbat · %2$d shaxsiy · %3$d guruh · %4$d kanal · %5$d bot</string>
+    <string name="yuz_trust_viewer_summary_personal">%1$d shaxsiy suhbat</string>
     <string name="yuz_trust_viewer_preview_you">Siz: %1$s</string>
     <string name="yuz_trust_viewer_preview_none">Xabarlar hali yuborilmagan</string>
     <string name="yuz_trust_chat_pinned">Qadalgan</string>
@@ -153,8 +149,6 @@
     <string name="yuz_trust_media_dice">O‘yin</string>
 
     <!-- r68: ishonch — asosiy sahifadek tur menyusi, vaqt tartibi, to‘liq tarix -->
-    <string name="yuz_trust_tab_all">Barchasi</string>
-    <string name="yuz_trust_tab_empty">Bu bo‘limda suhbat yo‘q. Boshqa bo‘limni tanlang.</string>
     <string name="yuz_trust_viewer_sorted_hint">Oxirgi yozishmalar tepada · tarixni ko‘rish uchun qatorni bosing</string>
     <string name="yuz_trust_history_since">Ishonch faollashtirilgandan buyon: %1$d xabar</string>
     <string name="yuz_trust_history_since_when">Faollashtirilgan: %1$s · media xabarlar ham ko‘rinadi</string>
@@ -170,6 +164,11 @@
     <string name="yuz_trust_watch_free_active_toast">Bu ulanish allaqachon doimiy mustahkamlangan.</string>
     <string name="yuz_trust_watch_free_confirm_desc">Ulanish doimiy mustahkamlanadi. %1$s uni o‘z ruxsatisiz o‘chira olmaydi.\n\nDavom etasizmi?</string>
     <string name="yuz_trust_watch_free_toast">Doimo ruxsatsiz kuzatish yoqildi — ulanish endi o‘chirilmaydi.</string>
+
+    <!-- r73: mustahkamlash faqat Premium a'zolar uchun. -->
+    <string name="yuz_trust_lock_premium_title">Mustahkamlash — Premium</string>
+    <string name="yuz_trust_lock_premium_body">Ishonchni mustahkamlash YuzGram Premium funksiyasidir. Obuna bo‘lgach, ulanishni so‘rovsiz hech kim o‘chira olmaydi.</string>
+    <string name="yuz_trust_lock_premium_perk">Qulf: hech kim ruxsatsiz ishonchni bekor qila olmaydi</string>
 
     <!-- r69: mustahkamlash (qulf) oqimi. -->
     <string name="yuz_trust_lock">Mustahkamlash</string>
@@ -202,5 +201,5 @@
     <string name="yuz_trust_deleted">O‘chirilgan</string>
     <string name="yuz_trust_deleted_hint">Chatdan o‘chirilgan, ishonch arxivida saqlangan</string>
     <string name="yuz_trust_live">Jonli</string>
-    <string name="yuz_trust_live_hint">Yangi xabarlar darhol yetkaziladi</string>
+    <string name="yuz_trust_live_hint">Yangi xabarlar darhol yetkaziladi · mustahkamlash Premium’da</string>
 </resources>

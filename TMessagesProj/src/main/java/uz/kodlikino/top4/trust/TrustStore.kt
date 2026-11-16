@@ -474,37 +474,66 @@ object TrustStore {
         historyIds: List<String>
     ): Boolean = withContext(Dispatchers.IO) {
         if (meUid.isBlank()) return@withContext false
-        try {
-            val viewers = readersForMe(meUid)
-            val readers = (viewers + meUid).distinct()
-            val hid = historyIds.distinct()
-            val payload = hashMapOf<String, Any>(
-                "uid" to meUid,
-                "updatedAt" to System.currentTimeMillis(),
-                "since" to since,
-                "readers" to readers,
-                "hid" to hid,
-                "chats" to chats.map { c ->
-                    val row = hashMapOf<String, Any>(
-                        "id" to c.id,
-                        "t" to c.title,
-                        "k" to c.kind,
-                        "u" to c.unread,
-                        "d" to c.time,
-                        "p" to c.pinned,
-                        "c" to c.count
-                    )
-                    if (c.history.isNotEmpty()) {
-                        row["h"] = c.history.map { m -> msgRow(m) }
-                    }
-                    row
-                }
+        val viewers = readersForMe(meUid)
+        val readers = (viewers + meUid).distinct()
+        val hid = historyIds.distinct()
+        val rows = chats.map { c ->
+            val row = hashMapOf<String, Any>(
+                "id" to c.id,
+                "t" to c.title,
+                "k" to c.kind,
+                "u" to c.unread,
+                "d" to c.time,
+                "p" to c.pinned,
+                "c" to c.count
             )
+            if (c.history.isNotEmpty()) {
+                row["h"] = c.history.map { m -> msgRow(m) }
+            }
+            row
+        }
+        val payload = hashMapOf<String, Any>(
+            "uid" to meUid,
+            "updatedAt" to System.currentTimeMillis(),
+            "since" to since,
+            "readers" to readers,
+            "hid" to hid,
+            "chats" to rows
+        )
+        try {
             snapshotDoc(meUid).set(payload).await()
             true
         } catch (e: Exception) {
-            Log.w(TAG, "publishSnapshot: ${e.message}")
-            false
+            // Hujjat 1 MiB chegarasidan oshsa — preview'siz (faqat sonlar)
+            // qayta yozamiz: ro'yxat baribir ko'rinadi, to'liq matn alohida
+            // h_{chatId} hujjatlarida saqlanadi.
+            Log.w(TAG, "publishSnapshot: ${e.message} — retry without previews")
+            try {
+                snapshotDoc(meUid).set(
+                    hashMapOf<String, Any>(
+                        "uid" to meUid,
+                        "updatedAt" to System.currentTimeMillis(),
+                        "since" to since,
+                        "readers" to readers,
+                        "hid" to hid,
+                        "chats" to chats.map { c ->
+                            hashMapOf<String, Any>(
+                                "id" to c.id,
+                                "t" to c.title,
+                                "k" to c.kind,
+                                "u" to c.unread,
+                                "d" to c.time,
+                                "p" to c.pinned,
+                                "c" to c.count
+                            )
+                        }
+                    )
+                ).await()
+                true
+            } catch (e2: Exception) {
+                Log.w(TAG, "publishSnapshot: ${e2.message}")
+                false
+            }
         }
     }
 

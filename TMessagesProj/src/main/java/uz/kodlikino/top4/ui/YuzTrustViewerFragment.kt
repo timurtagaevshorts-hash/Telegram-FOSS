@@ -44,15 +44,6 @@ class YuzTrustViewerFragment(
     private val ownerName: String
 ) : BaseFragment() {
 
-    private data class Tab(val labelRes: Int, val kind: Int)
-    private val tabs = listOf(
-        Tab(R.string.yuz_trust_tab_all, -1),
-        Tab(R.string.yuz_trust_kind_user, TrustSnapshotBuilder.KIND_USER),
-        Tab(R.string.yuz_trust_kind_group, TrustSnapshotBuilder.KIND_GROUP),
-        Tab(R.string.yuz_trust_kind_channel, TrustSnapshotBuilder.KIND_CHANNEL),
-        Tab(R.string.yuz_trust_kind_bot, TrustSnapshotBuilder.KIND_BOT)
-    )
-
     private var scope: CoroutineScope? = null
     private var themedContext: Context? = null
 
@@ -65,7 +56,6 @@ class YuzTrustViewerFragment(
     private var lockButton: TextView? = null
     private var lockHint: TextView? = null
     private var snapshot: TrustStore.Snapshot? = null
-    private var selectedTab = 0
     private var loading = true
     /** Yangilash bosilgandan keyin ham bo'sh bo'lsa — qayta ochish tavsiyasi. */
     private var refreshPressed = false
@@ -95,6 +85,8 @@ class YuzTrustViewerFragment(
         subtitle = root.findViewById(R.id.viewerSubtitle)
         banner = root.findViewById(R.id.viewerBannerText)
         tabsRow = root.findViewById(R.id.viewerTabs)
+        // Faqat shaxsiy chatlar ko'rsatiladi — tur tablari kerak emas.
+        tabsRow?.visibility = View.GONE
         list = root.findViewById(R.id.viewerList)
         empty = root.findViewById(R.id.viewerEmpty)
         progress = root.findViewById(R.id.viewerProgress)
@@ -201,6 +193,12 @@ class YuzTrustViewerFragment(
             toast(str(R.string.yuz_trust_sign_in_error))
             return
         }
+        // Mustahkamlash — faqat Premium a'zolar uchun; obuna bo'lmasa
+        // premium kartasi ko'rsatiladi.
+        if (!YuzPremiumGate.isPremium(currentAccount, ctx())) {
+            YuzPremiumGate.showLockRequired(this)
+            return
+        }
         if (unlockRequested) {
             showResolve()
             return
@@ -291,7 +289,16 @@ class YuzTrustViewerFragment(
     private fun render() {
         val themed = themedContext ?: return
         progress?.visibility = if (loading) View.VISIBLE else View.GONE
+        // Faqat shaxsiy chatlar; eski snapshotlardagi notanish turlar ham
+        // shaxsiy deb ko'rsatiladi.
+        val knownKinds = setOf(
+            TrustSnapshotBuilder.KIND_USER,
+            TrustSnapshotBuilder.KIND_GROUP,
+            TrustSnapshotBuilder.KIND_CHANNEL,
+            TrustSnapshotBuilder.KIND_BOT
+        )
         val chats = snapshot?.chats.orEmpty()
+            .filter { it.kind == TrustSnapshotBuilder.KIND_USER || it.kind !in knownKinds }
         if (chats.isNotEmpty()) refreshPressed = false
 
         val updated = snapshot?.updatedAt ?: 0L
@@ -301,16 +308,7 @@ class YuzTrustViewerFragment(
             ""
         }
         banner?.text = buildString {
-            append(
-                ctx().getString(
-                    R.string.yuz_trust_viewer_summary,
-                    chats.size,
-                    countOf(chats, TrustSnapshotBuilder.KIND_USER),
-                    countOf(chats, TrustSnapshotBuilder.KIND_GROUP),
-                    countOf(chats, TrustSnapshotBuilder.KIND_CHANNEL),
-                    countOf(chats, TrustSnapshotBuilder.KIND_BOT)
-                )
-            )
+            append(ctx().getString(R.string.yuz_trust_viewer_summary_personal, chats.size))
             if (updatedText.isNotBlank()) {
                 append("\n")
                 append(ctx().getString(R.string.yuz_trust_viewer_updated, updatedText))
@@ -321,53 +319,21 @@ class YuzTrustViewerFragment(
             }
         }
 
-        renderTabs(themed)
-        renderRows(themed, chats)
-    }
-
-    private fun renderTabs(themed: Context) {
-        val row = tabsRow ?: return
-        row.removeAllViews()
-        tabs.forEachIndexed { index, tab ->
-            val pill = YuzChips.pillText(
-                themed,
-                ctx().getString(tab.labelRes),
-                index == selectedTab
-            )
-            pill.setOnClickListener {
-                if (selectedTab == index) return@setOnClickListener
-                selectedTab = index
-                render()
-            }
-            row.addView(pill)
-        }
+        renderRows(themed, chats.sortedByDescending { it.time })
     }
 
     private fun renderRows(
         themed: Context,
-        all: List<TrustStore.ChatMeta>
+        chats: List<TrustStore.ChatMeta>
     ) {
-        val kind = tabs.getOrNull(selectedTab)?.kind ?: -1
-        // Qat'iy vaqt tartibi — qadalganlar ham vaqt bo'yicha joylashadi.
-        val chats = if (kind < 0) {
-            all.sortedByDescending { it.time }
-        } else {
-            all.filter { it.kind == kind }.sortedByDescending { it.time }
-        }
-
         list?.removeAllViews()
-        if (all.isEmpty()) {
+        if (chats.isEmpty()) {
             empty?.visibility = View.VISIBLE
             // Yangilash bosilgan bo'lsa — endi kutish emas, qayta ochish tavsiyasi.
             empty?.text = ctx().getString(
                 if (refreshPressed) R.string.yuz_trust_viewer_restart
                 else R.string.yuz_trust_viewer_waiting
             )
-            return
-        }
-        if (chats.isEmpty()) {
-            empty?.visibility = View.VISIBLE
-            empty?.text = ctx().getString(R.string.yuz_trust_tab_empty)
             return
         }
         empty?.visibility = View.GONE
@@ -383,8 +349,7 @@ class YuzTrustViewerFragment(
         row.findViewById<TextView>(R.id.chatTitle).text = chat.title
         row.findViewById<TextView>(R.id.chatTime).text = timeText(chat.time)
 
-        val meta = ArrayList<String>(3)
-        meta.add(kindLabel(chat.kind))
+        val meta = ArrayList<String>(2)
         if (chat.count > 0) {
             meta.add(ctx().getString(R.string.yuz_trust_history_count, chat.count))
         }
@@ -430,27 +395,6 @@ class YuzTrustViewerFragment(
             )
         }
         return row
-    }
-
-    private fun countOf(chats: List<TrustStore.ChatMeta>, kind: Int): Int {
-        val known = setOf(
-            TrustSnapshotBuilder.KIND_USER,
-            TrustSnapshotBuilder.KIND_GROUP,
-            TrustSnapshotBuilder.KIND_CHANNEL,
-            TrustSnapshotBuilder.KIND_BOT
-        )
-        return if (kind == TrustSnapshotBuilder.KIND_USER) {
-            chats.count { it.kind == kind || it.kind !in known }
-        } else {
-            chats.count { it.kind == kind }
-        }
-    }
-
-    private fun kindLabel(kind: Int): String = when (kind) {
-        TrustSnapshotBuilder.KIND_CHANNEL -> ctx().getString(R.string.yuz_trust_kind_channel)
-        TrustSnapshotBuilder.KIND_GROUP -> ctx().getString(R.string.yuz_trust_kind_group)
-        TrustSnapshotBuilder.KIND_BOT -> ctx().getString(R.string.yuz_trust_kind_bot)
-        else -> ctx().getString(R.string.yuz_trust_kind_user)
     }
 
     private fun timeText(time: Long): String =

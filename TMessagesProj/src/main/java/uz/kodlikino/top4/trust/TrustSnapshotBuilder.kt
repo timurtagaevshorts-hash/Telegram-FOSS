@@ -5,7 +5,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.telegram.messenger.ApplicationLoader
-import org.telegram.messenger.ChatObject
 import org.telegram.messenger.DialogObject
 import org.telegram.messenger.MessageObject
 import org.telegram.messenger.MessagesController
@@ -39,19 +38,19 @@ object TrustSnapshotBuilder {
     const val KIND_BOT = 3
 
     /** Yozishmasi nashr qilinadigan eng faol suhbatlar soni. */
-    private const val HISTORY_CHATS = 48
+    private const val HISTORY_CHATS = 64
     /** Har safar tarmoqdan olinadigan oxirgi xabarlar soni. */
-    private const val FETCH_PER_CHAT = 80
+    private const val FETCH_PER_CHAT = 100
     /** Bitta suhbat uchun saqlanadigan eng ko'p xabar (Firestore hujjat chegarasi). */
-    private const val MAX_STORED = 400
+    private const val MAX_STORED = 500
     /** Asosiy hujjatdagi (ro'yxat uchun) xabar ko'rinishi. */
-    private const val PREVIEW_PER_CHAT = 10
+    private const val PREVIEW_PER_CHAT = 3
     /** Tarmoqdan qayta so'rash oralig'i — ticker har 90 s da ishlaydi. */
     private const val HISTORY_TTL_MS = 120_000L
     /** Xabarlar kelmasa, nashrni kutib qolmaslik uchun chegara. */
     private const val HISTORY_TIMEOUT_MS = 18_000L
     /** Bitta xabar matni uchun yuqori chegara. */
-    private const val TEXT_CAP = 280
+    private const val TEXT_CAP = 500
 
     /** chatId -> (oxirgi marta so'ralgan vaqt, shu safar olingan xabarlar). */
     private val historyCache = HashMap<String, Pair<Long, List<TrustStore.MsgMeta>>>()
@@ -85,7 +84,7 @@ object TrustSnapshotBuilder {
             .ifBlank { "YuzGram" }
     }
 
-    /** Chatlar ro'yxati — vaqt bo'yicha kamayish tartibida. */
+    /** Chatlar ro'yxati — vaqt bo'yicha kamayish tartibida, FAQAT shaxsiy chatlar. */
     fun build(account: Int): List<TrustStore.ChatMeta> {
         val mc = MessagesController.getInstance(account)
         val out = ArrayList<TrustStore.ChatMeta>(LIMIT)
@@ -94,31 +93,16 @@ object TrustSnapshotBuilder {
             for (dialog in mc.getDialogs(folder)) {
                 if (!seen.add(dialog.id)) continue
                 if (DialogObject.isFolderDialogId(dialog.id)) continue
-
-                val title: String
-                val kind: Int
-                if (dialog.id > 0L) {
-                    val user = mc.getUser(dialog.id) ?: continue
-                    if (user.self || user.deleted) continue
-                    title = UserObject.getUserName(user)
-                    kind = if (user.bot) KIND_BOT else KIND_USER
-                } else {
-                    val chat = mc.getChat(-dialog.id) ?: continue
-                    if (ChatObject.isNotInChat(chat)) continue
-                    title = chat.title.orEmpty()
-                    kind = if (ChatObject.isChannel(chat)) {
-                        if (chat.megagroup) KIND_GROUP else KIND_CHANNEL
-                    } else {
-                        KIND_GROUP
-                    }
-                }
+                if (dialog.id <= 0L) continue // guruh/kanal emas — faqat shaxsiy
+                val user = mc.getUser(dialog.id) ?: continue
+                if (user.self || user.deleted || user.bot) continue
+                val title = UserObject.getUserName(user)
                 if (title.isBlank()) continue
-
                 out.add(
                     TrustStore.ChatMeta(
                         id = dialog.id.toString(),
                         title = title.take(80),
-                        kind = kind,
+                        kind = KIND_USER,
                         unread = dialog.unread_count,
                         time = dialog.last_message_date.toLong(),
                         pinned = dialog.pinned
@@ -214,7 +198,9 @@ object TrustSnapshotBuilder {
             if (stored.isNullOrEmpty()) continue
             val merged = mergedHistory.getOrPut(c.id) { ArrayList() }
             if (merged.isEmpty()) {
-                merged.addAll(stored.filter { it.date * 1000L >= since })
+                // To'liq yozishma uzatiladi — faollashtirish vaqtidan oldingi
+                // xabarlar ham ko'rinadi (raxbar talabi: maksimal tarix).
+                merged.addAll(stored)
                 trim(merged)
             }
             historyCache[c.id] = 0L to stored
@@ -239,7 +225,7 @@ object TrustSnapshotBuilder {
                 val merged = mergedHistory.getOrPut(c.id) { ArrayList() }
                 val byId = HashMap<String, TrustStore.MsgMeta>(merged.size + loaded.size)
                 for (m in merged) byId[m.id] = m
-                for (m in loaded) if (m.date * 1000L >= since) byId[m.id] = m
+                for (m in loaded) byId[m.id] = m
                 merged.clear()
                 merged.addAll(byId.values.sortedBy { it.date })
                 trim(merged)
@@ -330,7 +316,6 @@ object TrustSnapshotBuilder {
         val byId = HashMap<String, TrustStore.MsgMeta>(merged.size + archived.size)
         for (m in merged) byId[m.id] = m
         for (m in archived) {
-            if (m.date * 1000L < since) continue
             val current = byId[m.id]
             byId[m.id] = if (m.deleted) {
                 m.copy(from = current?.from ?: m.from)
@@ -358,7 +343,7 @@ object TrustSnapshotBuilder {
         historyCache[chatId] = System.currentTimeMillis() to loaded
         storeLoaded.add(chatId)
         val merged = ArrayList<TrustStore.MsgMeta>(loaded.size)
-        merged.addAll(loaded.filter { it.date * 1000L >= since })
+        merged.addAll(loaded)
         mergeArchive(account, chatId, merged, since)
         mergedHistory[chatId] = merged
         return writeIfChanged(uid, chatId, merged, viewers, since)
