@@ -3411,16 +3411,11 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                     if (getParentActivity() == null) {
                         return;
                     }
-                    String gamesTitle = currentChat != null ? currentChat.title :
-                        (currentUser != null ? UserObject.getUserName(currentUser) : "");
-                    boolean gamesGroup = currentChat != null;
-                    String gamesPeerUid = "";
-                    String gamesPeerName = "";
-                    if (!gamesGroup && currentUser != null && !UserObject.isUserSelf(currentUser) && currentUser.id > 0) {
-                        gamesPeerUid = "tg_" + currentUser.id;
-                        gamesPeerName = UserObject.getUserName(currentUser);
-                    }
-                    presentFragment(new uz.kodlikino.top4.ui.GamesHubFragment(dialog_id, gamesTitle, gamesPeerUid, gamesPeerName, gamesGroup), false);
+                    AlertDialog.Builder gamesComingBuilder = new AlertDialog.Builder(getParentActivity(), themeDelegate);
+                    gamesComingBuilder.setTitle(LocaleController.getString("games_coming_title", R.string.games_coming_title));
+                    gamesComingBuilder.setMessage(LocaleController.getString("games_coming_message", R.string.games_coming_message));
+                    gamesComingBuilder.setPositiveButton(LocaleController.getString("games_coming_ok", R.string.games_coming_ok), null);
+                    gamesComingBuilder.show();
                 } else if (id == clear_history || id == delete_chat || id == auto_delete_timer) {
                     if (getParentActivity() == null) {
                         return;
@@ -27134,9 +27129,6 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             contentView.onResume();
         }
         checkChecksHint();
-        if (chatMode == 0) {
-            uz.kodlikino.top4.ui.GameInvitePrompt.attach(this, currentAccount, dialog_id);
-        }
 
         Bulletin.addDelegate(this, bulletinDelegate = new Bulletin.Delegate() {
             @Override
@@ -27286,7 +27278,6 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     @Override
     public void onPause() {
         super.onPause();
-        uz.kodlikino.top4.ui.GameInvitePrompt.detach();
         scrolling = false;
         if (scrimPopupWindow != null) {
             scrimPopupWindow.setPauseNotifications(false);

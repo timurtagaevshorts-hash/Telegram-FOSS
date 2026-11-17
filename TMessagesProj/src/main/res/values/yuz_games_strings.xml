@@ -7,6 +7,9 @@
     <string name="games_subtitle">Chatdagi do‘stlar bilan onlayn o‘ynang</string>
     <string name="games_back">Orqaga</string>
     <string name="games_loading">Yuklanmoqda…</string>
+    <string name="games_coming_title">O‘yinlar yaxshilanmoqda</string>
+    <string name="games_coming_message">Chat o‘yinlarini hozircha yangidan sifatli qilib tayyorlayapmiz. Tez orada ishga tushadi — sizlar uchun eng yaxshisini tayyorlayapmiz.</string>
+    <string name="games_coming_ok">Yaxshi</string>
     <string name="games_checkers">Shashka</string>
     <string name="games_checkers_desc">Rus damasi: majburiy urish, shohlar uchar</string>
     <string name="games_checkers_meta">2 o‘yinchi · 90 s yurish</string>

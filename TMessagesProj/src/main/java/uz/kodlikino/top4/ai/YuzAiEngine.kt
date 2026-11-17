@@ -56,9 +56,12 @@ object YuzAiEngine {
     }
 
     private val SEND_WORDS_RAW = listOf(
-        "yubor", "yubordim", "jo'nat", "jonat", "yoz", "olibsana", "xabar", "habar", "xabarlang"
+        "yubor", "yubordim", "jo'nat", "jonat", "yoz", "yozib", "olibsana", "xabar", "habar", "xabarlang", "sms", "send"
     )
-    private val CALL_WORDS_RAW = listOf("qo'ng'iroq", "qong'iroq", "qo'ngiroq", "qongiroq", "qoingiroq", "telefon", "zvonit", "qo'ng'iroqni")
+    private val CALL_WORDS_RAW = listOf(
+        "qo'ng'iroq", "qong'iroq", "qo'ngiroq", "qongiroq", "qoingiroq", "telefon", "zvonit", "qo'ng'iroqni",
+        "aloqa", "zangla", "bellash", "zvonok"
+    )
     private val NAV_WORDS_RAW = listOf(
         "reels" to Section.REELS,
         "reka" to Section.REELS,
@@ -92,10 +95,10 @@ object YuzAiEngine {
     // "qo'shig'ini" -> norm("qoshigini")). Shu sabab ildiz variantlari
     // ham qo'shilgan: "qoshig", "musiq", "ashul".
     private val MUSIC_WORDS_RAW = listOf(
-        "musiq", "muzik", "qoshiq", "qoshig", "ashul", "trek", "song", "music", "audio"
+        "musiq", "muzik", "qoshiq", "qoshig", "ashul", "ohang", "trek", "song", "music", "audio"
     )
     private val PLAY_WORDS_RAW = listOf(
-        "qo'y", "qoy", "chal", "ijro", "top", "izla", "qidir", "yoq", "yondir", "boshlab",
+        "qo'y", "qoy", "chal", "ijro", "oynat", "top", "izla", "qidir", "yoq", "yondir", "boshlab",
         "kuyla", "yangra", "eshittir", "eshit"
     )
     private val MUSIC_STOP_RAW = listOf(

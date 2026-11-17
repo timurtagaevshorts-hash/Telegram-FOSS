@@ -226,35 +226,98 @@ object YuzMusicRepository {
     }
 
     /**
-     * #294: ANIQ qo'shiqqa o'xshash qatorlar. searchMore'dan farqi — u
-     * so'rovga " 2026"/" remix" qo'shib YANA o'sha qo'shiqni qaytaradi;
-     * bu esa YouTube watch-next avto-miksidan (janr/kayfiyat/o'xshash
-     * ijrochilar bo'yicha eng yaqin) oladi, keyin Deezer o'xshash
-     * ijrochilar grafi bilan to'ldiriladi. Ya'ni "qidirilgan odamning
-     * qo'shiqlari" doirasi buziladi.
+     * #294 + xilma-xillik: ANIQ qo'shiqqa o'xshash qatorlar — lekin endi
+     * "faqat shu ijrochi / shu nomdagi qo'shiqlar" halqasi buziladi:
+     *  1) yaqin qatorlar (YouTube avto-radio + o'xshash ijrochilar) —
+     *     anchor ijrochisidan MAKSIMUM 2 qo'shiq, anchor nomining
+     *     boshqa nusxalari (remix/cover/live/"official") umuman chiqmaydi;
+     *  2) o'zbek sara qo'shiqlari havzasi — aylanadigan seedlar, 1 ijrochidan
+     *     1 qo'shiq, aralashtirilgan tartibda.
+     * Natija 1:2 nisbatda aralashtiriladi — asosan o'zbek sara qo'shiqlari.
      */
+    private val uzDiversitySeeds = arrayOf(
+        "eng sara ozbek qoshiklari",
+        "ozbek musiqa top 2026",
+        "yangi ozbek xitlari 2026",
+        "ozbek estrada eng yaxshi qoshiklar",
+        "ozbek xit paradi 2026",
+        "ozbekcha eng zo'r qoshiklar",
+        "mashhur ozbek qoshiklari 2026",
+        "ozbek gold qoshiklar"
+    )
+    @Volatile private var diversityRotate = 0
+
     fun similar(anchor: YuzTrack, exclude: Set<Long>, limit: Int = 20): List<YuzTrack> {
-        val out = LinkedHashMap<Long, YuzTrack>()
+        val anchorKey = artistKey(anchor.artist)
+
+        // 1) Yaqin qatorlar: radio + o'xshash ijrochilar + (zaxira) shu
+        //    ijrochining boshqa qo'shiqlari — lekin cheklangan.
+        val base = ArrayList<YuzTrack>()
         if (anchor.videoId.isNotBlank()) {
-            val radio = runCatching { YuzYouTubeApi.radio(anchor.videoId, limit * 2) }
+            base += runCatching { YuzYouTubeApi.radio(anchor.videoId, limit * 2) }
                 .getOrDefault(emptyList())
-            mergeInto(out, radio, exclude)
         }
-        if (out.isEmpty()) {
-            val artist = anchor.artist.trim()
-            if (artist.isNotEmpty()) {
-                for (name in relatedArtistNames(artist, 3)) {
-                    if (out.size >= limit) break
-                    mergeInto(out, pull(name + " qoshiklari", 10), exclude)
-                }
-                // Radio ham, o'xshash ijrochilar ham bo'sh bo'lsa, hech
-                // bo'lmasa shu ijrochining boshqa qo'shiqlari chiqsin.
-                if (out.isEmpty()) {
-                    mergeInto(out, pull(artist + " qoshiklari", 15), exclude)
+        val artist = anchor.artist.trim()
+        if (artist.isNotEmpty()) {
+            // Radio boy bo'lsa o'xshash ijrochilarni qo'shimcha tortmaymiz —
+            // sust tarmoqda har bir pull alohida kutishdir.
+            if (base.size < 10) {
+                for (name in relatedArtistNames(artist, 4)) {
+                    base += pull(name + " qoshiklari", 10)
                 }
             }
+            base += pull(artist + " qoshiklari", 12)
         }
-        return out.values.filter { !sameSong(anchor, it) }.take(limit)
+        val near = ArrayList<YuzTrack>()
+        val nearArtists = HashMap<String, Int>()
+        val seenSigs = HashSet<String>()
+        for (t in base) {
+            if (t.id in exclude || t.title.isBlank() || !longEnough(t)) continue
+            if (sameSong(anchor, t)) continue
+            val sig = titleSignature(t)
+            if (sig.isEmpty() || !seenSigs.add(sig)) continue
+            val k = artistKey(t.artist)
+            val n = if (k.isEmpty()) 0 else nearArtists[k] ?: 0
+            if (k == anchorKey && n >= 2) continue
+            if (k.isNotEmpty()) nearArtists[k] = n + 1
+            near.add(t)
+        }
+
+        // 2) O'zbek sara qo'shiqlari havzasi — har chaqiruvda boshqa seedlar.
+        val uz = ArrayList<YuzTrack>()
+        val uzArtists = HashMap<String, Int>()
+        val s1 = uzDiversitySeeds[diversityRotate % uzDiversitySeeds.size]
+        val s2 = uzDiversitySeeds[(diversityRotate + 1) % uzDiversitySeeds.size]
+        val s3 = uzDiversitySeeds[(diversityRotate + 3) % uzDiversitySeeds.size]
+        diversityRotate++
+        for (s in arrayOf(s1, s2, s3)) {
+            for (t in pull(s, 20)) {
+                if (t.id in exclude || t.title.isBlank() || !longEnough(t)) continue
+                if (sameSong(anchor, t)) continue
+                val sig = titleSignature(t)
+                if (sig.isEmpty() || sig in seenSigs || !seenSigs.add(sig)) continue
+                val k = artistKey(t.artist)
+                val n = if (k.isEmpty()) 0 else uzArtists[k] ?: 0
+                // O'zbek havzasida 1 ijrochidan faqat 1 qo'shiq — maksimal xilma-xillik.
+                if (k.isNotEmpty() && n >= 1) continue
+                if (k.isNotEmpty()) uzArtists[k] = n + 1
+                uz.add(t)
+            }
+        }
+        uz.shuffle()
+
+        // 3) 1 yaqin : 2 o'zbek nisbatida aralashtirish.
+        val out = ArrayList<YuzTrack>(limit)
+        var i = 0
+        var j = 0
+        while (out.size < limit) {
+            var added = false
+            if (j < uz.size && out.size < limit) { out.add(uz[j++]); added = true }
+            if (j < uz.size && out.size < limit) { out.add(uz[j++]); added = true }
+            if (i < near.size && out.size < limit) { out.add(near[i++]); added = true }
+            if (!added) break
+        }
+        return out
     }
 
     /** Bitta seedni avval worker (tez), keyin to'g'ridan-to'g'ri YouTube'dan oladi. */

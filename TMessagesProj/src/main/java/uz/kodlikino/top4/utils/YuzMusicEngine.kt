@@ -199,10 +199,12 @@ object YuzMusicEngine {
     // xitlari almashinib aylanadi (radio navbati shu manbalardan yig'iladi).
     private val hitSeeds = arrayOf(
         "eng kop eshitilgan ozbek qoshiklari",
-        "russkie hity 2026",
+        "eng sara ozbek qoshiklari",
         "ozbek xit qoshiklar 2026",
-        "top russian hits pop",
-        "trend musiqi 2026",
+        "yangi ozbek xitlari 2026",
+        "ozbek musiqa top 2026",
+        "ozbek estrada eng yaxshi qoshiklar",
+        "russkie hity 2026",
         "russkaya pop muzyka novinki 2026"
     )
     @Volatile
