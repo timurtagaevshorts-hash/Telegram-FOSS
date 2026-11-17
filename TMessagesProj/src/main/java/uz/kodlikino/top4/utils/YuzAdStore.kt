@@ -3,11 +3,10 @@ package uz.kodlikino.top4.utils
 import android.content.Context
 import android.content.SharedPreferences
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import org.json.JSONArray
 import org.json.JSONObject
@@ -33,7 +32,11 @@ object YuzAdStore {
     private const val COLLECTION = "ad_banners"
     private const val PREFS = "yuz_ads_cache"
     private const val KEY_ACTIVE = "active"
+    private const val KEY_SYNCED_AT = "syncedAt"
     private const val ACTIVE_LIMIT = 20L
+
+    /** Kesh faqat oflayn sovuq start uchun; eski banner abadiy qolmasin. */
+    private const val CACHE_TTL_MS = 72L * 60L * 60L * 1000L
 
     data class AdTheme(
         val key: String,
@@ -88,7 +91,6 @@ object YuzAdStore {
             "updatedAt" to now
         )
         ref.set(payload, SetOptions.merge()).await()
-        YuzAdFeed.invalidate()
         Result.success(Unit)
     } catch (e: Exception) {
         FileLog.e(e)
@@ -99,7 +101,6 @@ object YuzAdStore {
         if (id.isBlank()) Result.failure(IllegalArgumentException("empty id"))
         else {
             db.collection(COLLECTION).document(id).delete().await()
-            YuzAdFeed.invalidate()
             Result.success(Unit)
         }
     } catch (e: Exception) {
@@ -109,24 +110,20 @@ object YuzAdStore {
 
     // ── Ommaviy o'qish ───────────────────────────────────────────────────
 
-    suspend fun loadActive(): List<AdBanner> {
-        return try {
-            // Bepul kvota: butun kolleksiya o'rniga faqat faol bannerlar (<=20).
-            val snapshot = db.collection(COLLECTION)
-                .whereEqualTo("isActive", true)
-                .limit(ACTIVE_LIMIT)
-                .get().await()
-            val list = snapshot.documents
-                .mapNotNull { doc -> doc.data?.let { toBanner(doc.id, it) } }
-                .filter { it.isActive && (it.title.isNotBlank() || it.imageUrl.isNotBlank()) }
-                .sortedWith(compareByDescending<AdBanner> { it.createdAt })
-            cacheActive(list)
-            list
-        } catch (e: Exception) {
-            FileLog.e(e)
-            loadCachedActive()
-        }
-    }
+    /**
+     * Faol bannerlar uchun real-time query. [YuzAdFeed] shu listener orqali
+     * admin qo'shgan yoki o'chirgan reklamani barcha ochiq ekranlarga darhol
+     * yetkazadi — 10 daqiqalik kesh bilan qolib ketmaydi.
+     */
+    internal fun activeQuery(): Query = db.collection(COLLECTION)
+        .whereEqualTo("isActive", true)
+        .limit(ACTIVE_LIMIT)
+
+    internal fun bannersFrom(snapshot: QuerySnapshot): List<AdBanner> =
+        snapshot.documents
+            .mapNotNull { doc -> doc.data?.let { toBanner(doc.id, it) } }
+            .filter { it.isActive && (it.title.isNotBlank() || it.imageUrl.isNotBlank()) }
+            .sortedWith(compareByDescending<AdBanner> { it.createdAt })
 
     fun pick(list: List<AdBanner>, forChats: Boolean): AdBanner? =
         list.firstOrNull { if (forChats) it.showInChats else it.showInFunctions }
@@ -158,7 +155,7 @@ object YuzAdStore {
         null
     }
 
-    private fun cacheActive(list: List<AdBanner>) {
+    internal fun cacheActive(list: List<AdBanner>) {
         try {
             val array = JSONArray()
             for (b in list.take(8)) {
@@ -176,14 +173,20 @@ object YuzAdStore {
                         .put("createdAt", b.createdAt)
                 )
             }
-            prefs()?.edit()?.putString(KEY_ACTIVE, array.toString())?.apply()
+            prefs()?.edit()
+                ?.putString(KEY_ACTIVE, array.toString())
+                ?.putLong(KEY_SYNCED_AT, System.currentTimeMillis())
+                ?.apply()
         } catch (e: Exception) {
             FileLog.e(e)
         }
     }
 
     fun loadCachedActive(): List<AdBanner> {
-        val raw = prefs()?.getString(KEY_ACTIVE, null) ?: return emptyList()
+        val st = prefs() ?: return emptyList()
+        val syncedAt = st.getLong(KEY_SYNCED_AT, 0L)
+        if (System.currentTimeMillis() - syncedAt > CACHE_TTL_MS) return emptyList()
+        val raw = st.getString(KEY_ACTIVE, null) ?: return emptyList()
         return try {
             val array = JSONArray(raw)
             val list = ArrayList<AdBanner>(array.length())
@@ -213,9 +216,11 @@ object YuzAdStore {
 }
 
 /**
- * Bannerlarni UI'ga yetkazuvchi yengil qatlam: 10 daqiqalik kesh + fonda
- * yangilash (bepul kvota uchun 60 s juda tez-tez o'qirdi; admin saqlaganda
- * [invalidate] orqali darhol yangilanadi). Callback har doim UI thread'da.
+ * Bannerlarni UI'ga yetkazuvchi qatlam: Firestore'ga real-time listener
+ * o'rnatiladi, shuning uchun admin qo'shgan, tahrirlagan yoki o'chirgan
+ * reklama barcha qurilmalarda va ochiq ekranlarda darhol yangilanadi.
+ * Sovuq startda oxirgi kesh (72 soatlik TTL) darhol ko'rsatiladi, keyin
+ * server holati ustidan yoziladi. Callback har doim UI thread'da.
  * Java tomonidan (`DialogsActivity`) SAM listener bilan chaqiriladi.
  */
 object YuzAdFeed {
@@ -224,59 +229,58 @@ object YuzAdFeed {
         fun onBanner(banner: AdBanner?)
     }
 
-    private const val FRESH_MS = 10L * 60L * 1000L
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val lock = Any()
 
     @Volatile
-    private var cached: List<AdBanner>? = null
+    private var active: List<AdBanner>? = null
 
     @Volatile
-    private var cachedAt = 0L
+    private var chatListener: Listener? = null
 
-    private val pending = ArrayList<Pair<Boolean, Listener>>()
-    private var loading = false
+    @Volatile
+    private var functionsListener: Listener? = null
+
+    @Volatile
+    private var registration: ListenerRegistration? = null
+
+    /** Listener bir marta server javobini olgach, SDK'ning eski kesh nusxalari e'tiborsiz qoladi. */
+    @Volatile
+    private var serverSeen = false
 
     @JvmStatic
-    fun loadChatBanner(listener: Listener) = load(true, listener)
+    fun loadChatBanner(listener: Listener) = register(true, listener)
 
     @JvmStatic
-    fun loadFunctionsBanner(listener: Listener) = load(false, listener)
+    fun loadFunctionsBanner(listener: Listener) = register(false, listener)
 
-    @JvmStatic
-    fun invalidate() {
-        cached = null
-        cachedAt = 0L
+    private fun register(forChats: Boolean, listener: Listener) {
+        synchronized(lock) {
+            if (forChats) chatListener = listener else functionsListener = listener
+            if (registration == null) {
+                registration = YuzAdStore.activeQuery().addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        FileLog.e(error)
+                        return@addSnapshotListener
+                    }
+                    if (snapshot == null) return@addSnapshotListener
+                    val fromCache = snapshot.metadata.isFromCache
+                    if (fromCache && serverSeen) return@addSnapshotListener
+                    if (!fromCache) serverSeen = true
+                    val list = YuzAdStore.bannersFrom(snapshot)
+                    active = list
+                    YuzAdStore.cacheActive(list)
+                    dispatch()
+                }
+            }
+        }
+        deliver(active ?: YuzAdStore.loadCachedActive(), forChats, listener)
     }
 
-    private fun load(forChats: Boolean, listener: Listener) {
-        val snapshot = cached
-        if (snapshot != null && System.currentTimeMillis() - cachedAt < FRESH_MS) {
-            deliver(snapshot, forChats, listener)
-            return
-        }
-        synchronized(pending) {
-            pending.add(forChats to listener)
-            if (loading) return
-            loading = true
-        }
-        scope.launch {
-            val list = try {
-                YuzAdStore.loadActive()
-            } catch (e: Exception) {
-                FileLog.e(e)
-                YuzAdStore.loadCachedActive()
-            }
-            cached = list
-            cachedAt = System.currentTimeMillis()
-            val waiters: List<Pair<Boolean, Listener>>
-            synchronized(pending) {
-                waiters = ArrayList(pending)
-                pending.clear()
-                loading = false
-            }
-            for ((chats, l) in waiters) {
-                deliver(list, chats, l)
-            }
+    private fun dispatch() {
+        val list = active ?: return
+        synchronized(lock) {
+            chatListener?.let { deliver(list, true, it) }
+            functionsListener?.let { deliver(list, false, it) }
         }
     }
 
