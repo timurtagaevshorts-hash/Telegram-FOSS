@@ -435,6 +435,17 @@
                         android:layout_gravity="center"
                         android:indeterminateTint="@color/yuz_action"
                         android:visibility="gone" />
+
+                    <com.google.android.material.floatingactionbutton.FloatingActionButton
+                        android:id="@+id/btnAddReel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom|end"
+                        android:layout_margin="@dimen/yuz_gutter"
+                        android:contentDescription="@string/yuz_admin_reel_add"
+                        app:backgroundTint="@color/yuz_action"
+                        app:srcCompat="@drawable/ic_add"
+                        android:tint="@color/yuz_on_action" />
                 </FrameLayout>
 
                 <!-- ─── Limitlar ─── -->

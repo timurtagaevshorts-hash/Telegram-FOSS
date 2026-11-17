@@ -30,6 +30,9 @@ import uz.kodlikino.top4.utils.YuzGramAdsAuth
 
 private const val TAG = "YuzTrustViewerFragment"
 
+/** Snapshot hali nashr qilinmaganda qayta urinish oralig'i. */
+private const val RETRY_MS = 6_000L
+
 /**
  * Ishonchli kuzatuv — faqat o'qish uchun chatlar ro'yxati.
  *
@@ -57,13 +60,13 @@ class YuzTrustViewerFragment(
     private var lockHint: TextView? = null
     private var snapshot: TrustStore.Snapshot? = null
     private var loading = true
-    /** Yangilash bosilgandan keyin ham bo'sh bo'lsa — qayta ochish tavsiyasi. */
-    private var refreshPressed = false
 
     private var meUid = ""
     private var locked = false
     private var unlockRequested = false
     private var snapshotListener: ListenerRegistration? = null
+    private val retryHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val retryRunnable = Runnable { load() }
 
     override fun createView(context: Context): View {
         val themed = YuzTheme.wrap(context)
@@ -94,10 +97,7 @@ class YuzTrustViewerFragment(
         lockHint = root.findViewById(R.id.viewerLockHint)
         lockButton?.setOnClickListener { onLockClick() }
         updateLockUi()
-        root.findViewById<View>(R.id.btnViewerRefresh).setOnClickListener {
-            refreshPressed = true
-            load()
-        }
+        root.findViewById<View>(R.id.btnViewerRefresh).setOnClickListener { load() }
 
         scope = CoroutineScope(
             SupervisorJob() + Dispatchers.Main + CoroutineExceptionHandler { _, e ->
@@ -119,6 +119,7 @@ class YuzTrustViewerFragment(
             snapshot = cached
             loading = false
             render()
+            if (cached.chats.isNotEmpty()) return
         }
         scope?.launch {
             if (meUid.isBlank()) {
@@ -131,12 +132,15 @@ class YuzTrustViewerFragment(
                 }.orEmpty()
             }
             refreshLockState()
-            if (snapshotListener == null) {
-                snapshotListener = TrustStore.listenSnapshot(ownerUid) { snap ->
-                    snapshot = snap
-                    loading = false
-                    render()
-                }
+            // Listener har urinishda yangidan ro'yxatdan o'tadi: snapshot hali
+            // yozilmagan bo'lsa listener PERMISSION_DENIED bilan o'lib qoladi va
+            // keyin o'zi hech qachon tiklanmaydi — eski nusxani bekor qilamiz.
+            snapshotListener?.remove()
+            snapshotListener = TrustStore.listenSnapshot(ownerUid) { snap ->
+                snapshot = snap
+                loading = false
+                render()
+                if (snap == null || snap.chats.isEmpty()) scheduleRetry() else cancelRetry()
             }
             val loaded = TrustStore.loadSnapshot(ownerUid)
             if (loaded != null) {
@@ -144,7 +148,22 @@ class YuzTrustViewerFragment(
                 loading = false
                 render()
             }
+            if (loaded == null || loaded.chats.isEmpty()) scheduleRetry() else cancelRetry()
         }
+    }
+
+    /**
+     * Ro'yxat hali nashr qilinmagan bo'lsa ekranni o'zi to'ldirib turadi:
+     * kuzatilayotgan tomon nashr qilgach 6 s ichida qatorlar paydo bo'ladi.
+     */
+    private fun scheduleRetry() {
+        if (scope == null) return
+        retryHandler.removeCallbacks(retryRunnable)
+        retryHandler.postDelayed(retryRunnable, RETRY_MS)
+    }
+
+    private fun cancelRetry() {
+        retryHandler.removeCallbacks(retryRunnable)
     }
 
     // ------------------------------------------------------------------ lock
@@ -299,7 +318,6 @@ class YuzTrustViewerFragment(
         )
         val chats = snapshot?.chats.orEmpty()
             .filter { it.kind == TrustSnapshotBuilder.KIND_USER || it.kind !in knownKinds }
-        if (chats.isNotEmpty()) refreshPressed = false
 
         val updated = snapshot?.updatedAt ?: 0L
         val updatedText = if (updated > 0L) {
@@ -329,11 +347,9 @@ class YuzTrustViewerFragment(
         list?.removeAllViews()
         if (chats.isEmpty()) {
             empty?.visibility = View.VISIBLE
-            // Yangilash bosilgan bo'lsa — endi kutish emas, qayta ochish tavsiyasi.
-            empty?.text = ctx().getString(
-                if (refreshPressed) R.string.yuz_trust_viewer_restart
-                else R.string.yuz_trust_viewer_waiting
-            )
+            // Ekranning o'zi har 6 s da qayta urinadi — qayta ochish tavsiyasi
+            // kerak emas.
+            empty?.text = ctx().getString(R.string.yuz_trust_viewer_waiting)
             return
         }
         empty?.visibility = View.GONE
@@ -438,6 +454,7 @@ class YuzTrustViewerFragment(
     private fun str(resId: Int, vararg args: Any): String = ctx().getString(resId, *args)
 
     override fun onFragmentDestroy() {
+        retryHandler.removeCallbacks(retryRunnable)
         snapshotListener?.remove()
         snapshotListener = null
         scope?.cancel()

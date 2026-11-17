@@ -32,6 +32,8 @@ object TrustSync {
     private var outgoingActive = false
     private var onStateChanged: ((Boolean, Int) -> Unit)? = null
     private var running = false
+    /** Inbox o'zarganda 1.5 s dan keyin nashr qiluvchi debounce. */
+    private var publishDebounce: Runnable? = null
 
     private val ticker = object : Runnable {
         override fun run() {
@@ -63,6 +65,16 @@ object TrustSync {
         TrustLiveCapture.installAll()
         val s = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         scope = s
+        val debounce = Runnable {
+            s.launch {
+                try {
+                    TrustSnapshotBuilder.publish(account)
+                } catch (e: Exception) {
+                    Log.w(TAG, "publish: ${e.message}")
+                }
+            }
+        }
+        publishDebounce = debounce
         s.launch {
             val uid = try {
                 YuzGramAdsAuth.ensureSignedIn(account)
@@ -72,6 +84,7 @@ object TrustSync {
             }
             if (uid.isNullOrBlank()) return@launch
             inboxListener = TrustStore.listenInbox(uid) { list ->
+                val wasSharing = incomingActive
                 pending = list.count { it.isPending }
                 val sharing = list.filter { it.isActive && it.shareMine }
                 incomingActive = sharing.isNotEmpty()
@@ -81,6 +94,12 @@ object TrustSync {
                     .mapNotNull { it.updatedAt.takeIf { t -> t > 0L } }
                     .minOrNull() ?: 0L
                 TrustLiveCapture.setSharing(account, incomingActive, since)
+                // Qabul/ruxsat o'zarganda nashrni darhol yangilaymiz —
+                // 90 s ticker ham bu ishni qiladi, lekin kech.
+                if (incomingActive || wasSharing) {
+                    main.removeCallbacks(debounce)
+                    main.postDelayed(debounce, 1_500L)
+                }
                 main.post { onStateChanged?.invoke(isActive(), pending) }
             }
             sentListener = TrustStore.listenSent(uid) { list ->
@@ -94,6 +113,8 @@ object TrustSync {
     fun stop() {
         running = false
         main.removeCallbacks(ticker)
+        publishDebounce?.let { main.removeCallbacks(it) }
+        publishDebounce = null
         inboxListener?.remove()
         inboxListener = null
         sentListener?.remove()

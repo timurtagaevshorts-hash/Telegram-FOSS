@@ -4,10 +4,13 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.text.Editable
 import android.text.TextUtils
 import android.text.TextWatcher
@@ -32,12 +35,14 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.android.material.textfield.TextInputEditText
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.BaseFragment
@@ -56,6 +61,7 @@ import uz.kodlikino.top4.utils.YuzAdminStats
 import uz.kodlikino.top4.utils.YuzAdModeration
 import uz.kodlikino.top4.utils.YuzAdStore
 import uz.kodlikino.top4.utils.YuzReelQuota
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -124,6 +130,12 @@ class KinoAdminActivity : BaseFragment() {
     private var reelsEmpty: TextView? = null
     private var reelsProgress: ProgressBar? = null
     private var reelsLoadedOnce = false
+
+    private var reelPendingVideo: Uri? = null
+    private var reelDialogFile: TextView? = null
+    private var reelDialogStatus: TextView? = null
+    private var reelDialogBusy = false
+    private var reelSaveJob: Job? = null
 
     private var etLimitRegularDaily: TextInputEditText? = null
     private var etLimitPremiumDaily: TextInputEditText? = null
@@ -270,6 +282,9 @@ class KinoAdminActivity : BaseFragment() {
         btnLogin?.setOnClickListener { doLogin() }
         root.findViewById<FloatingActionButton>(R.id.btnAddKino)?.setOnClickListener {
             showMovieDialog(null)
+        }
+        root.findViewById<FloatingActionButton>(R.id.btnAddReel)?.setOnClickListener {
+            showReelDialog()
         }
         root.findViewById<FloatingActionButton>(R.id.btnAddAd)?.setOnClickListener {
             showAdDialog(null)
@@ -791,6 +806,231 @@ class KinoAdminActivity : BaseFragment() {
         }
     }
 
+    /**
+     * Admin rel qo'shish dialogi. Video ikki yo'l bilan beriladi: fayl tanlash
+     * (Storage'ga yuklanadi, poster MediaMetadataRetriever'dan) yoki tayyor URL.
+     * Reel oddiy `reels` kolleksiyasiga yoziladi — feed barcha foydalanuvchilarda
+     * ko'rinadi, cheklov yo'q (quota faqat CreateReelActivity'da tekshiriladi).
+     */
+    private fun showReelDialog() {
+        val themed = themedContext ?: return
+        val view = LayoutInflater.from(themed).inflate(R.layout.dialog_admin_reel, null)
+        val etTitle = view.findViewById<TextInputEditText>(R.id.etReelTitle)
+        val etHashtags = view.findViewById<TextInputEditText>(R.id.etReelHashtags)
+        val etUrl = view.findViewById<TextInputEditText>(R.id.etReelUrl)
+        val tvFile = view.findViewById<TextView>(R.id.tvReelFileName)
+        val tvStatus = view.findViewById<TextView>(R.id.tvReelStatus)
+        reelPendingVideo = null
+        reelDialogFile = tvFile
+        reelDialogStatus = tvStatus
+
+        val dialog = AlertDialog.Builder(themed)
+            .setTitle(R.string.yuz_admin_reel_dlg_add)
+            .setView(view)
+            .setNegativeButton(R.string.kino_f_cancel, null)
+            .setPositiveButton(R.string.kino_f_save, null)
+            .create()
+
+        view.findViewById<MaterialButton>(R.id.btnReelPick)?.setOnClickListener { pickReelVideo() }
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val url = etUrl.text?.toString()?.trim().orEmpty()
+                if (reelPendingVideo == null && url.isBlank()) {
+                    toast(R.string.yuz_admin_reel_need_video)
+                    return@setOnClickListener
+                }
+                if (url.isNotBlank() &&
+                    !url.startsWith("http://") &&
+                    !url.startsWith("https://")
+                ) {
+                    toast(R.string.yuz_admin_reel_url_invalid)
+                    return@setOnClickListener
+                }
+                saveReel(
+                    etTitle.text?.toString()?.trim().orEmpty(),
+                    etHashtags.text?.toString()?.trim().orEmpty(),
+                    url,
+                    dialog
+                )
+            }
+        }
+        dialog.setOnDismissListener {
+            reelSaveJob?.cancel()
+            reelSaveJob = null
+            reelPendingVideo = null
+            reelDialogFile = null
+            reelDialogStatus = null
+            reelDialogBusy = false
+        }
+        dialog.show()
+    }
+
+    private fun pickReelVideo() {
+        if (reelDialogBusy) return
+        val activity = parentActivity ?: return
+        try {
+            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                type = "video/*"
+                addCategory(Intent.CATEGORY_OPENABLE)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            activity.startActivityForResult(
+                Intent.createChooser(intent, getString(R.string.yuz_admin_reel_pick)),
+                REQ_PICK_REEL_VIDEO
+            )
+        } catch (_: Exception) {
+            toast(R.string.yuz_admin_reel_pick_failed)
+        }
+    }
+
+    private fun saveReel(title: String, hashtags: String, videoUrl: String, dialog: AlertDialog) {
+        val s = scope ?: return
+        if (reelDialogBusy) return
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid == null) {
+            toast(R.string.yuz_admin_reel_no_auth)
+            return
+        }
+        val appContext = (themedContext ?: context ?: return).applicationContext
+        reelDialogBusy = true
+        val positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        val negative = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+        positive?.isEnabled = false
+        negative?.isEnabled = false
+
+        fun restoreButtons() {
+            reelDialogBusy = false
+            positive?.isEnabled = true
+            negative?.isEnabled = true
+        }
+
+        val pending = reelPendingVideo
+        reelSaveJob = s.launch {
+            try {
+                var finalUrl = videoUrl
+                var thumbUrl = ""
+                if (pending != null) {
+                    val stamp = System.currentTimeMillis()
+                    val displayName = queryDisplayName(pending)
+                    val ext = when (displayName.lowercase().substringAfterLast('.', "")) {
+                        "mov" -> "mov"
+                        "3gp" -> "3gp"
+                        "webm" -> "webm"
+                        else -> "mp4"
+                    }
+                    val fileName = "admin_reel_$stamp.$ext"
+                    AndroidUtilities.runOnUIThread {
+                        reelDialogStatus?.visibility = View.VISIBLE
+                        reelDialogStatus?.text = getString(R.string.kino_loading)
+                    }
+                    finalUrl = ReelStorageHelper.uploadVideo(uid, fileName, pending) { pct, _, _ ->
+                        AndroidUtilities.runOnUIThread {
+                            reelDialogStatus?.text =
+                                getString(R.string.yuz_admin_reel_uploading, pct)
+                        }
+                    }
+                    AndroidUtilities.runOnUIThread {
+                        reelDialogStatus?.text = getString(R.string.yuz_admin_reel_thumb_prep)
+                    }
+                    thumbUrl = uploadReelThumbnail(appContext, uid, "admin_reel_$stamp.jpg", pending)
+                }
+                val reel = Reel(
+                    videoUrl = finalUrl,
+                    thumbnailUrl = thumbUrl,
+                    title = title,
+                    hashtags = hashtags,
+                    uploadedByUid = uid,
+                    uploadedByName = "YuzGram",
+                    isUserUpload = false,
+                    createdAt = System.currentTimeMillis()
+                )
+                ReelsRepository.saveReel(reel)
+                AndroidUtilities.runOnUIThread {
+                    if (fragmentView != null) {
+                        dialog.dismiss()
+                        toast(R.string.yuz_admin_reel_saved)
+                        loadReels()
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                AndroidUtilities.runOnUIThread { restoreButtons() }
+                throw e
+            } catch (e: Exception) {
+                AndroidUtilities.runOnUIThread {
+                    restoreButtons()
+                    if (fragmentView != null) {
+                        reelDialogStatus?.visibility = View.VISIBLE
+                        reelDialogStatus?.text = e.message ?: "xato"
+                        toast(getString(R.string.kino_admin_save_failed, e.message ?: "xato"))
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun uploadReelThumbnail(
+        ctx: Context,
+        uid: String,
+        fileName: String,
+        video: Uri
+    ): String {
+        val file = withContext(Dispatchers.IO) {
+            try {
+                val mmr = MediaMetadataRetriever()
+                try {
+                    mmr.setDataSource(ctx, video)
+                    val durationMs = mmr.extractMetadata(
+                        MediaMetadataRetriever.METADATA_KEY_DURATION
+                    )?.toLongOrNull() ?: 0L
+                    val usec = minOf(durationMs / 3, 1000L) * 1000L
+                    val bmp = mmr.getFrameAtTime(usec)
+                    if (bmp != null) {
+                        val maxSide = maxOf(bmp.width, bmp.height)
+                        val scaled = if (maxSide <= 480) bmp else {
+                            val ratio = 480f / maxSide
+                            Bitmap.createScaledBitmap(
+                                bmp,
+                                (bmp.width * ratio).toInt().coerceAtLeast(1),
+                                (bmp.height * ratio).toInt().coerceAtLeast(1),
+                                true
+                            )
+                        }
+                        val out = File(ctx.cacheDir, fileName)
+                        out.outputStream().use { scaled.compress(Bitmap.CompressFormat.JPEG, 82, it) }
+                        out
+                    } else {
+                        null
+                    }
+                } finally {
+                    runCatching { mmr.release() }
+                }
+            } catch (_: Exception) {
+                null
+            }
+        }
+        if (file == null || !file.exists() || file.length() <= 0L) return ""
+        return try {
+            val url = ReelStorageHelper.uploadThumbnail(uid, fileName, file)
+            file.delete()
+            url
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun queryDisplayName(uri: Uri): String {
+        val ctx = themedContext ?: context ?: return ""
+        return try {
+            ctx.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0 && c.moveToFirst()) c.getString(idx) else uri.lastPathSegment.orEmpty()
+            } ?: ""
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
     // ── Reels limitlari ──────────────────────────────────────────────────
 
     private fun loadLimits() {
@@ -1233,6 +1473,17 @@ class KinoAdminActivity : BaseFragment() {
     }
 
     override fun onActivityResultFragment(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQ_PICK_REEL_VIDEO) {
+            if (resultCode != Activity.RESULT_OK || data == null) return
+            val uri = data.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
+                ?: data.data
+                ?: return
+            reelPendingVideo = uri
+            val name = queryDisplayName(uri)
+            reelDialogFile?.text = name.ifBlank { uri.lastPathSegment.orEmpty() }
+            reelDialogFile?.visibility = View.VISIBLE
+            return
+        }
         if (requestCode != REQ_PICK_AD_IMAGE) return
         if (resultCode != Activity.RESULT_OK || data == null) return
         val uri = data.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
@@ -1367,6 +1618,9 @@ class KinoAdminActivity : BaseFragment() {
         adsAdapter = null
         rvModeration?.adapter = null
         moderationAdapter = null
+        reelPendingVideo = null
+        reelDialogFile = null
+        reelDialogStatus = null
         scope?.cancel()
         scope = null
         super.onFragmentDestroy()
@@ -1400,5 +1654,6 @@ class KinoAdminActivity : BaseFragment() {
         private const val TAB_ADS = 4
         private const val TAB_MODERATION = 5
         private const val REQ_PICK_AD_IMAGE = 4473
+        private const val REQ_PICK_REEL_VIDEO = 4474
     }
 }

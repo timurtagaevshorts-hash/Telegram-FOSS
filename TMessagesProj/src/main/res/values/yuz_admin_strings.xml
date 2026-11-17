@@ -34,6 +34,19 @@
 
     <string name="yuz_admin_reel_untitled">Reel</string>
     <string name="yuz_admin_reel_delete_confirm">"%1$s" o\'chirilsinmi? Bu amal qaytarilmaydi.</string>
+    <string name="yuz_admin_reel_add">Yangi reel</string>
+    <string name="yuz_admin_reel_dlg_add">Yangi reel qo\'shish</string>
+    <string name="yuz_admin_reel_f_title">Sarlavha (ixtiyoriy)</string>
+    <string name="yuz_admin_reel_f_hashtags">Hashtag\'lar (ixtiyoriy)</string>
+    <string name="yuz_admin_reel_f_url">Video URL (fayl tanlanmasa)</string>
+    <string name="yuz_admin_reel_pick">Videoni tanlash</string>
+    <string name="yuz_admin_reel_pick_failed">Fayl tanlash oynasi ochilmadi</string>
+    <string name="yuz_admin_reel_need_video">Video fayl tanlang yoki video URL kiriting</string>
+    <string name="yuz_admin_reel_url_invalid">URL http:// yoki https:// bilan boshlanishi kerak</string>
+    <string name="yuz_admin_reel_uploading">Yuklanmoqda: %1$d%%</string>
+    <string name="yuz_admin_reel_thumb_prep">Poster tayyorlanmoqda…</string>
+    <string name="yuz_admin_reel_no_auth">Admin akkaunti topilmadi — Telegram orqali qayta kiring</string>
+    <string name="yuz_admin_reel_saved">Reel saqlandi — barcha foydalanuvchilar ko\'radi</string>
     <string name="yuz_admin_ago_now">hozir</string>
     <string name="yuz_admin_ago_min">%1$d daqiqa oldin</string>
     <string name="yuz_admin_ago_hour">%1$d soat oldin</string>
