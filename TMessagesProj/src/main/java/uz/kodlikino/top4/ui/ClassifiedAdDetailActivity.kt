@@ -173,8 +173,10 @@ class ClassifiedAdDetailActivity(
 
         tvTitle?.text = title
         tvPrice?.text = ad.formattedPrice()
+        // Yangi e'lonlarda manzil = viloyat/tuman; eski hujjatlarda faqat region bo'lishi mumkin.
+        val place = ad.address.ifBlank { ad.region }
         tvAddress?.text =
-            if (ad.address.isNotBlank()) ad.address else getString(R.string.classified_address_missing)
+            if (place.isNotBlank()) place else getString(R.string.classified_address_missing)
         tvAddress?.setIconStart(R.drawable.ic_location_pin, sizeDp = 14, gapDp = 5)
         tvDescription?.text =
             if (ad.description.isNotBlank()) ad.description else getString(R.string.classified_description_missing)
@@ -220,8 +222,9 @@ class ClassifiedAdDetailActivity(
             if (ad.formattedPrice().isNotBlank()) {
                 append("\n"); append(ad.formattedPrice())
             }
-            if (ad.address.isNotBlank()) {
-                append("\n"); append(ad.address)
+            val place = ad.address.ifBlank { ad.region }
+            if (place.isNotBlank()) {
+                append("\n"); append(place)
             }
             if (ad.description.isNotBlank()) {
                 append("\n\n"); append(ad.description)

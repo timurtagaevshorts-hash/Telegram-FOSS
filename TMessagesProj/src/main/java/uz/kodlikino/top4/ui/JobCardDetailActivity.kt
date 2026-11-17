@@ -94,7 +94,7 @@ class JobCardDetailActivity(
                 return@setOnClickListener
             }
             try {
-                context?.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
+                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
             } catch (e: ActivityNotFoundException) {
                 toast(R.string.classified_call_not_supported)
             }
@@ -141,7 +141,9 @@ class JobCardDetailActivity(
         tvType?.text = JobCardListingTypes.label(card.listingType)
         tvType?.setIconStart(JobCardListingTypes.icon(card.listingType))
         tvTitle?.text = card.title
-        tvLocation?.text = card.location.ifBlank { getString(R.string.classified_address_missing) }
+        val place = card.location.ifBlank { card.region }
+        tvLocation?.text =
+            if (place.isNotBlank()) place else getString(R.string.classified_address_missing)
         tvDescription?.text = card.description.ifBlank { getString(R.string.classified_description_missing) }
 
         if (card.listingType == JobCardListingTypes.HIRING) {
@@ -155,7 +157,7 @@ class JobCardDetailActivity(
             id = card.id,
             title = card.title,
             description = card.description,
-            address = card.location,
+            address = place,
             price = card.salaryAmount,
             cardTheme = card.cardTheme
         )

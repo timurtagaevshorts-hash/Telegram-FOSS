@@ -5,6 +5,8 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
@@ -122,9 +124,14 @@ class CreateJobCardActivity(
             val ctx = themedContext ?: return@setOnClickListener
             ClassifiedLocationHelper.showLocationPicker(ctx) { loc ->
                 selectedRegion = loc
-                btnPickRegion?.text = loc
+                btnPickRegion?.text = if (loc.isBlank()) {
+                    getString(R.string.classified_region_optional)
+                } else {
+                    loc
+                }
             }
         }
+        attachErrorReset(etTitle, etPhone)
 
         val typeLabels = listOf(
             getString(R.string.job_board_type_hiring),
@@ -181,8 +188,9 @@ class CreateJobCardActivity(
             etTitle?.setText(card.title)
             etDescription?.setText(card.description)
             etPhone?.setText(card.phone)
-            selectedRegion = card.region
-            if (card.region.isNotBlank()) btnPickRegion?.text = card.region
+            // Eski kartalarda joylashuv faqat `location`da bo'lishi mumkin.
+            selectedRegion = card.region.ifBlank { card.location }
+            if (selectedRegion.isNotBlank()) btnPickRegion?.text = selectedRegion
             val salaryIndex = JobCardSalaryTypes.spinnerOrder.indexOf(card.salaryType)
             if (salaryIndex >= 0) spinnerSalaryType?.setSelection(salaryIndex)
             if (card.salaryAmount > 0L) {
@@ -272,10 +280,13 @@ class CreateJobCardActivity(
         val phone = etPhone?.text?.toString()?.trim().orEmpty()
 
         if (title.isBlank()) {
-            etTitle?.error = getString(R.string.job_board_title_required); return
+            showFieldError(etTitle, R.string.job_board_title_required); return
         }
         if (phone.isBlank()) {
-            etPhone?.error = getString(R.string.classified_phone_required); return
+            showFieldError(etPhone, R.string.classified_phone_required); return
+        }
+        if (phone.count { it.isDigit() } < 7) {
+            showFieldError(etPhone, R.string.classified_phone_invalid); return
         }
 
         val salaryAmount = if (listingType == JobCardListingTypes.HIRING &&
@@ -293,7 +304,6 @@ class CreateJobCardActivity(
 
         val cardId = editCardId.ifBlank { System.currentTimeMillis().toString() }
         val now = System.currentTimeMillis()
-        publishing = true
         // Yuklash ekranni bloklamaydi: yozuv trekerga qo'yiladi va servis
         // rasmni Storage'ga, so'ng hujjatni Firestore'ga yozadi. Ekran yopiladi.
         val upload = YuzAdUploads.Upload(
@@ -308,7 +318,8 @@ class CreateJobCardActivity(
             category = JobCardCategories.fromListingType(listingType),
             phone = phone,
             region = selectedRegion,
-            address = "",
+            // Eski o'quvchilar faqat `address`ni ko'rsatadi — viloyat u yerga ham yoziladi.
+            address = selectedRegion,
             createdAt = existingCreatedAt.takeIf { it > 0L } ?: now,
             localUris = listOfNotNull(pickedUri?.toString()),
             existingUrls = existingImageUrl.trim().takeIf { it.isNotBlank() }
@@ -320,6 +331,7 @@ class CreateJobCardActivity(
             startedAt = now
         )
         val ctx = parentActivity ?: context ?: ApplicationLoader.applicationContext ?: return
+        publishing = true
         try {
             YuzAdUploads.begin(upload)
             ClassifiedAdUploadService.startUpload(ctx, cardId)
@@ -348,6 +360,26 @@ class CreateJobCardActivity(
         scope?.cancel()
         scope = null
         super.onFragmentDestroy()
+    }
+
+    /** Xatoni maydon ichida ko'rsatadi va fokus bilan ekranni o'sha yerga suradi. */
+    private fun showFieldError(field: TextInputEditText?, resId: Int) {
+        val target = field ?: return
+        target.error = getString(resId)
+        target.requestFocus()
+    }
+
+    /** Foydalanuvchi yozishni boshlaganda eski xato yozuvi yo'qolsin. */
+    private fun attachErrorReset(vararg fields: TextInputEditText?) {
+        fields.filterNotNull().forEach { field ->
+            field.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                override fun afterTextChanged(s: Editable?) {
+                    if (field.error != null) field.error = null
+                }
+            })
+        }
     }
 
     private fun toast(resId: Int) {

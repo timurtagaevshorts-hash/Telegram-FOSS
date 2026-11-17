@@ -59,9 +59,11 @@ object JobCardCardBinder {
             tvSalary.visibility = View.GONE
         }
 
-        if (card.location.isNotBlank()) {
+        // Yangi kartalarda joylashuv `region`da (viloyat/tuman); eski hujjatlarda `location`da.
+        val place = card.location.ifBlank { card.region }
+        if (place.isNotBlank()) {
             locationRow.visibility = View.VISIBLE
-            tvLocation.text = card.location
+            tvLocation.text = place
         } else {
             locationRow.visibility = View.GONE
         }
@@ -70,7 +72,7 @@ object JobCardCardBinder {
             id = card.id,
             title = card.title,
             description = card.description,
-            address = card.location,
+            address = place,
             price = card.salaryAmount,
             cardTheme = card.cardTheme
         )

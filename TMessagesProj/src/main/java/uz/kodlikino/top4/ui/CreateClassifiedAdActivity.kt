@@ -5,6 +5,8 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
@@ -79,6 +81,7 @@ class CreateClassifiedAdActivity(
     private val removedRemoteUrls = mutableListOf<String>()
 
     private var scope: CoroutineScope? = null
+    private var publishing = false
 
     private fun currentUid(): String = YuzGramAdsAuth.expectedUid(currentAccount)
 
@@ -115,9 +118,16 @@ class CreateClassifiedAdActivity(
             val ctx = themedContext ?: return@setOnClickListener
             ClassifiedLocationHelper.showLocationPicker(ctx) { loc ->
                 selectedRegion = loc
-                btnPickRegion?.text = loc
+                // "Tozalash" tanlansa eski manzil ham qolmasin (aks holda u card'da ko'rinadi).
+                if (loc.isBlank()) existingAddress = ""
+                btnPickRegion?.text = if (loc.isBlank()) {
+                    getString(R.string.classified_region_optional)
+                } else {
+                    loc
+                }
             }
         }
+        attachErrorReset(etModel, etTitle, etPhone, etDescription)
 
         // Kategoriya ro'yxati: emoji o'rniga chizilgan ikon (har punktda), shunda
         // tanlangan holat ham belgi bilan o'qiladi.
@@ -268,6 +278,7 @@ class CreateClassifiedAdActivity(
      * ko'rinadi, xato bo'lsa o'sha yerdan "Qayta urinish" bor.
      */
     private fun publishAd() {
+        if (publishing) return
         if (currentUid().isBlank()) {
             toast(R.string.classified_sign_in_required)
             return
@@ -278,10 +289,15 @@ class CreateClassifiedAdActivity(
         val phone = etPhone?.text?.toString()?.trim().orEmpty()
         val price = YuzPriceInput.parse(etPrice?.text) ?: 0L
 
-        if (model.isBlank()) { etModel?.error = getString(R.string.classified_model_required); return }
-        if (title.isBlank()) { etTitle?.error = getString(R.string.classified_title_required); return }
-        if (description.isBlank()) { etDescription?.error = getString(R.string.classified_description_required); return }
-        if (phone.isBlank()) { etPhone?.error = getString(R.string.classified_phone_required); return }
+        if (model.isBlank()) { showFieldError(etModel, R.string.classified_model_required); return }
+        if (title.isBlank()) { showFieldError(etTitle, R.string.classified_title_required); return }
+        if (description.isBlank()) {
+            showFieldError(etDescription, R.string.classified_description_required); return
+        }
+        if (phone.isBlank()) { showFieldError(etPhone, R.string.classified_phone_required); return }
+        if (phone.count { it.isDigit() } < 7) {
+            showFieldError(etPhone, R.string.classified_phone_invalid); return
+        }
         if (imageItems.isEmpty()) { toast(R.string.classified_images_required); return }
 
         val category = ClassifiedAdCategories.all
@@ -319,10 +335,13 @@ class CreateClassifiedAdActivity(
 
         val ctx = parentActivity ?: context ?: org.telegram.messenger.ApplicationLoader.applicationContext
             ?: return
+        // Ikki marta bosish bitta e'lonni ikki marta yuklashga urinmasin.
+        publishing = true
         try {
             YuzAdUploads.begin(upload)
             ClassifiedAdUploadService.startUpload(ctx, adId)
         } catch (e: Exception) {
+            publishing = false
             YuzAdUploads.complete(adId)
             toast(e.message ?: getString(R.string.classified_publish_failed))
             return
@@ -335,6 +354,26 @@ class CreateClassifiedAdActivity(
             }
         )
         removeSelfFromStack()
+    }
+
+    /** Xatoni maydon ichida ko'rsatadi va fokus bilan ekranni o'sha yerga suradi. */
+    private fun showFieldError(field: TextInputEditText?, resId: Int) {
+        val target = field ?: return
+        target.error = getString(resId)
+        target.requestFocus()
+    }
+
+    /** Foydalanuvchi yozishni boshlaganda eski xato yozuvi yo'qolsin. */
+    private fun attachErrorReset(vararg fields: TextInputEditText?) {
+        fields.filterNotNull().forEach { field ->
+            field.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                override fun afterTextChanged(s: Editable?) {
+                    if (field.error != null) field.error = null
+                }
+            })
+        }
     }
 
     private fun toast(text: String) {

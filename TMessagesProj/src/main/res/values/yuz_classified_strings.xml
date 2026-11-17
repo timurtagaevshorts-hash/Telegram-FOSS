@@ -45,6 +45,7 @@
 <string name="classified_phone_missing">Telefon raqam ko\'rsatilmagan</string>
 <string name="classified_call_not_supported">Qo\'ng\'iroq ilovasi topilmadi — raqamni qo\'lda tering</string>
 <string name="classified_phone_required">Telefon raqam kiriting</string>
+<string name="classified_phone_invalid">Telefon raqam noto\'g\'ri — kamida 7 raqam kiriting</string>
 <string name="classified_pick_images">Rasm tanlash (5 tagacha)</string>
 <string name="classified_pick_images_count">Rasm tanlash (%1$d/%2$d)</string>
 <string name="classified_post_ad">E\'lon joylash</string>

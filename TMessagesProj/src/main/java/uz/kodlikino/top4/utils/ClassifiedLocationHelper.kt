@@ -1,6 +1,8 @@
 package uz.kodlikino.top4.utils
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /**
@@ -70,29 +72,65 @@ object ClassifiedLocationHelper {
     fun pickerLabel(loc: String): String =
         if (loc.isBlank()) DEFAULT_PICKER_LABEL else loc
 
+    /**
+     * Ikki bosqichli viloyat/tuman tanlovchisi.
+     *
+     * Dialog konteksti sifatida Activity zanjirini talab qilamiz: uiMode uchun
+     * yaratilgan `createConfigurationContext()` kontekstida oyna tokeni bo'lmaydi
+     * va `show()` `BadTokenException` beradi. Agar zanjirda Activity yo'q bo'lsa
+     * (masalan, ekran allaqachon yopilgan) — jim qaytamiz, crash yo'q.
+     * "Tozalash" tugmasi bo'sh satr qaytaradi — joylashuvni bekor qilish uchun.
+     */
     fun showLocationPicker(context: Context, onLocationSelected: (String) -> Unit) {
+        val host = dialogHost(context) ?: return
+        showRegionDialog(host, onLocationSelected)
+    }
+
+    private fun showRegionDialog(context: Context, onLocationSelected: (String) -> Unit) {
         val regionNames = regions.map { it.name }.toTypedArray()
         MaterialAlertDialogBuilder(context)
             .setTitle("Viloyatni tanlang")
             .setItems(regionNames) { _, regionIndex ->
-                val selectedRegion = regions[regionIndex]
-                val districtNames =
-                    (listOf("Butun viloyat") + selectedRegion.districts).toTypedArray()
-                MaterialAlertDialogBuilder(context)
-                    .setTitle("${selectedRegion.name}: Tumanni tanlang")
-                    .setItems(districtNames) { _, districtIndex ->
-                        if (districtIndex == 0) {
-                            onLocationSelected(selectedRegion.name)
-                        } else {
-                            onLocationSelected("${selectedRegion.name}, ${districtNames[districtIndex]}")
-                        }
-                    }
-                    .setNegativeButton("Orqaga") { _, _ ->
-                        showLocationPicker(context, onLocationSelected)
-                    }
-                    .show()
+                showDistrictDialog(context, regions[regionIndex], onLocationSelected)
             }
+            .setNeutralButton("Tozalash") { _, _ -> onLocationSelected("") }
             .setNegativeButton("Bekor qilish", null)
             .show()
+    }
+
+    private fun showDistrictDialog(
+        context: Context,
+        region: Region,
+        onLocationSelected: (String) -> Unit
+    ) {
+        val districtNames = (listOf("Butun viloyat") + region.districts).toTypedArray()
+        MaterialAlertDialogBuilder(context)
+            .setTitle("${region.name}: Tumanni tanlang")
+            .setItems(districtNames) { _, districtIndex ->
+                if (districtIndex == 0) {
+                    onLocationSelected(region.name)
+                } else {
+                    onLocationSelected("${region.name}, ${districtNames[districtIndex]}")
+                }
+            }
+            .setNegativeButton("Orqaga") { _, _ ->
+                showRegionDialog(context, onLocationSelected)
+            }
+            .show()
+    }
+
+    /** Dialog oynasi uchun Activity'ni o'z ichida saqlagan kontekst (yoki null). */
+    private fun dialogHost(context: Context): Context? {
+        var current: Context? = context
+        var depth = 0
+        while (current != null && depth++ < 12) {
+            if (current is Activity) {
+                if (current.isFinishing) return null
+                if (android.os.Build.VERSION.SDK_INT >= 17 && current.isDestroyed) return null
+                return context
+            }
+            current = (current as? ContextWrapper)?.baseContext
+        }
+        return null
     }
 }
