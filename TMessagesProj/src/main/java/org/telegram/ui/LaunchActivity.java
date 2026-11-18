@@ -1439,6 +1439,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     }
 
     private boolean switchingAccount;
+    private long yuzLastBackPressTime;
     public void switchToAccount(int account, boolean removeAll) {
         switchToAccount(account, removeAll, obj -> new DialogsActivity(null));
     }
@@ -7614,8 +7615,58 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 }
             }
         } else {
+            // YuzGram: orqaga bosish chatdan to'g'ridan-to'g'ri chiqarmasin —
+            // har doim asosiy sahifaga qaytamiz, chiqish uchun ikki marta bosiladi.
+            BaseFragment lastFragment = actionBarLayout.getLastFragment();
+            if (lastFragment instanceof ChatActivity || lastFragment instanceof TopicsFragment) {
+                if (!lastFragment.onBackPressed()) {
+                    return;
+                }
+                yuzLastBackPressTime = 0;
+                if (actionBarLayout.getFragmentStack().size() > 1) {
+                    actionBarLayout.closeLastFragment(true);
+                } else {
+                    showYuzGramMainPage();
+                }
+                return;
+            }
+            if (lastFragment instanceof DialogsActivity && actionBarLayout.getFragmentStack().size() <= 1) {
+                if (!lastFragment.onBackPressed()) {
+                    return;
+                }
+                handleYuzGramExitBack();
+                return;
+            }
             actionBarLayout.onBackPressed();
         }
+    }
+
+    private void showYuzGramMainPage() {
+        if (actionBarLayout == null) {
+            return;
+        }
+        DialogsActivity dialogsActivity = new DialogsActivity(null);
+        dialogsActivity.setSideMenu(sideMenu);
+        actionBarLayout.removeAllFragments();
+        boolean added = actionBarLayout.addFragmentToStack(dialogsActivity, 0);
+        if (!added) {
+            onFinish();
+            finish();
+        } else {
+            updateYuzGramBottomBar();
+        }
+    }
+
+    private void handleYuzGramExitBack() {
+        long now = SystemClock.elapsedRealtime();
+        if (yuzLastBackPressTime != 0 && now - yuzLastBackPressTime <= 2000) {
+            yuzLastBackPressTime = 0;
+            onFinish();
+            finish();
+            return;
+        }
+        yuzLastBackPressTime = now;
+        Toast.makeText(this, getString(R.string.yuz_exit_confirm), Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -7986,8 +8037,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     public boolean needCloseLastFragment(INavigationLayout layout) {
         if (AndroidUtilities.isTablet()) {
             if (layout == actionBarLayout && layout.getFragmentStack().size() <= 1 && !switchingAccount) {
-                onFinish();
-                finish();
+                handleYuzGramExitBack();
                 return false;
             } else if (layout == rightActionBarLayout) {
                 if (!tabletFullSize) {
@@ -8014,6 +8064,11 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     } else {
                         updateYuzGramBottomBar();
                     }
+                    return false;
+                }
+                // Asosiy sahifa — chiqish uchun ikki marta bosish kerak.
+                if (onlyFragment instanceof DialogsActivity) {
+                    handleYuzGramExitBack();
                     return false;
                 }
                 onFinish();

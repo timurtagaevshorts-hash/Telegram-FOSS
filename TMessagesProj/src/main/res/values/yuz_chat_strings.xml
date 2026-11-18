@@ -202,4 +202,7 @@
     <string name="yuz_trust_deleted_hint">Chatdan o‘chirilgan, ishonch arxivida saqlangan</string>
     <string name="yuz_trust_live">Jonli</string>
     <string name="yuz_trust_live_hint">Yangi xabarlar darhol yetkaziladi · mustahkamlash Premium’da</string>
+
+    <!-- YuzGram: asosiy sahifada orqaga ikki marta bosib chiqish -->
+    <string name="yuz_exit_confirm">Ilovadan chiqish uchun orqaga yana bir marta bosing</string>
 </resources>

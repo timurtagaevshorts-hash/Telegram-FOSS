@@ -109,7 +109,7 @@ class JobCardDetailActivity(
             // Keshdagi nusxa tarmoq javobini kutmasdan darhol chiziladi.
             val cached = JobCardRepository.getCardByIdFromCache(cardId)
             if (fragmentView == null) return@launch
-            if (cached != null && cached.isActive &&
+            if (cached != null &&
                 (cached.isPubliclyVisible() || cached.ownerUid == myUid)
             ) {
                 bind(cached)
@@ -123,7 +123,7 @@ class JobCardDetailActivity(
                 }
                 return@launch
             }
-            if (!card.isActive || (!card.isPubliclyVisible() && card.ownerUid != myUid)) {
+            if (!card.isPubliclyVisible() && card.ownerUid != myUid) {
                 toast(R.string.job_board_not_found)
                 removeSelfFromStack()
                 return@launch

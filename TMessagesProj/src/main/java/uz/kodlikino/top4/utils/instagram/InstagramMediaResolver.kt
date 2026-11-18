@@ -67,6 +67,10 @@ object InstagramMediaResolver {
     private const val CRAWLER_UA =
         "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
 
+    private const val IPHONE_UA =
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 " +
+            "(KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+
     private const val SHORTCODE_ALPHABET =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
@@ -76,8 +80,10 @@ object InstagramMediaResolver {
         RegexOption.IGNORE_CASE
     )
 
+    // Faqat video URL — embed sahifasida birinchi fbcdn havolasi ko'pincha
+    // muqova rasmi (jpg) bo'ladi, shuning uchun .mp4 shart.
     private val cdnVideoRegex = Regex(
-        """https?://[^"'\\>\s]*(?:cdninstagram|fbcdn)\.net[^"'\\>\s]*""",
+        """https?://[^"'\\>\s]*(?:cdninstagram|fbcdn)\.net[^"'\\>\s]*\.mp4[^"'\\>\s]*""",
         RegexOption.IGNORE_CASE
     )
 
@@ -137,8 +143,16 @@ object InstagramMediaResolver {
             ?: return@withContext Result.failure(IllegalArgumentException(ERROR_INVALID_LINK))
 
         val savedCookies = InstagramCookieStore.load(context).orEmpty()
-        val session = buildSession(shortcode, savedCookies)
         val canonicalUrl = canonicalReelUrl(shortcode)
+
+        // 2026-11: GraphQL doc_id'lar 403 (login wall), i.instagram.com 404,
+        // web_profile_info 429. Faqat oddiy /embed/ sahifasi video_url beradi,
+        // shuning uchun uni birinchi bo'lib so'raymiz.
+        fromPlainEmbed(shortcode)?.let {
+            return@withContext Result.success(it)
+        }
+
+        val session = buildSession(shortcode, savedCookies)
 
         val graphQlQueries = listOf(
             GraphQlQuery(
@@ -211,12 +225,47 @@ object InstagramMediaResolver {
             onProgress?.invoke(100)
             return@withContext out
         }
+        val referer = canonicalReelUrl(media.shortcode)
         val cookieHeader = InstagramCookieStore.load(context).orEmpty()
+        val attempts = listOf(
+            Triple(MOBILE_UA, referer, cookieHeader),
+            Triple(DESKTOP_UA, "https://www.instagram.com/", ""),
+            Triple(CRAWLER_UA, "", "")
+        )
+        var lastError = "download failed"
+        for ((ua, ref, cookies) in attempts) {
+            try {
+                downloadOnce(media.videoUrl, out, ua, ref, cookies, onProgress)
+            } catch (t: Throwable) {
+                out.delete()
+                lastError = t.message ?: "download failed"
+                continue
+            }
+            if (out.exists() && out.length() > 0L) {
+                onProgress?.invoke(100)
+                return@withContext out
+            }
+            out.delete()
+        }
+        throw IllegalStateException(lastError)
+    }
+
+    private fun downloadOnce(
+        url: String,
+        out: File,
+        userAgent: String,
+        referer: String,
+        cookieHeader: String,
+        onProgress: ((Int) -> Unit)?
+    ) {
         val builder = Request.Builder()
-            .url(media.videoUrl)
-            .header("User-Agent", MOBILE_UA)
-            .header("Referer", canonicalReelUrl(media.shortcode))
-            .header("Origin", "https://www.instagram.com")
+            .url(url)
+            .header("User-Agent", userAgent)
+            .header("Accept", "*/*")
+        if (referer.isNotBlank()) {
+            builder.header("Referer", referer)
+            builder.header("Origin", "https://www.instagram.com")
+        }
         if (cookieHeader.isNotBlank()) {
             builder.header("Cookie", cookieHeader)
         }
@@ -242,12 +291,6 @@ object InstagramMediaResolver {
                 }
             }
         }
-        if (!out.exists() || out.length() <= 0L) {
-            out.delete()
-            throw IllegalStateException("download failed")
-        }
-        onProgress?.invoke(100)
-        out
     }
 
     private fun buildSession(shortcode: String, savedCookieHeader: String): Session {
@@ -358,6 +401,21 @@ object InstagramMediaResolver {
         return fromPageHtml(html, shortcode)
     }
 
+    private fun fromPlainEmbed(shortcode: String): Media? {
+        val phone = fetchText(
+            url = "https://www.instagram.com/reel/$shortcode/embed/",
+            userAgent = IPHONE_UA,
+            referer = canonicalReelUrl(shortcode)
+        )
+        fromPageHtml(phone.orEmpty(), shortcode)?.let { return it }
+        val post = fetchText(
+            url = "https://www.instagram.com/p/$shortcode/embed/",
+            userAgent = IPHONE_UA,
+            referer = canonicalReelUrl(shortcode)
+        )
+        return fromPageHtml(post.orEmpty(), shortcode)
+    }
+
     private fun fromEmbedPage(shortcode: String, session: Session): Media? {
         val html = fetchText(
             url = "https://www.instagram.com/reel/$shortcode/embed/captioned/",
@@ -402,31 +460,44 @@ object InstagramMediaResolver {
 
     private fun fromPageHtml(html: String, shortcode: String): Media? {
         if (html.isBlank()) return null
-        findCdnVideoUrl(html)?.let { url ->
-            val thumb = Regex("""property="og:image"[^>]*content="([^"]+)"""")
-                .find(html)?.groupValues?.getOrNull(1)?.let(::unescape)
-            val author = Regex("""property="og:title"[^>]*content="([^"]+)"""")
-                .find(html)?.groupValues?.getOrNull(1)?.let(::unescape)
-            return Media(shortcode, url, thumb.orEmpty(), author.orEmpty())
-        }
+        // /embed/ javobi JSON'ni bir necha qatlam escape qiladi:
+        // \"video_url\":\"https:\\/\\/...mp4?... — avval ochib olish shart.
+        val plain = deepUnescape(html)
+        val thumb = Regex("""property="og:image"[^>]*content="([^"]+)"""")
+            .find(plain)?.groupValues?.getOrNull(1)?.let(::unescape).orEmpty()
+
+        // Eng aniq manba — video_url maydoni (embed JSON'ida aynan shu bor).
+        Regex(""""video_url"\s*:\s*"([^"]+)"""")
+            .find(plain)?.groupValues?.getOrNull(1)
+            ?.let(::unescape)
+            ?.takeIf { it.startsWith("http") }
+            ?.let { return Media(shortcode, cleanUrl(it), thumb) }
+
         val patterns = listOf(
-            Regex(""""video_url"\s*:\s*"([^"]+)""""),
             Regex(""""playback_url"\s*:\s*"([^"]+)""""),
             Regex(""""video_versions"\s*:\s*\[\s*\{[^}]*?"url"\s*:\s*"([^"]+)"""")
         )
         for (pattern in patterns) {
-            val raw = pattern.find(html)?.groupValues?.getOrNull(1)
+            val raw = pattern.find(plain)?.groupValues?.getOrNull(1)
             if (!raw.isNullOrBlank()) {
                 return Media(
                     shortcode = shortcode,
-                    videoUrl = unescape(raw),
-                    thumbnailUrl = Regex(""""display_url"\s*:\s*"([^"]+)"""")
-                        .find(html)?.groupValues?.getOrNull(1)?.let(::unescape).orEmpty()
+                    videoUrl = cleanUrl(unescape(raw)),
+                    thumbnailUrl = thumb.ifBlank {
+                        Regex(""""display_url"\s*:\s*"([^"]+)"""")
+                            .find(plain)?.groupValues?.getOrNull(1)?.let(::unescape).orEmpty()
+                    }
                 )
             }
         }
+        findCdnVideoUrl(plain)?.let { url ->
+            return Media(shortcode, url, thumb)
+        }
         return null
     }
+
+    private fun cleanUrl(url: String): String =
+        url.trim().trimEnd('\\', '"', '\'').substringBefore('\\').substringBefore('"')
 
     private fun parseMediaFromJson(json: JSONObject, shortcode: String): Media? {
         val webInfo = json.optJSONObject("data")
@@ -702,5 +773,31 @@ object InstagramMediaResolver {
             .replace("\\u0026", "&")
             .replace("\\\"", "\"")
             .replace("&amp;", "&")
+    }
+
+    /**
+     * /embed/ sahifasi JSON'ni bir necha qatlam escape qilib beradi
+     * (\"video_url\":\"https:\\/\\/...). Bir marta ochish yetmaydi — qatlam
+     * chuqurligi joyiga qarab har xil, shuning uchun barqarorlashguncha
+     * takrorlaymiz.
+     */
+    private fun deepUnescape(raw: String): String {
+        if (raw.isBlank()) return raw
+        val slashes = Regex("\\\\+/")
+        val quotes = Regex("\\\\+\"")
+        // \uXXXX har qanday kod bo'lishi mumkin: & (\u0026), = (\u003D),
+        // %3D (\u00253D) — bittasi ochilmasa CDN "Bad URL hash" qaytaradi.
+        val unicode = Regex("\\\\+u([0-9a-fA-F]{4})")
+        var current = raw
+        repeat(4) {
+            val next = unicode.replace(
+                quotes.replace(slashes.replace(current, "/"), "\"")
+            ) { match ->
+                match.groupValues[1].toInt(16).toChar().toString()
+            }.replace("&amp;", "&")
+            if (next == current) return current
+            current = next
+        }
+        return current
     }
 }
