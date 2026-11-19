@@ -325,7 +325,6 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     private ActionBarMenuItem.Item translateItem;
     private ActionBarMenuItem searchIconItem;
     private ActionBarMenu.LazyItem audioCallIconItem;
-    private ActionBarMenu.LazyItem yuzGamesIconItem;
     private boolean searchItemVisible;
     private RadialProgressView progressBar;
     private ActionBarMenuItem.Item addContactItem;
@@ -1452,7 +1451,6 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     
     private final static int share = 69;
     private final static int yuz_original_messages = 70;
-    private final static int yuz_games = 71;
 
     private final static int id_chat_compose_panel = 1000;
 
@@ -3407,15 +3405,6 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                         firstMessagesLoaded = false;
                         firstLoadMessages();
                     });
-                } else if (id == yuz_games) {
-                    if (getParentActivity() == null) {
-                        return;
-                    }
-                    AlertDialog.Builder gamesComingBuilder = new AlertDialog.Builder(getParentActivity(), themeDelegate);
-                    gamesComingBuilder.setTitle(LocaleController.getString("games_coming_title", R.string.games_coming_title));
-                    gamesComingBuilder.setMessage(LocaleController.getString("games_coming_message", R.string.games_coming_message));
-                    gamesComingBuilder.setPositiveButton(LocaleController.getString("games_coming_ok", R.string.games_coming_ok), null);
-                    gamesComingBuilder.show();
                 } else if (id == clear_history || id == delete_chat || id == auto_delete_timer) {
                     if (getParentActivity() == null) {
                         return;
@@ -3818,12 +3807,6 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                     avatarContainer.setTitleExpand(showAudioCallAsIcon);
                 }
             }
-        }
-
-        if (chatMode == 0 && (currentUser != null || currentChat != null) && currentEncryptedChat == null && !UserObject.isReplyUser(currentUser) && reportType < 0) {
-            yuzGamesIconItem = menu.lazilyAddItem(yuz_games, R.drawable.ic_yuz_games, themeDelegate);
-            yuzGamesIconItem.setContentDescription(LocaleController.getString("YuzGames", R.string.YuzGames));
-            yuzGamesIconItem.setVisibility(View.VISIBLE);
         }
 
         editTextItem = menu.lazilyAddItem(chat_menu_edit_text_options, R.drawable.ic_ab_other, themeDelegate);

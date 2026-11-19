@@ -3,12 +3,9 @@ package uz.kodlikino.top4.ui;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.LinearGradient;
-import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
-import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
@@ -24,22 +21,22 @@ import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Components.AvatarDrawable;
 
 /**
- * YuzGram pastki navigatsiya bari — neon "floating dock".
+ * YuzGram pastki navigatsiya bari — Telegram uslubidagi yassi panel.
  *
- * Tuzilishi (4 teng slot):  Asosiy | Reels | Elonlar | Profil
- * Markazdagi dumaloq "+" FAB olib tashlangan (e'lon/reel joylash tugmalari
- * o'z bo'limlari ichida: ElonlarActivity va ReelsActivity).
+ * Tuzilishi (4 teng slot):  Chatlar | Reels | Funksiyalar | Profil
  *
- * Animatsiyalar:
- *  - Faol slot ostida gradientli "pill" — tab almashganda u spring (overshoot)
- *    bilan siljiydi va yo'lning o'rtasida cho'zilib, o'rniga qaytadi (morph).
- *  - Tanlangan ikon "pop" qiladi (kattalashib qaytadi) va atrofidan halqa tarqaydi.
- *  - Ikon/matn rangi va qalinligi pill bilan masofaga qarap crossfade bo'ladi
- *    (shu sababli siljish paytida ikkala tab ham qisman yorqin ko'rinadi).
- *  - Bosilganda slot cho'kadi (press), bar ko'rinmaganda pastdan spring bilan chiqadi.
+ * Ko'rinish butunlay Telegram mavzusidan olinadi:
+ *  - sirt — `key_windowBackgroundWhite` (Neon'da qora, kunduzgi mavzuda oq);
+ *  - tanlangan slot — mavzu aksenti `key_chats_actionBackground`
+ *    (Neon'da pushti — shuning uchun birinchi ochilishdagi rang o'zgarmaydi);
+ *  - tanlanmagan slot — `key_chats_menuItemIcon`.
+ * Mavzu almashganda bar darhol yangi ranglarga o'tadi (didSetNewTheme).
  *
- * Ikonkalar Canvas'da chiziladi (resursga bog'liq emas), dark neon mavzu doimiy.
- * Brend palitrasining ko'klari YuzGramChatRail bilan bir xil (38B6FF -> 5B6CF9).
+ * Animatsiya minimal: tab almashganda ikon/matn rangi aksentga qarab silliq
+ * o'tadi va tanlangan ikon bir marta "pop" qiladi. Glow, glass, pill va
+ * gradientlar olib tashlangan — Telegram'da bunday qatlamlar yo'q.
+ *
+ * Ikonkalar Canvas'da chiziladi (resursga bog'liq emas).
  */
 public class YuzGramBottomBar extends View {
 
@@ -49,58 +46,20 @@ public class YuzGramBottomBar extends View {
     public static final int TAB_PROFIL = 3;
     public static final int COUNT = 4;
 
-    /** Panelning umumiy balandligi (dip) — tepada panel + glow uchun bo'shliq bilan. */
+    /** Panelning umumiy balandligi (dip). */
     public static final int HEIGHT_DP = 68;
 
-    private static final String[] LABELS = {"Asosiy", "Reels", "Funksiyalar", "Profil"};
+    private static final String[] LABELS = {"Chatlar", "Reels", "Funksiyalar", "Profil"};
 
-    // Neon palitra (YuzGram brendi; rail bilan bir xil ko'klar)
-    // YuzGram #96/#102/#108: sirt shaffof shisha edi — ostidan o'tayotgan chat
-    // qatorlari aniq ko'rinardi.
-    // #185: chat ro'yxati endi bar ORTIDAN davom etadi (padding 0).
-    // #192: sirt yassi rang emas, vertikal gradient: tepada ochiqroq, pastda
-    // yorliqlar zonasi quyuqlashadi.
-    // #286: bar endi fon bilan qo'shilib ketmaydi — ancha quyuq, to'yingan
-    // tungi-ko'k shisha (taxminan 84% → 95%). Qatorlar ostidan xira ko'rinadi,
-    // lekin panel chegara bilan aniq ajralib turadi.
-    // Tungi juftlik: to'q shisha panel + neon pushti chet.
-    private static final int GLASS_TOP_DARK = 0xD6281436;    // ~84%
-    private static final int GLASS_BOTTOM_DARK = 0xF2160820; // ~95%
-    private static final int BORDER_DARK = 0x80C2185B;
-    private static final int GLOW_DARK = 0xAAC2185B;
-    private static final int PILL_STROKE_DARK = 0x99CFA8FF;
-    private static final int ICON_IDLE_DARK = 0xFF8E9DBB;
-    private static final int TEXT_IDLE_DARK = 0xFF8794AF;
-    private static final int AVATAR_RING_IDLE_DARK = 0x4DBB9FD0;
-
-    // r63 kunduzgi juftlik: oq sutli shisha + to'q matn (matn 4.9:1).
-    private static final int GLASS_TOP_LIGHT = 0xF2FFFFFF;
-    private static final int GLASS_BOTTOM_LIGHT = 0xFFFFFFFF;
-    private static final int BORDER_LIGHT = 0x59C2185B;
-    private static final int GLOW_LIGHT = 0x4DD81B60;
-    private static final int PILL_STROKE_LIGHT = 0x66FFFFFF;
-    private static final int ICON_IDLE_LIGHT = 0xFF7C6C73;
-    private static final int TEXT_IDLE_LIGHT = 0xFF7C6C73;
-    private static final int AVATAR_RING_IDLE_LIGHT = 0x33C2185B;
-
-    // Faol pill — ikkala mavzuda bir xil brend gradienti, oq matn 8.9:1.
-    private static final int PILL_START = 0xFFC2185B;
-    private static final int PILL_END = 0xFFD81B60;
-    private static final int ICON_ACTIVE = 0xFFFFFFFF;
-    private static final int TEXT_ACTIVE = 0xFFFFFFFF;
-    private static final int AVATAR_RING_ACTIVE = 0xFFFFFFFF;
-
-    // Joriy mavzu qiymatlari — applyThemeColors() to'ldiradi.
-    private int glassTopColor;
-    private int glassBottomColor;
-    private int borderColor;
-    private int glowColor;
-    private int pillStrokeColor;
+    // Mavzudan hal qilinadigan ranglar — applyThemeColors() to'ldiradi.
+    private int surfaceColor;
+    private int dividerColor;
+    private int accentColor;
     private int iconIdleColor;
     private int textIdleColor;
     private int avatarRingIdleColor;
 
-    /** Mavzu almashganda panel qayta bo'yaladi (oq <-> qora juftlik). */
+    /** Mavzu almashganda bar darhol yangi Telegram ranglariga o'tadi. */
     private final NotificationCenter.NotificationCenterDelegate themeObserver =
             (id, account, args) -> {
                 if (id == NotificationCenter.didSetNewTheme) {
@@ -109,25 +68,18 @@ public class YuzGramBottomBar extends View {
             };
 
     private final Paint surfacePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint highlightPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint pillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint pillStrokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint dividerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private final RectF panelRect = new RectF();
-    private final RectF pillRect = new RectF();
     private final RectF tmpRect = new RectF();
     private final Path path = new Path();
-    private final Matrix shaderMatrix = new Matrix();
 
     private int activeTab = TAB_ASOSIY;
-    /** Chat ro'yxati ochiq: ASOSIY slot "yangi chat" ikonkasini ko'rsatadi. */
+    /** Eski API: chat ro'yxatidagi "yangi chat" holati (ikon endi o'zgarmaydi). */
     private boolean homeCompose;
     private float indicatorPos = 0f;   // tab-space 0..COUNT-1, animatsiyalanadi
-    private float stretch = 0f;        // 0..1 — pill siljish paytidagi cho'zilishi
     private int popTab = -1;           // "pop" animatsiyasi ketayotgan tab
     private float popAmount = 0f;      // 0..1
     private int pressSlot = -1;        // bosilayotgan slot (0..COUNT-1)
@@ -152,15 +104,6 @@ public class YuzGramBottomBar extends View {
     // Geometriya (onDraw hisoblaydi)
     private float panelLeft, panelRight, panelTop, panelBottom;
     private final float[] slotCx = new float[COUNT];
-
-    // Gradient faqat 1x1 birlik katakda quriladi; har kadrda Matrix orqali
-    // pill o'lchamiga masshtablanadi — shuning uchun per-frame Shader yaratilmaydi.
-    private LinearGradient pillGrad;
-
-    // Shisha sirt gradienti panel o'lchamiga bog'liq — o'lcham o'zgarganda qayta quriladi.
-    private LinearGradient glassGrad;
-    private float glassTop = Float.NaN;
-    private float glassBottom = Float.NaN;
 
     public interface OnTabSelectedListener {
         /**
@@ -193,34 +136,20 @@ public class YuzGramBottomBar extends View {
         iconPaint.setStrokeWidth(AndroidUtilities.dp(1.9f));
         iconPaint.setStrokeCap(Paint.Cap.ROUND);
         iconPaint.setStrokeJoin(Paint.Join.ROUND);
-        borderPaint.setStyle(Paint.Style.STROKE);
-        borderPaint.setStrokeWidth(AndroidUtilities.dp(1f));
-        highlightPaint.setStyle(Paint.Style.STROKE);
-        highlightPaint.setStrokeWidth(AndroidUtilities.dp(1f));
-        pillStrokePaint.setStyle(Paint.Style.STROKE);
-        pillStrokePaint.setStrokeWidth(AndroidUtilities.dp(1.1f));
-        ringPaint.setStyle(Paint.Style.STROKE);
-        ringPaint.setStrokeWidth(AndroidUtilities.dp(1.6f));
-        pillGrad = new LinearGradient(0f, 0f, 1f, 1f,
-                PILL_START, PILL_END, Shader.TileMode.CLAMP);
-        setLayerType(LAYER_TYPE_SOFTWARE, null); // glow (setShadowLayer) uchun
+        dividerPaint.setStyle(Paint.Style.FILL);
         indicatorPos = activeTab;
         avatarReceiver.setDelegate((receiver, set, thumb, memCache) -> invalidate());
         applyThemeColors();
     }
 
     private void applyThemeColors() {
-        boolean dark = org.telegram.ui.ActionBar.Theme.isCurrentThemeDark();
-        glassTopColor = dark ? GLASS_TOP_DARK : GLASS_TOP_LIGHT;
-        glassBottomColor = dark ? GLASS_BOTTOM_DARK : GLASS_BOTTOM_LIGHT;
-        borderColor = dark ? BORDER_DARK : BORDER_LIGHT;
-        glowColor = dark ? GLOW_DARK : GLOW_LIGHT;
-        pillStrokeColor = dark ? PILL_STROKE_DARK : PILL_STROKE_LIGHT;
-        iconIdleColor = dark ? ICON_IDLE_DARK : ICON_IDLE_LIGHT;
-        textIdleColor = dark ? TEXT_IDLE_DARK : TEXT_IDLE_LIGHT;
-        avatarRingIdleColor = dark ? AVATAR_RING_IDLE_DARK : AVATAR_RING_IDLE_LIGHT;
-        // Shisha gradienti mavzuga bog'liq — keshni tashlaymiz.
-        glassGrad = null;
+        surfaceColor = org.telegram.ui.ActionBar.Theme.getColor(org.telegram.ui.ActionBar.Theme.key_windowBackgroundWhite);
+        accentColor = org.telegram.ui.ActionBar.Theme.getColor(org.telegram.ui.ActionBar.Theme.key_chats_actionBackground);
+        iconIdleColor = org.telegram.ui.ActionBar.Theme.getColor(org.telegram.ui.ActionBar.Theme.key_chats_menuItemIcon);
+        textIdleColor = iconIdleColor;
+        avatarRingIdleColor = (iconIdleColor & 0x00FFFFFF) | 0x40000000;
+        // Nozik ajratuvchi chiziq — mavzu aksentidan 20% shaffoflik bilan.
+        dividerColor = (accentColor & 0x00FFFFFF) | 0x33000000;
         invalidate();
     }
 
@@ -277,9 +206,7 @@ public class YuzGramBottomBar extends View {
     /**
      * Balandlikni qat'iy dp(HEIGHT_DP)ga qotamiz. LaunchActivity'dagi frameLayout
      * (maxsus FrameLayout) bolaga ba'zan kutilganidan katta balandlik bermoqda —
-     * bunda panel (panelBottom = h - dp(7)) butun ekranni egallab, ikonlar bilan
-     * matn orasida ulkan bo'sh joy qolardi. EXACTLY spec bu xato holatdan qat'i-nazar
-     * barni doim kompakt saqlaydi.
+     * bunda bar butun ekranni egallab qolardi. EXACTLY spec buni oldini oladi.
      */
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -292,8 +219,8 @@ public class YuzGramBottomBar extends View {
     }
 
     /**
-     * ASOSIY slot ikonkasini almashtiradi: chat ro'yxati ochiq bo'lganda u
-     * "yangi chat" (ko'pik + plus) bo'lib ko'rinadi, boshqa tabda esa uy ikonkasi.
+     * Chatlar slotidagi qayta bosish menyusi uchun holat bayrog'i (LaunchActivity
+     * o'qiydi). Bar ko'rinishi bunga bog'liq emas — ikon Telegram'dagi kabi doimiy.
      */
     public void setHomeCompose(boolean compose) {
         if (homeCompose != compose) {
@@ -342,9 +269,8 @@ public class YuzGramBottomBar extends View {
     private float travelFrom, travelTo;
 
     /**
-     * Pill siljishi: masofaga qarab davomiylik (1 ta tab — tezkor, 3 ta tab —
-     * sekinroq) va OvershootInterpolator — shuning uchun u o'rniga "urilib"
-     * qaytadi (spring hissi). stretch yo'lning o'rtasida cho'zishni beradi.
+     * Slotlar orasidagi o'tish: masofaga qarab davomiylik va OvershootInterpolator —
+     * rang/ikon holati silliq ko'chadi.
      */
     private void animateIndicatorTo(int target, boolean animated) {
         if (indicatorAnim != null) {
@@ -354,7 +280,6 @@ public class YuzGramBottomBar extends View {
         travelTo = target;
         if (!animated || Math.abs(travelTo - travelFrom) < 0.01f) {
             indicatorPos = target;
-            stretch = 0f;
             invalidate();
             return;
         }
@@ -365,8 +290,6 @@ public class YuzGramBottomBar extends View {
         indicatorAnim.addUpdateListener(a -> {
             float f = (float) a.getAnimatedValue();
             indicatorPos = travelFrom + (travelTo - travelFrom) * f;
-            float k = Math.max(0f, Math.min(1f, f));
-            stretch = (float) Math.sin(Math.PI * k);
             invalidate();
         });
         indicatorAnim.start();
@@ -452,13 +375,10 @@ public class YuzGramBottomBar extends View {
             return;
         }
 
-        float sideMargin = AndroidUtilities.dp(10);
-        float bottomMargin = AndroidUtilities.dp(7);
-        panelLeft = sideMargin;
-        panelRight = w - sideMargin;
-        panelTop = AndroidUtilities.dp(8);
-        panelBottom = h - bottomMargin;
-        float corner = AndroidUtilities.dp(23);
+        panelLeft = 0;
+        panelRight = w;
+        panelTop = 0;
+        panelBottom = h;
         panelRect.set(panelLeft, panelTop, panelRight, panelBottom);
 
         float usable = panelRight - panelLeft;
@@ -466,74 +386,29 @@ public class YuzGramBottomBar extends View {
             slotCx[i] = panelLeft + usable * (i + 0.5f) / COUNT;
         }
 
-        float iconCy = panelTop + AndroidUtilities.dp(18.5f);
-        float textBaseline = panelBottom - AndroidUtilities.dp(9);
-        float pillHalfBase = AndroidUtilities.dp(20f);
-        float pillHalfH = AndroidUtilities.dp(13f);
+        float iconCy = AndroidUtilities.dp(23f);
+        float textBaseline = panelBottom - AndroidUtilities.dp(19f);
         float ind = clampIndicator();
 
-        // --- Panel sirti + tashqi neon glow ---
-        int layer = canvas.saveLayer(
-                panelLeft - AndroidUtilities.dp(20), panelTop - AndroidUtilities.dp(20),
-                panelRight + AndroidUtilities.dp(20), panelBottom + AndroidUtilities.dp(20), null);
+        // --- Telegram uslubidagi yassi sirt + nozik yuqori ajratuvchi ---
+        surfacePaint.setColor(surfaceColor);
+        canvas.drawRect(panelRect, surfacePaint);
+        dividerPaint.setColor(dividerColor);
+        canvas.drawRect(panelLeft, panelTop, panelRight, panelTop + AndroidUtilities.dp(1f), dividerPaint);
 
-        surfacePaint.setShader(glassGradient(panelTop, panelBottom));
-        surfacePaint.setShadowLayer(AndroidUtilities.dp(15), 0, AndroidUtilities.dp(2), glowColor);
-        canvas.drawRoundRect(panelRect, corner, corner, surfacePaint);
-        surfacePaint.clearShadowLayer();
-        surfacePaint.setShader(null);
-
-        // border + tepadagi nozik yorug' chiziq (sirt "ustidagi" neon chiroyi)
-        borderPaint.setColor(borderColor);
-        canvas.drawRoundRect(panelRect, corner, corner, borderPaint);
-        highlightPaint.setColor(0x22FFFFFF);
-        tmpRect.set(panelLeft + AndroidUtilities.dp(16), panelTop + AndroidUtilities.dp(0.6f),
-                panelRight - AndroidUtilities.dp(16), panelTop + AndroidUtilities.dp(0.7f));
-        canvas.drawLine(tmpRect.left, tmpRect.top, tmpRect.right, tmpRect.top, highlightPaint);
-        canvas.restoreToCount(layer);
-
-        // --- Faol pill (siljuvchi + cho'ziluvchi) ---
-        float pillCx = panelLeft + usable * (ind + 0.5f) / COUNT;
-        float pillHalfW = pillHalfBase + AndroidUtilities.dp(10f) * stretch;
-        pillRect.set(pillCx - pillHalfW, iconCy - pillHalfH,
-                pillCx + pillHalfW, iconCy + pillHalfH);
-        // Mulohaza: Paint rangi Shader'ga alpha'ni "modulyatsiya" qiladi —
-        // oldin qolgan alpha gradientni xiralashtiradi, shuning uchun AVVAL oq.
-        pillPaint.setColor(0xFFFFFFFF);
-        shaderMatrix.reset();
-        shaderMatrix.setTranslate(pillRect.left, pillRect.top);
-        shaderMatrix.preScale(pillRect.width(), pillRect.height());
-        pillGrad.setLocalMatrix(shaderMatrix);
-        pillPaint.setShader(pillGrad);
-        pillPaint.setAlpha((int) (235 - 40 * pressAmount));
-        pillPaint.setShadowLayer(AndroidUtilities.dp(11), 0, AndroidUtilities.dp(1.5f), PILL_START);
-        canvas.drawRoundRect(pillRect, pillHalfH, pillHalfH, pillPaint);
-        pillPaint.clearShadowLayer();
-        pillPaint.setShader(null);
-        pillStrokePaint.setColor(pillStrokeColor);
-        canvas.drawRoundRect(pillRect, pillHalfH, pillHalfH, pillStrokePaint);
-
-        // --- "pop" halqasi: tanlangan ikon atrofidan tarqaydi ---
-        if (popTab >= 0 && popAmount > 0.01f) {
-            float rc = AndroidUtilities.dp(13f) + AndroidUtilities.dp(17f) * popAmount;
-            ringPaint.setColor(PILL_START);
-            ringPaint.setAlpha((int) (110 * (1f - popAmount)));
-            canvas.drawCircle(slotCx[popTab], iconCy, rc, ringPaint);
-        }
-
-        // --- Slotlar: ikon + matn (masofaga qarab crossfade) ---
+        // --- Slotlar: ikon + matn (aksentga qarab crossfade) ---
         for (int i = 0; i < COUNT; i++) {
             float prox = 1f - Math.min(1f, Math.abs(i - ind));
             float squeeze = i == pressSlot ? 1f - 0.07f * pressAmount : 1f;
             float cx = slotCx[i];
 
             boolean bold = prox > 0.5f;
-            int iconColor = lerpColor(iconIdleColor, ICON_ACTIVE, easeOut(prox));
-            int textColor = lerpColor(textIdleColor, TEXT_ACTIVE, easeOut(prox));
+            int iconColor = lerpColor(iconIdleColor, accentColor, easeOut(prox));
+            int textColor = lerpColor(textIdleColor, accentColor, easeOut(prox));
 
-            float scale = (1f + 0.1f * prox) * squeeze;
+            float scale = (1f + 0.06f * prox) * squeeze;
             if (popTab == i && popAmount > 0.01f) {
-                scale *= 1f + 0.16f * popAmount;
+                scale *= 1f + 0.14f * popAmount;
             }
             drawIcon(canvas, i, cx, iconCy, iconSize * scale, iconColor, bold);
 
@@ -542,20 +417,6 @@ public class YuzGramBottomBar extends View {
             float ty = textBaseline + (1f - prox) * AndroidUtilities.dp(0.8f);
             canvas.drawText(LABELS[i], cx, ty, textPaint);
         }
-    }
-
-    /**
-     * Shisha sirt gradienti: panel tepasida ochiq, yorliqlar zonasida quyuq.
-     * Panel o'lchami o'zgarmaguncha shader qayta qurilmaydi.
-     */
-    private LinearGradient glassGradient(float top, float bottom) {
-        if (glassGrad == null || glassTop != top || glassBottom != bottom || bottom <= top) {
-            glassGrad = new LinearGradient(0f, top, 0f, bottom,
-                    glassTopColor, glassBottomColor, Shader.TileMode.CLAMP);
-            glassTop = top;
-            glassBottom = bottom;
-        }
-        return glassGrad;
     }
 
     /**
@@ -598,8 +459,7 @@ public class YuzGramBottomBar extends View {
         float half = size / 2f;
         switch (tab) {
             case TAB_ASOSIY: {
-                // Suhbat ko'pigi + chap-pastdagi quloqcha. Chat ro'yxati ochiq
-                // bo'lsa (homeCompose) ko'pik ichiga "+" qo'shiladi — yangi chat.
+                // Chatlar: suhbat ko'pigi + chap-pastdagi quloqcha.
                 tmpRect.set(cx - half, cy - half + AndroidUtilities.dp(1f) * k,
                         cx + half, cy + half - AndroidUtilities.dp(6f) * k);
                 drawRoundRectStroke(canvas, tmpRect, AndroidUtilities.dp(5.5f) * k);
@@ -612,18 +472,6 @@ public class YuzGramBottomBar extends View {
                 iconPaint.setStyle(Paint.Style.FILL);
                 canvas.drawPath(path, iconPaint);
                 iconPaint.setStyle(Paint.Style.STROKE);
-                if (homeCompose) {
-                    // "+" — ko'pik ichida optik markazda. Qanotlar qisqaroq va
-                    // chiziq biroz ingichka: ilgari belgi ko'pikning deyarli
-                    // butun balandligini egallab, ichki bo'shliq qolmasdi.
-                    float arm = AndroidUtilities.dp(3.05f) * k;
-                    float plusCy = tmpRect.centerY();
-                    float prevStroke = iconPaint.getStrokeWidth();
-                    iconPaint.setStrokeWidth(AndroidUtilities.dp(1.95f) * k);
-                    canvas.drawLine(cx - arm, plusCy, cx + arm, plusCy, iconPaint);
-                    canvas.drawLine(cx, plusCy - arm, cx, plusCy + arm, iconPaint);
-                    iconPaint.setStrokeWidth(prevStroke);
-                }
                 break;
             }
             case TAB_REELS: {
@@ -678,7 +526,7 @@ public class YuzGramBottomBar extends View {
                 avatarReceiver.draw(canvas);
                 iconPaint.setStyle(Paint.Style.STROKE);
                 iconPaint.setStrokeWidth(AndroidUtilities.dp(active ? 1.7f : 1.3f) * k);
-                iconPaint.setColor(active ? AVATAR_RING_ACTIVE : avatarRingIdleColor);
+                iconPaint.setColor(active ? accentColor : avatarRingIdleColor);
                 canvas.drawCircle(cx, cy, r - iconPaint.getStrokeWidth() / 2f, iconPaint);
                 break;
             }
